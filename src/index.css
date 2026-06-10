@@ -679,7 +679,21 @@ textarea.input { resize: vertical; }
 .commission-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
 .commission-lead { font-weight: 600; }
 .commission-amount { font-size: 1.125rem; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
-.commission-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-secondary); }
+.commission-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); }
+
+.commissions-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.commission-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.commission-total-card { border-radius: var(--radius); padding: 14px 16px; }
+.commission-total-card.pending { background: var(--warning-light); }
+.commission-total-card.paid { background: var(--success-light); }
+.commission-total-value { font-size: 1.125rem; font-weight: 700; }
+.commission-total-card.pending .commission-total-value { color: #92400e; }
+.commission-total-card.paid .commission-total-value { color: #047857; }
+.commission-total-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+
+.partner-stat.pending { background: var(--warning-light); }
+.partner-stat.pending .partner-stat-value { color: #92400e; }
+.pay-all-btn { margin-top: 10px; }
 
 /* ============================================================
    Tablette (≥ 640px) : grilles plus denses

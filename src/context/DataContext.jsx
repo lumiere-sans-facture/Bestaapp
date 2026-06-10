@@ -4,6 +4,8 @@ import * as seed from '../data/seed';
 const DataContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_data';
 
+export const COMMISSION_RATES = { 1: 0.03, 2: 0.015 };
+
 const buildInitialState = () => ({
   version: seed.SEED_VERSION,
   leads: seed.leads,
@@ -46,19 +48,82 @@ export function DataProvider({ children }) {
         ],
       })),
 
+    // Passer une affaire à « gagné » génère automatiquement les commissions
+    // de parrainage (3 % niveau 1, 1,5 % niveau 2) si elles n'existent pas déjà.
     updateLeadStage: (leadId, stage) =>
+      setState((s) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const lead = s.leads.find((l) => l.id === leadId);
+        let commissions = s.commissions;
+        if (stage === 'gagne' && lead) {
+          const alreadyExists = (partnerId, level) =>
+            s.commissions.some((c) => c.leadId === leadId && c.partnerId === partnerId && c.level === level);
+          const generated = [];
+          if (lead.parrainL1 && !alreadyExists(lead.parrainL1, 1)) {
+            generated.push({
+              id: `c${Date.now()}-1`, partnerId: lead.parrainL1, leadId, level: 1,
+              amount: Math.round(lead.estimatedValue * COMMISSION_RATES[1]),
+              status: 'en_attente', paidAt: null, createdAt: today,
+            });
+          }
+          if (lead.parrainL2 && !alreadyExists(lead.parrainL2, 2)) {
+            generated.push({
+              id: `c${Date.now()}-2`, partnerId: lead.parrainL2, leadId, level: 2,
+              amount: Math.round(lead.estimatedValue * COMMISSION_RATES[2]),
+              status: 'en_attente', paidAt: null, createdAt: today,
+            });
+          }
+          if (generated.length) commissions = [...generated, ...s.commissions];
+        }
+        return {
+          ...s,
+          commissions,
+          leads: s.leads.map((l) =>
+            l.id === leadId
+              ? {
+                  ...l,
+                  stage,
+                  lastActivity: today,
+                  wonAt: stage === 'gagne' ? today : l.wonAt,
+                  lostAt: stage === 'perdu' ? today : null,
+                }
+              : l
+          ),
+        };
+      }),
+
+    addCommission: (commission) =>
       setState((s) => ({
         ...s,
-        leads: s.leads.map((l) =>
-          l.id === leadId
-            ? {
-                ...l,
-                stage,
-                lastActivity: new Date().toISOString().slice(0, 10),
-                wonAt: stage === 'gagne' ? new Date().toISOString().slice(0, 10) : l.wonAt,
-                lostAt: stage === 'perdu' ? new Date().toISOString().slice(0, 10) : null,
-              }
-            : l
+        commissions: [
+          {
+            ...commission,
+            id: `c${Date.now()}`,
+            status: 'en_attente',
+            paidAt: null,
+            createdAt: new Date().toISOString().slice(0, 10),
+          },
+          ...s.commissions,
+        ],
+      })),
+
+    payCommission: (commissionId) =>
+      setState((s) => ({
+        ...s,
+        commissions: s.commissions.map((c) =>
+          c.id === commissionId
+            ? { ...c, status: 'payée', paidAt: new Date().toISOString().slice(0, 10) }
+            : c
+        ),
+      })),
+
+    payAllCommissionsForPartner: (partnerId) =>
+      setState((s) => ({
+        ...s,
+        commissions: s.commissions.map((c) =>
+          c.partnerId === partnerId && c.status === 'en_attente'
+            ? { ...c, status: 'payée', paidAt: new Date().toISOString().slice(0, 10) }
+            : c
         ),
       })),
 
