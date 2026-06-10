@@ -21,7 +21,7 @@ export default function Devis() {
   const [paymentType, setPaymentType] = useState('cash');
 
   const myLeads = leadsForUser(user);
-  const availableLeads = myLeads.filter((l) => l.stage !== 'gagne');
+  const availableLeads = myLeads.filter((l) => l.stage !== 'gagne' && l.stage !== 'perdu');
   const selectedLead = myLeads.find((l) => l.id === selectedLeadId);
   const myDevis = user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id);
 

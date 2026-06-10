@@ -56,6 +56,24 @@ export function DataProvider({ children }) {
                 stage,
                 lastActivity: new Date().toISOString().slice(0, 10),
                 wonAt: stage === 'gagne' ? new Date().toISOString().slice(0, 10) : l.wonAt,
+                lostAt: stage === 'perdu' ? new Date().toISOString().slice(0, 10) : null,
+              }
+            : l
+        ),
+      })),
+
+    addLeadNote: (leadId, text, userId) =>
+      setState((s) => ({
+        ...s,
+        leads: s.leads.map((l) =>
+          l.id === leadId
+            ? {
+                ...l,
+                activities: [
+                  { id: `a${Date.now()}`, date: new Date().toISOString(), text, by: userId },
+                  ...(l.activities || []),
+                ],
+                lastActivity: new Date().toISOString().slice(0, 10),
               }
             : l
         ),
@@ -82,7 +100,7 @@ export function DataProvider({ children }) {
   }), [state]);
 
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, stages: seed.stages, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team: seed.users }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team: seed.users }}>
       {children}
     </DataContext.Provider>
   );
