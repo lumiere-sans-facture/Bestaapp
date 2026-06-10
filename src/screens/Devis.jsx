@@ -1,155 +1,252 @@
-import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Check, CreditCard, Banknote } from 'lucide-react';
-import { products, leads, formatCFA } from '../data/mockData';
+import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Check, CreditCard, Banknote, FileText, Plus } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
+import { formatCFA, formatDate } from '../utils/format';
+import PageHeader from '../components/PageHeader';
 
-export default function Devis({ user }) {
+const PAYMENT_OPTIONS = [
+  { id: 'cash', label: 'Comptant', rate: 0, months: null, details: 'Paiement intégral à la livraison', icon: Banknote },
+  { id: '6months', label: 'Crédit 6 mois', rate: 0.10, months: 6, details: 'Taux 10%', icon: CreditCard },
+  { id: '12months', label: 'Crédit 12 mois', rate: 0.15, months: 12, details: 'Taux 15%', icon: CreditCard },
+];
+
+export default function Devis() {
+  const { user } = useAuth();
+  const { products, devis, addDevis, leadsForUser, getLeadById } = useData();
+  const [view, setView] = useState('list');
   const [step, setStep] = useState(1);
-  const [selectedLead, setSelectedLead] = useState(null);
-  const [selectedProducts, setSelectedProducts] = useState([]);
-  const [quantities, setQuantities] = useState({});
+  const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const [items, setItems] = useState({}); // { productId: quantité }
   const [paymentType, setPaymentType] = useState('cash');
 
-  const userLeads = user.role === 'gerant' ? leads : leads.filter(l => l.assignedTo === user.id);
-  const availableLeads = userLeads.filter(l => l.stage !== 'gagne');
+  const myLeads = leadsForUser(user);
+  const availableLeads = myLeads.filter((l) => l.stage !== 'gagne');
+  const selectedLead = myLeads.find((l) => l.id === selectedLeadId);
+  const myDevis = user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id);
+
+  const getPrice = (basePrice) => (user.role === 'gerant' ? Math.round(basePrice * 1.15) : basePrice);
 
   const toggleProduct = (productId) => {
-    setSelectedProducts(prev => {
-      if (prev.includes(productId)) {
-        const newQty = { ...quantities };
-        delete newQty[productId];
-        setQuantities(newQty);
-        return prev.filter(id => id !== productId);
-      }
-      setQuantities(prev => ({ ...prev, [productId]: 1 }));
-      return [...prev, productId];
+    setItems((prev) => {
+      const next = { ...prev };
+      if (next[productId]) delete next[productId];
+      else next[productId] = 1;
+      return next;
     });
   };
 
   const updateQty = (productId, delta) => {
-    setQuantities(prev => ({ ...prev, [productId]: Math.max(1, (prev[productId] || 1) + delta) }));
+    setItems((prev) => ({ ...prev, [productId]: Math.max(1, (prev[productId] || 1) + delta) }));
   };
 
-  const subtotal = useMemo(() => selectedProducts.reduce((sum, id) => {
-    const product = products.find(p => p.id === id);
-    return sum + (product?.basePrice || 0) * (quantities[id] || 1);
-  }, 0), [selectedProducts, quantities]);
+  const subtotal = useMemo(
+    () =>
+      Object.entries(items).reduce((sum, [id, qty]) => {
+        const product = products.find((p) => p.id === id);
+        return sum + getPrice(product?.basePrice || 0) * qty;
+      }, 0),
+    [items, products] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
-  const creditAmount = useMemo(() => {
-    if (paymentType === '6months') return Math.round(subtotal * 1.10);
-    if (paymentType === '12months') return Math.round(subtotal * 1.15);
-    return subtotal;
-  }, [subtotal, paymentType]);
+  const payment = PAYMENT_OPTIONS.find((p) => p.id === paymentType);
+  const total = Math.round(subtotal * (1 + payment.rate));
+  const monthly = payment.months ? Math.round(total / payment.months) : null;
 
-  const monthlyPayment = useMemo(() => {
-    if (paymentType === '6months') return Math.round(creditAmount / 6);
-    if (paymentType === '12months') return Math.round(creditAmount / 12);
-    return null;
-  }, [creditAmount, paymentType]);
+  const resetWizard = () => {
+    setStep(1);
+    setSelectedLeadId(null);
+    setItems({});
+    setPaymentType('cash');
+  };
 
   const handleSubmit = () => {
-    alert(`Devis créé pour ${selectedLead?.name}!\nTotal: ${formatCFA(creditAmount)}`);
-    setStep(1); setSelectedLead(null); setSelectedProducts([]); setQuantities({}); setPaymentType('cash');
+    addDevis({
+      leadId: selectedLeadId,
+      items: Object.entries(items).map(([productId, qty]) => ({ productId, qty })),
+      paymentType,
+      subtotal,
+      total,
+      monthly,
+      createdBy: user.id,
+    });
+    resetWizard();
+    setView('list');
   };
 
-  const getPrice = (basePrice) => user.role === 'gerant' ? Math.round(basePrice * 1.15) : basePrice;
-
-  return (
-    <>
-      <div className="devis-header"><h1 className="screen-title">Nouveau Devis</h1></div>
-      <div className="steps-indicator">
-        <div className={`step-dot ${step >= 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`} />
-        <div className={`step-dot ${step >= 2 ? 'active' : ''} ${step > 2 ? 'completed' : ''}`} />
-        <div className={`step-dot ${step >= 3 ? 'active' : ''}`} />
-      </div>
-      <div className="wizard-form">
-        {step === 1 && (
-          <div>
-            <div className="wizard-step-title">Sélectionnez un client</div>
-            <div className="lead-select">
-              {availableLeads.map(lead => (
-                <div key={lead.id} className={`lead-select-item ${selectedLead?.id === lead.id ? 'selected' : ''}`} onClick={() => setSelectedLead(lead)}>
-                  <div className="lead-select-name">{lead.name}</div>
-                  <div className="lead-select-value">{lead.contact} - {formatCFA(lead.estimatedValue)}</div>
-                </div>
-              ))}
+  if (view === 'list') {
+    return (
+      <div className="page">
+        <PageHeader
+          title="Devis"
+          subtitle={`${myDevis.length} devis créé(s)`}
+          actions={
+            <button className="btn btn-accent" onClick={() => setView('wizard')}>
+              <Plus size={18} /> Nouveau devis
+            </button>
+          }
+        />
+        <div className="page-content">
+          {myDevis.length === 0 ? (
+            <div className="empty-state card">
+              <FileText size={40} strokeWidth={1.5} />
+              <p>Aucun devis pour le moment.</p>
+              <button className="btn btn-primary" onClick={() => setView('wizard')}>
+                <Plus size={18} /> Créer un devis
+              </button>
             </div>
-          </div>
-        )}
-        {step === 2 && (
-          <div>
-            <div className="wizard-step-title">Ajoutez des produits</div>
-            <div className="products-select">
-              {products.filter(p => p.stock > 0).map(product => {
-                const isSelected = selectedProducts.includes(product.id);
-                const qty = quantities[product.id] || 1;
+          ) : (
+            <div className="devis-list">
+              {myDevis.map((d) => {
+                const lead = getLeadById(d.leadId);
+                const opt = PAYMENT_OPTIONS.find((p) => p.id === d.paymentType);
                 return (
-                  <div key={product.id} className={`product-select-item ${isSelected ? 'selected' : ''}`}>
-                    <div className="product-checkbox" onClick={() => toggleProduct(product.id)}>{isSelected && <Check size={14} />}</div>
-                    <div className="product-select-info" onClick={() => toggleProduct(product.id)}>
-                      <div className="product-select-name">{product.name}</div>
-                      <div className="product-select-price">{formatCFA(getPrice(product.basePrice))}</div>
-                    </div>
-                    {isSelected && (
-                      <div className="flex items-center gap-2">
-                        <button className="btn btn-sm btn-outline" onClick={() => updateQty(product.id, -1)}>-</button>
-                        <span style={{ fontWeight: 500, minWidth: '24px', textAlign: 'center' }}>{qty}</span>
-                        <button className="btn btn-sm btn-outline" onClick={() => updateQty(product.id, 1)}>+</button>
+                  <div key={d.id} className="card devis-card">
+                    <div className="devis-card-header">
+                      <div>
+                        <div className="devis-card-lead">{lead?.name || 'Client supprimé'}</div>
+                        <div className="text-sm text-secondary">{formatDate(d.createdAt)} · {opt?.label}</div>
                       </div>
-                    )}
+                      <div className="devis-card-total">{formatCFA(d.total)}</div>
+                    </div>
+                    <div className="devis-card-meta">
+                      <span>{d.items.reduce((s, it) => s + it.qty, 0)} article(s)</span>
+                      {d.monthly && <span className="badge badge-warning">{formatCFA(d.monthly)}/mois</span>}
+                    </div>
                   </div>
                 );
               })}
             </div>
-            <div className="devis-summary">
-              <div className="devis-summary-row"><span>Sous-total</span><span>{formatCFA(subtotal)}</span></div>
-            </div>
-          </div>
-        )}
-        {step === 3 && (
-          <div>
-            <div className="wizard-step-title">Mode de paiement</div>
-            <div className="payment-options">
-              <div className={`payment-option ${paymentType === 'cash' ? 'selected' : ''}`} onClick={() => setPaymentType('cash')}>
-                <div className="payment-option-header">
-                  <div className="payment-option-icon"><Banknote size={18} /></div>
-                  <div className="payment-option-label">Comptant</div>
-                  <div className="payment-option-price">{formatCFA(subtotal)}</div>
-                </div>
-                <div className="payment-option-details">Paiement intégral à la livraison</div>
-              </div>
-              <div className={`payment-option ${paymentType === '6months' ? 'selected' : ''}`} onClick={() => setPaymentType('6months')}>
-                <div className="payment-option-header">
-                  <div className="payment-option-icon"><CreditCard size={18} /></div>
-                  <div className="payment-option-label">Crédit 6 mois</div>
-                  <div className="payment-option-price">{formatCFA(creditAmount)}</div>
-                </div>
-                <div className="payment-option-details">{formatCFA(monthlyPayment)}/mois - Taux 10%</div>
-              </div>
-              <div className={`payment-option ${paymentType === '12months' ? 'selected' : ''}`} onClick={() => setPaymentType('12months')}>
-                <div className="payment-option-header">
-                  <div className="payment-option-icon"><CreditCard size={18} /></div>
-                  <div className="payment-option-label">Crédit 12 mois</div>
-                  <div className="payment-option-price">{formatCFA(creditAmount)}</div>
-                </div>
-                <div className="payment-option-details">{formatCFA(monthlyPayment)}/mois - Taux 15%</div>
-              </div>
-            </div>
-            <div className="devis-summary" style={{ marginTop: '16px' }}>
-              <div className="devis-summary-row"><span>Sous-total</span><span>{formatCFA(subtotal)}</span></div>
-              {paymentType !== 'cash' && <div className="devis-summary-row credit"><span>Intérêts ({paymentType === '6months' ? '10%' : '15%'})</span><span>{formatCFA(creditAmount - subtotal)}</span></div>}
-              <div className="devis-summary-row total"><span>Total</span><span>{formatCFA(creditAmount)}</span></div>
-            </div>
-          </div>
-        )}
-        <div className="wizard-actions">
-          {step > 1 && <button className="btn btn-outline btn-block" onClick={() => setStep(step - 1)}><ChevronLeft size={18} />Précédent</button>}
-          {step < 3 ? (
-            <button className="btn btn-primary btn-block" onClick={() => setStep(step + 1)} disabled={(step === 1 && !selectedLead) || (step === 2 && selectedProducts.length === 0)}>Suivant<ChevronRight size={18} /></button>
-          ) : (
-            <button className="btn btn-accent btn-block" onClick={handleSubmit}><Check size={18} />Créer le devis</button>
           )}
         </div>
       </div>
-    </>
+    );
+  }
+
+  return (
+    <div className="page">
+      <PageHeader
+        title="Nouveau devis"
+        actions={
+          <button className="btn btn-outline-light" onClick={() => { resetWizard(); setView('list'); }}>
+            Annuler
+          </button>
+        }
+      />
+      <div className="page-content">
+        <div className="wizard">
+          <div className="steps-indicator">
+            {[1, 2, 3].map((s) => (
+              <div key={s} className={`step-dot ${step >= s ? 'active' : ''} ${step > s ? 'completed' : ''}`} />
+            ))}
+          </div>
+          <div className="wizard-form card">
+            {step === 1 && (
+              <div>
+                <div className="wizard-step-title">1. Sélectionnez un client</div>
+                <div className="lead-select">
+                  {availableLeads.map((lead) => (
+                    <button
+                      key={lead.id}
+                      className={`lead-select-item ${selectedLeadId === lead.id ? 'selected' : ''}`}
+                      onClick={() => setSelectedLeadId(lead.id)}
+                    >
+                      <div className="lead-select-name">{lead.name}</div>
+                      <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
+                    </button>
+                  ))}
+                  {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d'abord une piste dans le pipeline.</div>}
+                </div>
+              </div>
+            )}
+            {step === 2 && (
+              <div>
+                <div className="wizard-step-title">2. Ajoutez des produits</div>
+                <div className="products-select">
+                  {products.filter((p) => p.stock > 0).map((product) => {
+                    const qty = items[product.id];
+                    return (
+                      <div key={product.id} className={`product-select-item ${qty ? 'selected' : ''}`}>
+                        <button className="product-checkbox" onClick={() => toggleProduct(product.id)} aria-label={`Sélectionner ${product.name}`}>
+                          {qty && <Check size={14} />}
+                        </button>
+                        <button className="product-select-info" onClick={() => toggleProduct(product.id)}>
+                          <div className="product-select-name">{product.name}</div>
+                          <div className="product-select-price">{formatCFA(getPrice(product.basePrice))}</div>
+                        </button>
+                        {qty && (
+                          <div className="qty-stepper">
+                            <button className="btn btn-sm btn-outline" onClick={() => updateQty(product.id, -1)}>−</button>
+                            <span className="qty-value">{qty}</span>
+                            <button className="btn btn-sm btn-outline" onClick={() => updateQty(product.id, 1)}>+</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="devis-summary">
+                  <div className="devis-summary-row"><span>Sous-total</span><span>{formatCFA(subtotal)}</span></div>
+                </div>
+              </div>
+            )}
+            {step === 3 && (
+              <div>
+                <div className="wizard-step-title">3. Mode de paiement</div>
+                <div className="payment-options">
+                  {PAYMENT_OPTIONS.map((opt) => {
+                    const optTotal = Math.round(subtotal * (1 + opt.rate));
+                    const optMonthly = opt.months ? Math.round(optTotal / opt.months) : null;
+                    return (
+                      <button
+                        key={opt.id}
+                        className={`payment-option ${paymentType === opt.id ? 'selected' : ''}`}
+                        onClick={() => setPaymentType(opt.id)}
+                      >
+                        <div className="payment-option-header">
+                          <div className="payment-option-icon"><opt.icon size={18} /></div>
+                          <div className="payment-option-label">{opt.label}</div>
+                          <div className="payment-option-price">{formatCFA(optTotal)}</div>
+                        </div>
+                        <div className="payment-option-details">
+                          {optMonthly ? `${formatCFA(optMonthly)}/mois — ${opt.details}` : opt.details}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="devis-summary">
+                  <div className="devis-summary-row"><span>Sous-total</span><span>{formatCFA(subtotal)}</span></div>
+                  {payment.rate > 0 && (
+                    <div className="devis-summary-row credit"><span>Intérêts ({Math.round(payment.rate * 100)}%)</span><span>{formatCFA(total - subtotal)}</span></div>
+                  )}
+                  <div className="devis-summary-row total"><span>Total</span><span>{formatCFA(total)}</span></div>
+                </div>
+              </div>
+            )}
+            <div className="wizard-actions">
+              {step > 1 && (
+                <button className="btn btn-outline btn-block" onClick={() => setStep(step - 1)}>
+                  <ChevronLeft size={18} /> Précédent
+                </button>
+              )}
+              {step < 3 ? (
+                <button
+                  className="btn btn-primary btn-block"
+                  onClick={() => setStep(step + 1)}
+                  disabled={(step === 1 && !selectedLeadId) || (step === 2 && Object.keys(items).length === 0)}
+                >
+                  Suivant <ChevronRight size={18} />
+                </button>
+              ) : (
+                <button className="btn btn-accent btn-block" onClick={handleSubmit}>
+                  <Check size={18} /> Créer le devis{selectedLead ? ` pour ${selectedLead.name}` : ''}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
