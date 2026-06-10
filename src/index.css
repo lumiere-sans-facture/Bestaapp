@@ -550,6 +550,82 @@ textarea.input { resize: vertical; }
 .devis-card-lead { font-weight: 600; }
 .devis-card-total { font-size: 1.125rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
 .devis-card-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; color: var(--text-secondary); }
+.devis-type-tag { display: inline-flex; align-items: center; gap: 6px; }
+.devis-type-tag.solar { color: var(--accent-dark); font-weight: 500; }
+
+/* Choix du type de devis */
+.devis-mode-grid { display: grid; grid-template-columns: 1fr; gap: 16px; max-width: 760px; margin: 0 auto; }
+.devis-mode-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  width: 100%; padding: 24px; text-align: left;
+  background: white; border: 1.5px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.devis-mode-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.devis-mode-icon {
+  width: 56px; height: 56px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--primary);
+}
+.devis-mode-icon.solar { background: var(--warning-light); color: var(--accent-dark); }
+.devis-mode-title { font-size: 1.0625rem; font-weight: 600; }
+.devis-mode-desc { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5; }
+
+/* Calculateur de consommation (devis solaire) */
+.wizard-step-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.wizard-step-header .wizard-step-title { margin-bottom: 0; }
+.appliance-picker { display: flex; gap: 8px; margin-bottom: 14px; }
+.appliance-picker .input { flex: 1; }
+.appliance-picker .btn { flex-shrink: 0; }
+.appliance-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.appliance-row { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.appliance-row-main { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.appliance-name { font-size: 0.875rem; font-weight: 600; }
+.appliance-delete { color: var(--error); padding: 4px; display: flex; border-radius: 6px; }
+.appliance-delete:hover { background: var(--error-light); }
+.appliance-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.appliance-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.6875rem; color: var(--text-secondary); }
+.appliance-field span { display: inline-flex; align-items: center; gap: 3px; }
+.appliance-field input { width: 100%; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.875rem; background: white; }
+.appliance-field input:focus { outline: none; border-color: var(--primary); }
+.appliance-row-consumption { display: flex; gap: 16px; margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); }
+.appliance-row-consumption span { display: inline-flex; align-items: center; gap: 4px; }
+
+.consumption-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: var(--bg); border-radius: 10px; padding: 14px; }
+.consumption-stat { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
+.consumption-stat.day { color: var(--accent-dark); }
+.consumption-stat.night { color: var(--primary-light); }
+.consumption-stat.total { color: var(--text-primary); }
+.consumption-value { font-size: 1rem; font-weight: 700; }
+.consumption-label { font-size: 0.6875rem; color: var(--text-muted); }
+
+.manual-consumption-grid { display: grid; grid-template-columns: 1fr; gap: 0 16px; }
+.sun-hours-field { margin-top: 16px; margin-bottom: 0; }
+.field-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; }
+
+@media (min-width: 640px) {
+  .manual-consumption-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* Dimensionnement (résultat) */
+.sizing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
+.sizing-card { background: var(--bg); border-radius: 10px; padding: 14px; }
+.sizing-icon {
+  width: 34px; height: 34px; border-radius: 9px; margin-bottom: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: white; color: var(--primary);
+}
+.sizing-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+.sizing-label { font-size: 0.75rem; color: var(--text-secondary); }
+
+.bom { border: 1px solid var(--border); border-radius: 10px; padding: 4px 14px; margin-bottom: 16px; }
+.bom-title { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 0 8px; }
+.bom-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 0.875rem; }
+.bom-name { color: var(--text-primary); }
+.bom-qty { color: var(--text-muted); }
+.bom-price { font-weight: 500; white-space: nowrap; }
+.roi-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; font-size: 0.8125rem; color: var(--text-secondary); }
+.roi-note strong { color: var(--accent-dark); }
 
 .wizard { max-width: 640px; margin: 0 auto; width: 100%; }
 .steps-indicator { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
@@ -707,6 +783,8 @@ textarea.input { resize: vertical; }
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
   .form-grid .input-group:nth-last-child(2),
   .form-grid > button { grid-column: 1 / -1; }
+  .devis-mode-grid { grid-template-columns: 1fr 1fr; }
+  .sizing-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
 /* ============================================================
