@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BestaSolar</string>
+    <string name="title_activity_main">BestaSolar</string>
+    <string name="package_name">com.bestasolar.app</string>
+    <string name="custom_url_scheme">com.bestasolar.app</string>
+</resources>
