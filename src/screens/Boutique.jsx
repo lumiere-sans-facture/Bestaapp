@@ -1,62 +1,86 @@
 import { useState } from 'react';
-import { products, productCategories, formatCFA } from '../data/mockData';
+import { Search } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
+import { formatCFA } from '../utils/format';
+import PageHeader from '../components/PageHeader';
 
-export default function Boutique({ user }) {
+const getStockStatus = (stock) => {
+  if (stock === 0) return { label: 'Rupture', class: 'out' };
+  if (stock <= 5) return { label: 'Stock faible', class: 'low' };
+  return { label: 'En stock', class: 'in-stock' };
+};
+
+export default function Boutique() {
+  const { user } = useAuth();
+  const { products, productCategories } = useData();
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const filteredProducts = selectedCategory ? products.filter(p => p.category === selectedCategory) : products;
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    if (a.stock === 0 && b.stock !== 0) return 1;
-    if (a.stock !== 0 && b.stock === 0) return -1;
-    return 0;
-  });
+  const [search, setSearch] = useState('');
 
-  const getStockStatus = (stock) => {
-    if (stock === 0) return { label: 'Rupture', class: 'out', dotClass: 'stock-low' };
-    if (stock <= 5) return { label: 'Stock faible', class: 'low', dotClass: 'stock-medium' };
-    return { label: 'En stock', class: 'in-stock', dotClass: 'stock-high' };
-  };
+  const getPrice = (basePrice) => (user.role === 'gerant' ? Math.round(basePrice * 1.15) : basePrice);
 
-  const getPrice = (basePrice) => user.role === 'gerant' ? Math.round(basePrice * 1.15) : basePrice;
+  const filtered = products
+    .filter((p) => !selectedCategory || p.category === selectedCategory)
+    .filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (a.stock === 0) - (b.stock === 0));
 
   return (
-    <>
-      <div className="boutique-header">
-        <h1 className="screen-title">Boutique</h1>
-        <div className="boutique-user-info">
-          <div className="user-avatar">{user.avatar}</div>
-          <div className="user-name">{user.name}<div className="user-role-badge">{user.role === 'gerant' ? 'Prix public' : 'Prix special'}</div></div>
+    <div className="page">
+      <PageHeader
+        title="Boutique"
+        subtitle={user.role === 'gerant' ? 'Prix public affiché' : 'Prix technicien affiché'}
+        actions={
+          <div className="search-box">
+            <Search size={18} className="search-icon" />
+            <input
+              className="input search-input"
+              placeholder="Rechercher un produit…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        }
+      />
+      <div className="page-content">
+        <div className="categories-scroll">
+          <button className={`category-chip ${!selectedCategory ? 'active' : ''}`} onClick={() => setSelectedCategory(null)}>Tous</button>
+          {productCategories.map((cat) => (
+            <button
+              key={cat.id}
+              className={`category-chip ${selectedCategory === cat.id ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(cat.id)}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
-      </div>
-      <div className="categories-scroll">
-        <button className={`category-chip ${!selectedCategory ? 'active' : ''}`} onClick={() => setSelectedCategory(null)}>Tous</button>
-        {productCategories.map(cat => (
-          <button key={cat.id} className={`category-chip ${selectedCategory === cat.id ? 'active' : ''}`} onClick={() => setSelectedCategory(cat.id)}>{cat.label}</button>
-        ))}
-      </div>
-      <div className="products-grid">
-        {sortedProducts.map(product => {
-          const stockStatus = getStockStatus(product.stock);
-          return (
-            <div key={product.id} className="product-card">
-              <img src={product.image} alt={product.name} className="product-image" />
-              <div className="product-content">
-                <div className="product-name">{product.name}</div>
-                <div className="product-description">{product.description}</div>
-                <div className="product-footer">
-                  <div>
-                    <div className="product-price">{formatCFA(getPrice(product.basePrice))}</div>
-                    {user.role === 'gerant' && <div className="product-price notechnicien">Technicien: {formatCFA(product.basePrice)}</div>}
-                  </div>
-                  <div className={`stock-badge ${stockStatus.class}`}>
-                    <span className={`stock-dot ${stockStatus.dotClass}`} />
-                    {stockStatus.label}{product.stock > 0 && ` (${product.stock})`}
+        <div className="products-grid">
+          {filtered.map((product) => {
+            const stockStatus = getStockStatus(product.stock);
+            return (
+              <div key={product.id} className={`product-card ${product.stock === 0 ? 'product-unavailable' : ''}`}>
+                <img src={product.image} alt={product.name} className="product-image" loading="lazy" />
+                <div className="product-content">
+                  <div className="product-name">{product.name}</div>
+                  <div className="product-description">{product.description}</div>
+                  <div className="product-footer">
+                    <div>
+                      <div className="product-price">{formatCFA(getPrice(product.basePrice))}</div>
+                      {user.role === 'gerant' && (
+                        <div className="product-price-alt">Technicien : {formatCFA(product.basePrice)}</div>
+                      )}
+                    </div>
+                    <div className={`stock-badge ${stockStatus.class}`}>
+                      {stockStatus.label}{product.stock > 0 && ` (${product.stock})`}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+          {filtered.length === 0 && <div className="empty-state">Aucun produit ne correspond à votre recherche.</div>}
+        </div>
       </div>
-    </>
+    </div>
   );
 }

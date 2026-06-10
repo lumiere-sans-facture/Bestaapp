@@ -1,6 +1,4 @@
-export const formatCFA = (amount) => {
-  return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' F CFA';
-};
+export const SEED_VERSION = 2;
 
 export const users = [
   { id: 'u1', email: 'adam@bestasolar.bj', password: 'demo123', name: 'Adam Adébiyi', role: 'gerant', phone: '+229 97 12 34 56', avatar: 'AA' },
@@ -18,10 +16,10 @@ export const stages = [
 ];
 
 export const partners = [
-  { id: 'p1', name: 'Mamadou Balogun', phone: '+229 97 11 22 33', type: 'Partenaire Level 1', registeredAt: '2025-01-15', totalCommissions: 75000, status: 'actif' },
-  { id: 'p2', name: 'Aminata Kesso', phone: '+229 96 44 55 66', type: 'Partenaire Level 1', registeredAt: '2025-02-20', totalCommissions: 45000, status: 'actif' },
-  { id: 'p3', name: 'Toffa Gname', phone: '+229 95 77 88 99', type: 'Partenaire Level 1', registeredAt: '2025-03-10', totalCommissions: 30000, status: 'actif' },
-  { id: 'p4', name: 'Balogoun Alassane', phone: '+229 94 33 22 11', type: 'Partenaire Level 1', registeredAt: '2025-04-05', totalCommissions: 0, status: 'inactif' },
+  { id: 'p1', name: 'Mamadou Balogun', phone: '+229 97 11 22 33', type: 'Partenaire Level 1', registeredAt: '2025-01-15', status: 'actif' },
+  { id: 'p2', name: 'Aminata Kesso', phone: '+229 96 44 55 66', type: 'Partenaire Level 1', registeredAt: '2025-02-20', status: 'actif' },
+  { id: 'p3', name: 'Toffa Gname', phone: '+229 95 77 88 99', type: 'Partenaire Level 1', registeredAt: '2025-03-10', status: 'actif' },
+  { id: 'p4', name: 'Balogoun Alassane', phone: '+229 94 33 22 11', type: 'Partenaire Level 1', registeredAt: '2025-04-05', status: 'inactif' },
 ];
 
 export const leads = [
@@ -36,19 +34,19 @@ export const leads = [
 ];
 
 export const products = [
-  { id: 'prod1', name: 'Sacoche Solaire 100W', description: 'Kit portable pour téléphone et tablette', basePrice: 75000, category: 'sacs', stock: 12, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=200' },
-  { id: 'prod2', name: 'Sacoche Solaire 200W', description: 'Kit portable avec ampoules LED', basePrice: 125000, category: 'sacs', stock: 8, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=200' },
-  { id: 'prod3', name: 'Panneau Solaire 300W', description: 'Panneau monocristallin haute efficacité', basePrice: 85000, category: 'panneaux', stock: 25, image: 'https://images.pexels.com/photos/356049/pexels-photo-356049.jpeg?w=200' },
-  { id: 'prod4', name: 'Panneau Solaire 450W', description: 'Panneau professionnel grande surface', basePrice: 135000, category: 'panneaux', stock: 18, image: 'https://images.pexels.com/photos/356049/pexels-photo-356049.jpeg?w=200' },
-  { id: 'prod5', name: 'Batterie 100Ah Gel', description: 'Batterie solaire à décharge profonde', basePrice: 185000, category: 'batteries', stock: 6, image: 'https://images.pexels.com/photos/14733999/pexels-photo-14733999.jpeg?w=200' },
-  { id: 'prod6', name: 'Batterie 200Ah Gel', description: 'Batterie solaire grande capacité', basePrice: 295000, category: 'batteries', stock: 5, image: 'https://images.pexels.com/photos/14733999/pexels-photo-14733999.jpeg?w=200' },
-  { id: 'prod7', name: 'Onduleur 1.5kVA Pur Sinus', description: 'Convertisseur 12V/220V avec chargeur', basePrice: 195000, category: 'onduleurs', stock: 9, image: 'https://images.pexels.com/photos/9248257/pexels-photo-9248257.jpeg?w=200' },
-  { id: 'prod8', name: 'Onduleur 3kVA Pur Sinus', description: 'Convertisseur 24V/220V pro', basePrice: 345000, category: 'onduleurs', stock: 0, image: 'https://images.pexels.com/photos/9248257/pexels-photo-9248257.jpeg?w=200' },
-  { id: 'prod9', name: 'Kit Complet 500W', description: 'Panneau 300W + Batt 100Ah + Onduleur + LED', basePrice: 485000, category: 'kits', stock: 3, image: 'https://images.pexels.com/photos/10908002/pexels-photo-10908002.jpeg?w=200' },
-  { id: 'prod10', name: 'Kit Complet 1kW', description: '2 Panneaux 300W + 2 Batt 100Ah + Onduleur 1.5kVA', basePrice: 895000, category: 'kits', stock: 4, image: 'https://images.pexels.com/photos/10908002/pexels-photo-10908002.jpeg?w=200' },
-  { id: 'prod11', name: 'Ampoule LED Solaire 12V', description: 'Ampoule basse consommation E27', basePrice: 4500, category: 'accessoires', stock: 50, image: 'https://images.pexels.com/photos/6310187/pexels-photo-6310187.jpeg?w=200' },
-  { id: 'prod12', name: 'Régulateur PWM 30A', description: 'Régulateur de charge solaire', basePrice: 28000, category: 'accessoires', stock: 15, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=200' },
-  { id: 'prod13', name: 'Régulateur MPPT 40A', description: 'Régulateur intelligent haute efficacité', basePrice: 65000, category: 'accessoires', stock: 7, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=200' },
+  { id: 'prod1', name: 'Sacoche Solaire 100W', description: 'Kit portable pour téléphone et tablette', basePrice: 75000, category: 'sacs', stock: 12, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
+  { id: 'prod2', name: 'Sacoche Solaire 200W', description: 'Kit portable avec ampoules LED', basePrice: 125000, category: 'sacs', stock: 8, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
+  { id: 'prod3', name: 'Panneau Solaire 300W', description: 'Panneau monocristallin haute efficacité', basePrice: 85000, category: 'panneaux', stock: 25, image: 'https://images.pexels.com/photos/356049/pexels-photo-356049.jpeg?w=400' },
+  { id: 'prod4', name: 'Panneau Solaire 450W', description: 'Panneau professionnel grande surface', basePrice: 135000, category: 'panneaux', stock: 18, image: 'https://images.pexels.com/photos/356049/pexels-photo-356049.jpeg?w=400' },
+  { id: 'prod5', name: 'Batterie 100Ah Gel', description: 'Batterie solaire à décharge profonde', basePrice: 185000, category: 'batteries', stock: 6, image: 'https://images.pexels.com/photos/14733999/pexels-photo-14733999.jpeg?w=400' },
+  { id: 'prod6', name: 'Batterie 200Ah Gel', description: 'Batterie solaire grande capacité', basePrice: 295000, category: 'batteries', stock: 5, image: 'https://images.pexels.com/photos/14733999/pexels-photo-14733999.jpeg?w=400' },
+  { id: 'prod7', name: 'Onduleur 1.5kVA Pur Sinus', description: 'Convertisseur 12V/220V avec chargeur', basePrice: 195000, category: 'onduleurs', stock: 9, image: 'https://images.pexels.com/photos/9248257/pexels-photo-9248257.jpeg?w=400' },
+  { id: 'prod8', name: 'Onduleur 3kVA Pur Sinus', description: 'Convertisseur 24V/220V pro', basePrice: 345000, category: 'onduleurs', stock: 0, image: 'https://images.pexels.com/photos/9248257/pexels-photo-9248257.jpeg?w=400' },
+  { id: 'prod9', name: 'Kit Complet 500W', description: 'Panneau 300W + Batt 100Ah + Onduleur + LED', basePrice: 485000, category: 'kits', stock: 3, image: 'https://images.pexels.com/photos/10908002/pexels-photo-10908002.jpeg?w=400' },
+  { id: 'prod10', name: 'Kit Complet 1kW', description: '2 Panneaux 300W + 2 Batt 100Ah + Onduleur 1.5kVA', basePrice: 895000, category: 'kits', stock: 4, image: 'https://images.pexels.com/photos/10908002/pexels-photo-10908002.jpeg?w=400' },
+  { id: 'prod11', name: 'Ampoule LED Solaire 12V', description: 'Ampoule basse consommation E27', basePrice: 4500, category: 'accessoires', stock: 50, image: 'https://images.pexels.com/photos/6310187/pexels-photo-6310187.jpeg?w=400' },
+  { id: 'prod12', name: 'Régulateur PWM 30A', description: 'Régulateur de charge solaire', basePrice: 28000, category: 'accessoires', stock: 15, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
+  { id: 'prod13', name: 'Régulateur MPPT 40A', description: 'Régulateur intelligent haute efficacité', basePrice: 65000, category: 'accessoires', stock: 7, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
 ];
 
 export const commissions = [
@@ -75,7 +73,3 @@ export const monthlyData = [
   { month: 'Mai', leads: 10, won: 3, revenue: 2450000 },
   { month: 'Juin', leads: 8, won: 2, revenue: 1870000 },
 ];
-
-export const getPartnerById = (id) => partners.find(p => p.id === id);
-export const getLeadById = (id) => leads.find(l => l.id === id);
-export const getUserById = (id) => users.find(u => u.id === id);
