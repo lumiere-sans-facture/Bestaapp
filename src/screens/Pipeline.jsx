@@ -16,10 +16,26 @@ const isOpen = (lead) => lead.stage !== 'gagne' && lead.stage !== 'perdu';
 export default function Pipeline() {
   const { user } = useAuth();
   const {
-    stages, lostStage, team,
+    stages, lostStage, team, commissions,
     leadsForUser, getPartnerById, getUserById,
     updateLeadStage, addLead, addLeadNote,
   } = useData();
+
+  // Commission réelle si l'affaire est gagnée, sinon estimation au taux du niveau
+  const renderCommissionInfo = (lead, partnerId, level, rate) => {
+    const commission = commissions.find((c) => c.leadId === lead.id && c.partnerId === partnerId && c.level === level);
+    if (commission) {
+      return (
+        <>
+          Commission : {formatCFA(commission.amount)}{' '}
+          <span className={`badge ${commission.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>
+            {commission.status === 'payée' ? 'Payée' : 'En attente'}
+          </span>
+        </>
+      );
+    }
+    return <>Commission estimée : {formatCFA(Math.round(lead.estimatedValue * rate))}</>;
+  };
 
   const openStages = stages.filter((s) => s.id !== 'gagne');
 
@@ -243,7 +259,7 @@ export default function Pipeline() {
                         <div className="referral-level-icon">L1</div>
                         <div className="referral-level-info">
                           <div className="referral-level-name">{getPartnerById(selectedLead.parrainL1)?.name}</div>
-                          <div className="referral-level-commission">Commission : {formatCFA(Math.round(selectedLead.estimatedValue * 0.03))}</div>
+                          <div className="referral-level-commission">{renderCommissionInfo(selectedLead, selectedLead.parrainL1, 1, 0.03)}</div>
                         </div>
                       </div>
                       {selectedLead.parrainL2 && <div className="referral-connector" />}
@@ -254,7 +270,7 @@ export default function Pipeline() {
                       <div className="referral-level-icon">L2</div>
                       <div className="referral-level-info">
                         <div className="referral-level-name">{getPartnerById(selectedLead.parrainL2)?.name}</div>
-                        <div className="referral-level-commission">Commission : {formatCFA(Math.round(selectedLead.estimatedValue * 0.015))}</div>
+                        <div className="referral-level-commission">{renderCommissionInfo(selectedLead, selectedLead.parrainL2, 2, 0.015)}</div>
                       </div>
                     </div>
                   )}
