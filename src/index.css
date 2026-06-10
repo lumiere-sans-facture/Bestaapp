@@ -288,18 +288,24 @@ textarea.input { resize: vertical; }
 .alert-icon.medium { background: var(--warning-light); color: #92400e; }
 .alert-message { font-size: 0.875rem; }
 
-.stage-summary-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 9px 0; border-bottom: 1px solid var(--border);
-}
-.stage-summary-row:last-child { border-bottom: none; }
-.stage-summary-label { font-size: 0.875rem; font-weight: 500; }
-.stage-summary-value { font-size: 0.875rem; color: var(--text-secondary); }
+.funnel-card { display: flex; flex-direction: column; gap: 12px; }
+.funnel-row { min-width: 0; }
+.funnel-header { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.funnel-label { font-size: 0.8125rem; font-weight: 600; }
+.funnel-value { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
+.funnel-track { height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+.funnel-bar { height: 100%; border-radius: 5px; min-width: 4px; transition: width 0.3s ease; }
 
-/* ============ Pipeline (kanban) ============ */
+/* ============ Pipeline (kanban, inspiré de Pipedrive) ============ */
+
+.select-filter {
+  width: auto; padding: 9px 12px; font-size: 0.875rem;
+  border: none; border-radius: 10px; background: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
+}
 
 .kanban-container {
-  display: flex; gap: 12px;
+  display: flex; gap: 10px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
   padding-bottom: 8px;
@@ -307,56 +313,133 @@ textarea.input { resize: vertical; }
 .kanban-column {
   flex: 0 0 280px; min-width: 280px;
   background: rgba(10, 36, 114, 0.04);
-  border-radius: var(--radius); padding: 10px;
+  border-radius: var(--radius);
   scroll-snap-align: start;
   display: flex; flex-direction: column;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.kanban-column.drag-over {
+  background: rgba(10, 36, 114, 0.1);
+  box-shadow: inset 0 0 0 2px var(--primary-light);
 }
 .kanban-column-header {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 0.8125rem; font-weight: 600; padding: 6px 6px 10px;
+  background: white; border-radius: var(--radius) var(--radius) 0 0;
+  border-top: 3px solid var(--border);
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
 }
+.kanban-column-title {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.875rem; font-weight: 600;
+}
+.kanban-column-summary { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
 .kanban-column-count {
-  background: white; border: 1px solid var(--border);
+  background: var(--bg); border: 1px solid var(--border);
   padding: 1px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 500;
   color: var(--text-secondary);
 }
-.kanban-column-body { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.kanban-empty { font-size: 0.8125rem; color: var(--text-muted); text-align: center; padding: 16px 0; }
+.kanban-column-body { display: flex; flex-direction: column; gap: 8px; flex: 1; padding: 10px; }
+.kanban-empty {
+  font-size: 0.8125rem; color: var(--text-muted); text-align: center;
+  padding: 18px 8px; border: 1.5px dashed var(--border); border-radius: 10px;
+}
 .kanban-card {
   display: block; width: 100%;
-  background: white; border-radius: 10px; padding: 12px;
-  box-shadow: var(--shadow); transition: transform 0.15s ease, box-shadow 0.15s ease;
+  background: white; border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px;
+  box-shadow: var(--shadow); transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  cursor: grab;
 }
 .kanban-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
-.kanban-card:active { transform: scale(0.98); }
-.kanban-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.kanban-card:active { cursor: grabbing; }
+.kanban-card.dragging { opacity: 0.4; cursor: grabbing; }
 .kanban-card-title { font-size: 0.875rem; font-weight: 600; line-height: 1.3; }
-.kanban-card-value { font-size: 0.8125rem; font-weight: 600; color: var(--primary); white-space: nowrap; }
-.kanban-card-meta { display: flex; flex-direction: column; gap: 6px; font-size: 0.75rem; color: var(--text-secondary); }
-.kanban-card-contact { display: flex; align-items: center; gap: 6px; }
-.kanban-card-assignee {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 8px; background: var(--bg); border-radius: 6px; align-self: flex-start;
+.kanban-card-contact { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+.kanban-card-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 10px;
+}
+.kanban-card-value { font-size: 0.8125rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+.kanban-card-icons { display: inline-flex; align-items: center; gap: 6px; }
+.stale-indicator {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--error-light); color: var(--error);
 }
 .assignee-avatar {
-  width: 18px; height: 18px; background: var(--primary); color: white;
-  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; background: var(--primary); color: white;
+  border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
   font-size: 0.625rem; font-weight: 600;
 }
-.stage-nouveau { border-left: 3px solid #6366f1; }
-.stage-qualifie { border-left: 3px solid #8b5cf6; }
-.stage-visite { border-left: 3px solid #ec4899; }
-.stage-proposition { border-left: 3px solid #f59e0b; }
-.stage-negociation { border-left: 3px solid #3b82f6; }
-.stage-gagne { border-left: 3px solid #10b981; }
 
-.stage-selector { display: flex; flex-wrap: wrap; gap: 8px; }
-.stage-chip {
-  padding: 7px 14px; border-radius: 18px; font-size: 0.8125rem; font-weight: 500;
-  border: 1.5px solid var(--border); background: white;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+/* Zones de dépôt Gagné / Perdu pendant le glissement */
+.drag-zones {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
+  display: flex; gap: 10px; padding: 12px;
+  background: linear-gradient(transparent, rgba(6, 21, 64, 0.12));
 }
-.stage-chip.active { color: white; }
+.drag-zone {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px;
+  height: 68px; border-radius: 12px;
+  font-weight: 700; font-size: 0.9375rem; letter-spacing: 1px;
+  border: 2px dashed; transition: transform 0.15s ease, background 0.15s ease;
+}
+.drag-zone-lost { border-color: var(--error); color: var(--error); background: var(--error-light); }
+.drag-zone-won { border-color: var(--success); color: #047857; background: var(--success-light); }
+.drag-zone.active { transform: scale(1.02); border-style: solid; }
+.drag-zone-lost.active { background: var(--error); color: white; }
+.drag-zone-won.active { background: var(--success); color: white; }
+
+/* Stepper d'étapes en chevrons (fiche affaire) */
+.stage-stepper { display: flex; margin-bottom: 14px; }
+.stage-step {
+  flex: 1; min-width: 0; padding: 9px 4px 9px 10px;
+  background: var(--bg); color: var(--text-secondary);
+  font-size: 0.6875rem; font-weight: 600; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
+  margin-left: -4px; transition: background 0.15s ease, color 0.15s ease;
+}
+.stage-step:first-child { margin-left: 0; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%); border-radius: 6px 0 0 6px; }
+.stage-step:last-child { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%); border-radius: 0 6px 6px 0; }
+.stage-step.reached { background: var(--primary-light); color: white; }
+.stage-step.current { background: var(--primary); color: white; }
+.stage-step:hover:not(.current) { background: var(--border); color: var(--text-primary); }
+.stage-step.reached:hover:not(.current) { background: var(--primary); color: white; }
+
+.outcome-actions { display: flex; gap: 10px; margin-bottom: 20px; }
+.outcome-actions .btn { flex: 1; }
+.btn-won { background: var(--success); color: white; }
+.btn-won:hover { background: #0da271; }
+.btn-lost { background: white; border: 1.5px solid var(--error); color: var(--error); }
+.btn-lost:hover { background: var(--error-light); }
+
+.outcome-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; border-radius: 10px; margin-bottom: 20px;
+  font-size: 0.875rem; font-weight: 600;
+}
+.outcome-banner.won { background: var(--success-light); color: #047857; }
+.outcome-banner.lost { background: var(--error-light); color: var(--error); }
+.outcome-banner-label { display: inline-flex; align-items: center; gap: 8px; }
+.outcome-banner .btn { background: white; }
+
+/* Notes et activités (fiche affaire) */
+.note-form { display: flex; gap: 8px; margin-bottom: 14px; }
+.note-submit { padding: 10px 14px; flex-shrink: 0; }
+.activity-timeline { display: flex; flex-direction: column; }
+.activity-item { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+.activity-item:not(:last-child)::before {
+  content: ''; position: absolute; left: 4px; top: 14px; bottom: 0;
+  width: 2px; background: var(--border);
+}
+.activity-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  background: var(--primary-light); margin-top: 5px;
+}
+.activity-content { flex: 1; min-width: 0; }
+.activity-text { font-size: 0.875rem; }
+.activity-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+.sheet-link { color: var(--primary); font-weight: 600; }
 
 /* ============ Panneau (sheet mobile / fenêtre desktop) ============ */
 
@@ -642,7 +725,8 @@ textarea.input { resize: vertical; }
 
   /* Le kanban occupe toute la largeur disponible */
   .kanban-container { scroll-snap-type: none; }
-  .kanban-column { flex: 1 1 0; min-width: 240px; }
+  .kanban-column { flex: 1 1 0; min-width: 200px; }
+  .drag-zones { left: var(--sidebar-width); padding: 16px 32px; }
 
   .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; align-items: start; }
   .products-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }

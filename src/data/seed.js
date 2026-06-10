@@ -1,4 +1,4 @@
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 export const users = [
   { id: 'u1', email: 'adam@bestasolar.bj', password: 'demo123', name: 'Adam Adébiyi', role: 'gerant', phone: '+229 97 12 34 56', avatar: 'AA' },
@@ -6,6 +6,8 @@ export const users = [
   { id: 'u3', email: 'ibrahim@bestasolar.bj', password: 'demo123', name: 'Ibrahim Dan Djido', role: 'technicien', phone: '+229 95 55 66 77', avatar: 'ID' },
 ];
 
+// Étapes ouvertes du pipeline (affichées en colonnes et dans le stepper).
+// 'gagne' et 'perdu' sont des issues, pas des étapes.
 export const stages = [
   { id: 'nouveau', label: 'Nouveau', color: '#6366f1' },
   { id: 'qualifie', label: 'Qualifié', color: '#8b5cf6' },
@@ -15,6 +17,8 @@ export const stages = [
   { id: 'gagne', label: 'Gagné', color: '#10b981' },
 ];
 
+export const LOST_STAGE = { id: 'perdu', label: 'Perdu', color: '#ef4444' };
+
 export const partners = [
   { id: 'p1', name: 'Mamadou Balogun', phone: '+229 97 11 22 33', type: 'Partenaire Level 1', registeredAt: '2025-01-15', status: 'actif' },
   { id: 'p2', name: 'Aminata Kesso', phone: '+229 96 44 55 66', type: 'Partenaire Level 1', registeredAt: '2025-02-20', status: 'actif' },
@@ -23,7 +27,7 @@ export const partners = [
 ];
 
 export const leads = [
-  { id: 'l1', name: 'Clinique Notre Dame', contact: 'Dr. Honoré Ganse', phone: '+229 97 88 99 00', address: 'Quartier Commercial, Parakou', stage: 'negociation', estimatedValue: 2450000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: null, createdAt: '2025-05-10', notes: 'Besoin urgent - panne fréquente', lastActivity: '2025-06-08' },
+  { id: 'l1', name: 'Clinique Notre Dame', contact: 'Dr. Honoré Ganse', phone: '+229 97 88 99 00', address: 'Quartier Commercial, Parakou', stage: 'negociation', estimatedValue: 2450000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: null, createdAt: '2025-05-10', notes: 'Besoin urgent - panne fréquente', lastActivity: '2025-06-08', activities: [{ id: 'a1', date: '2025-06-08T10:30:00', text: 'Visite technique effectuée, dimensionnement validé pour 3kVA', by: 'u2' }, { id: 'a2', date: '2025-05-12T09:00:00', text: 'Premier appel : pannes SBEE fréquentes, besoin urgent', by: 'u2' }] },
   { id: 'l2', name: 'Hôtel du Parc', contact: 'M. Kossi Agboka', phone: '+229 96 11 22 33', address: 'Avenue de la Liberté, Parakou', stage: 'proposition', estimatedValue: 1850000, assignedTo: 'u2', parrainL1: 'p2', parrainL2: 'p1', createdAt: '2025-05-15', notes: 'Économie carburant générateur', lastActivity: '2025-06-05' },
   { id: 'l3', name: 'Pharmacie Alafia', contact: 'Mme. Françoude Akpaki', phone: '+229 95 44 55 66', address: 'Marché Central, Parakou', stage: 'gagne', estimatedValue: 980000, assignedTo: 'u3', parrainL1: 'p1', parrainL2: null, createdAt: '2025-04-20', notes: 'Devis signé', lastActivity: '2025-06-09', wonAt: '2025-06-09' },
   { id: 'l4', name: 'Boulangerie Tcha-Tcha', contact: 'Honoré Tcha-Tcha', phone: '+229 94 77 88 99', address: 'Quartier Zongo, Parakou', stage: 'visite', estimatedValue: 650000, assignedTo: 'u3', parrainL1: 'p3', parrainL2: 'p2', createdAt: '2025-05-25', notes: 'Petite boulangerie', lastActivity: '2025-06-07' },

@@ -86,15 +86,24 @@ export default function Dashboard() {
             )}
             {user.role === 'gerant' && (
               <div>
-                <div className="section-title">Résumé par étape</div>
-                <div className="card">
+                <div className="section-title">Entonnoir du pipeline</div>
+                <div className="card funnel-card">
                   {stages.map((stage) => {
                     const stageLeads = leads.filter((l) => l.stage === stage.id);
                     const value = stageLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
+                    const maxCount = Math.max(1, ...stages.map((s) => leads.filter((l) => l.stage === s.id).length));
                     return (
-                      <div key={stage.id} className="stage-summary-row">
-                        <span className="stage-summary-label" style={{ color: stage.color }}>{stage.label}</span>
-                        <span className="stage-summary-value">{stageLeads.length} · {formatCFA(value)}</span>
+                      <div key={stage.id} className="funnel-row">
+                        <div className="funnel-header">
+                          <span className="funnel-label">{stage.label}</span>
+                          <span className="funnel-value">{stageLeads.length} · {formatCFA(value)}</span>
+                        </div>
+                        <div className="funnel-track">
+                          <div
+                            className="funnel-bar"
+                            style={{ width: `${(stageLeads.length / maxCount) * 100}%`, background: stage.color }}
+                          />
+                        </div>
                       </div>
                     );
                   })}
