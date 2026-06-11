@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as seed from '../data/seed';
+import { generatePartnerCode, getActiveRef, consumeRefClick } from '../utils/referral';
 
 const DataContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_data';
@@ -13,6 +14,25 @@ const buildInitialState = () => ({
   partners: seed.partners,
   commissions: seed.commissions,
   devis: [],
+  referrals: [],
+});
+
+// Partenaire actif correspondant à l'attribution d'affiliation en cours (?ref=…)
+const partnerFromActiveRef = (partners) => {
+  const ref = getActiveRef();
+  if (!ref) return null;
+  return partners.find((p) => p.code === ref.code && p.status === 'actif') || null;
+};
+
+const newReferral = (partnerCode, type, extra = {}) => ({
+  id: `r${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+  partnerCode,
+  type, // 'clic' | 'piste' | 'devis'
+  status: type === 'clic' ? 'validé' : 'en_attente',
+  amount: null,
+  leadId: null,
+  createdAt: new Date().toISOString(),
+  ...extra,
 });
 
 // Corrections du catalogue : si l'appareil a encore l'ancienne valeur erronée,
@@ -34,6 +54,15 @@ const loadState = () => {
           ? seed.products.find((sp) => sp.id === p.id) || p
           : p
       );
+      // Migration affiliation : registre des parrainages + code pour chaque partenaire
+      if (!saved.referrals) saved.referrals = [];
+      const codes = saved.partners.map((p) => p.code).filter(Boolean);
+      saved.partners = saved.partners.map((p) => {
+        if (p.code) return p;
+        const code = seed.partners.find((sp) => sp.id === p.id)?.code || generatePartnerCode(codes);
+        codes.push(code);
+        return { ...p, code };
+      });
       return saved;
     }
   } catch {
@@ -49,20 +78,45 @@ export function DataProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
+  // Comptabilise le clic d'affiliation capturé à l'ouverture de l'app (?ref=…)
+  useEffect(() => {
+    const code = consumeRefClick();
+    if (!code) return;
+    setState((s) =>
+      s.partners.some((p) => p.code === code && p.status === 'actif')
+        ? { ...s, referrals: [newReferral(code, 'clic'), ...(s.referrals || [])] }
+        : s
+    );
+  }, []);
+
   const actions = useMemo(() => ({
     // Le niveau 2 se déduit du réseau : c'est le parrain du partenaire apporteur.
+    // Sans partenaire explicite, l'attribution d'affiliation active (?ref=…,
+    // 30 jours, last-click) rattache automatiquement la piste au partenaire.
     addLead: (lead) =>
       setState((s) => {
-        const sponsor = lead.parrainL1
-          ? s.partners.find((p) => p.id === lead.parrainL1)?.sponsorId || null
+        const leadId = `l${Date.now()}`;
+        let parrainL1 = lead.parrainL1 || null;
+        let referrals = s.referrals || [];
+        if (!parrainL1) {
+          const refPartner = partnerFromActiveRef(s.partners);
+          if (refPartner) {
+            parrainL1 = refPartner.id;
+            referrals = [newReferral(refPartner.code, 'piste', { leadId }), ...referrals];
+          }
+        }
+        const sponsor = parrainL1
+          ? s.partners.find((p) => p.id === parrainL1)?.sponsorId || null
           : null;
         return {
           ...s,
+          referrals,
           leads: [
             {
               ...lead,
+              parrainL1,
               parrainL2: sponsor,
-              id: `l${Date.now()}`,
+              id: leadId,
               stage: 'nouveau',
               createdAt: new Date().toISOString().slice(0, 10),
               lastActivity: new Date().toISOString().slice(0, 10),
@@ -80,6 +134,7 @@ export function DataProvider({ children }) {
           {
             ...partner,
             id: `p${Date.now()}`,
+            code: generatePartnerCode(s.partners.map((p) => p.code).filter(Boolean)),
             status: 'actif',
             registeredAt: new Date().toISOString().slice(0, 10),
           },
@@ -91,6 +146,13 @@ export function DataProvider({ children }) {
       setState((s) => ({
         ...s,
         partners: s.partners.map((p) => (p.id === partnerId ? { ...p, ...patch } : p)),
+      })),
+
+    // Validation manuelle des conversions d'affiliation avant paiement
+    updateReferralStatus: (referralId, status) =>
+      setState((s) => ({
+        ...s,
+        referrals: (s.referrals || []).map((r) => (r.id === referralId ? { ...r, status } : r)),
       })),
 
     // Passer une affaire à « gagné » génère automatiquement les commissions
@@ -209,23 +271,36 @@ export function DataProvider({ children }) {
       })),
 
     // Le devis porte la référence du partenaire apporteur : c'est par lui
-    // que le parrainage est tracé. Si la piste n'a pas encore de parrain,
-    // le partenaire du devis devient son parrain niveau 1 (commission à la victoire).
+    // que le parrainage est tracé. Sans partenaire explicite, l'attribution
+    // d'affiliation active rattache le devis (conversion enregistrée au registre).
     addDevis: (devis) =>
       setState((s) => {
         const now = new Date();
         const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
         const devisNumber = `BS-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
+        let partnerId = devis.partnerId || null;
+        let referrals = s.referrals || [];
+        if (!partnerId) {
+          const refPartner = partnerFromActiveRef(s.partners);
+          if (refPartner) {
+            partnerId = refPartner.id;
+            referrals = [
+              newReferral(refPartner.code, 'devis', { leadId: devis.leadId, amount: devis.total }),
+              ...referrals,
+            ];
+          }
+        }
         return {
           ...s,
+          referrals,
           devis: [
-            { ...devis, id: `d${Date.now()}`, devisNumber, createdAt: now.toISOString() },
+            { ...devis, partnerId, id: `d${Date.now()}`, devisNumber, createdAt: now.toISOString() },
             ...s.devis,
           ],
           leads: s.leads.map((l) => {
-            if (l.id !== devis.leadId || !devis.partnerId || l.parrainL1) return l;
-            const sponsor = s.partners.find((p) => p.id === devis.partnerId)?.sponsorId || null;
-            return { ...l, parrainL1: devis.partnerId, parrainL2: l.parrainL2 || sponsor };
+            if (l.id !== devis.leadId || !partnerId || l.parrainL1) return l;
+            const sponsor = s.partners.find((p) => p.id === partnerId)?.sponsorId || null;
+            return { ...l, parrainL1: partnerId, parrainL2: l.parrainL2 || sponsor };
           }),
         };
       }),

@@ -1,6 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
+import { captureRefFromUrl } from './utils/referral';
+
+// Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
+// avant même la connexion — durée 30 jours, last-click.
+captureRefFromUrl();
 import AppLayout from './components/AppLayout';
 import Login from './screens/Login';
 import Dashboard from './screens/Dashboard';

@@ -1,22 +1,42 @@
 import { useState } from 'react';
-import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network } from 'lucide-react';
+import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate, initials } from '../../utils/format';
+import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
 import Sheet from '../../components/Sheet';
 
-const EMPTY_FORM = { name: '', phone: '', sponsorId: '', status: 'actif' };
+const EMPTY_FORM = { name: '', phone: '', momoNumber: '', sponsorId: '', status: 'actif' };
+
+const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };
 
 export default function PartnersSection({ onBack }) {
   const {
-    partners, leads, commissions, stages, lostStage,
+    partners, leads, commissions, stages, lostStage, referrals,
     addPartner, updatePartner, payAllCommissionsForPartner, getPartnerById,
+    updateReferralStatus, getLeadById,
   } = useData();
   const [selectedId, setSelectedId] = useState(null);
   // null = fermé, 'new' = création, sinon id en édition
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [copied, setCopied] = useState(false);
 
   const selected = partners.find((p) => p.id === selectedId);
+
+  const copyLink = async (code) => {
+    try {
+      await navigator.clipboard.writeText(partnerLink(code));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Copiez le lien :', partnerLink(code));
+    }
+  };
+
+  const shareWhatsApp = (partner) => {
+    const text = `Bonjour ! Découvrez les solutions solaires BestaSolar (lumière sans facture ☀️). Demandez votre devis ici : ${partnerLink(partner.code)} — Code partenaire : ${partner.code}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
 
   const statsFor = (partner) => {
     const l1Leads = leads.filter((l) => l.parrainL1 === partner.id);
@@ -26,7 +46,10 @@ export default function PartnersSection({ onBack }) {
     const paid = myComs.filter((c) => c.status === 'payée').reduce((s, c) => s + c.amount, 0);
     const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
     const filleuls = partners.filter((p) => p.sponsorId === partner.id);
-    return { l1Leads, l2Leads, won, paid, pending, filleuls };
+    const myReferrals = (referrals || []).filter((r) => r.partnerCode === partner.code);
+    const clicks = myReferrals.filter((r) => r.type === 'clic').length;
+    const conversions = myReferrals.filter((r) => r.type !== 'clic');
+    return { l1Leads, l2Leads, won, paid, pending, filleuls, myReferrals, clicks, conversions };
   };
 
   const stageInfo = (lead) =>
@@ -34,7 +57,7 @@ export default function PartnersSection({ onBack }) {
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing('new'); };
   const openEdit = (partner) => {
-    setForm({ name: partner.name, phone: partner.phone, sponsorId: partner.sponsorId || '', status: partner.status });
+    setForm({ name: partner.name, phone: partner.phone, momoNumber: partner.momoNumber || '', sponsorId: partner.sponsorId || '', status: partner.status });
     setEditing(partner.id);
   };
 
@@ -43,6 +66,7 @@ export default function PartnersSection({ onBack }) {
     const data = {
       name: form.name.trim(),
       phone: form.phone.trim(),
+      momoNumber: form.momoNumber.trim(),
       sponsorId: form.sponsorId || null,
       status: form.status,
     };
@@ -52,7 +76,8 @@ export default function PartnersSection({ onBack }) {
   };
 
   const handlePayAll = (partner, amount) => {
-    if (window.confirm(`Payer toutes les commissions en attente de ${partner.name} (${formatCFA(amount)}) ?`)) {
+    const via = partner.momoNumber ? ` via Mobile Money (${partner.momoNumber})` : '';
+    if (window.confirm(`Payer toutes les commissions en attente de ${partner.name} (${formatCFA(amount)})${via} ?`)) {
       payAllCommissionsForPartner(partner.id);
     }
   };
@@ -83,7 +108,7 @@ export default function PartnersSection({ onBack }) {
               <div className="partner-header">
                 <div className="partner-avatar">{initials(partner.name)}</div>
                 <div className="partner-info">
-                  <div className="partner-name">{partner.name}</div>
+                  <div className="partner-name">{partner.name} <span className="partner-code-chip">{partner.code}</span></div>
                   <div className="partner-type">
                     {sponsor ? <><Network size={12} /> Filleul de {sponsor.name}</> : <><Users size={12} /> Tête de réseau</>}
                   </div>
@@ -135,6 +160,49 @@ export default function PartnersSection({ onBack }) {
                 <div className="sheet-row"><span className="sheet-label">Inscrit le</span><span className="sheet-value">{formatDate(selected.registeredAt)}</span></div>
                 <div className="sheet-row"><span className="sheet-label">Commissions payées</span><span className="sheet-value">{formatCFA(st.paid)}</span></div>
                 <div className="sheet-row"><span className="sheet-label">Commissions en attente</span><span className="sheet-value amount">{formatCFA(st.pending)}</span></div>
+              </div>
+
+              <div className="sheet-section">
+                <div className="sheet-section-title">Parrainages (affiliation)</div>
+                <div className="affiliate-box">
+                  <div className="affiliate-code">{selected.code}</div>
+                  <div className="affiliate-link">{partnerLink(selected.code)}</div>
+                  <div className="affiliate-actions">
+                    <button className="btn btn-sm btn-outline" onClick={() => copyLink(selected.code)}>
+                      {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copié !' : 'Copier le lien'}
+                    </button>
+                    <button className="btn btn-sm btn-whatsapp" onClick={() => shareWhatsApp(selected)}>
+                      <MessageCircle size={14} /> Partager WhatsApp
+                    </button>
+                  </div>
+                  <div className="field-hint">Attribution {REF_TTL_DAYS} jours, dernier clic. Les pistes et devis créés pendant cette période sont rattachés automatiquement.</div>
+                </div>
+                <div className="affiliate-stats">
+                  <div className="partner-stat"><div className="partner-stat-value"><MousePointerClick size={14} /> {st.clicks}</div><div className="partner-stat-label">Clics</div></div>
+                  <div className="partner-stat"><div className="partner-stat-value">{st.conversions.length}</div><div className="partner-stat-label">Conversions</div></div>
+                  <div className="partner-stat"><div className="partner-stat-value">{formatCFA(st.pending)}</div><div className="partner-stat-label">En attente</div></div>
+                  <div className="partner-stat"><div className="partner-stat-value">{formatCFA(st.paid)}</div><div className="partner-stat-label">Payées</div></div>
+                </div>
+                {st.conversions.length > 0 && (
+                  <div className="referral-history">
+                    {st.conversions.map((r) => (
+                      <div key={r.id} className="sheet-row">
+                        <span className="sheet-label">
+                          {REFERRAL_TYPE_LABELS[r.type]}{r.leadId && getLeadById(r.leadId) ? ` — ${getLeadById(r.leadId).name}` : ''}
+                          <span className="text-secondary"> · {formatDate(r.createdAt)}</span>
+                        </span>
+                        <span className="sheet-value">
+                          {r.amount ? `${formatCFA(r.amount)} ` : ''}
+                          {r.status === 'en_attente' ? (
+                            <button className="btn btn-sm btn-outline" onClick={() => updateReferralStatus(r.id, 'validé')}>Valider</button>
+                          ) : (
+                            <span className={`badge ${r.status === 'validé' ? 'badge-success' : 'badge-muted'}`}>{r.status}</span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="sheet-section">
@@ -199,6 +267,10 @@ export default function PartnersSection({ onBack }) {
           <div className="input-group">
             <label className="input-label">Téléphone *</label>
             <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Numéro Mobile Money (paiement des commissions)</label>
+            <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+229 ..." />
           </div>
           <div className="input-group">
             <label className="input-label">Parrain (recruteur)</label>
