@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import PartnersSection from './plus/PartnersSection';
+import MyPartnerDashboard from './plus/MyPartnerDashboard';
 
 export default function Plus() {
   const { user, logout } = useAuth();
@@ -160,6 +161,14 @@ export default function Plus() {
             </button>
           </>
         )}
+        <button className="menu-item" onClick={() => setActiveTab('mypartner')}>
+          <div className="menu-item-icon"><Share2 size={18} /></div>
+          <div className="menu-item-info">
+            <div className="menu-item-title">Mon espace partenaire</div>
+            <div className="menu-item-subtitle">Mon code, mon lien, mes commissions</div>
+          </div>
+          <ChevronRight size={18} className="menu-item-arrow" />
+        </button>
         <button className="menu-item" onClick={() => setActiveTab('profile')}>
           <div className="menu-item-icon"><User size={18} /></div>
           <div className="menu-item-info">
@@ -187,6 +196,7 @@ export default function Plus() {
         {activeTab === 'menu' && renderMenu()}
         {activeTab === 'partners' && renderPartners()}
         {activeTab === 'commissions' && renderCommissions()}
+        {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
         {activeTab === 'profile' && renderProfile()}
       </div>
 

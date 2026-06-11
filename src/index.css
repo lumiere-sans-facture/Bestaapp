@@ -791,6 +791,16 @@ textarea.input { resize: vertical; }
 .affiliate-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
 .affiliate-stats .partner-stat-value { display: flex; align-items: center; gap: 4px; font-size: 0.875rem; }
 .referral-history { border-top: 1px solid var(--border); padding-top: 4px; }
+
+/* Espace partenaire personnel */
+.my-affiliate-box { margin-bottom: 0; }
+.my-partner-kpis { margin-top: 16px; }
+.my-partner-section { margin-top: 16px; }
+.my-partner-subtitle { margin-top: 18px; }
+.momo-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.momo-input-row { display: flex; gap: 8px; }
+.momo-input-row .input { flex: 1; }
+.momo-input-row .btn { flex-shrink: 0; }
 .partner-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .partner-avatar {
   width: 40px; height: 40px; flex-shrink: 0;
