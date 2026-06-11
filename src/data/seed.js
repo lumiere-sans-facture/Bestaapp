@@ -26,10 +26,10 @@ export const LOST_STAGE = { id: 'perdu', label: 'Perdu', color: '#ef4444' };
 // Quand un partenaire apporte une affaire (niveau 1, 3 %), son parrain
 // touche automatiquement la commission de niveau 2 (1,5 %).
 export const partners = [
-  { id: 'p1', name: 'Mamadou Balogun', phone: '+229 97 11 22 33', sponsorId: null, registeredAt: '2025-01-15', status: 'actif', code: 'BESTA-M4K2', momoNumber: '+229 97 11 22 33' },
-  { id: 'p2', name: 'Aminata Kesso', phone: '+229 96 44 55 66', sponsorId: 'p1', registeredAt: '2025-02-20', status: 'actif', code: 'BESTA-AK7N', momoNumber: '+229 96 44 55 66' },
-  { id: 'p3', name: 'Toffa Gname', phone: '+229 95 77 88 99', sponsorId: 'p2', registeredAt: '2025-03-10', status: 'actif', code: 'BESTA-TG5R', momoNumber: '' },
-  { id: 'p4', name: 'Balogoun Alassane', phone: '+229 94 33 22 11', sponsorId: 'p1', registeredAt: '2025-04-05', status: 'inactif', code: 'BESTA-BA9W', momoNumber: '' },
+  { id: 'p1', name: 'Mamadou Balogun', phone: '+229 97 11 22 33', sponsorId: null, registeredAt: '2025-01-15', status: 'actif', code: 'BESTA-MAMADOU', momoNumber: '+229 97 11 22 33' },
+  { id: 'p2', name: 'Aminata Kesso', phone: '+229 96 44 55 66', sponsorId: 'p1', registeredAt: '2025-02-20', status: 'actif', code: 'BESTA-AMINATA', momoNumber: '+229 96 44 55 66' },
+  { id: 'p3', name: 'Toffa Gname', phone: '+229 95 77 88 99', sponsorId: 'p2', registeredAt: '2025-03-10', status: 'actif', code: 'BESTA-TOFFA', momoNumber: '' },
+  { id: 'p4', name: 'Balogoun Alassane', phone: '+229 94 33 22 11', sponsorId: 'p1', registeredAt: '2025-04-05', status: 'inactif', code: 'BESTA-BALOGOUN', momoNumber: '' },
 ];
 
 export const leads = [
