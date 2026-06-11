@@ -1,7 +1,7 @@
 import { catalogueProducts } from './catalogue';
 
-// v4 : catalogue partenaire officiel 2026 (remplace les produits de démonstration)
-export const SEED_VERSION = 4;
+// v5 : réseau de partenaires à deux niveaux (sponsorId = parrain du partenaire)
+export const SEED_VERSION = 5;
 
 export const users = [
   { id: 'u1', email: 'adam@bestasolar.bj', password: 'demo123', name: 'Adam Adébiyi', role: 'gerant', phone: '+229 97 12 34 56', avatar: 'AA' },
@@ -22,11 +22,14 @@ export const stages = [
 
 export const LOST_STAGE = { id: 'perdu', label: 'Perdu', color: '#ef4444' };
 
+// Réseau de parrainage : sponsorId = partenaire qui a recruté celui-ci.
+// Quand un partenaire apporte une affaire (niveau 1, 3 %), son parrain
+// touche automatiquement la commission de niveau 2 (1,5 %).
 export const partners = [
-  { id: 'p1', name: 'Mamadou Balogun', phone: '+229 97 11 22 33', type: 'Partenaire Level 1', registeredAt: '2025-01-15', status: 'actif' },
-  { id: 'p2', name: 'Aminata Kesso', phone: '+229 96 44 55 66', type: 'Partenaire Level 1', registeredAt: '2025-02-20', status: 'actif' },
-  { id: 'p3', name: 'Toffa Gname', phone: '+229 95 77 88 99', type: 'Partenaire Level 1', registeredAt: '2025-03-10', status: 'actif' },
-  { id: 'p4', name: 'Balogoun Alassane', phone: '+229 94 33 22 11', type: 'Partenaire Level 1', registeredAt: '2025-04-05', status: 'inactif' },
+  { id: 'p1', name: 'Mamadou Balogun', phone: '+229 97 11 22 33', sponsorId: null, registeredAt: '2025-01-15', status: 'actif' },
+  { id: 'p2', name: 'Aminata Kesso', phone: '+229 96 44 55 66', sponsorId: 'p1', registeredAt: '2025-02-20', status: 'actif' },
+  { id: 'p3', name: 'Toffa Gname', phone: '+229 95 77 88 99', sponsorId: 'p2', registeredAt: '2025-03-10', status: 'actif' },
+  { id: 'p4', name: 'Balogoun Alassane', phone: '+229 94 33 22 11', sponsorId: 'p1', registeredAt: '2025-04-05', status: 'inactif' },
 ];
 
 export const leads = [
@@ -37,7 +40,7 @@ export const leads = [
   { id: 'l5', name: 'École Privée Bethanie', contact: 'Directeur Toussaint Hinnou', phone: '+229 97 33 44 55', address: 'Quartier A, Parakou', stage: 'qualifie', estimatedValue: 3200000, assignedTo: 'u2', parrainL1: null, parrainL2: null, createdAt: '2025-06-01', notes: 'École 200 élèves', lastActivity: '2025-06-08' },
   { id: 'l6', name: 'Station Service Avion', contact: 'Amidou Nima', phone: '+229 96 66 77 88', address: 'Route de Cotonou, Parakou', stage: 'nouveau', estimatedValue: 4500000, assignedTo: 'u2', parrainL1: 'p2', parrainL2: null, createdAt: '2025-06-09', notes: 'Nouveau lead', lastActivity: '2025-06-09' },
   { id: 'l7', name: "Grain d'Or", contact: 'Bienvenu Ykpè', phone: '+229 95 99 00 11', address: 'Marché Arzeke, Parakou', stage: 'nouveau', estimatedValue: 320000, assignedTo: 'u3', parrainL1: 'p3', parrainL2: null, createdAt: '2025-06-10', notes: 'Petit commerce', lastActivity: '2025-06-10' },
-  { id: 'l8', name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+229 94 22 33 44', address: 'Centre-Ville, Parakou', stage: 'gagne', estimatedValue: 890000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: 'p3', createdAt: '2025-03-15', notes: 'Studio radio', lastActivity: '2025-05-20', wonAt: '2025-05-20' },
+  { id: 'l8', name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+229 94 22 33 44', address: 'Centre-Ville, Parakou', stage: 'gagne', estimatedValue: 890000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: null, createdAt: '2025-03-15', notes: 'Studio radio', lastActivity: '2025-05-20', wonAt: '2025-05-20' },
 ];
 
 export const products = catalogueProducts;
@@ -45,7 +48,6 @@ export const products = catalogueProducts;
 export const commissions = [
   { id: 'c1', partnerId: 'p1', leadId: 'l3', amount: 29400, level: 1, status: 'payée', paidAt: '2025-06-10', createdAt: '2025-06-09' },
   { id: 'c2', partnerId: 'p1', leadId: 'l8', amount: 26700, level: 1, status: 'payée', paidAt: '2025-05-25', createdAt: '2025-05-20' },
-  { id: 'c3', partnerId: 'p3', leadId: 'l8', amount: 13350, level: 2, status: 'payée', paidAt: '2025-05-25', createdAt: '2025-05-20' },
   { id: 'c4', partnerId: 'p2', leadId: 'l2', amount: 55500, level: 1, status: 'en_attente', paidAt: null, createdAt: '2025-06-05' },
 ];
 

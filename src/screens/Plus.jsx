@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Wallet } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
-import { formatCFA, formatDate, initials } from '../utils/format';
+import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import PartnersSection from './plus/PartnersSection';
 
 export default function Plus() {
   const { user, logout } = useAuth();
   const {
     partners, commissions, leads,
     getPartnerById, getLeadById,
-    payCommission, payAllCommissionsForPartner, addCommission,
+    payCommission, addCommission,
   } = useData();
   const [activeTab, setActiveTab] = useState('menu');
   const [comFilter, setComFilter] = useState('all');
@@ -28,12 +29,6 @@ export default function Plus() {
     const partner = getPartnerById(commission.partnerId);
     if (window.confirm(`Confirmer le paiement de ${formatCFA(commission.amount)} à ${partner?.name} ?`)) {
       payCommission(commission.id);
-    }
-  };
-
-  const handlePayAll = (partner, amount) => {
-    if (window.confirm(`Payer toutes les commissions en attente de ${partner.name} (${formatCFA(amount)}) ?`)) {
-      payAllCommissionsForPartner(partner.id);
     }
   };
 
@@ -61,49 +56,7 @@ export default function Plus() {
     </button>
   );
 
-  const renderPartners = () => (
-    <>
-      <BackButton />
-      <div className="section-title">Partenaires ({partners.length})</div>
-      <div className="partners-list">
-        {partners.map((partner) => {
-          const partnerLeads = leads.filter((l) => l.parrainL1 === partner.id || l.parrainL2 === partner.id);
-          const wonLeads = partnerLeads.filter((l) => l.stage === 'gagne');
-          const totalPaid = commissions
-            .filter((c) => c.partnerId === partner.id && c.status === 'payée')
-            .reduce((sum, c) => sum + c.amount, 0);
-          const totalPending = commissions
-            .filter((c) => c.partnerId === partner.id && c.status === 'en_attente')
-            .reduce((sum, c) => sum + c.amount, 0);
-          return (
-            <div key={partner.id} className="card partner-card">
-              <div className="partner-header">
-                <div className="partner-avatar">{initials(partner.name)}</div>
-                <div className="partner-info">
-                  <div className="partner-name">{partner.name}</div>
-                  <div className="partner-type"><Phone size={12} /> {partner.phone}</div>
-                </div>
-                <span className={`badge ${partner.status === 'actif' ? 'badge-success' : 'badge-muted'}`}>
-                  {partner.status === 'actif' ? 'Actif' : 'Inactif'}
-                </span>
-              </div>
-              <div className="partner-stats">
-                <div className="partner-stat"><div className="partner-stat-value">{partnerLeads.length}</div><div className="partner-stat-label">Pistes</div></div>
-                <div className="partner-stat"><div className="partner-stat-value">{wonLeads.length}</div><div className="partner-stat-label">Gagnées</div></div>
-                <div className="partner-stat"><div className="partner-stat-value">{formatCFA(totalPaid)}</div><div className="partner-stat-label">Payé</div></div>
-                <div className="partner-stat pending"><div className="partner-stat-value">{formatCFA(totalPending)}</div><div className="partner-stat-label">En attente</div></div>
-              </div>
-              {totalPending > 0 && (
-                <button className="btn btn-won btn-block btn-sm pay-all-btn" onClick={() => handlePayAll(partner, totalPending)}>
-                  <Wallet size={16} /> Payer {formatCFA(totalPending)}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
+  const renderPartners = () => <PartnersSection onBack={() => setActiveTab('menu')} />;
 
   const filteredCommissions = commissions
     .filter((c) => comFilter === 'all' || c.status === comFilter)
@@ -191,7 +144,7 @@ export default function Plus() {
               <div className="menu-item-icon success"><Users size={18} /></div>
               <div className="menu-item-info">
                 <div className="menu-item-title">Partenaires</div>
-                <div className="menu-item-subtitle">{partners.length} parrains</div>
+                <div className="menu-item-subtitle">{partners.length} partenaires · réseau 2 niveaux</div>
               </div>
               <ChevronRight size={18} className="menu-item-arrow" />
             </button>
