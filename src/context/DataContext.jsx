@@ -127,6 +127,25 @@ export function DataProvider({ children }) {
         ),
       })),
 
+    // ---- Gestion du catalogue boutique (gérant) ----
+    addProduct: (product) =>
+      setState((s) => ({
+        ...s,
+        products: [{ ...product, id: `prod${Date.now()}` }, ...s.products],
+      })),
+
+    updateProduct: (productId, patch) =>
+      setState((s) => ({
+        ...s,
+        products: s.products.map((p) => (p.id === productId ? { ...p, ...patch } : p)),
+      })),
+
+    deleteProduct: (productId) =>
+      setState((s) => ({
+        ...s,
+        products: s.products.filter((p) => p.id !== productId),
+      })),
+
     addLeadNote: (leadId, text, userId) =>
       setState((s) => ({
         ...s,
