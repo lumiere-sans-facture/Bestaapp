@@ -122,15 +122,18 @@ export const calculateSystemSize = (consumption, systemType, peakSunHours = DEFA
 
 // ---- Chiffrage (devis) ----
 
+import { TVA_RATE } from '../config/company';
+
 /**
  * Construit la liste des composants chiffrés et les totaux à partir d'un dimensionnement.
- * @returns {{ components, equipmentCost, installationCost, maintenanceCost, total, roi }}
+ * Format aligné sur le devis officiel BestaSolar : équipements + prestations,
+ * sous-total HT, TVA 18 %, total TTC.
  */
 export const buildQuotation = (sizing) => {
   const components = [
     {
       type: 'panneau',
-      name: `${PANEL_SPEC.brand} ${PANEL_SPEC.model} ${PANEL_SPEC.power}W`,
+      name: `${PANEL_SPEC.brand} ${PANEL_SPEC.model} ${PANEL_SPEC.power}W ${PANEL_SPEC.type}`,
       quantity: sizing.numberOfPanels,
       unitPrice: PANEL_SPEC.price,
       totalPrice: sizing.numberOfPanels * PANEL_SPEC.price,
@@ -138,6 +141,7 @@ export const buildQuotation = (sizing) => {
     {
       type: 'onduleur',
       name: `Onduleur ${sizing.inverter.brand} ${sizing.inverter.model} (${sizing.inverter.capacity} kVA)`,
+      description: 'Onduleur hybride pur sinus',
       quantity: 1,
       unitPrice: sizing.inverter.price,
       totalPrice: sizing.inverter.price,
@@ -145,6 +149,7 @@ export const buildQuotation = (sizing) => {
     ...sizing.batteries.map((b) => ({
       type: 'batterie',
       name: `Batterie ${b.brand} ${b.model} (${b.capacity} kWh)`,
+      description: 'Batterie lithium grande capacité',
       quantity: b.quantity,
       unitPrice: b.price,
       totalPrice: b.price * b.quantity,
@@ -159,20 +164,44 @@ export const buildQuotation = (sizing) => {
     { type: 'accessoire', name: 'Coffret de Protection DC/AC', quantity: 1, unitPrice: 85000, totalPrice: 85000 },
   ];
 
-  const allComponents = [...components, ...accessories];
-  const equipmentCost = allComponents.reduce((sum, c) => sum + c.totalPrice, 0);
+  const equipment = [...components, ...accessories];
   const installationCost = sizing.numberOfPanels * INSTALLATION_COST_PER_PANEL;
-  const total = equipmentCost + installationCost;
+  const prestations = [
+    {
+      type: 'prestation',
+      name: "Main d'oeuvre et installation",
+      description: 'Pose et mise en service par techniciens agréés',
+      quantity: 1,
+      unitPrice: installationCost,
+      totalPrice: installationCost,
+    },
+    {
+      type: 'prestation',
+      name: 'Maintenance annuelle',
+      description: 'Service après-vente et assistance technique',
+      quantity: 1,
+      unitPrice: MAINTENANCE_COST,
+      totalPrice: MAINTENANCE_COST,
+    },
+  ];
+
+  const equipmentCost = equipment.reduce((sum, c) => sum + c.totalPrice, 0);
+  const subtotalHT = equipmentCost + prestations.reduce((sum, c) => sum + c.totalPrice, 0);
+  const tva = Math.round(subtotalHT * TVA_RATE);
+  const total = subtotalHT + tva;
 
   // Retour sur investissement (en mois)
   const annualSavings = sizing.estimatedProduction * ELECTRICITY_PRICE;
   const roi = annualSavings > 0 ? (total / annualSavings) * 12 : 0;
 
   return {
-    components: allComponents,
+    components: equipment,
+    prestations,
     equipmentCost,
     installationCost,
     maintenanceCost: MAINTENANCE_COST,
+    subtotalHT,
+    tva,
     total,
     roi,
   };

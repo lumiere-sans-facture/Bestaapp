@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Plus, Sun, ShoppingCart, PanelTop } from 'lucide-react';
+import { FileText, Plus, Sun, ShoppingCart, PanelTop, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
@@ -9,7 +9,13 @@ import SolarWizard from './devis/SolarWizard';
 
 export default function Devis() {
   const { user } = useAuth();
-  const { devis, getLeadById } = useData();
+  const { devis, getLeadById, getPartnerById, products } = useData();
+
+  // jsPDF est chargé à la demande pour ne pas alourdir le chargement initial
+  const downloadPdf = async (d) => {
+    const { generateDevisPdf } = await import('../utils/devisPdf');
+    generateDevisPdf(d, getLeadById(d.leadId), d.partnerId ? getPartnerById(d.partnerId) : null, products);
+  };
   // 'list' | 'choose' | 'solar' | 'manual'
   const [view, setView] = useState('list');
 
@@ -51,8 +57,11 @@ export default function Devis() {
                       <div>
                         <div className="devis-card-lead">{lead?.name || 'Client supprimé'}</div>
                         <div className="text-sm text-secondary">
-                          {formatDate(d.createdAt)} · {isSolar ? 'Devis solaire' : opt?.label}
+                          {d.devisNumber ? `${d.devisNumber} · ` : ''}{formatDate(d.createdAt)} · {isSolar ? 'Devis solaire' : opt?.label}
                         </div>
+                        {d.partnerId && (
+                          <div className="devis-partner-tag">Partenaire : {getPartnerById(d.partnerId)?.name}</div>
+                        )}
                       </div>
                       <div className="devis-card-total">{formatCFA(d.total)}</div>
                     </div>
@@ -62,7 +71,12 @@ export default function Devis() {
                       ) : (
                         <span className="devis-type-tag"><ShoppingCart size={13} /> {d.items.reduce((s, it) => s + it.qty, 0)} article(s)</span>
                       )}
-                      {!isSolar && d.monthly && <span className="badge badge-warning">{formatCFA(d.monthly)}/mois</span>}
+                      <span className="devis-card-actions">
+                        {!isSolar && d.monthly && <span className="badge badge-warning">{formatCFA(d.monthly)}/mois</span>}
+                        <button className="btn btn-sm btn-primary" onClick={() => downloadPdf(d)}>
+                          <Download size={14} /> PDF
+                        </button>
+                      </span>
                     </div>
                   </div>
                 );

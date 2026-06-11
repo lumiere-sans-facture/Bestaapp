@@ -10,9 +10,10 @@ let rowSeq = 0;
 
 export default function SolarWizard({ onDone }) {
   const { user } = useAuth();
-  const { addDevis, leadsForUser } = useData();
+  const { addDevis, leadsForUser, partners } = useData();
   const [step, setStep] = useState(1);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const [partnerId, setPartnerId] = useState('');
   const [rows, setRows] = useState([]); // appareils sélectionnés
   const [pickerId, setPickerId] = useState('');
   const [manualMode, setManualMode] = useState(false);
@@ -58,6 +59,7 @@ export default function SolarWizard({ onDone }) {
     addDevis({
       type: 'solar',
       leadId: selectedLeadId,
+      partnerId: partnerId || null,
       consumption,
       sizing: {
         numberOfPanels: sizing.numberOfPanels,
@@ -95,13 +97,21 @@ export default function SolarWizard({ onDone }) {
                 <button
                   key={lead.id}
                   className={`lead-select-item ${selectedLeadId === lead.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedLeadId(lead.id)}
+                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(lead.parrainL1 || ''); }}
                 >
                   <div className="lead-select-name">{lead.name}</div>
                   <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
                 </button>
               ))}
               {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d'abord une piste dans le pipeline.</div>}
+            </div>
+            <div className="input-group partner-field">
+              <label className="input-label">Partenaire apporteur (commission)</label>
+              <select className="input" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
+                <option value="">Aucun partenaire</option>
+                {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <div className="field-hint">Tracé sur le devis — sert au calcul de la commission quand l'affaire est gagnée.</div>
             </div>
           </div>
         )}
@@ -254,22 +264,29 @@ export default function SolarWizard({ onDone }) {
             </div>
 
             <div className="bom">
-              <div className="bom-title">Détail du devis</div>
+              <div className="bom-title">Équipements</div>
               {quotation.components.map((c, i) => (
                 <div key={i} className="bom-row">
                   <div className="bom-name">{c.name}{c.quantity > 1 ? <span className="bom-qty"> × {c.quantity % 1 === 0 ? c.quantity : c.quantity.toFixed(1)}</span> : ''}</div>
                   <div className="bom-price">{formatCFA(c.totalPrice)}</div>
                 </div>
               ))}
+              <div className="bom-title">Prestations</div>
+              {quotation.prestations.map((c, i) => (
+                <div key={i} className="bom-row">
+                  <div className="bom-name">{c.name}</div>
+                  <div className="bom-price">{formatCFA(c.totalPrice)}</div>
+                </div>
+              ))}
             </div>
 
             <div className="devis-summary">
-              <div className="devis-summary-row"><span>Équipement</span><span>{formatCFA(quotation.equipmentCost)}</span></div>
-              <div className="devis-summary-row"><span>Installation ({sizing.numberOfPanels} panneaux)</span><span>{formatCFA(quotation.installationCost)}</span></div>
-              <div className="devis-summary-row total"><span>Total</span><span>{formatCFA(quotation.total)}</span></div>
+              <div className="devis-summary-row"><span>Sous-total HT</span><span>{formatCFA(quotation.subtotalHT)}</span></div>
+              <div className="devis-summary-row credit"><span>TVA (18 %)</span><span>{formatCFA(quotation.tva)}</span></div>
+              <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(quotation.total)}</span></div>
             </div>
             <div className="roi-note">
-              <Zap size={14} /> Retour sur investissement estimé : <strong>{quotation.roi.toFixed(1)} mois</strong> · Maintenance annuelle {formatCFA(quotation.maintenanceCost)}
+              <Zap size={14} /> Retour sur investissement estimé : <strong>{quotation.roi.toFixed(1)} mois</strong>
             </div>
           </div>
         )}
