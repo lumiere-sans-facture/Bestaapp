@@ -183,8 +183,7 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
     if (devis.quotation.roi) totalRows.push(['ROI estimé', `${Math.round(devis.quotation.roi)} mois`]);
   } else {
     totalRows.push(['Sous-total', fmt(devis.subtotal)]);
-    if (devis.total > devis.subtotal) totalRows.push(['Intérêts crédit', fmt(devis.total - devis.subtotal)]);
-    if (devis.monthly) totalRows.push(['Mensualité', `${fmt(devis.monthly)} / mois`]);
+    totalRows.push(['Mode de règlement', 'Comptant']);
   }
 
   const totalsX = W - M - 220;
