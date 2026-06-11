@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
-import ManualWizard, { PAYMENT_OPTIONS } from './devis/ManualWizard';
+import ManualWizard from './devis/ManualWizard';
 import SolarWizard from './devis/SolarWizard';
 
 export default function Devis() {
@@ -50,14 +50,13 @@ export default function Devis() {
               {myDevis.map((d) => {
                 const lead = getLeadById(d.leadId);
                 const isSolar = d.type === 'solar';
-                const opt = !isSolar && PAYMENT_OPTIONS.find((p) => p.id === d.paymentType);
                 return (
                   <div key={d.id} className="card devis-card">
                     <div className="devis-card-header">
                       <div>
                         <div className="devis-card-lead">{lead?.name || 'Client supprimé'}</div>
                         <div className="text-sm text-secondary">
-                          {d.devisNumber ? `${d.devisNumber} · ` : ''}{formatDate(d.createdAt)} · {isSolar ? 'Devis solaire' : opt?.label}
+                          {d.devisNumber ? `${d.devisNumber} · ` : ''}{formatDate(d.createdAt)} · {isSolar ? 'Devis solaire' : 'Comptant'}
                         </div>
                         {d.partnerId && (
                           <div className="devis-partner-tag">Partenaire : {getPartnerById(d.partnerId)?.name}</div>
@@ -72,7 +71,6 @@ export default function Devis() {
                         <span className="devis-type-tag"><ShoppingCart size={13} /> {d.items.reduce((s, it) => s + it.qty, 0)} article(s)</span>
                       )}
                       <span className="devis-card-actions">
-                        {!isSolar && d.monthly && <span className="badge badge-warning">{formatCFA(d.monthly)}/mois</span>}
                         <button className="btn btn-sm btn-primary" onClick={() => downloadPdf(d)}>
                           <Download size={14} /> PDF
                         </button>
