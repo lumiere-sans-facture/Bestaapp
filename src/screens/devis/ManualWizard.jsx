@@ -12,9 +12,10 @@ export const PAYMENT_OPTIONS = [
 
 export default function ManualWizard({ onDone }) {
   const { user } = useAuth();
-  const { products, addDevis, leadsForUser } = useData();
+  const { products, addDevis, leadsForUser, partners } = useData();
   const [step, setStep] = useState(1);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const [partnerId, setPartnerId] = useState('');
   const [items, setItems] = useState({});
   const [paymentType, setPaymentType] = useState('cash');
 
@@ -51,10 +52,18 @@ export default function ManualWizard({ onDone }) {
   const monthly = payment.months ? Math.round(total / payment.months) : null;
 
   const handleSubmit = () => {
+    // Prix unitaires figés au moment de la création (ils dépendent du rôle)
+    const unitPrices = {};
+    Object.keys(items).forEach((id) => {
+      const product = products.find((p) => p.id === id);
+      if (product) unitPrices[id] = getPrice(product.basePrice);
+    });
     addDevis({
       type: 'manual',
       leadId: selectedLeadId,
+      partnerId: partnerId || null,
       items: Object.entries(items).map(([productId, qty]) => ({ productId, qty })),
+      unitPrices,
       paymentType,
       subtotal,
       total,
@@ -80,13 +89,21 @@ export default function ManualWizard({ onDone }) {
                 <button
                   key={lead.id}
                   className={`lead-select-item ${selectedLeadId === lead.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedLeadId(lead.id)}
+                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(lead.parrainL1 || ''); }}
                 >
                   <div className="lead-select-name">{lead.name}</div>
                   <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
                 </button>
               ))}
               {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d'abord une piste dans le pipeline.</div>}
+            </div>
+            <div className="input-group partner-field">
+              <label className="input-label">Partenaire apporteur (commission)</label>
+              <select className="input" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
+                <option value="">Aucun partenaire</option>
+                {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <div className="field-hint">Tracé sur le devis — sert au calcul de la commission quand l'affaire est gagnée.</div>
             </div>
           </div>
         )}

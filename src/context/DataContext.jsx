@@ -144,14 +144,27 @@ export function DataProvider({ children }) {
         ),
       })),
 
+    // Le devis porte la référence du partenaire apporteur : c'est par lui
+    // que le parrainage est tracé. Si la piste n'a pas encore de parrain,
+    // le partenaire du devis devient son parrain niveau 1 (commission à la victoire).
     addDevis: (devis) =>
-      setState((s) => ({
-        ...s,
-        devis: [
-          { ...devis, id: `d${Date.now()}`, createdAt: new Date().toISOString() },
-          ...s.devis,
-        ],
-      })),
+      setState((s) => {
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const devisNumber = `BS-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
+        return {
+          ...s,
+          devis: [
+            { ...devis, id: `d${Date.now()}`, devisNumber, createdAt: now.toISOString() },
+            ...s.devis,
+          ],
+          leads: s.leads.map((l) =>
+            l.id === devis.leadId && devis.partnerId && !l.parrainL1
+              ? { ...l, parrainL1: devis.partnerId }
+              : l
+          ),
+        };
+      }),
 
     resetData: () => setState(buildInitialState()),
   }), []);
