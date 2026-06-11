@@ -1,6 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as seed from '../data/seed';
 import { generatePartnerCode, codeBaseFromName, getActiveRef, consumeRefClick } from '../utils/referral';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { pullAll, pushCollections, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 
 const DataContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_data';
@@ -101,6 +103,79 @@ export function DataProvider({ children }) {
         : s
     );
   }, []);
+
+  // ---- Synchronisation Supabase (si configuré) ----
+  // Au démarrage : récupère les données partagées (ou y pousse les données
+  // locales si la base est vide). Ensuite : réplique chaque changement local
+  // et applique les changements venus des autres appareils en temps réel.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const syncedRef = useRef(null); // dernier état répliqué/reçu, par collection
+  const lastPushAt = useRef(0);
+  const [syncStatus, setSyncStatus] = useState(isSupabaseConfigured ? 'connecting' : 'local');
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    let unsubscribe = () => {};
+
+    const applyRemote = (collections) => {
+      const next = { ...stateRef.current, ...collections };
+      syncedRef.current = collections;
+      setState(next);
+    };
+
+    const refreshFromRemote = async () => {
+      try {
+        const { collections } = await pullAll();
+        if (!cancelled) applyRemote(collections);
+      } catch (e) {
+        console.error('Synchronisation Supabase impossible :', e.message);
+      }
+    };
+
+    (async () => {
+      try {
+        const { empty, collections } = await pullAll();
+        if (cancelled) return;
+        if (empty) {
+          // Première initialisation : la base reçoit les données de cet appareil
+          const initial = Object.fromEntries(SYNCED_COLLECTIONS.map((t) => [t, stateRef.current[t] || []]));
+          lastPushAt.current = Date.now();
+          await pushCollections(initial);
+          syncedRef.current = initial;
+        } else {
+          applyRemote(collections);
+        }
+        setSyncStatus('online');
+        let timer = null;
+        unsubscribe = subscribeToChanges(() => {
+          // Ignorer l'écho de nos propres écritures, regrouper les rafales
+          if (Date.now() - lastPushAt.current < 2500) return;
+          clearTimeout(timer);
+          timer = setTimeout(refreshFromRemote, 600);
+        });
+      } catch (e) {
+        console.error('Supabase indisponible, mode local :', e.message);
+        if (!cancelled) setSyncStatus('error');
+      }
+    })();
+
+    return () => { cancelled = true; unsubscribe(); };
+  }, []);
+
+  // Réplication des changements locaux vers Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured || syncStatus !== 'online' || !syncedRef.current) return;
+    const changed = {};
+    for (const table of SYNCED_COLLECTIONS) {
+      if (state[table] !== syncedRef.current[table]) changed[table] = state[table] || [];
+    }
+    if (!Object.keys(changed).length) return;
+    syncedRef.current = { ...syncedRef.current, ...changed };
+    lastPushAt.current = Date.now();
+    pushCollections(changed).catch((e) => console.error('Réplication Supabase échouée :', e.message));
+  }, [state, syncStatus]);
 
   const actions = useMemo(() => ({
     // Le niveau 2 se déduit du réseau : c'est le parrain du partenaire apporteur.
@@ -355,7 +430,7 @@ export function DataProvider({ children }) {
   }), [state]);
 
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team: seed.users }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team: seed.users }}>
       {children}
     </DataContext.Provider>
   );

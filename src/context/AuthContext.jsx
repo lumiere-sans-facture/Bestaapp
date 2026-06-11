@@ -1,14 +1,37 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { users } from '../data/seed';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
+
+const fetchProfile = async (email) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email, name, role, phone, avatar')
+    .eq('email', email.toLowerCase())
+    .single();
+  if (error || !data) return null;
+  return data;
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (isSupabaseConfigured) {
+      // Session Supabase persistée : restaurer le profil de l'équipe
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (session?.user?.email) {
+          const profile = await fetchProfile(session.user.email);
+          if (profile) setUser(profile);
+        }
+        setIsLoading(false);
+      });
+      return;
+    }
+    // Mode local (sans backend configuré)
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) setUser(JSON.parse(saved));
@@ -18,7 +41,18 @@ export function AuthProvider({ children }) {
     setIsLoading(false);
   }, []);
 
-  const login = (email, password) => {
+  const login = async (email, password) => {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) return false;
+      const profile = await fetchProfile(email.trim());
+      if (!profile) {
+        await supabase.auth.signOut();
+        return false;
+      }
+      setUser(profile);
+      return true;
+    }
     const found = users.find(
       (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
     );
@@ -30,6 +64,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    if (isSupabaseConfigured) supabase.auth.signOut();
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
   };

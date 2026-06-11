@@ -15,8 +15,8 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
-    if (!login(email, password)) {
+    const ok = await login(email, password);
+    if (!ok) {
       setError('Email ou mot de passe incorrect');
       setLoading(false);
     }
