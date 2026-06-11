@@ -18,7 +18,14 @@ const buildInitialState = () => ({
 const loadState = () => {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved && saved.version === seed.SEED_VERSION) return saved;
+    if (saved && saved.version === seed.SEED_VERSION) {
+      // Injecte les nouveaux produits du catalogue officiel sans toucher
+      // aux données locales (modifications de prix, photos, pistes, devis…)
+      const knownIds = new Set((saved.products || []).map((p) => p.id));
+      const newOfficial = seed.products.filter((p) => !knownIds.has(p.id));
+      if (newOfficial.length) saved.products = [...newOfficial, ...saved.products];
+      return saved;
+    }
   } catch {
     // données corrompues : on repart du seed
   }

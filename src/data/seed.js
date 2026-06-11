@@ -38,6 +38,7 @@ export const leads = [
 ];
 
 export const products = [
+  { id: 'prod-marstek-2000w', name: 'Générateur Marstek 2000W', description: 'Station S2000F 2042Wh · prises 2400W onde sinusoïdale pure, USB-C 100W + 45W, 2× USB-A 18W, 12V CC 120W', basePrice: 550000, category: 'generateurs', stock: 5, image: '/products/marstek-2000w.jpg' },
   { id: 'prod1', name: 'Sacoche Solaire 100W', description: 'Kit portable pour téléphone et tablette', basePrice: 75000, category: 'sacs', stock: 12, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
   { id: 'prod2', name: 'Sacoche Solaire 200W', description: 'Kit portable avec ampoules LED', basePrice: 125000, category: 'sacs', stock: 8, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
   { id: 'prod3', name: 'Panneau Solaire 300W', description: 'Panneau monocristallin haute efficacité', basePrice: 85000, category: 'panneaux', stock: 25, image: 'https://images.pexels.com/photos/356049/pexels-photo-356049.jpeg?w=400' },
@@ -62,6 +63,7 @@ export const commissions = [
 
 export const productCategories = [
   { id: 'kits', label: 'Kits' },
+  { id: 'generateurs', label: 'Générateurs' },
   { id: 'panneaux', label: 'Panneaux' },
   { id: 'batteries', label: 'Batteries' },
   { id: 'onduleurs', label: 'Onduleurs' },
