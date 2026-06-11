@@ -161,6 +161,30 @@ export function DataProvider({ children }) {
         partners: s.partners.map((p) => (p.id === partnerId ? { ...p, ...patch } : p)),
       })),
 
+    // Chaque utilisateur de l'app (technicien ou gérant) dispose de son propre
+    // profil partenaire, créé automatiquement à la première visite de son espace.
+    ensurePartnerForUser: (user) =>
+      setState((s) => {
+        if (s.partners.some((p) => p.userId === user.id)) return s;
+        return {
+          ...s,
+          partners: [
+            {
+              id: `p-user-${user.id}`,
+              userId: user.id,
+              name: user.name,
+              phone: user.phone || '',
+              momoNumber: '',
+              sponsorId: null,
+              status: 'actif',
+              registeredAt: new Date().toISOString().slice(0, 10),
+              code: generatePartnerCode(user.name, s.partners.map((p) => p.code).filter(Boolean)),
+            },
+            ...s.partners,
+          ],
+        };
+      }),
+
     // Validation manuelle des conversions d'affiliation avant paiement
     updateReferralStatus: (referralId, status) =>
       setState((s) => ({
@@ -323,6 +347,7 @@ export function DataProvider({ children }) {
 
   const helpers = useMemo(() => ({
     getPartnerById: (id) => state.partners.find((p) => p.id === id),
+    getPartnerByUserId: (userId) => state.partners.find((p) => p.userId === userId),
     getLeadById: (id) => state.leads.find((l) => l.id === id),
     getUserById: (id) => seed.users.find((u) => u.id === id),
     leadsForUser: (user) =>
