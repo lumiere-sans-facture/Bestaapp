@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as seed from '../data/seed';
-import { generatePartnerCode, getActiveRef, consumeRefClick } from '../utils/referral';
+import { generatePartnerCode, codeBaseFromName, getActiveRef, consumeRefClick } from '../utils/referral';
 
 const DataContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_data';
@@ -54,15 +54,28 @@ const loadState = () => {
           ? seed.products.find((sp) => sp.id === p.id) || p
           : p
       );
-      // Migration affiliation : registre des parrainages + code pour chaque partenaire
+      // Migration affiliation : registre des parrainages + codes basés sur le nom.
+      // Les anciens codes aléatoires (BESTA-XXXX) sont régénérés à partir du nom,
+      // et le registre des parrainages est remappé vers les nouveaux codes.
       if (!saved.referrals) saved.referrals = [];
-      const codes = saved.partners.map((p) => p.code).filter(Boolean);
+      const isNameBased = (p) => p.code && p.code.startsWith(`BESTA-${codeBaseFromName(p.name)}`);
+      // 1re passe : réserver les codes déjà conformes (basés sur le nom)
+      const codes = saved.partners.filter(isNameBased).map((p) => p.code);
+      const remap = {};
+      // 2e passe : régénérer les autres à partir du nom
       saved.partners = saved.partners.map((p) => {
-        if (p.code) return p;
-        const code = seed.partners.find((sp) => sp.id === p.id)?.code || generatePartnerCode(codes);
+        if (isNameBased(p)) return p;
+        const seedCode = seed.partners.find((sp) => sp.id === p.id)?.code;
+        const code = seedCode && !codes.includes(seedCode) ? seedCode : generatePartnerCode(p.name, codes);
         codes.push(code);
+        if (p.code) remap[p.code] = code;
         return { ...p, code };
       });
+      if (Object.keys(remap).length) {
+        saved.referrals = saved.referrals.map((r) =>
+          remap[r.partnerCode] ? { ...r, partnerCode: remap[r.partnerCode] } : r
+        );
+      }
       return saved;
     }
   } catch {
@@ -134,7 +147,7 @@ export function DataProvider({ children }) {
           {
             ...partner,
             id: `p${Date.now()}`,
-            code: generatePartnerCode(s.partners.map((p) => p.code).filter(Boolean)),
+            code: generatePartnerCode(partner.name, s.partners.map((p) => p.code).filter(Boolean)),
             status: 'actif',
             registeredAt: new Date().toISOString().slice(0, 10),
           },

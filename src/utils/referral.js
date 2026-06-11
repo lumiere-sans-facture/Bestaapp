@@ -1,13 +1,30 @@
 // Programme d'affiliation : codes partenaires et tracking du lien de parrainage.
 
-// Alphabet sans ambiguïté : pas de 0/O ni de 1/I.
+// Alphabet sans ambiguïté pour les suffixes : pas de 0/O ni de 1/I.
 const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-export const generatePartnerCode = (existingCodes = []) => {
-  let code;
-  do {
-    code = 'BESTA-' + Array.from({ length: 4 }, () => CHARSET[Math.floor(Math.random() * CHARSET.length)]).join('');
-  } while (existingCodes.includes(code));
+/** Partie « nom » du code : premier mot du nom, sans accents ni caractères spéciaux. */
+export const codeBaseFromName = (name = '') =>
+  name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // retire les accents
+    .toUpperCase()
+    .replace(/[^A-Z ]/g, ' ')
+    .trim()
+    .split(/\s+/)[0]
+    .slice(0, 10) || 'PARTENAIRE';
+
+/**
+ * Code lisible basé sur le nom : BESTA-AMINATA.
+ * En cas d'homonyme, un suffixe court est ajouté : BESTA-AMINATA-K7.
+ */
+export const generatePartnerCode = (name, existingCodes = []) => {
+  const base = codeBaseFromName(name);
+  let code = `BESTA-${base}`;
+  while (existingCodes.includes(code)) {
+    const suffix = Array.from({ length: 2 }, () => CHARSET[Math.floor(Math.random() * CHARSET.length)]).join('');
+    code = `BESTA-${base}-${suffix}`;
+  }
   return code;
 };
 
