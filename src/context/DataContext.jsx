@@ -50,19 +50,47 @@ export function DataProvider({ children }) {
   }, [state]);
 
   const actions = useMemo(() => ({
+    // Le niveau 2 se déduit du réseau : c'est le parrain du partenaire apporteur.
     addLead: (lead) =>
+      setState((s) => {
+        const sponsor = lead.parrainL1
+          ? s.partners.find((p) => p.id === lead.parrainL1)?.sponsorId || null
+          : null;
+        return {
+          ...s,
+          leads: [
+            {
+              ...lead,
+              parrainL2: sponsor,
+              id: `l${Date.now()}`,
+              stage: 'nouveau',
+              createdAt: new Date().toISOString().slice(0, 10),
+              lastActivity: new Date().toISOString().slice(0, 10),
+            },
+            ...s.leads,
+          ],
+        };
+      }),
+
+    // ---- Réseau de partenaires ----
+    addPartner: (partner) =>
       setState((s) => ({
         ...s,
-        leads: [
+        partners: [
           {
-            ...lead,
-            id: `l${Date.now()}`,
-            stage: 'nouveau',
-            createdAt: new Date().toISOString().slice(0, 10),
-            lastActivity: new Date().toISOString().slice(0, 10),
+            ...partner,
+            id: `p${Date.now()}`,
+            status: 'actif',
+            registeredAt: new Date().toISOString().slice(0, 10),
           },
-          ...s.leads,
+          ...s.partners,
         ],
+      })),
+
+    updatePartner: (partnerId, patch) =>
+      setState((s) => ({
+        ...s,
+        partners: s.partners.map((p) => (p.id === partnerId ? { ...p, ...patch } : p)),
       })),
 
     // Passer une affaire à « gagné » génère automatiquement les commissions
@@ -194,11 +222,11 @@ export function DataProvider({ children }) {
             { ...devis, id: `d${Date.now()}`, devisNumber, createdAt: now.toISOString() },
             ...s.devis,
           ],
-          leads: s.leads.map((l) =>
-            l.id === devis.leadId && devis.partnerId && !l.parrainL1
-              ? { ...l, parrainL1: devis.partnerId }
-              : l
-          ),
+          leads: s.leads.map((l) => {
+            if (l.id !== devis.leadId || !devis.partnerId || l.parrainL1) return l;
+            const sponsor = s.partners.find((p) => p.id === devis.partnerId)?.sponsorId || null;
+            return { ...l, parrainL1: devis.partnerId, parrainL2: l.parrainL2 || sponsor };
+          }),
         };
       }),
 

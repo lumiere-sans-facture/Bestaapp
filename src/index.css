@@ -770,6 +770,10 @@ textarea.input { resize: vertical; }
 .profile-stat-label { font-size: 0.75rem; color: var(--text-muted); }
 
 .partners-list, .commissions-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.partners-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.partner-card-clickable { display: block; width: 100%; text-align: left; transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.partner-card-clickable:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+.partner-detail-actions { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
 .partner-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .partner-avatar {
   width: 40px; height: 40px; flex-shrink: 0;

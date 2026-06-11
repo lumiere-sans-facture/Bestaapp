@@ -16,7 +16,7 @@ const isOpen = (lead) => lead.stage !== 'gagne' && lead.stage !== 'perdu';
 export default function Pipeline() {
   const { user } = useAuth();
   const {
-    stages, lostStage, team, commissions,
+    stages, lostStage, team, commissions, partners,
     leadsForUser, getPartnerById, getUserById,
     updateLeadStage, addLead, addLeadNote,
   } = useData();
@@ -45,7 +45,7 @@ export default function Pipeline() {
   const [draggedLeadId, setDraggedLeadId] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [noteText, setNoteText] = useState('');
-  const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '' });
+  const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', parrainL1: '' });
 
   const allMyLeads = leadsForUser(user);
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
@@ -68,10 +68,9 @@ export default function Pipeline() {
       ...newLead,
       estimatedValue: Number(newLead.estimatedValue) || 0,
       assignedTo: user.id,
-      parrainL1: null,
-      parrainL2: null,
+      parrainL1: newLead.parrainL1 || null,
     });
-    setNewLead({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '' });
+    setNewLead({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', parrainL1: '' });
     setShowAddForm(false);
   };
 
@@ -340,6 +339,13 @@ export default function Pipeline() {
           <div className="input-group">
             <label className="input-label">Valeur estimée (F CFA)</label>
             <input className="input" type="number" min="0" value={newLead.estimatedValue} onChange={(e) => setNewLead({ ...newLead, estimatedValue: e.target.value })} placeholder="0" />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Partenaire apporteur</label>
+            <select className="input" value={newLead.parrainL1} onChange={(e) => setNewLead({ ...newLead, parrainL1: e.target.value })}>
+              <option value="">Aucun</option>
+              {partners.filter((p) => p.status === 'actif').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
           <div className="input-group">
             <label className="input-label">Notes</label>
