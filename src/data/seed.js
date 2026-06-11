@@ -1,4 +1,7 @@
-export const SEED_VERSION = 3;
+import { catalogueProducts } from './catalogue';
+
+// v4 : catalogue partenaire officiel 2026 (remplace les produits de démonstration)
+export const SEED_VERSION = 4;
 
 export const users = [
   { id: 'u1', email: 'adam@bestasolar.bj', password: 'demo123', name: 'Adam Adébiyi', role: 'gerant', phone: '+229 97 12 34 56', avatar: 'AA' },
@@ -37,22 +40,7 @@ export const leads = [
   { id: 'l8', name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+229 94 22 33 44', address: 'Centre-Ville, Parakou', stage: 'gagne', estimatedValue: 890000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: 'p3', createdAt: '2025-03-15', notes: 'Studio radio', lastActivity: '2025-05-20', wonAt: '2025-05-20' },
 ];
 
-export const products = [
-  { id: 'prod-marstek-2000w', name: 'Générateur Marstek 2000W', description: 'Station S2000F 2042Wh · prises 2400W onde sinusoïdale pure, USB-C 100W + 45W, 2× USB-A 18W, 12V CC 120W', basePrice: 550000, category: 'generateurs', stock: 5, image: '/products/marstek-2000w.jpg' },
-  { id: 'prod1', name: 'Sacoche Solaire 100W', description: 'Kit portable pour téléphone et tablette', basePrice: 75000, category: 'sacs', stock: 12, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
-  { id: 'prod2', name: 'Sacoche Solaire 200W', description: 'Kit portable avec ampoules LED', basePrice: 125000, category: 'sacs', stock: 8, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
-  { id: 'prod3', name: 'Panneau Solaire 300W', description: 'Panneau monocristallin haute efficacité', basePrice: 85000, category: 'panneaux', stock: 25, image: 'https://images.pexels.com/photos/356049/pexels-photo-356049.jpeg?w=400' },
-  { id: 'prod4', name: 'Panneau Solaire 450W', description: 'Panneau professionnel grande surface', basePrice: 135000, category: 'panneaux', stock: 18, image: 'https://images.pexels.com/photos/356049/pexels-photo-356049.jpeg?w=400' },
-  { id: 'prod5', name: 'Batterie 100Ah Gel', description: 'Batterie solaire à décharge profonde', basePrice: 185000, category: 'batteries', stock: 6, image: 'https://images.pexels.com/photos/14733999/pexels-photo-14733999.jpeg?w=400' },
-  { id: 'prod6', name: 'Batterie 200Ah Gel', description: 'Batterie solaire grande capacité', basePrice: 295000, category: 'batteries', stock: 5, image: 'https://images.pexels.com/photos/14733999/pexels-photo-14733999.jpeg?w=400' },
-  { id: 'prod7', name: 'Onduleur 1.5kVA Pur Sinus', description: 'Convertisseur 12V/220V avec chargeur', basePrice: 195000, category: 'onduleurs', stock: 9, image: 'https://images.pexels.com/photos/9248257/pexels-photo-9248257.jpeg?w=400' },
-  { id: 'prod8', name: 'Onduleur 3kVA Pur Sinus', description: 'Convertisseur 24V/220V pro', basePrice: 345000, category: 'onduleurs', stock: 0, image: 'https://images.pexels.com/photos/9248257/pexels-photo-9248257.jpeg?w=400' },
-  { id: 'prod9', name: 'Kit Complet 500W', description: 'Panneau 300W + Batt 100Ah + Onduleur + LED', basePrice: 485000, category: 'kits', stock: 3, image: 'https://images.pexels.com/photos/10908002/pexels-photo-10908002.jpeg?w=400' },
-  { id: 'prod10', name: 'Kit Complet 1kW', description: '2 Panneaux 300W + 2 Batt 100Ah + Onduleur 1.5kVA', basePrice: 895000, category: 'kits', stock: 4, image: 'https://images.pexels.com/photos/10908002/pexels-photo-10908002.jpeg?w=400' },
-  { id: 'prod11', name: 'Ampoule LED Solaire 12V', description: 'Ampoule basse consommation E27', basePrice: 4500, category: 'accessoires', stock: 50, image: 'https://images.pexels.com/photos/6310187/pexels-photo-6310187.jpeg?w=400' },
-  { id: 'prod12', name: 'Régulateur PWM 30A', description: 'Régulateur de charge solaire', basePrice: 28000, category: 'accessoires', stock: 15, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
-  { id: 'prod13', name: 'Régulateur MPPT 40A', description: 'Régulateur intelligent haute efficacité', basePrice: 65000, category: 'accessoires', stock: 7, image: 'https://images.pexels.com/photos/983436/pexels-photo-983436.jpeg?w=400' },
-];
+export const products = catalogueProducts;
 
 export const commissions = [
   { id: 'c1', partnerId: 'p1', leadId: 'l3', amount: 29400, level: 1, status: 'payée', paidAt: '2025-06-10', createdAt: '2025-06-09' },
@@ -62,12 +50,11 @@ export const commissions = [
 ];
 
 export const productCategories = [
-  { id: 'kits', label: 'Kits' },
   { id: 'generateurs', label: 'Générateurs' },
-  { id: 'panneaux', label: 'Panneaux' },
-  { id: 'batteries', label: 'Batteries' },
   { id: 'onduleurs', label: 'Onduleurs' },
-  { id: 'sacs', label: 'Sacs Solaires' },
+  { id: 'batteries', label: 'Batteries' },
+  { id: 'panneaux', label: 'Panneaux' },
+  { id: 'controleurs', label: 'Contrôleurs' },
   { id: 'accessoires', label: 'Accessoires' },
 ];
 
