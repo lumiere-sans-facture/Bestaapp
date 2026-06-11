@@ -15,6 +15,11 @@ const buildInitialState = () => ({
   devis: [],
 });
 
+// Corrections du catalogue : si l'appareil a encore l'ancienne valeur erronée,
+// le produit est remplacé par sa version corrigée (les modifications locales
+// volontaires, elles, ne correspondent plus à l'ancienne valeur et sont gardées).
+const CATALOGUE_FIXES = { 'cat-p14r4': 65000, 'cat-p14r5': 70000 };
+
 const loadState = () => {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -24,6 +29,11 @@ const loadState = () => {
       const knownIds = new Set((saved.products || []).map((p) => p.id));
       const newOfficial = seed.products.filter((p) => !knownIds.has(p.id));
       if (newOfficial.length) saved.products = [...newOfficial, ...saved.products];
+      saved.products = saved.products.map((p) =>
+        CATALOGUE_FIXES[p.id] === p.basePrice
+          ? seed.products.find((sp) => sp.id === p.id) || p
+          : p
+      );
       return saved;
     }
   } catch {
