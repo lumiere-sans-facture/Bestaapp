@@ -1,6 +1,20 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
+
+const SYNC_LABELS = {
+  online: ['sync-online', 'Synchronisé — données partagées en temps réel'],
+  connecting: ['sync-connecting', 'Connexion au serveur…'],
+  error: ['sync-error', 'Serveur injoignable — données locales'],
+  local: ['sync-local', 'Mode local — données sur cet appareil'],
+};
+
+function SyncDot() {
+  const { syncStatus } = useData();
+  const [cls, label] = SYNC_LABELS[syncStatus] || SYNC_LABELS.local;
+  return <span className={`sync-dot ${cls}`} title={label} aria-label={label} />;
+}
 
 const navItems = [
   { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
@@ -40,7 +54,7 @@ export default function AppLayout() {
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{user.avatar}</div>
             <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{user.name}</div>
+              <div className="sidebar-user-name">{user.name} <SyncDot /></div>
               <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
             </div>
             <button className="sidebar-logout" onClick={logout} title="Déconnexion" aria-label="Déconnexion">

@@ -34,7 +34,19 @@ src/
 └── index.css       # Design system (variables CSS, mobile-first, breakpoints 640px / 1024px)
 ```
 
-Les données (pistes, devis créés, changements d'étape) sont conservées dans le `localStorage` du navigateur. Pour repartir de zéro, videz le stockage du site.
+## Backend partagé (Supabase)
+
+Sans configuration, l'app fonctionne en **mode local** : les données restent sur l'appareil (`localStorage`). Pour partager les données entre tous les appareils en temps réel :
+
+1. Créez un projet sur [supabase.com](https://supabase.com) (gratuit)
+2. Dans **SQL Editor**, collez et exécutez le contenu de [`supabase/schema.sql`](supabase/schema.sql)
+3. Dans **Authentication → Users**, créez les comptes de l'équipe (mêmes emails que les profils : `adam@bestasolar.bj`, `fatou@bestasolar.bj`, `ibrahim@bestasolar.bj`)
+4. Récupérez l'URL du projet et la clé `anon` dans **Settings → API**, puis renseignez-les :
+   - **Vercel** : Settings → Environment Variables → `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`, puis redéployez
+   - **APK Android** : mêmes noms dans GitHub → Settings → Secrets and variables → Actions
+   - **En local** : copiez `.env.example` en `.env.local`
+
+Au premier démarrage connecté, l'app **pousse automatiquement son catalogue et ses données vers la base** ; ensuite tous les appareils lisent et écrivent les mêmes données, mises à jour en temps réel (pastille de statut à côté du nom de l'utilisateur).
 
 ## Stack
 
