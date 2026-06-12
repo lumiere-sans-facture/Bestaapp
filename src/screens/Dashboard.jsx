@@ -33,7 +33,7 @@ export default function Dashboard() {
           <div className="kpi-card highlight">
             <div className="kpi-icon"><TrendingUp size={20} /></div>
             <div className="kpi-value">{formatCFA(pipelineValue)}</div>
-            <div className="kpi-label">Pipeline en cours</div>
+            <div className="kpi-label">Affaires en cours</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-icon"><Users size={20} /></div>
@@ -92,7 +92,7 @@ export default function Dashboard() {
             )}
             {user.role === 'gerant' && (
               <div>
-                <div className="section-title">Entonnoir du pipeline</div>
+                <div className="section-title">Entonnoir des ventes</div>
                 <div className="card funnel-card">
                   {stages.map((stage) => {
                     const stageLeads = leads.filter((l) => l.stage === stage.id);
