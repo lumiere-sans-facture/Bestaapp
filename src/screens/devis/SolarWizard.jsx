@@ -5,6 +5,7 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById } from '../../data/appliances';
 import { calculateSystemSize, buildQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
+import { ENSOLEILLEMENT, DEFAULT_CITY, pshForCity } from '../../data/ensoleillement';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
 
@@ -21,7 +22,15 @@ export default function SolarWizard({ onDone }) {
   const [manualMode, setManualMode] = useState(false);
   const [manual, setManual] = useState({ day: '', night: '' });
   const [systemType, setSystemType] = useState('hybrid');
-  const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
+  // Ensoleillement : déduit de la ville, saisie manuelle possible (« Autre »)
+  const [city, setCity] = useState(DEFAULT_CITY);
+  const [sunHours, setSunHours] = useState(pshForCity(DEFAULT_CITY) || DEFAULT_PEAK_SUN_HOURS);
+
+  const handleCityChange = (value) => {
+    setCity(value);
+    const psh = pshForCity(value);
+    if (psh) setSunHours(psh);
+  };
 
   const myLeads = leadsForUser(user);
   const availableLeads = myLeads.filter((l) => l.stage !== 'gagne' && l.stage !== 'perdu');
@@ -72,6 +81,7 @@ export default function SolarWizard({ onDone }) {
         estimatedProduction: sizing.estimatedProduction,
         systemType: sizing.systemType,
         peakSunHours: sizing.peakSunHours,
+        city: city === 'autre' ? null : city,
       },
       quotation,
       total: quotation.total,
@@ -105,7 +115,7 @@ export default function SolarWizard({ onDone }) {
                   <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
                 </button>
               ))}
-              {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d'abord une piste dans le pipeline.</div>}
+              {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d’abord une piste dans Suivi clients.</div>}
             </div>
             {selectedLeadId && <PartnerField value={partnerId} onChange={setPartnerId} />}
           </div>
@@ -223,9 +233,23 @@ export default function SolarWizard({ onDone }) {
               ))}
             </div>
             <div className="input-group sun-hours-field">
-              <label className="input-label"><Sun size={14} /> Heures d'ensoleillement / jour</label>
-              <input className="input" type="number" min="3" max="7" step="0.1" value={sunHours} onChange={(e) => setSunHours(e.target.value)} />
-              <div className="field-hint">Parakou ≈ 5,5 h. Ajustez selon la localisation.</div>
+              <label className="input-label"><Sun size={14} /> Ville d'installation (ensoleillement)</label>
+              <select className="input" value={city} onChange={(e) => handleCityChange(e.target.value)}>
+                {ENSOLEILLEMENT.map((e) => (
+                  <option key={e.city} value={e.city}>{e.city} — {String(e.psh).replace('.', ',')} h/jour</option>
+                ))}
+                <option value="autre">Autre ville (saisie manuelle)</option>
+              </select>
+              {city === 'autre' && (
+                <input
+                  className="input sun-hours-manual"
+                  type="number" min="3" max="7" step="0.1"
+                  value={sunHours}
+                  onChange={(e) => setSunHours(e.target.value)}
+                  aria-label="Heures d'ensoleillement par jour"
+                />
+              )}
+              <div className="field-hint">Le calcul utilise les heures de pic solaire de la ville sélectionnée.</div>
             </div>
           </div>
         )}

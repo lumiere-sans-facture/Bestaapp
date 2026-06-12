@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick, Search } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate, initials } from '../../utils/format';
-import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
+import { partnerLink, REF_TTL_DAYS, getActiveRef } from '../../utils/referral';
 import Sheet from '../../components/Sheet';
 
-const EMPTY_FORM = { name: '', phone: '', momoNumber: '', sponsorId: '', status: 'actif' };
+const EMPTY_FORM = { name: '', phone: '', momoNumber: '', sponsorId: '', status: 'actif', tier: 'standard' };
 
 const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };
 
@@ -58,9 +58,16 @@ export default function PartnersSection({ onBack }) {
   const stageInfo = (lead) =>
     lead.stage === 'perdu' ? lostStage : stages.find((s) => s.id === lead.stage);
 
-  const openNew = () => { setForm(EMPTY_FORM); setEditing('new'); };
+  const openNew = () => {
+    // Rattachement automatique : le parrain est pré-rempli depuis le lien
+    // d'affiliation actif sur l'appareil, le cas échéant.
+    const ref = getActiveRef();
+    const refPartner = ref ? partners.find((p) => p.code === ref.code && p.status === 'actif') : null;
+    setForm({ ...EMPTY_FORM, sponsorId: refPartner?.id || '' });
+    setEditing('new');
+  };
   const openEdit = (partner) => {
-    setForm({ name: partner.name, phone: partner.phone, momoNumber: partner.momoNumber || '', sponsorId: partner.sponsorId || '', status: partner.status });
+    setForm({ name: partner.name, phone: partner.phone, momoNumber: partner.momoNumber || '', sponsorId: partner.sponsorId || '', status: partner.status, tier: partner.tier || 'standard' });
     setEditing(partner.id);
   };
 
@@ -72,6 +79,7 @@ export default function PartnersSection({ onBack }) {
       momoNumber: form.momoNumber.trim(),
       sponsorId: form.sponsorId || null,
       status: form.status,
+      tier: form.tier,
     };
     if (editing === 'new') addPartner(data);
     else updatePartner(editing, data);
@@ -146,9 +154,16 @@ export default function PartnersSection({ onBack }) {
           return (
             <button key={partner.id} className="card partner-card partner-card-clickable" onClick={() => setSelectedId(partner.id)}>
               <div className="partner-header">
-                <div className="partner-avatar">{initials(partner.name)}</div>
+                {partner.photo ? (
+                  <img src={partner.photo} alt={partner.name} className="partner-avatar partner-avatar-photo" />
+                ) : (
+                  <div className="partner-avatar">{initials(partner.name)}</div>
+                )}
                 <div className="partner-info">
-                  <div className="partner-name">{partner.name} <span className="partner-code-chip">{partner.code}</span></div>
+                  <div className="partner-name">
+                    {partner.name} <span className="partner-code-chip">{partner.code}</span>
+                    {partner.tier === 'or' && <span className="tier-badge">⭐ OR</span>}
+                  </div>
                   <div className="partner-type">
                     {sponsor ? <><Network size={12} /> Filleul de {sponsor.name}</> : <><Users size={12} /> Tête de réseau</>}
                   </div>
@@ -337,12 +352,21 @@ export default function PartnersSection({ onBack }) {
             </select>
             <div className="field-hint">Le parrain touche 1,5 % (niveau 2) sur chaque affaire gagnée apportée par ce partenaire.</div>
           </div>
-          <div className="input-group">
-            <label className="input-label">Statut</label>
-            <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-              <option value="actif">Actif</option>
-              <option value="inactif">Inactif</option>
-            </select>
+          <div className="form-row-2">
+            <div className="input-group">
+              <label className="input-label">Statut</label>
+              <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <option value="actif">Actif</option>
+                <option value="inactif">Inactif</option>
+              </select>
+            </div>
+            <div className="input-group">
+              <label className="input-label">Niveau de partenariat</label>
+              <select className="input" value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value })}>
+                <option value="standard">Standard</option>
+                <option value="or">Or ⭐</option>
+              </select>
+            </div>
           </div>
           <button type="submit" className="btn btn-primary btn-block">
             <Check size={18} /> {editing === 'new' ? 'Ajouter le partenaire' : 'Enregistrer'}

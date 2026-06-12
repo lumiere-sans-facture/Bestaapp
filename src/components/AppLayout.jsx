@@ -5,7 +5,7 @@ import { SyncDot } from './SyncStatus';
 
 const navItems = [
   { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
-  { path: '/pipeline', label: 'Pipeline', shortLabel: 'Pipeline', icon: FolderKanban },
+  { path: '/pipeline', label: 'Suivi clients', shortLabel: 'Clients', icon: FolderKanban },
   { path: '/boutique', label: 'Boutique', shortLabel: 'Boutique', icon: ShoppingCart },
   { path: '/devis', label: 'Devis', shortLabel: 'Devis', icon: FileText },
   { path: '/plus', label: 'Plus', shortLabel: 'Plus', icon: MoreHorizontal },

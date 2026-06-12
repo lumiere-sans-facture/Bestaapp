@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send } from 'lucide-react';
+import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
@@ -45,7 +45,7 @@ export default function Pipeline() {
   const [draggedLeadId, setDraggedLeadId] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [noteText, setNoteText] = useState('');
-  const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', parrainL1: '' });
+  const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', clientType: 'particulier' });
 
   const allMyLeads = leadsForUser(user);
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
@@ -68,9 +68,9 @@ export default function Pipeline() {
       ...newLead,
       estimatedValue: Number(newLead.estimatedValue) || 0,
       assignedTo: user.id,
-      parrainL1: newLead.parrainL1 || null,
+      parrainL1: null, // attribution automatique (lien d'affiliation) gérée par le store
     });
-    setNewLead({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', parrainL1: '' });
+    setNewLead({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', clientType: 'particulier' });
     setShowAddForm(false);
   };
 
@@ -84,7 +84,7 @@ export default function Pipeline() {
   return (
     <div className="page">
       <PageHeader
-        title="Pipeline"
+        title="Suivi clients"
         actions={
           <>
             {user.role === 'gerant' && (
@@ -243,6 +243,10 @@ export default function Pipeline() {
                 <a className="sheet-value sheet-link" href={`tel:${selectedLead.phone.replace(/\s/g, '')}`}>{selectedLead.phone}</a>
               </div>
               <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Adresse</span><span className="sheet-value">{selectedLead.address}</span></div>
+              <div className="sheet-row">
+                <span className="sheet-label">{selectedLead.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type de client</span>
+                <span className="sheet-value">{selectedLead.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
+              </div>
               {user.role === 'gerant' && (
                 <div className="sheet-row"><span className="sheet-label">Assignée à</span><span className="sheet-value">{getUserById(selectedLead.assignedTo)?.name}</span></div>
               )}
@@ -341,11 +345,23 @@ export default function Pipeline() {
             <input className="input" type="number" min="0" value={newLead.estimatedValue} onChange={(e) => setNewLead({ ...newLead, estimatedValue: e.target.value })} placeholder="0" />
           </div>
           <div className="input-group">
-            <label className="input-label">Partenaire apporteur</label>
-            <select className="input" value={newLead.parrainL1} onChange={(e) => setNewLead({ ...newLead, parrainL1: e.target.value })}>
-              <option value="">Aucun</option>
-              {partners.filter((p) => p.status === 'actif').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <label className="input-label">Type de client</label>
+            <div className="client-type-toggle">
+              <button
+                type="button"
+                className={`client-type-btn ${newLead.clientType === 'particulier' ? 'active' : ''}`}
+                onClick={() => setNewLead({ ...newLead, clientType: 'particulier' })}
+              >
+                <User size={16} /> Particulier
+              </button>
+              <button
+                type="button"
+                className={`client-type-btn ${newLead.clientType === 'entreprise' ? 'active' : ''}`}
+                onClick={() => setNewLead({ ...newLead, clientType: 'entreprise' })}
+              >
+                <Building2 size={16} /> Entreprise
+              </button>
+            </div>
           </div>
           <div className="input-group">
             <label className="input-label">Notes</label>

@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Pencil, Trash2, Camera, Check, ShoppingCart, FileText } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, Camera, Check, ShoppingCart, FileText, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
 import { formatCFA } from '../utils/format';
 import { fileToResizedDataUrl } from '../utils/image';
+import { extractPowerWatts, POWER_RANGES, PRICE_RANGES } from '../utils/power';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 
@@ -13,17 +14,25 @@ const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', catego
 
 export default function Boutique() {
   const { user } = useAuth();
-  const { products, productCategories, addProduct, updateProduct, deleteProduct } = useData();
+  const { products, productCategories, addProduct, updateProduct, deleteProduct, addOrder } = useData();
   const { items: cartItems, addItem, setQty, removeItem, clearCart, count } = useCart();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [search, setSearch] = useState('');
+  const [priceRange, setPriceRange] = useState('all');
+  const [powerRange, setPowerRange] = useState('all');
   // null = fermé, 'new' = création, sinon id du produit en édition
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [cartOpen, setCartOpen] = useState(false);
+  const [detailId, setDetailId] = useState(null);
+  // Paiement en ligne : null fermé, 'form' saisie, sinon la commande confirmée
+  const [payment, setPayment] = useState(null);
+  const [payForm, setPayForm] = useState({ operator: 'MTN MoMo', phone: '' });
   const [justAdded, setJustAdded] = useState(null);
   const fileInputRef = useRef(null);
+
+  const detailProduct = products.find((p) => p.id === detailId);
 
   const isManager = user.role === 'gerant';
   const getPrice = (basePrice) => (isManager ? Math.round(basePrice * 1.15) : basePrice);
@@ -97,10 +106,44 @@ export default function Boutique() {
     }
   };
 
+  const priceFilter = PRICE_RANGES.find((r) => r.id === priceRange);
+  const powerFilter = POWER_RANGES.find((r) => r.id === powerRange);
+
   const filtered = products
     .filter((p) => !selectedCategory || p.category === selectedCategory)
     .filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase()))
+    .filter((p) => {
+      if (priceRange === 'all') return true;
+      const price = getPrice(p.basePrice);
+      return price >= priceFilter.min && price < priceFilter.max;
+    })
+    .filter((p) => {
+      if (powerRange === 'all') return true;
+      const w = extractPowerWatts(p.name);
+      return w !== null && w >= powerFilter.min && w < powerFilter.max;
+    })
     .sort((a, b) => (a.stock === 0) - (b.stock === 0));
+
+  const handlePayOnline = () => {
+    setPayForm({ operator: 'MTN MoMo', phone: user.phone || '' });
+    setCartOpen(false);
+    setPayment('form');
+  };
+
+  const confirmPayment = (e) => {
+    e.preventDefault();
+    // Stub Mobile Money : la commande est enregistrée « paiement initié ».
+    // Point d'accroche pour l'agrégateur réel (FedaPay / Kkiapay) : ici.
+    const order = addOrder({
+      items: Object.entries(cartItems).map(([productId, qty]) => ({ productId, qty })),
+      total: cartTotal,
+      operator: payForm.operator,
+      phone: payForm.phone.trim(),
+      createdBy: user.id,
+    });
+    clearCart();
+    setPayment(order);
+  };
 
   return (
     <div className="page">
@@ -139,17 +182,27 @@ export default function Boutique() {
             </button>
           ))}
         </div>
+        <div className="list-toolbar boutique-filters">
+          <select className="input sort-select" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} aria-label="Filtrer par prix">
+            {PRICE_RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+          </select>
+          <select className="input sort-select" value={powerRange} onChange={(e) => setPowerRange(e.target.value)} aria-label="Filtrer par puissance">
+            {POWER_RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+          </select>
+        </div>
         <div className="products-grid">
           {filtered.map((product) => {
             const outOfStock = product.stock === 0;
             return (
               <div key={product.id} className={`product-card ${outOfStock ? 'product-unavailable' : ''}`}>
-                <div className="product-top">
+                <button className="product-top product-open" onClick={() => setDetailId(product.id)}>
                   <div className="product-name">{product.name}</div>
                   <div className="product-category">{categoryLabel(product.category)}</div>
-                </div>
+                </button>
                 <div className="product-image-wrap">
-                  <img src={product.image} alt={product.name} className="product-image" loading="lazy" />
+                  <button className="product-open product-image-btn" onClick={() => setDetailId(product.id)} aria-label={`Voir la fiche ${product.name}`}>
+                    <img src={product.image} alt={product.name} className="product-image" loading="lazy" />
+                  </button>
                   {isManager && (
                     <button className="product-edit-btn" onClick={() => openEdit(product)} aria-label={`Modifier ${product.name}`}>
                       <Pencil size={15} />
@@ -214,10 +267,113 @@ export default function Boutique() {
         </div>
         <div className="cart-actions">
           <button className="btn btn-outline" onClick={() => { clearCart(); setCartOpen(false); }}>Vider</button>
+          <button className="btn btn-primary btn-block" onClick={handlePayOnline}>
+            <Smartphone size={17} /> Payer en ligne
+          </button>
           <button className="btn btn-accent btn-block" onClick={goToDevis}>
             <FileText size={17} /> Créer le devis
           </button>
         </div>
+      </Sheet>
+
+      {/* Fiche produit détaillée */}
+      <Sheet
+        open={!!detailProduct}
+        onClose={() => setDetailId(null)}
+        title={detailProduct?.name}
+        subtitle={detailProduct && categoryLabel(detailProduct.category)}
+      >
+        {detailProduct && (
+          <>
+            <img src={detailProduct.image} alt={detailProduct.name} className="detail-image" />
+            <div className="sheet-section">
+              <div className="sheet-section-title">Caractéristiques</div>
+              {(detailProduct.description || '').split('·').map((spec, i) => spec.trim() && (
+                <div key={i} className="sheet-row"><span className="sheet-label">{spec.trim()}</span></div>
+              ))}
+              {extractPowerWatts(detailProduct.name) && (
+                <div className="sheet-row">
+                  <span className="sheet-label">Puissance</span>
+                  <span className="sheet-value">{(extractPowerWatts(detailProduct.name) / 1000).toLocaleString('fr-FR')} kW</span>
+                </div>
+              )}
+            </div>
+            <div className="sheet-section">
+              <div className="sheet-section-title">Prix et disponibilité</div>
+              <div className="sheet-row"><span className="sheet-label">Prix public</span><span className="sheet-value amount">{formatCFA(Math.round(detailProduct.basePrice * 1.15))}</span></div>
+              <div className="sheet-row"><span className="sheet-label">Prix partenaire</span><span className="sheet-value">{formatCFA(detailProduct.basePrice)}</span></div>
+              <div className="sheet-row">
+                <span className="sheet-label">Stock</span>
+                <span className="sheet-value">{detailProduct.stock > 0 ? `${detailProduct.stock} disponible(s)` : 'Rupture'}</span>
+              </div>
+            </div>
+            <div className="cart-actions">
+              {isManager && (
+                <button className="btn btn-outline" onClick={() => { setDetailId(null); openEdit(detailProduct); }}>
+                  <Pencil size={15} /> Modifier
+                </button>
+              )}
+              <button
+                className="btn btn-accent btn-block"
+                disabled={detailProduct.stock === 0}
+                onClick={() => { handleAddToCart(detailProduct); setDetailId(null); }}
+              >
+                <ShoppingCart size={17} /> Ajouter au panier
+              </button>
+            </div>
+          </>
+        )}
+      </Sheet>
+
+      {/* Paiement en ligne (Mobile Money — démo) */}
+      <Sheet
+        open={!!payment}
+        onClose={() => setPayment(null)}
+        title={payment === 'form' ? 'Payer en ligne' : 'Paiement initié'}
+        subtitle={payment === 'form' ? `Total : ${formatCFA(cartTotal)}` : undefined}
+      >
+        {payment === 'form' ? (
+          <form onSubmit={confirmPayment}>
+            <div className="input-group">
+              <label className="input-label">Opérateur Mobile Money</label>
+              <div className="client-type-toggle">
+                {['MTN MoMo', 'Moov Money'].map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    className={`client-type-btn ${payForm.operator === op ? 'active' : ''}`}
+                    onClick={() => setPayForm({ ...payForm, operator: op })}
+                  >
+                    <Smartphone size={16} /> {op}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="input-group">
+              <label className="input-label">Numéro Mobile Money *</label>
+              <input className="input" type="tel" required value={payForm.phone} onChange={(e) => setPayForm({ ...payForm, phone: e.target.value })} placeholder="+229 ..." />
+            </div>
+            <div className="devis-summary">
+              <div className="devis-summary-row total"><span>Montant à payer</span><span>{formatCFA(cartTotal)}</span></div>
+            </div>
+            <div className="field-hint payment-stub-note">
+              Mode démonstration : la commande sera enregistrée « paiement initié ». L'encaissement réel Mobile Money (agrégateur FedaPay/Kkiapay) sera branché ici.
+            </div>
+            <button type="submit" className="btn btn-primary btn-block">
+              <Smartphone size={17} /> Payer {formatCFA(cartTotal)}
+            </button>
+          </form>
+        ) : payment && (
+          <div className="payment-confirm">
+            <div className="payment-confirm-icon"><Check size={28} /></div>
+            <div className="payment-confirm-title">Commande {payment.orderNumber}</div>
+            <p className="text-sm text-secondary">
+              Paiement de {formatCFA(payment.total)} initié via {payment.operator} ({payment.phone}).
+              Vous serez notifié à la confirmation de l'opérateur.
+            </p>
+            <button className="btn btn-primary btn-block" onClick={() => setPayment(null)}>Fermer</button>
+          </div>
+        )}
       </Sheet>
 
       {/* Fiche produit (gérant) */}

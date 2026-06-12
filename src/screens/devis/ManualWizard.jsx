@@ -85,7 +85,7 @@ export default function ManualWizard({ onDone, initialItems }) {
                   <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
                 </button>
               ))}
-              {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d'abord une piste dans le pipeline.</div>}
+              {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d’abord une piste dans Suivi clients.</div>}
             </div>
             {selectedLeadId && <PartnerField value={partnerId} onChange={setPartnerId} />}
           </div>
