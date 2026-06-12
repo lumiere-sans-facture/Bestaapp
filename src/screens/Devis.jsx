@@ -59,7 +59,12 @@ export default function Devis() {
                           {d.devisNumber ? `${d.devisNumber} · ` : ''}{formatDate(d.createdAt)} · {isSolar ? 'Devis solaire' : 'Comptant'}
                         </div>
                         {d.partnerId && (
-                          <div className="devis-partner-tag">Partenaire : {getPartnerById(d.partnerId)?.name}</div>
+                          <div className="devis-partner-tag">
+                            Partenaire : {getPartnerById(d.partnerId)?.name}
+                            {(d.partnerCode || getPartnerById(d.partnerId)?.code) && (
+                              <span className="partner-code-chip">{d.partnerCode || getPartnerById(d.partnerId)?.code}</span>
+                            )}
+                          </div>
                         )}
                       </div>
                       <div className="devis-card-total">{formatCFA(d.total)}</div>

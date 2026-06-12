@@ -76,3 +76,19 @@ export const consumeRefClick = () => {
   }
   return null;
 };
+
+/**
+ * Attribution automatique du partenaire pour une affaire :
+ * 1) le parrain niveau 1 de la piste s'il existe,
+ * 2) sinon le partenaire du lien d'affiliation actif (?ref=…).
+ */
+export const resolveAutoPartner = (lead, partners) => {
+  if (lead?.parrainL1) {
+    return partners.find((p) => p.id === lead.parrainL1) || null;
+  }
+  const ref = getActiveRef();
+  if (ref) {
+    return partners.find((p) => p.code === ref.code && p.status === 'actif') || null;
+  }
+  return null;
+};

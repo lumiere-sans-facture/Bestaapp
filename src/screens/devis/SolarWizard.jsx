@@ -5,6 +5,8 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById } from '../../data/appliances';
 import { calculateSystemSize, buildQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
+import { resolveAutoPartner } from '../../utils/referral';
+import PartnerField from './PartnerField';
 
 let rowSeq = 0;
 
@@ -97,7 +99,7 @@ export default function SolarWizard({ onDone }) {
                 <button
                   key={lead.id}
                   className={`lead-select-item ${selectedLeadId === lead.id ? 'selected' : ''}`}
-                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(lead.parrainL1 || ''); }}
+                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(resolveAutoPartner(lead, partners)?.id || ''); }}
                 >
                   <div className="lead-select-name">{lead.name}</div>
                   <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
@@ -105,14 +107,7 @@ export default function SolarWizard({ onDone }) {
               ))}
               {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d'abord une piste dans le pipeline.</div>}
             </div>
-            <div className="input-group partner-field">
-              <label className="input-label">Partenaire apporteur (commission)</label>
-              <select className="input" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
-                <option value="">Aucun partenaire</option>
-                {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <div className="field-hint">Tracé sur le devis — sert au calcul de la commission quand l'affaire est gagnée.</div>
-            </div>
+            {selectedLeadId && <PartnerField value={partnerId} onChange={setPartnerId} />}
           </div>
         )}
 

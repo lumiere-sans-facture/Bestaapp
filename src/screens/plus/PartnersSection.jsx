@@ -11,7 +11,7 @@ const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste'
 
 export default function PartnersSection({ onBack }) {
   const {
-    partners, leads, commissions, stages, lostStage, referrals,
+    partners, leads, commissions, stages, lostStage, referrals, devis,
     addPartner, updatePartner, payAllCommissionsForPartner, getPartnerById,
     updateReferralStatus, getLeadById,
   } = useData();
@@ -202,6 +202,23 @@ export default function PartnersSection({ onBack }) {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+
+              <div className="sheet-section">
+                <div className="sheet-section-title">Devis générés ({(devis || []).filter((d) => d.partnerId === selected.id).length})</div>
+                {(devis || []).filter((d) => d.partnerId === selected.id).length ? (
+                  (devis || []).filter((d) => d.partnerId === selected.id).map((d) => (
+                    <div key={d.id} className="sheet-row">
+                      <span className="sheet-label">
+                        {d.devisNumber} — {getLeadById(d.leadId)?.name || 'Client'}
+                        <span className="text-secondary"> · {formatDate(d.createdAt)}</span>
+                      </span>
+                      <span className="sheet-value amount">{formatCFA(d.total)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="sheet-row"><span className="sheet-label">Aucun devis pour ce partenaire</span></div>
                 )}
               </div>
 

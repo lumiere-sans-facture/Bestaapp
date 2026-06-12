@@ -73,10 +73,11 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
   if (lead?.name) { doc.text(lead.name, M, y); y += 12; }
   if (lead?.phone) { doc.text(`P.  ${lead.phone}`, M, y); y += 12; }
   if (lead?.address) { doc.text(`A.  ${lead.address}`, M, y); y += 12; }
-  if (partner) {
+  if (partner || devis.partnerCode) {
     doc.setTextColor(...GRAY);
     doc.setFontSize(8);
-    doc.text(`Réf. partenaire :  ${partner.name}`, M, y + 2);
+    const code = devis.partnerCode || partner?.code || '';
+    doc.text(`Réf. partenaire :  ${partner ? partner.name : ''}${code ? `  ·  ${code}` : ''}`, M, y + 2);
     y += 12;
   }
 
