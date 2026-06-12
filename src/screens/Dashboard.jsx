@@ -2,11 +2,12 @@ import { TrendingUp, Users, Target, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA } from '../utils/format';
+import { computeMonthlyStats } from '../utils/stats';
 import PageHeader from '../components/PageHeader';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { products, stages, monthlyData, leadsForUser, leads } = useData();
+  const { products, stages, leadsForUser, leads } = useData();
 
   const myLeads = leadsForUser(user);
   const pipelineValue = myLeads.filter((l) => l.stage !== 'gagne').reduce((sum, l) => sum + l.estimatedValue, 0);
@@ -14,7 +15,10 @@ export default function Dashboard() {
   const winRate = myLeads.length > 0 ? Math.round((wonLeads.length / myLeads.length) * 100) : 0;
   const outOfStock = products.filter((p) => p.stock === 0).length;
   const lowStock = products.filter((p) => p.stock > 0 && p.stock <= 5).length;
-  const maxLeads = Math.max(...monthlyData.map((m) => m.leads));
+  // Courbes vivantes : calculées depuis le suivi réel des clients
+  const monthlyData = computeMonthlyStats(myLeads);
+  const maxLeads = Math.max(1, ...monthlyData.map((m) => m.leads), ...monthlyData.map((m) => m.won));
+  const sixMonthRevenue = monthlyData.reduce((sum, m) => sum + m.revenue, 0);
   const dateStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const alerts = [];
@@ -52,21 +56,23 @@ export default function Dashboard() {
 
         <div className="dashboard-grid">
           <div className="card chart-card">
-            <div className="card-title">Évolution mensuelle</div>
+            <div className="card-title">Évolution mensuelle — 6 derniers mois</div>
             <div className="bar-chart">
               {monthlyData.map((month) => (
-                <div key={month.month} className="bar-group">
+                <div key={month.month} className="bar-group" title={`${month.month} : ${month.leads} piste(s) · ${month.won} gagnée(s) · CA ${formatCFA(month.revenue)}`}>
                   <div className="bar-wrapper">
-                    <div className="bar bar-leads" style={{ height: `${(month.leads / maxLeads) * 100}%` }} title={`${month.leads} pistes`} />
-                    <div className="bar bar-won" style={{ height: `${(month.won / maxLeads) * 100}%` }} title={`${month.won} gagnées`} />
+                    <div className="bar bar-leads" style={{ height: `${(month.leads / maxLeads) * 100}%` }} />
+                    <div className="bar bar-won" style={{ height: `${(month.won / maxLeads) * 100}%` }} />
                   </div>
                   <div className="bar-label">{month.month}</div>
+                  <div className="bar-sublabel">{month.leads > 0 || month.won > 0 ? `${month.leads}/${month.won}` : '—'}</div>
                 </div>
               ))}
             </div>
             <div className="chart-legend">
-              <span className="legend-item"><span className="legend-dot legend-leads" /> Pistes</span>
+              <span className="legend-item"><span className="legend-dot legend-leads" /> Pistes créées</span>
               <span className="legend-item"><span className="legend-dot legend-won" /> Gagnées</span>
+              <span className="legend-item legend-revenue">CA gagné 6 mois : <strong>{formatCFA(sixMonthRevenue)}</strong></span>
             </div>
           </div>
 

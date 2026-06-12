@@ -269,6 +269,9 @@ textarea.input { resize: vertical; }
 .bar-leads { background: var(--primary-light); }
 .bar-won { background: var(--success); }
 .bar-label { font-size: 0.6875rem; color: var(--text-muted); }
+.bar-sublabel { font-size: 0.625rem; color: var(--text-secondary); font-weight: 600; }
+.legend-revenue { margin-left: auto; color: var(--text-secondary); }
+.legend-revenue strong { color: var(--primary); }
 .chart-legend { display: flex; gap: 18px; margin-top: 14px; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-secondary); }
 .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
