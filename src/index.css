@@ -625,6 +625,28 @@ textarea.input { resize: vertical; }
 .profile-edit-header .card-title { margin-bottom: 0; }
 .profile-edit-header + form { margin-top: 14px; }
 
+/* Formation */
+.formation-progress { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.formation-progress-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: var(--success-light); color: #047857;
+  display: flex; align-items: center; justify-content: center;
+}
+.formation-progress-info { flex: 1; }
+.formation-progress-title { font-weight: 600; font-size: 0.9375rem; margin-bottom: 6px; }
+.formation-card.formation-done { border-left: 3px solid var(--success); }
+.formation-header { display: flex; align-items: flex-start; gap: 12px; }
+.formation-type-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--primary);
+}
+.formation-type-icon.pdf { background: var(--warning-light); color: var(--accent-dark); }
+.formation-info { flex: 1; min-width: 0; }
+.formation-title { font-weight: 600; }
+.formation-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+.formation-desc { font-size: 0.8125rem; color: var(--text-secondary); margin: 10px 0 0; }
+
 /* Fiche produit (gestion catalogue) */
 .photo-field { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 18px; }
 .photo-preview {
