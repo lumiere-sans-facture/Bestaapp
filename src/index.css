@@ -519,23 +519,67 @@ textarea.input { resize: vertical; }
 .category-chip:hover { border-color: var(--primary); color: var(--primary); }
 .category-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
 
+/* Grille boutique : 2 colonnes sur mobile, façon e-commerce */
 .products-grid {
-  display: grid; grid-template-columns: 1fr; gap: 14px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
 }
 .product-card {
-  background: white; border-radius: var(--radius); overflow: hidden;
+  background: white; border-radius: var(--radius);
   box-shadow: var(--shadow); display: flex; flex-direction: column;
+  padding: 12px;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
+.product-top { margin-bottom: 6px; }
+.product-category { font-size: 0.6875rem; color: var(--text-muted); margin-top: 2px; }
 .product-image-wrap { position: relative; }
 .product-edit-btn {
-  position: absolute; top: 8px; right: 8px;
+  position: absolute; top: 4px; right: 4px;
   width: 32px; height: 32px; border-radius: 8px;
   background: rgba(255, 255, 255, 0.95); color: var(--primary);
   display: flex; align-items: center; justify-content: center;
   box-shadow: var(--shadow); transition: background 0.15s ease, color 0.15s ease;
 }
 .product-edit-btn:hover { background: var(--primary); color: white; }
+.oos-badge {
+  position: absolute; left: 4px; top: 4px;
+  background: var(--error-light); color: var(--error);
+  font-size: 0.6875rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 6px;
+}
+.cart-add-btn {
+  width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+  background: var(--bg); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cart-add-btn:hover { background: var(--primary); color: white; }
+.cart-add-btn.added { background: var(--success); color: white; }
+.cart-add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Barre panier flottante */
+.cart-bar {
+  position: fixed; left: 12px; right: 12px;
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 49;
+  display: flex; align-items: center; gap: 12px;
+  background: var(--primary); color: white;
+  padding: 13px 18px; border-radius: 14px;
+  box-shadow: var(--shadow-lg); font-weight: 600;
+}
+.cart-bar-count { display: inline-flex; align-items: center; gap: 7px; }
+.cart-bar-label { flex: 1; text-align: center; font-size: 0.9375rem; }
+.cart-bar-total { color: var(--accent); }
+
+/* Lignes du panier */
+.cart-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.cart-row-img { width: 46px; height: 46px; object-fit: contain; background: white; border: 1px solid var(--border); border-radius: 8px; flex-shrink: 0; }
+.cart-row-info { flex: 1; min-width: 0; }
+.cart-row-name { font-size: 0.8125rem; font-weight: 600; }
+.cart-row-price { font-size: 0.75rem; color: var(--text-secondary); }
+.cart-row-remove { color: var(--error); padding: 6px; border-radius: 8px; flex-shrink: 0; }
+.cart-row-remove:hover { background: var(--error-light); }
+.cart-actions { display: flex; gap: 10px; margin-top: 14px; }
+.cart-actions .btn-block { flex: 1; }
 
 /* Fiche produit (gestion catalogue) */
 .photo-field { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 18px; }
@@ -554,17 +598,15 @@ textarea.input { resize: vertical; }
 .product-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
 .product-unavailable { opacity: 0.65; }
 .product-image {
-  width: 100%; height: 160px;
+  width: 100%; height: 110px;
   object-fit: contain; /* image entière, jamais recadrée */
-  background: white; padding: 10px;
-  border-bottom: 1px solid var(--border);
+  background: white;
 }
-.product-content { padding: 14px; display: flex; flex-direction: column; flex: 1; }
-.product-name { font-size: 0.9375rem; font-weight: 600; margin-bottom: 2px; }
-.product-description { font-size: 0.78125rem; color: var(--text-secondary); margin-bottom: 12px; flex: 1; }
-.product-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
-.product-price { font-size: 1.0625rem; font-weight: 700; color: var(--primary); }
-.product-price-alt { font-size: 0.75rem; color: var(--text-muted); }
+.product-name { font-size: 0.8125rem; font-weight: 700; line-height: 1.3; }
+.product-description { display: none; font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px; }
+.product-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; padding-top: 10px; }
+.product-price { font-size: 0.9375rem; font-weight: 700; color: var(--primary); }
+.product-price-alt { font-size: 0.6875rem; color: var(--text-muted); }
 .stock-badge {
   font-size: 0.75rem; font-weight: 500; padding: 4px 10px; border-radius: 6px; white-space: nowrap;
 }
@@ -877,7 +919,11 @@ textarea.input { resize: vertical; }
    ============================================================ */
 
 @media (min-width: 640px) {
-  .products-grid { grid-template-columns: repeat(2, 1fr); }
+  .products-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .product-image { height: 140px; }
+  .product-name { font-size: 0.875rem; }
+  .product-description { display: block; }
+  .cart-bar { left: auto; right: 24px; width: 380px; }
   .kpi-grid { grid-template-columns: repeat(4, 1fr); }
   .devis-list { grid-template-columns: repeat(2, 1fr); }
   .partners-list { grid-template-columns: repeat(2, 1fr); }
@@ -922,7 +968,8 @@ textarea.input { resize: vertical; }
   .drag-zones { left: var(--sidebar-width); padding: 16px 32px; }
 
   .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; align-items: start; }
-  .products-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .products-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .cart-bar { bottom: 24px; right: 32px; }
   .devis-list { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
   .partners-list { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
   .bar-chart { height: 220px; }
