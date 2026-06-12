@@ -21,6 +21,9 @@ create table if not exists public.partners    (id text primary key, data jsonb n
 create table if not exists public.commissions (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
 create table if not exists public.devis       (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
 create table if not exists public.referrals   (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
+create table if not exists public.orders      (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
+create table if not exists public.formations  (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
+create table if not exists public."formationProgress" (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
 
 -- Sécurité : seuls les membres de l'équipe connectés accèdent aux données
 alter table public.profiles    enable row level security;
@@ -30,6 +33,9 @@ alter table public.partners    enable row level security;
 alter table public.commissions enable row level security;
 alter table public.devis       enable row level security;
 alter table public.referrals   enable row level security;
+alter table public.orders      enable row level security;
+alter table public.formations  enable row level security;
+alter table public."formationProgress" enable row level security;
 
 drop policy if exists "team read"  on public.profiles;
 create policy "team read" on public.profiles for select to authenticated using (true);
@@ -37,7 +43,7 @@ create policy "team read" on public.profiles for select to authenticated using (
 do $$
 declare t text;
 begin
-  foreach t in array array['products','leads','partners','commissions','devis','referrals'] loop
+  foreach t in array array['products','leads','partners','commissions','devis','referrals','orders','formations','formationProgress'] loop
     execute format('drop policy if exists "team full access" on public.%I', t);
     execute format('create policy "team full access" on public.%I for all to authenticated using (true) with check (true)', t);
   end loop;
@@ -47,7 +53,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['products','leads','partners','commissions','devis','referrals'] loop
+  foreach t in array array['products','leads','partners','commissions','devis','referrals','orders','formations','formationProgress'] loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
     exception when duplicate_object then null;

@@ -7,12 +7,13 @@ import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import PartnersSection from './plus/PartnersSection';
 import MyPartnerDashboard from './plus/MyPartnerDashboard';
+import OrdersSection from './plus/OrdersSection';
 import { SyncStatusRow } from '../components/SyncStatus';
 
 export default function Plus() {
   const { user, logout } = useAuth();
   const {
-    partners, commissions, leads,
+    partners, commissions, leads, orders,
     getPartnerById, getLeadById,
     payCommission, addCommission,
   } = useData();
@@ -151,6 +152,14 @@ export default function Plus() {
               </div>
               <ChevronRight size={18} className="menu-item-arrow" />
             </button>
+            <button className="menu-item" onClick={() => setActiveTab('orders')}>
+              <div className="menu-item-icon"><DollarSign size={18} /></div>
+              <div className="menu-item-info">
+                <div className="menu-item-title">Commandes en ligne</div>
+                <div className="menu-item-subtitle">{(orders || []).filter((o) => o.status === 'initie').length} à confirmer</div>
+              </div>
+              <ChevronRight size={18} className="menu-item-arrow" />
+            </button>
             <button className="menu-item" onClick={() => setActiveTab('commissions')}>
               <div className="menu-item-icon warning"><DollarSign size={18} /></div>
               <div className="menu-item-info">
@@ -198,6 +207,7 @@ export default function Plus() {
         {activeTab === 'menu' && renderMenu()}
         {activeTab === 'partners' && renderPartners()}
         {activeTab === 'commissions' && renderCommissions()}
+        {activeTab === 'orders' && <OrdersSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
         {activeTab === 'profile' && renderProfile()}
       </div>

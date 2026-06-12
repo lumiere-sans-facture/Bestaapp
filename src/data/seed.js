@@ -51,6 +51,13 @@ export const commissions = [
   { id: 'c4', partnerId: 'p2', leadId: 'l2', amount: 55500, level: 1, status: 'en_attente', paidAt: null, createdAt: '2025-06-05' },
 ];
 
+// Modules de formation des techniciens (gérés ensuite par le gérant dans l'app)
+export const formations = [
+  { id: 'f1', title: 'Prise en main de l’application', description: 'Tour complet : suivi clients, devis, boutique, commissions et espace partenaire.', type: 'video', url: 'https://www.youtube.com/@bestasolar', duration: '15 min' },
+  { id: 'f2', title: 'Dimensionner une installation solaire', description: 'Méthode BestaSolar : calcul des charges, choix des panneaux, batteries et onduleur selon la ville.', type: 'video', url: 'https://www.youtube.com/@bestasolar', duration: '25 min' },
+  { id: 'f3', title: 'Règles du programme partenaire', description: 'Codes partenaires, commissions niveau 1 (3 %) et niveau 2 (1,5 %), validation et paiement Mobile Money.', type: 'pdf', url: 'https://www.bestasolar.com', duration: '10 min' },
+];
+
 export const productCategories = [
   { id: 'generateurs', label: 'Générateurs' },
   { id: 'onduleurs', label: 'Onduleurs' },

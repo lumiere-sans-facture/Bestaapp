@@ -581,8 +581,28 @@ textarea.input { resize: vertical; }
 .cart-row-price { font-size: 0.75rem; color: var(--text-secondary); }
 .cart-row-remove { color: var(--error); padding: 6px; border-radius: 8px; flex-shrink: 0; }
 .cart-row-remove:hover { background: var(--error-light); }
-.cart-actions { display: flex; gap: 10px; margin-top: 14px; }
-.cart-actions .btn-block { flex: 1; }
+.cart-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.cart-actions .btn-block { flex: 1; min-width: 150px; }
+
+/* Fiche produit détaillée + filtres boutique */
+.boutique-filters { margin-bottom: 14px; }
+.boutique-filters .sort-select { flex: 1; }
+.product-open { display: block; width: 100%; text-align: left; cursor: pointer; }
+.product-image-btn { padding: 0; }
+.detail-image {
+  width: 100%; height: 220px; object-fit: contain;
+  background: white; border: 1px solid var(--border); border-radius: 12px;
+  margin-bottom: 16px;
+}
+.payment-stub-note { margin: 10px 0 14px; }
+.payment-confirm { text-align: center; padding: 8px 0; }
+.payment-confirm-icon {
+  width: 64px; height: 64px; margin: 0 auto 12px;
+  background: var(--success-light); color: #047857;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.payment-confirm-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 8px; }
+.payment-confirm .btn { margin-top: 16px; }
 
 /* Fiche produit (gestion catalogue) */
 .photo-field { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 18px; }

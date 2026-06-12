@@ -17,6 +17,9 @@ const buildInitialState = () => ({
   commissions: seed.commissions,
   devis: [],
   referrals: [],
+  orders: [],
+  formations: seed.formations,
+  formationProgress: [],
 });
 
 // Partenaire actif correspondant à l'attribution d'affiliation en cours (?ref=…)
@@ -60,6 +63,9 @@ const loadState = () => {
       // Les anciens codes aléatoires (BESTA-XXXX) sont régénérés à partir du nom,
       // et le registre des parrainages est remappé vers les nouveaux codes.
       if (!saved.referrals) saved.referrals = [];
+      if (!saved.orders) saved.orders = [];
+      if (!saved.formations) saved.formations = seed.formations;
+      if (!saved.formationProgress) saved.formationProgress = [];
       const isNameBased = (p) => p.code && p.code.startsWith(`BESTA-${codeBaseFromName(p.name)}`);
       // 1re passe : réserver les codes déjà conformes (basés sur le nom)
       const codes = saved.partners.filter(isNameBased).map((p) => p.code);
@@ -421,6 +427,27 @@ export function DataProvider({ children }) {
           }),
         };
       }),
+
+    // Commande payée en ligne (Mobile Money — stub en attendant l'agrégateur)
+    addOrder: (order) => {
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      const full = {
+        ...order,
+        id: `o${Date.now()}`,
+        orderNumber: `CMD-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`,
+        status: 'initie', // initie → confirme → livre (ou annule)
+        createdAt: now.toISOString(),
+      };
+      setState((s) => ({ ...s, orders: [full, ...(s.orders || [])] }));
+      return full;
+    },
+
+    updateOrderStatus: (orderId, status) =>
+      setState((s) => ({
+        ...s,
+        orders: (s.orders || []).map((o) => (o.id === orderId ? { ...o, status } : o)),
+      })),
 
     resetData: () => setState(buildInitialState()),
   }), []);
