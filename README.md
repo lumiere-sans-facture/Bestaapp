@@ -54,3 +54,5 @@ Au premier démarrage connecté, l'app **pousse automatiquement son catalogue et
 - [React Router 6](https://reactrouter.com)
 - [Lucide](https://lucide.dev) pour les icônes
 - CSS natif (variables, grid, flexbox) — aucun framework CSS
+
+<!-- Déploiement : 2026-06-12T23:21 -->
