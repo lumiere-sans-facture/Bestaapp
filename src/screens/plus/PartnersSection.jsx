@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick } from 'lucide-react';
+import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick, Search } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate, initials } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
@@ -20,6 +20,9 @@ export default function PartnersSection({ onBack }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [copied, setCopied] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all | actif | inactif
+  const [sortBy, setSortBy] = useState('nom');
 
   const selected = partners.find((p) => p.id === selectedId);
 
@@ -99,8 +102,45 @@ export default function PartnersSection({ onBack }) {
         </button>
       </div>
       <div className="section-title">Réseau partenaires ({partners.length})</div>
+
+      <div className="search-box partners-search">
+        <Search size={18} className="search-icon" />
+        <input
+          className="input search-input"
+          placeholder="Nom, code, téléphone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <div className="list-toolbar">
+        <div className="categories-scroll">
+          {[['all', 'Tous'], ['actif', 'Actifs'], ['inactif', 'Inactifs']].map(([id, label]) => (
+            <button key={id} className={`category-chip ${statusFilter === id ? 'active' : ''}`} onClick={() => setStatusFilter(id)}>{label}</button>
+          ))}
+        </div>
+        <select className="input sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Trier les partenaires">
+          <option value="nom">Nom A → Z</option>
+          <option value="attente">Commissions en attente</option>
+          <option value="affaires">Affaires apportées</option>
+          <option value="recent">Plus récents</option>
+        </select>
+      </div>
+
       <div className="partners-list">
-        {partners.map((partner) => {
+        {partners
+          .filter((p) => statusFilter === 'all' || p.status === statusFilter)
+          .filter((p) => {
+            if (!search.trim()) return true;
+            const q = search.trim().toLowerCase();
+            return [p.name, p.code, p.phone, p.momoNumber].some((v) => v && v.toLowerCase().includes(q));
+          })
+          .sort((a, b) => {
+            if (sortBy === 'attente') return statsFor(b).pending - statsFor(a).pending;
+            if (sortBy === 'affaires') return statsFor(b).l1Leads.length - statsFor(a).l1Leads.length;
+            if (sortBy === 'recent') return new Date(b.registeredAt) - new Date(a.registeredAt);
+            return a.name.localeCompare(b.name, 'fr');
+          })
+          .map((partner) => {
           const st = statsFor(partner);
           const sponsor = partner.sponsorId ? getPartnerById(partner.sponsorId) : null;
           return (

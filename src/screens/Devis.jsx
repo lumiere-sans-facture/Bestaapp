@@ -1,11 +1,18 @@
 import { useState } from 'react';
-import { FileText, Plus, Sun, ShoppingCart, PanelTop, Download } from 'lucide-react';
+import { FileText, Plus, Sun, ShoppingCart, PanelTop, Download, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import ManualWizard from './devis/ManualWizard';
 import SolarWizard from './devis/SolarWizard';
+
+const SORT_OPTIONS = [
+  { id: 'recent', label: 'Plus récents' },
+  { id: 'ancien', label: 'Plus anciens' },
+  { id: 'montant-desc', label: 'Montant décroissant' },
+  { id: 'montant-asc', label: 'Montant croissant' },
+];
 
 export default function Devis() {
   const { user } = useAuth();
@@ -18,8 +25,29 @@ export default function Devis() {
   };
   // 'list' | 'choose' | 'solar' | 'manual'
   const [view, setView] = useState('list');
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all'); // all | solar | manual
+  const [sortBy, setSortBy] = useState('recent');
 
   const myDevis = user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id);
+
+  // Recherche (client, numéro, partenaire/code) + filtre type + tri
+  const visibleDevis = myDevis
+    .filter((d) => typeFilter === 'all' || (typeFilter === 'solar' ? d.type === 'solar' : d.type !== 'solar'))
+    .filter((d) => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      const lead = getLeadById(d.leadId);
+      const partner = d.partnerId ? getPartnerById(d.partnerId) : null;
+      return [d.devisNumber, lead?.name, lead?.contact, partner?.name, d.partnerCode || partner?.code]
+        .some((v) => v && v.toLowerCase().includes(q));
+    })
+    .sort((a, b) => {
+      if (sortBy === 'montant-desc') return b.total - a.total;
+      if (sortBy === 'montant-asc') return a.total - b.total;
+      const diff = new Date(b.createdAt) - new Date(a.createdAt);
+      return sortBy === 'ancien' ? -diff : diff;
+    });
 
   const backToList = () => setView('list');
 
@@ -31,9 +59,20 @@ export default function Devis() {
           title="Devis"
           subtitle={`${myDevis.length} devis créé(s)`}
           actions={
-            <button className="btn btn-accent" onClick={() => setView('choose')}>
-              <Plus size={18} /> Nouveau devis
-            </button>
+            <>
+              <div className="search-box">
+                <Search size={18} className="search-icon" />
+                <input
+                  className="input search-input"
+                  placeholder="Client, numéro, partenaire…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <button className="btn btn-accent" onClick={() => setView('choose')}>
+                <Plus size={18} /> Nouveau devis
+              </button>
+            </>
           }
         />
         <div className="page-content">
@@ -46,8 +85,20 @@ export default function Devis() {
               </button>
             </div>
           ) : (
+            <>
+            <div className="list-toolbar">
+              <div className="categories-scroll">
+                {[['all', 'Tous'], ['solar', 'Solaires'], ['manual', 'Manuels']].map(([id, label]) => (
+                  <button key={id} className={`category-chip ${typeFilter === id ? 'active' : ''}`} onClick={() => setTypeFilter(id)}>{label}</button>
+                ))}
+              </div>
+              <select className="input sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Trier les devis">
+                {SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+            </div>
+            {visibleDevis.length === 0 && <div className="empty-state card">Aucun devis ne correspond à votre recherche.</div>}
             <div className="devis-list">
-              {myDevis.map((d) => {
+              {visibleDevis.map((d) => {
                 const lead = getLeadById(d.leadId);
                 const isSolar = d.type === 'solar';
                 return (
@@ -85,6 +136,7 @@ export default function Devis() {
                 );
               })}
             </div>
+            </>
           )}
         </div>
       </div>
