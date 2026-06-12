@@ -10,7 +10,7 @@ const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste'
 export default function MyPartnerDashboard({ onBack }) {
   const { user } = useAuth();
   const {
-    partners, leads, commissions, referrals, stages, lostStage,
+    partners, leads, commissions, referrals, stages, lostStage, devis,
     ensurePartnerForUser, updatePartner, getPartnerById, getLeadById,
   } = useData();
   const [copied, setCopied] = useState(false);
@@ -130,6 +130,24 @@ export default function MyPartnerDashboard({ onBack }) {
               </div>
             ))}
           </>
+        )}
+      </div>
+
+      {/* Mes devis */}
+      <div className="card my-partner-section">
+        <div className="card-title">Mes devis ({(devis || []).filter((d) => d.partnerId === me.id).length})</div>
+        {(devis || []).filter((d) => d.partnerId === me.id).length ? (
+          (devis || []).filter((d) => d.partnerId === me.id).map((d) => (
+            <div key={d.id} className="sheet-row">
+              <span className="sheet-label">
+                {d.devisNumber} — {getLeadById(d.leadId)?.name || 'Client'}
+                <span className="text-secondary"> · {formatDate(d.createdAt)}</span>
+              </span>
+              <span className="sheet-value amount">{formatCFA(d.total)}</span>
+            </div>
+          ))
+        ) : (
+          <div className="text-sm text-secondary">Aucun devis rattaché pour le moment.</div>
         )}
       </div>
 

@@ -792,6 +792,22 @@ textarea.input { resize: vertical; }
 .affiliate-stats .partner-stat-value { display: flex; align-items: center; gap: 4px; font-size: 0.875rem; }
 .referral-history { border-top: 1px solid var(--border); padding-top: 4px; }
 
+/* Attribution automatique du partenaire (devis) */
+.partner-auto-box {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--success-light); border: 1px solid #a7f3d0;
+  border-radius: 10px; padding: 12px 14px; margin-top: 14px;
+}
+.partner-auto-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: white; color: #047857;
+}
+.partner-auto-info { flex: 1; min-width: 0; }
+.partner-auto-label { font-size: 0.6875rem; font-weight: 600; color: #047857; text-transform: uppercase; letter-spacing: 0.4px; }
+.partner-auto-name { font-size: 0.9375rem; font-weight: 600; }
+.partner-auto-box .btn { flex-shrink: 0; background: white; }
+
 /* Espace partenaire personnel */
 .my-affiliate-box { margin-bottom: 0; }
 .my-partner-kpis { margin-top: 16px; }

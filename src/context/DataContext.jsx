@@ -390,7 +390,9 @@ export function DataProvider({ children }) {
         const now = new Date();
         const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
         const devisNumber = `BS-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
-        let partnerId = devis.partnerId || null;
+        // Attribution automatique : partenaire choisi > parrain de la piste > lien d'affiliation
+        const lead = s.leads.find((l) => l.id === devis.leadId);
+        let partnerId = devis.partnerId || lead?.parrainL1 || null;
         let referrals = s.referrals || [];
         if (!partnerId) {
           const refPartner = partnerFromActiveRef(s.partners);
@@ -402,11 +404,14 @@ export function DataProvider({ children }) {
             ];
           }
         }
+        // Le code partenaire est figé sur le devis : il identifie l'apporteur
+        // même si le partenaire est renommé plus tard.
+        const partnerCode = s.partners.find((p) => p.id === partnerId)?.code || null;
         return {
           ...s,
           referrals,
           devis: [
-            { ...devis, partnerId, id: `d${Date.now()}`, devisNumber, createdAt: now.toISOString() },
+            { ...devis, partnerId, partnerCode, id: `d${Date.now()}`, devisNumber, createdAt: now.toISOString() },
             ...s.devis,
           ],
           leads: s.leads.map((l) => {
