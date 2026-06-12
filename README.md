@@ -57,3 +57,4 @@ Au premier démarrage connecté, l'app **pousse automatiquement son catalogue et
 
 <!-- Déploiement : 2026-06-12T23:21 -->
 <!-- Déploiement : 2026-06-12T23:27 -->
+<!-- Déploiement : 2026-06-12T23:47 -->
