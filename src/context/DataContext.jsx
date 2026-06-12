@@ -247,6 +247,10 @@ export function DataProvider({ children }) {
     ensurePartnerForUser: (user) =>
       setState((s) => {
         if (s.partners.some((p) => p.userId === user.id)) return s;
+        // Rattachement automatique : si un lien de parrainage (?ref=…) est
+        // actif sur l'appareil à la création du profil, son propriétaire
+        // devient le parrain — sans saisie manuelle.
+        const refPartner = partnerFromActiveRef(s.partners);
         return {
           ...s,
           partners: [
@@ -255,8 +259,12 @@ export function DataProvider({ children }) {
               userId: user.id,
               name: user.name,
               phone: user.phone || '',
+              email: user.email || '',
               momoNumber: '',
-              sponsorId: null,
+              photo: '',
+              zone: '',
+              tier: 'standard',
+              sponsorId: refPartner && refPartner.userId !== user.id ? refPartner.id : null,
               status: 'actif',
               registeredAt: new Date().toISOString().slice(0, 10),
               code: generatePartnerCode(user.name, s.partners.map((p) => p.code).filter(Boolean)),

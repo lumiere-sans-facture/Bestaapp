@@ -8,6 +8,8 @@ import Sheet from '../components/Sheet';
 import PartnersSection from './plus/PartnersSection';
 import MyPartnerDashboard from './plus/MyPartnerDashboard';
 import OrdersSection from './plus/OrdersSection';
+import MyProfile from './plus/MyProfile';
+import TeamSection from './plus/TeamSection';
 import { SyncStatusRow } from '../components/SyncStatus';
 
 export default function Plus() {
@@ -117,21 +119,7 @@ export default function Plus() {
     </>
   );
 
-  const renderProfile = () => (
-    <>
-      <BackButton />
-      <div className="profile-card card">
-        <div className="profile-avatar">{user.avatar}</div>
-        <div className="profile-name">{user.name}</div>
-        <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
-        <div className="profile-phone"><Phone size={14} /> {user.phone}</div>
-        <div className="profile-stats">
-          <div><div className="profile-stat-value">{userWonLeads.length}</div><div className="profile-stat-label">Affaires gagnées</div></div>
-          <div><div className="profile-stat-value">{formatCFA(userWonValue)}</div><div className="profile-stat-label">Total gagné</div></div>
-        </div>
-      </div>
-    </>
-  );
+  const renderProfile = () => <MyProfile onBack={() => setActiveTab('menu')} />;
 
   const renderMenu = () => (
     <div className="plus-grid">
@@ -144,6 +132,14 @@ export default function Plus() {
       <div className="plus-card card">
         {user.role === 'gerant' && (
           <>
+            <button className="menu-item" onClick={() => setActiveTab('team')}>
+              <div className="menu-item-icon"><Users size={18} /></div>
+              <div className="menu-item-info">
+                <div className="menu-item-title">Équipe</div>
+                <div className="menu-item-subtitle">Profils des techniciens et performances</div>
+              </div>
+              <ChevronRight size={18} className="menu-item-arrow" />
+            </button>
             <button className="menu-item" onClick={() => setActiveTab('partners')}>
               <div className="menu-item-icon success"><Users size={18} /></div>
               <div className="menu-item-info">
@@ -208,6 +204,7 @@ export default function Plus() {
         {activeTab === 'partners' && renderPartners()}
         {activeTab === 'commissions' && renderCommissions()}
         {activeTab === 'orders' && <OrdersSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'team' && <TeamSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
         {activeTab === 'profile' && renderProfile()}
       </div>

@@ -604,6 +604,27 @@ textarea.input { resize: vertical; }
 .payment-confirm-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 8px; }
 .payment-confirm .btn { margin-top: 16px; }
 
+/* Profil complet + statut Or */
+.profile-photo-btn { position: relative; display: inline-block; margin: 0 auto; }
+.profile-photo { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block; }
+.profile-photo-badge {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--primary); color: white;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid white;
+}
+.tier-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-left: 6px; padding: 1px 8px; vertical-align: middle;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #5b3a00;
+  border-radius: 6px; font-size: 0.6875rem; font-weight: 700;
+}
+.partner-avatar-photo { object-fit: cover; }
+.profile-edit-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.profile-edit-header .card-title { margin-bottom: 0; }
+.profile-edit-header + form { margin-top: 14px; }
+
 /* Fiche produit (gestion catalogue) */
 .photo-field { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 18px; }
 .photo-preview {
