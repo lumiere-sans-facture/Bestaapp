@@ -1,32 +1,49 @@
 import { useRef, useState } from 'react';
-import { Search, Plus, Pencil, Trash2, Camera, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, Pencil, Trash2, Camera, Check, ShoppingCart, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useCart } from '../context/CartContext';
 import { formatCFA } from '../utils/format';
 import { fileToResizedDataUrl } from '../utils/image';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
-
-const getStockStatus = (stock) => {
-  if (stock === 0) return { label: 'Rupture', class: 'out' };
-  if (stock <= 5) return { label: 'Stock faible', class: 'low' };
-  return { label: 'En stock', class: 'in-stock' };
-};
 
 const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', category: 'kits', image: '' };
 
 export default function Boutique() {
   const { user } = useAuth();
   const { products, productCategories, addProduct, updateProduct, deleteProduct } = useData();
+  const { items: cartItems, addItem, setQty, removeItem, clearCart, count } = useCart();
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [search, setSearch] = useState('');
   // null = fermé, 'new' = création, sinon id du produit en édition
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [justAdded, setJustAdded] = useState(null);
   const fileInputRef = useRef(null);
 
   const isManager = user.role === 'gerant';
   const getPrice = (basePrice) => (isManager ? Math.round(basePrice * 1.15) : basePrice);
+  const categoryLabel = (id) => productCategories.find((c) => c.id === id)?.label || '';
+
+  const handleAddToCart = (product) => {
+    addItem(product.id);
+    setJustAdded(product.id);
+    setTimeout(() => setJustAdded((cur) => (cur === product.id ? null : cur)), 1200);
+  };
+
+  const cartProducts = Object.entries(cartItems)
+    .map(([id, qty]) => ({ product: products.find((p) => p.id === id), qty }))
+    .filter((e) => e.product);
+  const cartTotal = cartProducts.reduce((s, e) => s + getPrice(e.product.basePrice) * e.qty, 0);
+
+  const goToDevis = () => {
+    setCartOpen(false);
+    navigate('/devis', { state: { fromCart: true } });
+  };
 
   const openNew = () => {
     setForm(EMPTY_FORM);
@@ -124,9 +141,13 @@ export default function Boutique() {
         </div>
         <div className="products-grid">
           {filtered.map((product) => {
-            const stockStatus = getStockStatus(product.stock);
+            const outOfStock = product.stock === 0;
             return (
-              <div key={product.id} className={`product-card ${product.stock === 0 ? 'product-unavailable' : ''}`}>
+              <div key={product.id} className={`product-card ${outOfStock ? 'product-unavailable' : ''}`}>
+                <div className="product-top">
+                  <div className="product-name">{product.name}</div>
+                  <div className="product-category">{categoryLabel(product.category)}</div>
+                </div>
                 <div className="product-image-wrap">
                   <img src={product.image} alt={product.name} className="product-image" loading="lazy" />
                   {isManager && (
@@ -134,21 +155,24 @@ export default function Boutique() {
                       <Pencil size={15} />
                     </button>
                   )}
+                  {outOfStock && <span className="oos-badge">Rupture</span>}
                 </div>
-                <div className="product-content">
-                  <div className="product-name">{product.name}</div>
-                  <div className="product-description">{product.description}</div>
-                  <div className="product-footer">
-                    <div>
-                      <div className="product-price">{formatCFA(getPrice(product.basePrice))}</div>
-                      {isManager && (
-                        <div className="product-price-alt">Technicien : {formatCFA(product.basePrice)}</div>
-                      )}
-                    </div>
-                    <div className={`stock-badge ${stockStatus.class}`}>
-                      {stockStatus.label}{product.stock > 0 && ` (${product.stock})`}
-                    </div>
+                <div className="product-description">{product.description}</div>
+                <div className="product-footer">
+                  <div>
+                    <div className="product-price">{formatCFA(getPrice(product.basePrice))}</div>
+                    {isManager && (
+                      <div className="product-price-alt">Tech. : {formatCFA(product.basePrice)}</div>
+                    )}
                   </div>
+                  <button
+                    className={`cart-add-btn ${justAdded === product.id ? 'added' : ''}`}
+                    disabled={outOfStock}
+                    onClick={() => handleAddToCart(product)}
+                    aria-label={`Ajouter ${product.name} au panier`}
+                  >
+                    {justAdded === product.id ? <Check size={19} /> : <ShoppingCart size={19} />}
+                  </button>
                 </div>
               </div>
             );
@@ -156,6 +180,45 @@ export default function Boutique() {
           {filtered.length === 0 && <div className="empty-state">Aucun produit ne correspond à votre recherche.</div>}
         </div>
       </div>
+
+      {/* Barre panier flottante */}
+      {count > 0 && (
+        <button className="cart-bar" onClick={() => setCartOpen(true)}>
+          <span className="cart-bar-count"><ShoppingCart size={17} /> {count}</span>
+          <span className="cart-bar-label">Voir le panier</span>
+          <span className="cart-bar-total">{formatCFA(cartTotal)}</span>
+        </button>
+      )}
+
+      {/* Panier */}
+      <Sheet open={cartOpen} onClose={() => setCartOpen(false)} title="Panier" subtitle={`${count} article(s)`}>
+        {cartProducts.map(({ product, qty }) => (
+          <div key={product.id} className="cart-row">
+            <img src={product.image} alt="" className="cart-row-img" />
+            <div className="cart-row-info">
+              <div className="cart-row-name">{product.name}</div>
+              <div className="cart-row-price">{formatCFA(getPrice(product.basePrice))}</div>
+            </div>
+            <div className="qty-stepper">
+              <button className="btn btn-sm btn-outline" onClick={() => setQty(product.id, qty - 1)}>−</button>
+              <span className="qty-value">{qty}</span>
+              <button className="btn btn-sm btn-outline" onClick={() => setQty(product.id, qty + 1)}>+</button>
+            </div>
+            <button className="cart-row-remove" onClick={() => removeItem(product.id)} aria-label="Retirer">
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))}
+        <div className="devis-summary">
+          <div className="devis-summary-row total"><span>Total</span><span>{formatCFA(cartTotal)}</span></div>
+        </div>
+        <div className="cart-actions">
+          <button className="btn btn-outline" onClick={() => { clearCart(); setCartOpen(false); }}>Vider</button>
+          <button className="btn btn-accent btn-block" onClick={goToDevis}>
+            <FileText size={17} /> Créer le devis
+          </button>
+        </div>
+      </Sheet>
 
       {/* Fiche produit (gérant) */}
       <Sheet

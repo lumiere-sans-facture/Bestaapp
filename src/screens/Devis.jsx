@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { FileText, Plus, Sun, ShoppingCart, PanelTop, Download, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useCart } from '../context/CartContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import ManualWizard from './devis/ManualWizard';
@@ -23,8 +25,13 @@ export default function Devis() {
     const { generateDevisPdf } = await import('../utils/devisPdf');
     generateDevisPdf(d, getLeadById(d.leadId), d.partnerId ? getPartnerById(d.partnerId) : null, products);
   };
+  // Arrivée depuis le panier de la boutique : assistant manuel pré-rempli
+  const location = useLocation();
+  const fromCart = Boolean(location.state?.fromCart);
+  const { items: cartItems, clearCart } = useCart();
+
   // 'list' | 'choose' | 'solar' | 'manual'
-  const [view, setView] = useState('list');
+  const [view, setView] = useState(fromCart ? 'manual' : 'list');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all'); // all | solar | manual
   const [sortBy, setSortBy] = useState('recent');
@@ -177,7 +184,14 @@ export default function Devis() {
         actions={<button className="btn btn-outline-light" onClick={backToList}>Annuler</button>}
       />
       <div className="page-content">
-        {view === 'solar' ? <SolarWizard onDone={backToList} /> : <ManualWizard onDone={backToList} />}
+        {view === 'solar' ? (
+          <SolarWizard onDone={backToList} />
+        ) : (
+          <ManualWizard
+            initialItems={fromCart ? cartItems : undefined}
+            onDone={() => { if (fromCart) clearCart(); backToList(); }}
+          />
+        )}
       </div>
     </div>
   );

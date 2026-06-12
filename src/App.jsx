@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
+import { CartProvider } from './context/CartContext';
 import { captureRefFromUrl } from './utils/referral';
 
 // Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
@@ -25,16 +26,18 @@ function AppRoutes() {
 
   return (
     <DataProvider>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/pipeline" element={<Pipeline />} />
-          <Route path="/boutique" element={<Boutique />} />
-          <Route path="/devis" element={<Devis />} />
-          <Route path="/plus" element={<Plus />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
+      <CartProvider>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/pipeline" element={<Pipeline />} />
+            <Route path="/boutique" element={<Boutique />} />
+            <Route path="/devis" element={<Devis />} />
+            <Route path="/plus" element={<Plus />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </CartProvider>
     </DataProvider>
   );
 }

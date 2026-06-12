@@ -6,13 +6,14 @@ import { formatCFA } from '../../utils/format';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
 
-export default function ManualWizard({ onDone }) {
+export default function ManualWizard({ onDone, initialItems }) {
   const { user } = useAuth();
   const { products, addDevis, leadsForUser, partners } = useData();
   const [step, setStep] = useState(1);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [partnerId, setPartnerId] = useState('');
-  const [items, setItems] = useState({});
+  // Pré-rempli depuis le panier de la boutique le cas échéant
+  const [items, setItems] = useState(() => ({ ...(initialItems || {}) }));
 
   const myLeads = leadsForUser(user);
   const availableLeads = myLeads.filter((l) => l.stage !== 'gagne' && l.stage !== 'perdu');
