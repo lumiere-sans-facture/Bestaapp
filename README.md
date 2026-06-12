@@ -56,3 +56,4 @@ Au premier démarrage connecté, l'app **pousse automatiquement son catalogue et
 - CSS natif (variables, grid, flexbox) — aucun framework CSS
 
 <!-- Déploiement : 2026-06-12T23:21 -->
+<!-- Déploiement : 2026-06-12T23:27 -->
