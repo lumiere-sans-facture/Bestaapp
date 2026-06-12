@@ -825,6 +825,13 @@ textarea.input { resize: vertical; }
 .sync-error { background: var(--error); }
 .sync-local { background: var(--text-muted); }
 @keyframes sync-pulse { 50% { opacity: 0.35; } }
+.sync-status-row {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin-top: 10px; padding: 5px 12px;
+  background: var(--bg); border-radius: 14px;
+  font-size: 0.75rem; color: var(--text-secondary);
+}
+.sync-status-row .sync-dot { margin-left: 0; }
 .partner-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .partner-avatar {
   width: 40px; height: 40px; flex-shrink: 0;

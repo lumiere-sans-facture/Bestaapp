@@ -7,6 +7,7 @@ import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import PartnersSection from './plus/PartnersSection';
 import MyPartnerDashboard from './plus/MyPartnerDashboard';
+import { SyncStatusRow } from '../components/SyncStatus';
 
 export default function Plus() {
   const { user, logout } = useAuth();
@@ -137,6 +138,7 @@ export default function Plus() {
         <div className="profile-avatar">{user.avatar}</div>
         <div className="profile-name">{user.name}</div>
         <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
+        <SyncStatusRow />
       </div>
       <div className="plus-card card">
         {user.role === 'gerant' && (

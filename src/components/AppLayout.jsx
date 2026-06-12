@@ -1,20 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useData } from '../context/DataContext';
-
-const SYNC_LABELS = {
-  online: ['sync-online', 'Synchronisé — données partagées en temps réel'],
-  connecting: ['sync-connecting', 'Connexion au serveur…'],
-  error: ['sync-error', 'Serveur injoignable — données locales'],
-  local: ['sync-local', 'Mode local — données sur cet appareil'],
-};
-
-function SyncDot() {
-  const { syncStatus } = useData();
-  const [cls, label] = SYNC_LABELS[syncStatus] || SYNC_LABELS.local;
-  return <span className={`sync-dot ${cls}`} title={label} aria-label={label} />;
-}
+import { SyncDot } from './SyncStatus';
 
 const navItems = [
   { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
