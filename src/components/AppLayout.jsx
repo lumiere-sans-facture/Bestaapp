@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useMode } from '../context/ModeContext';
 import { SyncDot } from './SyncStatus';
 
 const navItems = [
@@ -13,6 +14,7 @@ const navItems = [
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const { setMode, proActive } = useMode();
 
   return (
     <div className="app-shell">
@@ -38,6 +40,11 @@ export default function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-footer">
+          {proActive && (
+            <button className="btn btn-accent btn-block sidebar-pro-btn" onClick={() => setMode('pro')}>
+              <Crown size={16} /> Mode Pro
+            </button>
+          )}
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{user.avatar}</div>
             <div className="sidebar-user-info">
