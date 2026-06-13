@@ -29,3 +29,24 @@ export const computeMonthlyStats = (leads, months = 6) => {
   }
   return out;
 };
+
+/**
+ * Chiffre d'affaires Pro sur les N derniers mois (mois courant inclus),
+ * calculé depuis les factures encaissées (statut « payee »).
+ */
+export const computeMonthlyRevenue = (factures, months = 6) => {
+  const now = new Date();
+  const out = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const paid = factures.filter((f) => f.statut === 'payee' && sameMonth(f.createdAt, year, month));
+    out.push({
+      month: MONTH_LABELS[month],
+      revenue: paid.reduce((sum, f) => sum + (f.totalTTC || 0), 0),
+      count: paid.length,
+    });
+  }
+  return out;
+};
