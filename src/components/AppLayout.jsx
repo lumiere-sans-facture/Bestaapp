@@ -48,11 +48,6 @@ export default function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          {isPro && (
-            <button className="btn btn-outline btn-block sidebar-pro-btn" onClick={() => setMode('public')}>
-              <ArrowLeft size={16} /> Mode public
-            </button>
-          )}
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{user.avatar}</div>
             <div className="sidebar-user-info">
