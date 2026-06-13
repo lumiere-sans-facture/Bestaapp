@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
+import { useMode } from '../context/ModeContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
@@ -17,6 +18,7 @@ import { SyncStatusRow } from '../components/SyncStatus';
 
 export default function Plus() {
   const { user, logout } = useAuth();
+  const { setMode, proActive } = useMode();
   const {
     partners, commissions, leads, orders,
     getPartnerById, getLeadById,
@@ -133,6 +135,16 @@ export default function Plus() {
         <SyncStatusRow />
       </div>
       <div className="plus-card card">
+        {proActive && (
+          <button className="menu-item menu-item-pro" onClick={() => setMode('pro')}>
+            <div className="menu-item-icon warning"><Crown size={18} /></div>
+            <div className="menu-item-info">
+              <div className="menu-item-title">Passer en mode Pro</div>
+              <div className="menu-item-subtitle">Ouvrir mon espace entreprise (devis &amp; factures)</div>
+            </div>
+            <ChevronRight size={18} className="menu-item-arrow" />
+          </button>
+        )}
         {user.role === 'gerant' && (
           <>
             <button className="menu-item" onClick={() => setActiveTab('team')}>
