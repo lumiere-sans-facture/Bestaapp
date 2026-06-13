@@ -1,10 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
 import { SyncDot } from './SyncStatus';
 
-const navItems = [
+const publicNavItems = [
   { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
   { path: '/pipeline', label: 'Suivi clients', shortLabel: 'Clients', icon: FolderKanban },
   { path: '/boutique', label: 'Boutique', shortLabel: 'Boutique', icon: ShoppingCart },
@@ -12,18 +12,25 @@ const navItems = [
   { path: '/plus', label: 'Plus', shortLabel: 'Plus', icon: MoreHorizontal },
 ];
 
+const proNavItems = [
+  { path: '/pro', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
+  { path: '/pro/gestion', label: 'Devis & Factures', shortLabel: 'Gestion', icon: FileText },
+];
+
 export default function AppLayout() {
   const { user, logout } = useAuth();
-  const { setMode, proActive } = useMode();
+  const { mode, setMode } = useMode();
+  const isPro = mode === 'pro';
+  const navItems = isPro ? proNavItems : publicNavItems;
 
   return (
     <div className="app-shell">
       {/* Barre latérale — visible uniquement sur grand écran */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-logo"><Sun size={22} /></div>
+          <div className="sidebar-logo">{isPro ? <Crown size={22} /> : <Sun size={22} />}</div>
           <div>
-            <div className="sidebar-title">BestaSolar Pro</div>
+            <div className="sidebar-title">{isPro ? 'Espace Pro' : 'BestaSolar Pro'}</div>
             <div className="sidebar-subtitle">Parakou, Bénin</div>
           </div>
         </div>
@@ -32,6 +39,7 @@ export default function AppLayout() {
             <NavLink
               key={item.path}
               to={item.path}
+              end={item.path === '/pro'}
               className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
             >
               <item.icon size={20} strokeWidth={2} />
@@ -40,9 +48,9 @@ export default function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          {proActive && (
-            <button className="btn btn-accent btn-block sidebar-pro-btn" onClick={() => setMode('pro')}>
-              <Crown size={16} /> Mode Pro
+          {isPro && (
+            <button className="btn btn-outline btn-block sidebar-pro-btn" onClick={() => setMode('public')}>
+              <ArrowLeft size={16} /> Mode public
             </button>
           )}
           <div className="sidebar-user">
@@ -68,12 +76,19 @@ export default function AppLayout() {
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.path === '/pro'}
             className={({ isActive }) => `tab-item ${isActive ? 'active' : ''}`}
           >
             <item.icon size={22} strokeWidth={2} />
             <span>{item.shortLabel}</span>
           </NavLink>
         ))}
+        {isPro && (
+          <button className="tab-item" onClick={() => setMode('public')}>
+            <ArrowLeft size={22} strokeWidth={2} />
+            <span>Retour</span>
+          </button>
+        )}
       </nav>
     </div>
   );

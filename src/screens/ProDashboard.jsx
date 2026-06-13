@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { computeMonthlyRevenue } from '../utils/stats';
+import PageHeader from '../components/PageHeader';
 
 const STATUT_BADGE = {
   payee: ['badge-success', 'Payée'],
@@ -46,7 +47,12 @@ export default function ProDashboard() {
   const recentFactures = myFactures.slice(0, 6);
 
   return (
-    <>
+    <div className="page">
+      <PageHeader
+        title={company?.nomEntreprise || 'Mon Entreprise'}
+        subtitle="Espace Pro — tableau de bord"
+      />
+      <div className="page-content">
       {!company?.nomEntreprise && (
         <div className="pro-alert">
           <Building2 size={17} />
@@ -119,6 +125,7 @@ export default function ProDashboard() {
           </div>
         </div>
       </div>
-    </>
+      </div>
+    </div>
   );
 }
