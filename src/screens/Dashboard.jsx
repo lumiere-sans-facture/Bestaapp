@@ -1,26 +1,13 @@
-import { useState } from 'react';
-import { TrendingUp, Users, Target, Package, Wrench, Crown } from 'lucide-react';
+import { TrendingUp, Users, Target, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA } from '../utils/format';
 import { computeMonthlyStats } from '../utils/stats';
-import { isSubscriptionActive } from '../utils/subscription';
 import PageHeader from '../components/PageHeader';
-import ProDashboard from './ProDashboard';
-
-const SPACE_KEY = 'bestasolar_dashboard_space';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { products, stages, leadsForUser, leads, getSubscriptionForUser, getCompanyForUser } = useData();
-
-  const isPro = isSubscriptionActive(getSubscriptionForUser(user.id));
-  const [space, setSpace] = useState(() => (isPro ? localStorage.getItem(SPACE_KEY) || 'tech' : 'tech'));
-  const showPro = isPro && space === 'pro';
-  const switchSpace = (next) => {
-    setSpace(next);
-    localStorage.setItem(SPACE_KEY, next);
-  };
+  const { products, stages, leadsForUser, leads } = useData();
 
   const myLeads = leadsForUser(user);
   const pipelineValue = myLeads.filter((l) => l.stage !== 'gagne').reduce((sum, l) => sum + l.estimatedValue, 0);
@@ -28,7 +15,6 @@ export default function Dashboard() {
   const winRate = myLeads.length > 0 ? Math.round((wonLeads.length / myLeads.length) * 100) : 0;
   const outOfStock = products.filter((p) => p.stock === 0).length;
   const lowStock = products.filter((p) => p.stock > 0 && p.stock <= 5).length;
-  // Courbes vivantes : calculées depuis le suivi réel des clients
   const monthlyData = computeMonthlyStats(myLeads);
   const maxLeads = Math.max(1, ...monthlyData.map((m) => m.leads), ...monthlyData.map((m) => m.won));
   const sixMonthRevenue = monthlyData.reduce((sum, m) => sum + m.revenue, 0);
@@ -38,28 +24,10 @@ export default function Dashboard() {
   if (outOfStock > 0) alerts.push({ id: 1, message: `${outOfStock} produit(s) en rupture de stock`, priority: 'high' });
   if (lowStock > 0) alerts.push({ id: 2, message: `${lowStock} produit(s) avec stock faible`, priority: 'medium' });
 
-  const proName = getCompanyForUser(user.id)?.nomEntreprise;
-
   return (
     <div className="page">
-      <PageHeader
-        title={showPro ? (proName || 'Mon Entreprise') : `Bonjour, ${user.name.split(' ')[0]}`}
-        subtitle={showPro ? 'Espace Pro — tableau de bord business' : dateStr}
-      />
+      <PageHeader title={`Bonjour, ${user.name.split(' ')[0]}`} subtitle={dateStr} />
       <div className="page-content">
-        {isPro && (
-          <div className="categories-scroll space-switcher">
-            <button className={`category-chip ${!showPro ? 'active' : ''}`} onClick={() => switchSpace('tech')}>
-              <Wrench size={14} /> Technicien
-            </button>
-            <button className={`category-chip ${showPro ? 'active' : ''}`} onClick={() => switchSpace('pro')}>
-              <Crown size={14} /> Mon Entreprise
-            </button>
-          </div>
-        )}
-
-        {showPro ? <ProDashboard /> : (
-        <>
         <div className="kpi-grid">
           <div className="kpi-card highlight">
             <div className="kpi-icon"><TrendingUp size={20} /></div>
@@ -149,8 +117,6 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        </>
-        )}
       </div>
     </div>
   );

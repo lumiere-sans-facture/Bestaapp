@@ -9,13 +9,14 @@ import { captureRefFromUrl } from './utils/referral';
 // avant même la connexion — durée 30 jours, last-click.
 captureRefFromUrl();
 import AppLayout from './components/AppLayout';
-import ProApp from './ProApp';
 import Login from './screens/Login';
 import Dashboard from './screens/Dashboard';
 import Pipeline from './screens/Pipeline';
 import Boutique from './screens/Boutique';
 import Devis from './screens/Devis';
 import Plus from './screens/Plus';
+import ProDashboard from './screens/ProDashboard';
+import ProGestion from './screens/pro/ProGestion';
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -37,14 +38,23 @@ function AppRoutes() {
   );
 }
 
-// Bascule exclusive entre les deux vues : une seule est montée à la fois.
-// mode === 'pro'  → uniquement <ProApp /> (espace entreprise)
-// mode === 'public' → uniquement l'app publique (tableau de bord, suivi clients…)
-// Zéro superposition, zéro fuite de données entre les deux.
+// Bascule exclusive : une seule arborescence de routes montée à la fois.
+// mode === 'pro'    → routes Pro dans AppLayout (zéro donnée publique visible)
+// mode === 'public' → routes publiques dans AppLayout
 function ModeSwitch() {
   const { mode } = useMode();
 
-  if (mode === 'pro') return <ProApp />;
+  if (mode === 'pro') {
+    return (
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/pro" element={<ProDashboard />} />
+          <Route path="/pro/gestion" element={<ProGestion />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/pro" replace />} />
+      </Routes>
+    );
+  }
 
   return (
     <Routes>
