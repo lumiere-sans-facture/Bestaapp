@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, Plus, Pencil, Check, PlayCircle, FileText, Clock, ExternalLink, Trash2, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { toEmbed } from '../../utils/video';
 import Sheet from '../../components/Sheet';
 
 const EMPTY_FORM = { title: '', description: '', type: 'video', url: '', duration: '' };
@@ -15,6 +16,8 @@ export default function FormationSection({ onBack }) {
   // null = fermé, 'new' = création, sinon id du module en édition
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  // Lecteur intégré : module en cours de visionnage
+  const [watching, setWatching] = useState(null);
 
   const isManager = user.role === 'gerant';
 
@@ -25,8 +28,16 @@ export default function FormationSection({ onBack }) {
 
   const openModule = (formation) => {
     if (!progressFor(formation.id)) setFormationProgress(user.id, formation.id, 'en_cours');
-    window.open(formation.url, '_blank', 'noopener');
+    // Vidéos YouTube/Vimeo/mp4 : lecture directement dans l'app.
+    // Seuls les documents (PDF…) s'ouvrent à l'extérieur.
+    if (formation.type !== 'pdf' && toEmbed(formation.url)) {
+      setWatching(formation);
+    } else {
+      window.open(formation.url, '_blank', 'noopener');
+    }
   };
+
+  const watchingEmbed = watching ? toEmbed(watching.url) : null;
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing('new'); };
   const openEdit = (f) => {
@@ -108,7 +119,8 @@ export default function FormationSection({ onBack }) {
               <p className="formation-desc">{f.description}</p>
               <div className="cart-actions">
                 <button className="btn btn-primary btn-block" onClick={() => openModule(f)}>
-                  <ExternalLink size={15} /> {status ? 'Reprendre' : 'Commencer'}
+                  {f.type !== 'pdf' && toEmbed(f.url) ? <PlayCircle size={15} /> : <ExternalLink size={15} />}
+                  {' '}{status ? 'Reprendre' : 'Commencer'}
                 </button>
                 {status !== 'complete' ? (
                   <button className="btn btn-won btn-block" onClick={() => setFormationProgress(user.id, f.id, 'complete')}>
@@ -127,6 +139,46 @@ export default function FormationSection({ onBack }) {
           <div className="empty-state card">Aucun module de formation pour le moment.</div>
         )}
       </div>
+
+      {/* Lecteur vidéo intégré : la vidéo se regarde sans quitter l'app */}
+      <Sheet
+        open={!!watching}
+        onClose={() => setWatching(null)}
+        title={watching?.title}
+        subtitle={watching?.duration ? `Durée : ${watching.duration}` : undefined}
+      >
+        {watchingEmbed && (
+          <>
+            <div className="video-embed">
+              {watchingEmbed.kind === 'iframe' ? (
+                <iframe
+                  src={watchingEmbed.src}
+                  title={watching.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  allowFullScreen
+                />
+              ) : (
+                <video src={watchingEmbed.src} controls autoPlay playsInline />
+              )}
+            </div>
+            {watching.description && <p className="formation-desc video-desc">{watching.description}</p>}
+            <div className="cart-actions">
+              {progressFor(watching.id) !== 'complete' ? (
+                <button
+                  className="btn btn-won btn-block"
+                  onClick={() => { setFormationProgress(user.id, watching.id, 'complete'); setWatching(null); }}
+                >
+                  <Check size={15} /> Marquer terminé
+                </button>
+              ) : (
+                <button className="btn btn-outline btn-block" onClick={() => setWatching(null)}>
+                  Fermer
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </Sheet>
 
       {/* Gestion des modules (gérant) */}
       <Sheet
@@ -157,8 +209,9 @@ export default function FormationSection({ onBack }) {
             </div>
           </div>
           <div className="input-group">
-            <label className="input-label">Lien (YouTube, PDF…) *</label>
+            <label className="input-label">Lien (YouTube, Vimeo, mp4, PDF…) *</label>
             <input className="input" type="url" required value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://…" />
+            <div className="field-hint">Les vidéos YouTube/Vimeo se lisent directement dans l'application.</div>
           </div>
           <button type="submit" className="btn btn-primary btn-block">
             <Check size={18} /> {editing === 'new' ? 'Ajouter le module' : 'Enregistrer'}
