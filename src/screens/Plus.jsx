@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
@@ -23,9 +22,7 @@ export default function Plus() {
     getPartnerById, getLeadById,
     payCommission, addCommission,
   } = useData();
-  // Permet un lien direct vers une section (ex. /plus?section=devispro depuis l'espace Pro)
-  const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('section') || 'menu');
+  const [activeTab, setActiveTab] = useState('menu');
   const [comFilter, setComFilter] = useState('all');
   const [showAddCommission, setShowAddCommission] = useState(false);
   const [newCommission, setNewCommission] = useState({ partnerId: '', leadId: '', level: 1, amount: '' });

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA } from '../utils/format';
 import { computeMonthlyStats } from '../utils/stats';
+import { isSubscriptionActive } from '../utils/subscription';
 import PageHeader from '../components/PageHeader';
 import ProDashboard from './ProDashboard';
 
@@ -11,14 +12,11 @@ const SPACE_KEY = 'bestasolar_dashboard_space';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { products, stages, leadsForUser, leads, getCompanyForUser } = useData();
+  const { products, stages, leadsForUser, leads, getSubscriptionForUser, getCompanyForUser } = useData();
 
-  // L'espace « Mon Entreprise » concerne les techniciens (le gérant gère les
-  // abonnements, il n'a pas d'espace pro personnel). Le sélecteur est visible
-  // même sans abonnement : l'espace Pro affiche alors une invitation à s'abonner.
-  const canSeePro = user.role !== 'gerant';
-  const [space, setSpace] = useState(() => localStorage.getItem(SPACE_KEY) || 'tech');
-  const showPro = canSeePro && space === 'pro';
+  const isPro = isSubscriptionActive(getSubscriptionForUser(user.id));
+  const [space, setSpace] = useState(() => (isPro ? localStorage.getItem(SPACE_KEY) || 'tech' : 'tech'));
+  const showPro = isPro && space === 'pro';
   const switchSpace = (next) => {
     setSpace(next);
     localStorage.setItem(SPACE_KEY, next);
@@ -49,7 +47,7 @@ export default function Dashboard() {
         subtitle={showPro ? 'Espace Pro — tableau de bord business' : dateStr}
       />
       <div className="page-content">
-        {canSeePro && (
+        {isPro && (
           <div className="categories-scroll space-switcher">
             <button className={`category-chip ${!showPro ? 'active' : ''}`} onClick={() => switchSpace('tech')}>
               <Wrench size={14} /> Technicien
