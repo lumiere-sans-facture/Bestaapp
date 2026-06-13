@@ -1,7 +1,6 @@
-import { Wallet, AlertCircle, Users, FileCheck, Building2, Receipt, ArrowLeft } from 'lucide-react';
+import { Wallet, AlertCircle, Users, FileCheck, Building2, Receipt } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { useMode } from '../context/ModeContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { computeMonthlyRevenue } from '../utils/stats';
 import PageHeader from '../components/PageHeader';
@@ -27,7 +26,6 @@ const isThisMonth = (iso) => {
 export default function ProDashboard() {
   const { user } = useAuth();
   const { factures, getCompanyForUser } = useData();
-  const { setMode } = useMode();
 
   const company = getCompanyForUser(user.id);
   const myFactures = (factures || []).filter((f) => f.userId === user.id);
@@ -53,11 +51,6 @@ export default function ProDashboard() {
       <PageHeader
         title={company?.nomEntreprise || 'Mon Entreprise'}
         subtitle="Espace Pro — tableau de bord"
-        actions={(
-          <button className="btn btn-outline btn-sm" onClick={() => setMode('public')}>
-            <ArrowLeft size={16} /> Mode public
-          </button>
-        )}
       />
       <div className="page-content">
       {!company?.nomEntreprise && (
