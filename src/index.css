@@ -918,6 +918,62 @@ textarea.input { resize: vertical; }
 .affiliate-stats .partner-stat-value { display: flex; align-items: center; gap: 4px; font-size: 0.875rem; }
 .referral-history { border-top: 1px solid var(--border); padding-top: 4px; }
 
+/* ============ Module Devis Pro ============ */
+.badge-gold { background: var(--warning-light); color: var(--accent-dark); display: inline-flex; align-items: center; gap: 4px; }
+
+.pro-paywall { text-align: center; padding: 28px 22px; max-width: 560px; }
+.pro-paywall-icon {
+  width: 64px; height: 64px; margin: 0 auto 12px;
+  background: var(--warning-light); color: var(--accent-dark);
+  border-radius: 18px; display: flex; align-items: center; justify-content: center;
+}
+.pro-paywall-title { font-size: 1.375rem; font-weight: 700; }
+.pro-paywall-price { color: var(--text-secondary); margin: 4px 0 16px; }
+.pro-paywall-price strong { color: var(--primary); font-size: 1.25rem; }
+.pro-benefits { list-style: none; text-align: left; margin: 0 auto 20px; max-width: 420px; display: flex; flex-direction: column; gap: 8px; }
+.pro-benefits li { display: flex; gap: 8px; align-items: flex-start; font-size: 0.875rem; }
+.pro-benefits svg { color: var(--success); flex-shrink: 0; margin-top: 2px; }
+.pro-subscribe-form { text-align: left; }
+.pro-pending {
+  display: flex; gap: 10px; align-items: flex-start; text-align: left;
+  background: var(--warning-light); border-radius: 10px; padding: 14px;
+}
+.pro-pending svg { color: var(--accent-dark); flex-shrink: 0; margin-top: 2px; }
+.pro-expired-note { margin-top: 12px; }
+
+.pro-alert {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--warning-light); border-radius: 10px;
+  padding: 11px 14px; margin-bottom: 14px; font-size: 0.875rem;
+}
+.pro-alert svg { color: var(--accent-dark); flex-shrink: 0; }
+.pro-alert span { flex: 1; min-width: 180px; }
+.pro-tabs { margin-bottom: 14px; }
+.pro-actions-row { display: flex; gap: 10px; margin-bottom: 4px; }
+.pro-doc-actions { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* Aperçu en direct de l'identité */
+.pro-preview { border: 1.5px solid; border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.pro-preview-band { display: flex; align-items: center; gap: 10px; padding: 12px 14px; color: white; }
+.pro-preview-logo { width: 38px; height: 38px; border-radius: 9px; object-fit: contain; background: white; flex-shrink: 0; }
+.pro-preview-initials { display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; }
+.pro-preview-name { font-weight: 700; font-size: 0.9375rem; }
+.pro-preview-slogan { font-size: 0.6875rem; opacity: 0.8; }
+.pro-preview-doc { margin-left: auto; font-weight: 800; letter-spacing: 1px; }
+.pro-preview-line { height: 3px; }
+.pro-preview-meta { padding: 8px 14px; font-size: 0.71875rem; color: var(--text-secondary); background: white; }
+.pro-logo-row { margin-bottom: 14px; }
+.pro-color-input { height: 46px; padding: 4px; cursor: pointer; }
+
+/* Lignes de facture */
+.facture-ligne { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.facture-ligne .input:first-child { flex: 1; }
+.facture-qty { width: 64px; flex-shrink: 0; }
+.facture-pu { width: 100px; flex-shrink: 0; }
+.facture-add-ligne { margin-bottom: 14px; }
+.pro-tva-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; margin: 4px 0 14px; cursor: pointer; }
+.pro-tva-toggle input { width: 17px; height: 17px; accent-color: var(--primary); }
+
 /* Lecteur vidéo intégré (formation) */
 .video-embed {
   position: relative; width: 100%; aspect-ratio: 16 / 9;
