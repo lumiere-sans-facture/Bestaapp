@@ -1,8 +1,10 @@
-import { Wallet, AlertCircle, Users, FileCheck, Building2, Receipt } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Wallet, AlertCircle, Users, FileCheck, Building2, Receipt, Crown, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { computeMonthlyRevenue } from '../utils/stats';
+import { isSubscriptionActive, SUBSCRIPTION_PRICE } from '../utils/subscription';
 
 const STATUT_BADGE = {
   payee: ['badge-success', 'Payée'],
@@ -20,11 +22,37 @@ const isThisMonth = (iso) => {
 /**
  * Corps du tableau de bord « Mon Entreprise » (espace Pro).
  * Rendu à l'intérieur de l'écran Dashboard, sous le sélecteur d'espace.
- * Suppose un abonnement actif (le sélecteur n'apparaît que dans ce cas).
+ * Sans abonnement actif : affiche une invitation à activer Devis Pro.
  */
 export default function ProDashboard() {
   const { user } = useAuth();
-  const { factures, getCompanyForUser } = useData();
+  const { factures, getCompanyForUser, getSubscriptionForUser } = useData();
+  const navigate = useNavigate();
+
+  const active = isSubscriptionActive(getSubscriptionForUser(user.id));
+
+  // Espace verrouillé : invitation à s'abonner (le sélecteur reste visible pour tous).
+  if (!active) {
+    return (
+      <div className="pro-paywall card">
+        <div className="pro-paywall-icon"><Crown size={30} /></div>
+        <h2 className="pro-paywall-title">Votre espace Mon Entreprise</h2>
+        <p className="pro-paywall-price"><strong>{formatCFA(SUBSCRIPTION_PRICE)}</strong> / mois</p>
+        <p className="text-secondary pro-paywall-pitch">
+          Un deuxième tableau de bord à votre image : suivez votre chiffre d'affaires,
+          vos factures et vos clients, et éditez des documents à votre marque.
+        </p>
+        <ul className="pro-benefits">
+          <li><Check size={15} /> Tableau de bord business : <strong>CA, impayés, clients</strong></li>
+          <li><Check size={15} /> Devis et factures à <strong>votre entreprise</strong> (logo, couleurs)</li>
+          <li><Check size={15} /> Factures numérotées + conversion devis → facture</li>
+        </ul>
+        <button className="btn btn-accent btn-block btn-lg" onClick={() => navigate('/plus?section=devispro')}>
+          <Crown size={18} /> Activer Mon Entreprise
+        </button>
+      </div>
+    );
+  }
 
   const company = getCompanyForUser(user.id);
   const myFactures = (factures || []).filter((f) => f.userId === user.id);
