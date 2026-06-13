@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { formatCFA, formatDate } from '../utils/format';
+import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import PartnersSection from './plus/PartnersSection';
@@ -12,7 +13,6 @@ import OrdersSection from './plus/OrdersSection';
 import MyProfile from './plus/MyProfile';
 import TeamSection from './plus/TeamSection';
 import FormationSection from './plus/FormationSection';
-import DevisProSection from './plus/DevisProSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import { SyncStatusRow } from '../components/SyncStatus';
 
@@ -23,11 +23,33 @@ export default function Plus() {
     partners, commissions, leads, orders,
     getPartnerById, getLeadById,
     payCommission, addCommission,
+    getSubscriptionForUser, requestSubscription,
   } = useData();
+
+  const sub = getSubscriptionForUser(user.id);
+  const subStatus = effectiveStatus(sub);
+
   const [activeTab, setActiveTab] = useState('menu');
   const [comFilter, setComFilter] = useState('all');
   const [showAddCommission, setShowAddCommission] = useState(false);
   const [newCommission, setNewCommission] = useState({ partnerId: '', leadId: '', level: 1, amount: '' });
+  const [subSheetOpen, setSubSheetOpen] = useState(false);
+  const [subForm, setSubForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
+  const [subSent, setSubSent] = useState(false);
+
+  const handleProClick = () => {
+    if (proActive) {
+      setMode('pro');
+    } else {
+      setSubSheetOpen(true);
+    }
+  };
+
+  const handleSubSubmit = (e) => {
+    e.preventDefault();
+    requestSubscription(user.id, subForm);
+    setSubSent(true);
+  };
 
   const userWonLeads = leads.filter((l) => l.assignedTo === user.id && l.stage === 'gagne');
   const userWonValue = userWonLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
@@ -135,16 +157,16 @@ export default function Plus() {
         <SyncStatusRow />
       </div>
       <div className="plus-card card">
-        {proActive && (
-          <button className="menu-item menu-item-pro" onClick={() => setMode('pro')}>
-            <div className="menu-item-icon warning"><Crown size={18} /></div>
-            <div className="menu-item-info">
-              <div className="menu-item-title">Passer en mode Pro</div>
-              <div className="menu-item-subtitle">Ouvrir mon espace entreprise (devis &amp; factures)</div>
+        <button className="menu-item menu-item-pro" onClick={handleProClick}>
+          <div className="menu-item-icon warning"><Crown size={18} /></div>
+          <div className="menu-item-info">
+            <div className="menu-item-title">Passer en mode Pro</div>
+            <div className="menu-item-subtitle">
+              {proActive ? 'Ouvrir mon espace entreprise (devis & factures)' : `Devis & factures pro — ${formatCFA(SUBSCRIPTION_PRICE)}/mois`}
             </div>
-            <ChevronRight size={18} className="menu-item-arrow" />
-          </button>
-        )}
+          </div>
+          <ChevronRight size={18} className="menu-item-arrow" />
+        </button>
         {user.role === 'gerant' && (
           <>
             <button className="menu-item" onClick={() => setActiveTab('team')}>
@@ -190,16 +212,6 @@ export default function Plus() {
               <ChevronRight size={18} className="menu-item-arrow" />
             </button>
           </>
-        )}
-        {user.role !== 'gerant' && (
-          <button className="menu-item" onClick={() => setActiveTab('devispro')}>
-            <div className="menu-item-icon warning"><Crown size={18} /></div>
-            <div className="menu-item-info">
-              <div className="menu-item-title">Devis Pro</div>
-              <div className="menu-item-subtitle">Devis et factures à votre image — {formatCFA(5000)}/mois</div>
-            </div>
-            <ChevronRight size={18} className="menu-item-arrow" />
-          </button>
         )}
         <button className="menu-item" onClick={() => setActiveTab('formation')}>
           <div className="menu-item-icon success"><GraduationCap size={18} /></div>
@@ -247,7 +259,6 @@ export default function Plus() {
         {activeTab === 'orders' && <OrdersSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'team' && <TeamSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
-        {activeTab === 'devispro' && <DevisProSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'subsadmin' && <SubscriptionsAdmin onBack={() => setActiveTab('menu')} />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
         {activeTab === 'profile' && renderProfile()}
@@ -303,6 +314,56 @@ export default function Plus() {
           </div>
           <button type="submit" className="btn btn-primary btn-block"><PlusIcon size={18} /> Créer la commission</button>
         </form>
+      </Sheet>
+
+      {/* Abonnement Devis Pro */}
+      <Sheet open={subSheetOpen} onClose={() => { setSubSheetOpen(false); setSubSent(false); }} title="Passer en mode Pro">
+        <div className="pro-paywall-icon" style={{ textAlign: 'center', marginBottom: 8 }}><Crown size={28} /></div>
+        <p className="pro-paywall-price" style={{ textAlign: 'center', marginBottom: 16 }}>
+          <strong>{formatCFA(SUBSCRIPTION_PRICE)}</strong> / mois
+        </p>
+        <ul className="pro-benefits" style={{ marginBottom: 20 }}>
+          <li><Check size={15} /> Devis personnalisés à <strong>votre entreprise</strong></li>
+          <li><Check size={15} /> Génération de <strong>factures</strong> numérotées</li>
+          <li><Check size={15} /> <strong>3 modèles</strong> de mise en page professionnels</li>
+          <li><Check size={15} /> Conversion devis → facture en un clic</li>
+        </ul>
+
+        {subSent || subStatus === 'en_attente_paiement' ? (
+          <div className="pro-pending">
+            <Clock size={18} />
+            <div>
+              <strong>Paiement en attente de validation</strong>
+              <div className="text-sm text-secondary">
+                Votre abonnement sera activé dès que le gérant aura confirmé la réception de votre paiement.
+              </div>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubSubmit}>
+            <div className="form-row-2">
+              <div className="input-group">
+                <label className="input-label">Opérateur</label>
+                <select className="input" value={subForm.methode} onChange={(e) => setSubForm({ ...subForm, methode: e.target.value })}>
+                  <option value="momo">MTN MoMo</option>
+                  <option value="moov">Moov Money</option>
+                </select>
+              </div>
+              <div className="input-group">
+                <label className="input-label">Votre numéro</label>
+                <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+229 ..." />
+              </div>
+            </div>
+            <div className="input-group">
+              <label className="input-label">Référence de la transaction (optionnel)</label>
+              <input className="input" value={subForm.reference} onChange={(e) => setSubForm({ ...subForm, reference: e.target.value })} placeholder="Ex : ID du transfert MoMo" />
+              <div className="field-hint">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} au +229 016 173 2956, puis validez.</div>
+            </div>
+            <button type="submit" className="btn btn-accent btn-block btn-lg">
+              <Crown size={18} /> S'abonner — {formatCFA(SUBSCRIPTION_PRICE)}/mois
+            </button>
+          </form>
+        )}
       </Sheet>
     </div>
   );
