@@ -1143,4 +1143,3 @@ textarea.input { resize: vertical; }
 /* Sélecteur d'espace Technicien / Mon Entreprise (tableau de bord) */
 .space-switcher { margin-bottom: 20px; }
 .space-switcher .category-chip { display: inline-flex; align-items: center; gap: 6px; }
-.pro-paywall-pitch { margin: 0 0 16px; }
