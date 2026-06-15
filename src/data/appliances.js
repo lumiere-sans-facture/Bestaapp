@@ -6,11 +6,11 @@ export const applianceCategories = [
   {
     label: 'Climatisation',
     items: [
-      { id: 'ac3cv', name: 'Climatiseur 3 CV', power: 2200, day: 4, night: 0 },
-      { id: 'ac25cv', name: 'Climatiseur 2.5 CV', power: 1850, day: 4, night: 0 },
-      { id: 'ac2cv', name: 'Climatiseur 2 CV', power: 1500, day: 4, night: 0 },
-      { id: 'ac15cv', name: 'Climatiseur 1.5 CV', power: 1100, day: 4, night: 0 },
-      { id: 'ac1cv', name: 'Climatiseur 1 CV', power: 735, day: 4, night: 0 },
+      { id: 'ac3cv', name: 'Climatiseur 3 CV', power: 2200, day: 4, night: 4 },
+      { id: 'ac25cv', name: 'Climatiseur 2.5 CV', power: 1850, day: 4, night: 4 },
+      { id: 'ac2cv', name: 'Climatiseur 2 CV', power: 1500, day: 3, night: 4 },
+      { id: 'ac15cv', name: 'Climatiseur 1.5 CV', power: 1100, day: 3, night: 4 },
+      { id: 'ac1cv', name: 'Climatiseur 1 CV', power: 735, day: 3, night: 4 },
     ],
   },
   {

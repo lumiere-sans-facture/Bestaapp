@@ -16,7 +16,7 @@ const MODELES = [
 const EMPTY_COMPANY = {
   nomEntreprise: '', logo: '', telephone: '', email: '', adresse: '',
   ifu: '', rccm: '', couleurPrimaire: '#0a2472', couleurSecondaire: '#f5a623',
-  slogan: '', modeleDefaut: 'classique', facturePrefix: 'FAC',
+  slogan: '', modeleDefaut: 'classique', facturePrefix: 'FAC', assujettieVAT: false,
 };
 
 const EMPTY_LIGNE = { designation: '', qty: 1, pu: '' };
@@ -114,14 +114,15 @@ export default function DevisProSection({ onBack }) {
       modele: factureForm.modele || modeleDefaut,
     });
     setFactureOpen(false);
-    setFactureForm({ clientName: '', clientPhone: '', clientVille: '', tvaActive: false, statut: 'emise', modele: '', lignes: [{ ...EMPTY_LIGNE }] });
+    setFactureForm({ clientName: '', clientPhone: '', clientVille: '', tvaActive: company?.assujettieVAT || false, statut: 'emise', modele: '', lignes: [{ ...EMPTY_LIGNE }] });
   };
 
   const convertDevis = (d) => {
     const lead = getLeadById(d.leadId);
     import('../../utils/proDocPdf').then(({ devisToLignes }) => {
       const lignes = devisToLignes(d, products);
-      const totals = factureTotals(lignes, false);
+      const tvaActive = company?.assujettieVAT || false;
+      const totals = factureTotals(lignes, tvaActive);
       addFacture({
         userId: user.id,
         clientName: lead?.contact || lead?.name || 'Client',
@@ -129,7 +130,7 @@ export default function DevisProSection({ onBack }) {
         clientVille: lead?.address || '',
         lignes,
         ...totals,
-        tvaActive: false,
+        tvaActive,
         statut: 'emise',
         modele: modeleDefaut,
         devisId: d.id,
@@ -252,7 +253,7 @@ export default function DevisProSection({ onBack }) {
             </div>
           )}
           <div className="pro-actions-row">
-            <button className="btn btn-accent" onClick={() => setFactureOpen(true)} disabled={!company?.nomEntreprise}>
+            <button className="btn btn-accent" onClick={() => { setFactureOpen(true); setFactureForm((f) => ({ ...f, tvaActive: company?.assujettieVAT || false })); }} disabled={!company?.nomEntreprise}>
               <Plus size={16} /> Nouvelle facture
             </button>
           </div>
@@ -395,6 +396,10 @@ export default function DevisProSection({ onBack }) {
                     <input className="input" value={f.facturePrefix} onChange={(e) => setCompanyForm({ ...f, facturePrefix: e.target.value.toUpperCase().slice(0, 6) })} />
                   </div>
                 </div>
+                <label className="pro-tva-toggle">
+                  <input type="checkbox" checked={!!f.assujettieVAT} onChange={(e) => setCompanyForm({ ...f, assujettieVAT: e.target.checked })} />
+                  Entreprise assujettie à la TVA <span className="text-secondary">(active la TVA 18 % par défaut sur les nouvelles factures)</span>
+                </label>
                 <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer mon entreprise</button>
               </form>
             );

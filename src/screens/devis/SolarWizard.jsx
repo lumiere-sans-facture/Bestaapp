@@ -13,7 +13,7 @@ let rowSeq = 0;
 
 export default function SolarWizard({ onDone }) {
   const { user } = useAuth();
-  const { addDevis, leadsForUser, partners } = useData();
+  const { addDevis, leadsForUser, partners, products } = useData();
   const [step, setStep] = useState(1);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [partnerId, setPartnerId] = useState('');
@@ -64,7 +64,11 @@ export default function SolarWizard({ onDone }) {
     () => (totalConsumption > 0 ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS) : null),
     [consumption, systemType, sunHours, totalConsumption]
   );
-  const quotation = useMemo(() => (sizing ? buildQuotation(sizing) : null), [sizing]);
+  const [includeMaintenance, setIncludeMaintenance] = useState(true);
+  const quotation = useMemo(
+    () => (sizing ? buildQuotation(sizing, { products, includeMaintenance }) : null),
+    [sizing, products, includeMaintenance]
+  );
 
   const handleSubmit = () => {
     addDevis({
@@ -251,6 +255,10 @@ export default function SolarWizard({ onDone }) {
               )}
               <div className="field-hint">Le calcul utilise les heures de pic solaire de la ville sélectionnée.</div>
             </div>
+            <label className="pro-tva-toggle">
+              <input type="checkbox" checked={includeMaintenance} onChange={(e) => setIncludeMaintenance(e.target.checked)} />
+              Inclure la maintenance annuelle (+{(50000).toLocaleString('fr-FR')} F CFA)
+            </label>
           </div>
         )}
 
