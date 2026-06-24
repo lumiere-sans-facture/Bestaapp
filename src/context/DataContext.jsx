@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import * as seed from '../data/seed';
 import { generatePartnerCode, codeBaseFromName, getActiveRef, consumeRefClick } from '../utils/referral';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { pullAll, pushCollections, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
+import { pullAll, pushCollections, pushTombstone, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 
 const DataContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_data';
@@ -24,6 +24,8 @@ const buildInitialState = () => ({
   subscriptionPayments: [],
   companies: [],
   factures: [],
+  devisCounter: 0,
+  orderCounter: 0,
 });
 
 // Partenaire actif correspondant à l'attribution d'affiliation en cours (?ref=…)
@@ -34,7 +36,7 @@ const partnerFromActiveRef = (partners) => {
 };
 
 const newReferral = (partnerCode, type, extra = {}) => ({
-  id: `r${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+  id: crypto.randomUUID(),
   partnerCode,
   type, // 'clic' | 'piste' | 'devis'
   status: type === 'clic' ? 'validé' : 'en_attente',
@@ -133,10 +135,20 @@ export function DataProvider({ children }) {
     let cancelled = false;
     let unsubscribe = () => {};
 
-    const applyRemote = (collections) => {
-      const next = { ...stateRef.current, ...collections };
+    // Pull fusionné : les items locaux absents du remote sont conservés
+    // (créés hors-ligne), sauf si un tombstone indique une suppression distante.
+    const applyRemote = (collections, tombstones = new Map()) => {
+      const merged = { ...stateRef.current };
+      for (const table of SYNCED_COLLECTIONS) {
+        const remoteItems = collections[table] || [];
+        const localItems = stateRef.current[table] || [];
+        const remoteMap = new Map(remoteItems.map((i) => [i.id, i]));
+        const deletedIds = tombstones.get(table) || new Set();
+        const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id));
+        merged[table] = [...remoteItems, ...localOnly];
+      }
       syncedRef.current = collections;
-      setState(next);
+      setState(merged);
     };
 
     const refreshFromRemote = async () => {
@@ -150,7 +162,7 @@ export function DataProvider({ children }) {
 
     (async () => {
       try {
-        const { empty, collections } = await pullAll();
+        const { empty, collections, tombstones } = await pullAll();
         if (cancelled) return;
         if (empty) {
           // Première initialisation : la base reçoit les données de cet appareil
@@ -159,7 +171,7 @@ export function DataProvider({ children }) {
           await pushCollections(initial);
           syncedRef.current = initial;
         } else {
-          applyRemote(collections);
+          applyRemote(collections, tombstones);
         }
         setSyncStatus('online');
         let timer = null;
@@ -178,17 +190,35 @@ export function DataProvider({ children }) {
     return () => { cancelled = true; unsubscribe(); };
   }, []);
 
-  // Réplication des changements locaux vers Supabase
+  // Réplication des changements locaux vers Supabase.
+  // Push uniquement les collections modifiées ; les suppressions passent par tombstones.
   useEffect(() => {
     if (!isSupabaseConfigured || syncStatus !== 'online' || !syncedRef.current) return;
     const changed = {};
+    const deletedByTable = {};
     for (const table of SYNCED_COLLECTIONS) {
-      if (state[table] !== syncedRef.current[table]) changed[table] = state[table] || [];
+      if (state[table] === syncedRef.current[table]) continue;
+      changed[table] = state[table] || [];
+      // Détection des suppressions locales
+      const prevIds = new Set((syncedRef.current[table] || []).map((i) => i.id));
+      const nextIds = new Set((state[table] || []).map((i) => i.id));
+      const deleted = [...prevIds].filter((id) => !nextIds.has(id));
+      if (deleted.length) deletedByTable[table] = deleted;
     }
     if (!Object.keys(changed).length) return;
     syncedRef.current = { ...syncedRef.current, ...changed };
     lastPushAt.current = Date.now();
-    pushCollections(changed).catch((e) => console.error('Réplication Supabase échouée :', e.message));
+    const doSync = async () => {
+      try {
+        await pushCollections(changed);
+        for (const [table, ids] of Object.entries(deletedByTable)) {
+          for (const id of ids) await pushTombstone(table, id);
+        }
+      } catch (e) {
+        console.error('Réplication Supabase échouée :', e.message);
+      }
+    };
+    doSync();
   }, [state, syncStatus]);
 
   const actions = useMemo(() => ({
@@ -197,7 +227,7 @@ export function DataProvider({ children }) {
     // 30 jours, last-click) rattache automatiquement la piste au partenaire.
     addLead: (lead) =>
       setState((s) => {
-        const leadId = `l${Date.now()}`;
+        const leadId = crypto.randomUUID();
         let parrainL1 = lead.parrainL1 || null;
         let referrals = s.referrals || [];
         if (!parrainL1) {
@@ -235,7 +265,7 @@ export function DataProvider({ children }) {
         partners: [
           {
             ...partner,
-            id: `p${Date.now()}`,
+            id: crypto.randomUUID(),
             code: generatePartnerCode(partner.name, s.partners.map((p) => p.code).filter(Boolean)),
             status: 'actif',
             registeredAt: new Date().toISOString().slice(0, 10),
@@ -302,14 +332,14 @@ export function DataProvider({ children }) {
           const generated = [];
           if (lead.parrainL1 && !alreadyExists(lead.parrainL1, 1)) {
             generated.push({
-              id: `c${Date.now()}-1`, partnerId: lead.parrainL1, leadId, level: 1,
+              id: crypto.randomUUID(), partnerId: lead.parrainL1, leadId, level: 1,
               amount: Math.round(lead.estimatedValue * COMMISSION_RATES[1]),
               status: 'en_attente', paidAt: null, createdAt: today,
             });
           }
           if (lead.parrainL2 && !alreadyExists(lead.parrainL2, 2)) {
             generated.push({
-              id: `c${Date.now()}-2`, partnerId: lead.parrainL2, leadId, level: 2,
+              id: crypto.randomUUID(), partnerId: lead.parrainL2, leadId, level: 2,
               amount: Math.round(lead.estimatedValue * COMMISSION_RATES[2]),
               status: 'en_attente', paidAt: null, createdAt: today,
             });
@@ -339,7 +369,7 @@ export function DataProvider({ children }) {
         commissions: [
           {
             ...commission,
-            id: `c${Date.now()}`,
+            id: crypto.randomUUID(),
             status: 'en_attente',
             paidAt: null,
             createdAt: new Date().toISOString().slice(0, 10),
@@ -372,7 +402,7 @@ export function DataProvider({ children }) {
     addProduct: (product) =>
       setState((s) => ({
         ...s,
-        products: [{ ...product, id: `prod${Date.now()}` }, ...s.products],
+        products: [{ ...product, id: crypto.randomUUID() }, ...s.products],
       })),
 
     updateProduct: (productId, patch) =>
@@ -395,7 +425,7 @@ export function DataProvider({ children }) {
             ? {
                 ...l,
                 activities: [
-                  { id: `a${Date.now()}`, date: new Date().toISOString(), text, by: userId },
+                  { id: crypto.randomUUID(), date: new Date().toISOString(), text, by: userId },
                   ...(l.activities || []),
                 ],
                 lastActivity: new Date().toISOString().slice(0, 10),
@@ -411,7 +441,8 @@ export function DataProvider({ children }) {
       setState((s) => {
         const now = new Date();
         const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-        const devisNumber = `BS-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const counter = (s.devisCounter || 0) + 1;
+        const devisNumber = `BS-${dateStr}-${String(counter).padStart(4, '0')}`;
         // Attribution automatique : partenaire choisi > parrain de la piste > lien d'affiliation
         const lead = s.leads.find((l) => l.id === devis.leadId);
         let partnerId = devis.partnerId || lead?.parrainL1 || null;
@@ -431,9 +462,10 @@ export function DataProvider({ children }) {
         const partnerCode = s.partners.find((p) => p.id === partnerId)?.code || null;
         return {
           ...s,
+          devisCounter: counter,
           referrals,
           devis: [
-            { ...devis, partnerId, partnerCode, id: `d${Date.now()}`, devisNumber, createdAt: now.toISOString() },
+            { ...devis, partnerId, partnerCode, id: crypto.randomUUID(), devisNumber, createdAt: now.toISOString() },
             ...s.devis,
           ],
           leads: s.leads.map((l) => {
@@ -448,7 +480,7 @@ export function DataProvider({ children }) {
     addFormation: (formation) =>
       setState((s) => ({
         ...s,
-        formations: [...(s.formations || []), { ...formation, id: `f${Date.now()}` }],
+        formations: [...(s.formations || []), { ...formation, id: crypto.randomUUID() }],
       })),
 
     updateFormation: (formationId, patch) =>
@@ -480,22 +512,47 @@ export function DataProvider({ children }) {
     addOrder: (order) => {
       const now = new Date();
       const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-      const full = {
-        ...order,
-        id: `o${Date.now()}`,
-        orderNumber: `CMD-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`,
-        status: 'initie', // initie → confirme → livre (ou annule)
-        createdAt: now.toISOString(),
-      };
-      setState((s) => ({ ...s, orders: [full, ...(s.orders || [])] }));
+      let full = null;
+      setState((s) => {
+        const counter = (s.orderCounter || 0) + 1;
+        full = {
+          ...order,
+          id: crypto.randomUUID(),
+          orderNumber: `CMD-${dateStr}-${String(counter).padStart(4, '0')}`,
+          status: 'initie',
+          createdAt: now.toISOString(),
+        };
+        return { ...s, orderCounter: counter, orders: [full, ...(s.orders || [])] };
+      });
       return full;
     },
 
     updateOrderStatus: (orderId, status) =>
-      setState((s) => ({
-        ...s,
-        orders: (s.orders || []).map((o) => (o.id === orderId ? { ...o, status } : o)),
-      })),
+      setState((s) => {
+        const order = (s.orders || []).find((o) => o.id === orderId);
+        if (!order) return s;
+        let products = s.products;
+        if (status === 'confirme' && order.status !== 'confirme') {
+          // Décrémenter le stock à la confirmation
+          products = s.products.map((p) => {
+            const item = (order.items || []).find((i) => i.productId === p.id);
+            if (!item) return p;
+            return { ...p, stock: Math.max(0, (p.stock || 0) - item.qty) };
+          });
+        } else if (status === 'annule' && order.status === 'confirme') {
+          // Restituer le stock à l'annulation (uniquement si était confirmé)
+          products = s.products.map((p) => {
+            const item = (order.items || []).find((i) => i.productId === p.id);
+            if (!item) return p;
+            return { ...p, stock: (p.stock || 0) + item.qty };
+          });
+        }
+        return {
+          ...s,
+          products,
+          orders: (s.orders || []).map((o) => (o.id === orderId ? { ...o, status } : o)),
+        };
+      }),
 
     // ---- Module Devis Pro (abonnement premium 5 000 F/mois) ----
 
@@ -513,7 +570,7 @@ export function DataProvider({ children }) {
               lastPaymentAt: null,
             };
         const payment = {
-          id: `payst${Date.now()}`,
+          id: crypto.randomUUID(),
           subscriptionId: subId, userId, montant: 5000,
           methode, phone: phone || '', referenceTransaction: reference || '',
           statut: 'initie', date: new Date().toISOString(),
@@ -589,7 +646,7 @@ export function DataProvider({ children }) {
         const numero = `${prefix}-${new Date().getFullYear()}-${String(counter).padStart(3, '0')}`;
         created = {
           ...facture,
-          id: `fac${Date.now()}`,
+          id: crypto.randomUUID(),
           numero,
           companySnapshot: company ? { ...company } : null,
           createdAt: new Date().toISOString(),

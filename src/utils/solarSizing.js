@@ -124,40 +124,88 @@ export const calculateSystemSize = (consumption, systemType, peakSunHours = DEFA
 
 import { TVA_RATE } from '../config/company';
 
+// Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
+// Retourne le prix du premier panneau trouvé, ou PANEL_SPEC.price par défaut.
+const panelPriceFromCatalog = (products = []) => {
+  const p = products.find((pr) => pr.category === 'panneaux');
+  return p ? p.basePrice : PANEL_SPEC.price;
+};
+
+// Extrait le prix d'un onduleur depuis le catalogue par capacité (kVA).
+// Recherche la capacité (ex. "5kva") dans le nom du produit, prend le plus proche.
+const inverterPriceFromCatalog = (products = [], capacityKva) => {
+  const inverters = products.filter((p) => p.category === 'onduleurs');
+  if (!inverters.length) return null;
+  // Extraire capacité numérique du nom (ex. "6kva" → 6)
+  const withCap = inverters.map((p) => {
+    const m = p.name.match(/(\d+(?:\.\d+)?)\s*kva/i);
+    return m ? { ...p, cap: parseFloat(m[1]) } : null;
+  }).filter(Boolean);
+  if (!withCap.length) return null;
+  withCap.sort((a, b) => a.cap - b.cap);
+  const match = withCap.find((p) => p.cap >= capacityKva) || withCap[withCap.length - 1];
+  return match.basePrice;
+};
+
+// Extrait le prix d'une batterie depuis le catalogue par capacité (kWh).
+// Retourne le prix unitaire de la batterie la plus proche en capacité.
+const batteryPriceFromCatalog = (products = [], capacityKwh) => {
+  const bats = products.filter((p) => p.category === 'batteries');
+  if (!bats.length) return null;
+  const withCap = bats.map((p) => {
+    const m = p.name.match(/(\d+(?:\.\d+)?)\s*kwh/i);
+    return m ? { ...p, cap: parseFloat(m[1]) } : null;
+  }).filter(Boolean);
+  if (!withCap.length) return null;
+  withCap.sort((a, b) => Math.abs(a.cap - capacityKwh) - Math.abs(b.cap - capacityKwh));
+  return withCap[0].basePrice;
+};
+
 /**
  * Construit la liste des composants chiffrés et les totaux à partir d'un dimensionnement.
  * Format aligné sur le devis officiel BestaSolar : équipements + prestations,
  * sous-total HT, TVA 18 %, total TTC.
+ *
+ * @param {object} sizing  Résultat de calculateSystemSize()
+ * @param {object} options
+ * @param {Array}  options.products         Catalogue produits pour les prix réels
+ * @param {boolean} options.incluireMaintenance  Inclure la ligne maintenance (défaut true)
  */
-export const buildQuotation = (sizing) => {
+export const buildQuotation = (sizing, { products = [], includeMaintenance = true } = {}) => {
+  const panelUnitPrice = panelPriceFromCatalog(products) || PANEL_SPEC.price;
+  const inverterUnitPrice = inverterPriceFromCatalog(products, sizing.inverter.capacity) || sizing.inverter.price;
+
   const components = [
     {
       type: 'panneau',
       name: `${PANEL_SPEC.brand} ${PANEL_SPEC.model} ${PANEL_SPEC.power}W ${PANEL_SPEC.type}`,
       quantity: sizing.numberOfPanels,
-      unitPrice: PANEL_SPEC.price,
-      totalPrice: sizing.numberOfPanels * PANEL_SPEC.price,
+      unitPrice: panelUnitPrice,
+      totalPrice: sizing.numberOfPanels * panelUnitPrice,
     },
     {
       type: 'onduleur',
       name: `Onduleur ${sizing.inverter.brand} ${sizing.inverter.model} (${sizing.inverter.capacity} kVA)`,
       description: 'Onduleur hybride pur sinus',
       quantity: 1,
-      unitPrice: sizing.inverter.price,
-      totalPrice: sizing.inverter.price,
+      unitPrice: inverterUnitPrice,
+      totalPrice: inverterUnitPrice,
     },
-    ...sizing.batteries.map((b) => ({
-      type: 'batterie',
-      name: `Batterie ${b.brand} ${b.model} (${b.capacity} kWh)`,
-      description: 'Batterie lithium grande capacité',
-      quantity: b.quantity,
-      unitPrice: b.price,
-      totalPrice: b.price * b.quantity,
-    })),
+    ...sizing.batteries.map((b) => {
+      const unitPrice = batteryPriceFromCatalog(products, b.capacity) || b.price;
+      return {
+        type: 'batterie',
+        name: `Batterie ${b.brand} ${b.model} (${b.capacity} kWh)`,
+        description: 'Batterie lithium grande capacité',
+        quantity: b.quantity,
+        unitPrice,
+        totalPrice: unitPrice * b.quantity,
+      };
+    }),
   ];
 
   // Accessoires standards
-  const mountingKits = sizing.numberOfPanels / 10; // 1 structure pour 10 panneaux
+  const mountingKits = sizing.numberOfPanels / 10;
   const accessories = [
     { type: 'accessoire', name: 'Structure de Montage', quantity: mountingKits, unitPrice: 120000, totalPrice: Math.round(mountingKits * 120000) },
     { type: 'accessoire', name: 'Kit de Câblage Solaire', quantity: 1, unitPrice: 45000, totalPrice: 45000 },
@@ -175,22 +223,23 @@ export const buildQuotation = (sizing) => {
       unitPrice: installationCost,
       totalPrice: installationCost,
     },
-    {
+  ];
+  if (includeMaintenance) {
+    prestations.push({
       type: 'prestation',
       name: 'Maintenance annuelle',
       description: 'Service après-vente et assistance technique',
       quantity: 1,
       unitPrice: MAINTENANCE_COST,
       totalPrice: MAINTENANCE_COST,
-    },
-  ];
+    });
+  }
 
   const equipmentCost = equipment.reduce((sum, c) => sum + c.totalPrice, 0);
   const subtotalHT = equipmentCost + prestations.reduce((sum, c) => sum + c.totalPrice, 0);
   const tva = Math.round(subtotalHT * TVA_RATE);
   const total = subtotalHT + tva;
 
-  // Retour sur investissement (en mois)
   const annualSavings = sizing.estimatedProduction * ELECTRICITY_PRICE;
   const roi = annualSavings > 0 ? (total / annualSavings) * 12 : 0;
 
@@ -199,7 +248,7 @@ export const buildQuotation = (sizing) => {
     prestations,
     equipmentCost,
     installationCost,
-    maintenanceCost: MAINTENANCE_COST,
+    maintenanceCost: includeMaintenance ? MAINTENANCE_COST : 0,
     subtotalHT,
     tva,
     total,

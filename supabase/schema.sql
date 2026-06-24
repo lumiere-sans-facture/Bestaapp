@@ -70,6 +70,19 @@ begin
   end loop;
 end $$;
 
+-- Tombstones : trace des suppressions pour la synchronisation non-destructive.
+-- Un item supprimé localement y est enregistré avant d'être retiré de sa collection.
+-- RAPPEL : exécuter ce bloc dans Supabase avant le premier déploiement multi-appareils.
+create table if not exists public.tombstones (
+  id         text        not null,
+  collection text        not null,
+  deleted_at timestamptz not null default now(),
+  primary key (id, collection)
+);
+alter table public.tombstones enable row level security;
+drop policy if exists "team full access" on public.tombstones;
+create policy "team full access" on public.tombstones for all to authenticated using (true) with check (true);
+
 -- Profils de l'équipe (les comptes Auth correspondants sont à créer
 -- dans Authentication → Users avec les mêmes emails)
 insert into public.profiles (id, email, name, role, phone, avatar) values

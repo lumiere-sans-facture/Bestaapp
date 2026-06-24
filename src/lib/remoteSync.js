@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 
 export const SYNCED_COLLECTIONS = ['products', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'factures'];
 
-/** Récupère toutes les collections. { empty, collections } */
+/** Récupère toutes les collections + les tombstones. { empty, collections, tombstones } */
 export async function pullAll() {
   const collections = {};
   let total = 0;
@@ -16,10 +16,31 @@ export async function pullAll() {
     collections[table] = (data || []).map((row) => ({ ...row.data, id: row.id }));
     total += collections[table].length;
   }
-  return { empty: total === 0, collections };
+
+  // Récupérer les tombstones pour filtrer les suppressions distantes.
+  // Enveloppé dans try/catch pour tolérer un déploiement progressif du schéma.
+  const tombstones = new Map();
+  try {
+    const { data: tbRows } = await supabase.from('tombstones').select('id, collection');
+    for (const row of (tbRows || [])) {
+      if (!tombstones.has(row.collection)) tombstones.set(row.collection, new Set());
+      tombstones.get(row.collection).add(row.id);
+    }
+    for (const table of SYNCED_COLLECTIONS) {
+      const deleted = tombstones.get(table);
+      if (deleted?.size) {
+        collections[table] = collections[table].filter((item) => !deleted.has(item.id));
+      }
+    }
+  } catch {
+    // Table tombstones absente : déploiement progressif, pas de filtrage
+  }
+
+  return { empty: total === 0, collections, tombstones };
 }
 
-/** Réplique les collections passées : upsert de toutes les lignes + suppression des absentes. */
+/** Réplique les collections passées : upsert uniquement, non-destructif.
+ *  Les suppressions passent exclusivement par pushTombstone. */
 export async function pushCollections(collections) {
   for (const [table, items] of Object.entries(collections)) {
     if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items)) continue;
@@ -28,16 +49,17 @@ export async function pushCollections(collections) {
       const { error } = await supabase.from(table).upsert(rows);
       if (error) throw error;
     }
-    // Supprimer les lignes distantes qui n'existent plus localement
-    const { data: remoteIds, error: idsError } = await supabase.from(table).select('id');
-    if (idsError) throw idsError;
-    const keep = new Set(items.map((i) => i.id));
-    const toDelete = (remoteIds || []).map((r) => r.id).filter((id) => !keep.has(id));
-    if (toDelete.length) {
-      const { error } = await supabase.from(table).delete().in('id', toDelete);
-      if (error) throw error;
-    }
   }
+}
+
+/** Enregistre une suppression dans la table tombstones (non-destructif). */
+export async function pushTombstone(table, id) {
+  const { error } = await supabase
+    .from('tombstones')
+    .upsert({ id, collection: table, deleted_at: new Date().toISOString() });
+  if (error) throw error;
+  // Supprimer aussi la ligne de la table source (cohérence distante)
+  await supabase.from(table).delete().eq('id', id);
 }
 
 /** Écoute les changements distants (autres appareils). Retourne une fonction de désabonnement. */
