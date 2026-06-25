@@ -3,12 +3,11 @@ import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, 
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
+import { daysSince } from '../utils/date';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 
 const STALE_DAYS = 5;
-
-const daysSince = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 
 // Étapes ouvertes uniquement : « Gagné » est une issue, pas une colonne
 const isOpen = (lead) => lead.stage !== 'gagne' && lead.stage !== 'perdu';

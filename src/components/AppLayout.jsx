@@ -1,4 +1,6 @@
+import { Suspense } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import ChunkErrorBoundary from './ChunkErrorBoundary';
 import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
@@ -67,7 +69,11 @@ export default function AppLayout() {
       </aside>
 
       <main className="app-main">
-        <Outlet />
+        <ChunkErrorBoundary>
+          <Suspense fallback={<div className="splash-screen">Chargement…</div>}>
+            <Outlet />
+          </Suspense>
+        </ChunkErrorBoundary>
       </main>
 
       {/* Barre d'onglets — visible uniquement sur mobile */}

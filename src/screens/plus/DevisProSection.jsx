@@ -5,6 +5,7 @@ import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate } from '../../utils/format';
 import { fileToResizedDataUrl } from '../../utils/image';
 import { SUBSCRIPTION_PRICE, effectiveStatus, isSubscriptionActive, daysLeft, needsRenewalAlert } from '../../utils/subscription';
+import { computeFactureTotals, FACTURE_STATUT_LABEL } from '../../utils/facture';
 import Sheet from '../../components/Sheet';
 
 const MODELES = [
@@ -89,19 +90,13 @@ export default function DevisProSection({ onBack }) {
     });
   };
 
-  const factureTotals = (lignes, tvaActive) => {
-    const totalHT = lignes.reduce((s, l) => s + (Number(l.pu) || 0) * (Number(l.qty) || 0), 0);
-    const tva = tvaActive ? Math.round(totalHT * 0.18) : 0;
-    return { totalHT, tva, totalTTC: totalHT + tva };
-  };
-
   const submitFacture = (e) => {
     e.preventDefault();
     const lignes = factureForm.lignes
       .filter((l) => l.designation.trim() && Number(l.pu) > 0)
       .map((l) => ({ designation: l.designation.trim(), qty: Math.max(1, Number(l.qty) || 1), pu: Number(l.pu) }));
     if (!lignes.length) return;
-    const totals = factureTotals(lignes, factureForm.tvaActive);
+    const totals = computeFactureTotals(lignes, factureForm.tvaActive);
     addFacture({
       userId: user.id,
       clientName: factureForm.clientName.trim(),
@@ -122,7 +117,7 @@ export default function DevisProSection({ onBack }) {
     import('../../utils/proDocPdf').then(({ devisToLignes }) => {
       const lignes = devisToLignes(d, products);
       const tvaActive = company?.assujettieVAT || false;
-      const totals = factureTotals(lignes, tvaActive);
+      const totals = computeFactureTotals(lignes, tvaActive);
       addFacture({
         userId: user.id,
         clientName: lead?.contact || lead?.name || 'Client',
@@ -266,7 +261,7 @@ export default function DevisProSection({ onBack }) {
                   {f.numero} — {f.clientName}
                   <span className="text-secondary"> · {formatDate(f.createdAt)}</span>
                   {' '}<span className={`badge ${f.statut === 'payee' ? 'badge-success' : f.statut === 'emise' ? 'badge-warning' : 'badge-muted'}`}>
-                    {{ brouillon: 'Brouillon', emise: 'Émise', payee: 'Payée' }[f.statut]}
+                    {FACTURE_STATUT_LABEL[f.statut]}
                   </span>
                 </span>
                 <span className="sheet-value pro-doc-actions">
@@ -496,7 +491,7 @@ export default function DevisProSection({ onBack }) {
 
           <div className="devis-summary">
             {(() => {
-              const t = factureTotals(
+              const t = computeFactureTotals(
                 factureForm.lignes.map((l) => ({ pu: Number(l.pu) || 0, qty: Number(l.qty) || 0 })),
                 factureForm.tvaActive
               );

@@ -4,17 +4,11 @@ import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { computeMonthlyRevenue } from '../utils/stats';
 import { effectiveStatus, daysLeft } from '../utils/subscription';
+import { isSameMonth, ageInDays } from '../utils/date';
+import { SEV_LABEL, SEV_ORDER } from '../utils/alerts';
+import { FACTURE_STATUT_BADGE } from '../utils/facture';
 import PageHeader from '../components/PageHeader';
 import Ring from '../components/Ring';
-
-const STATUT_BADGE = {
-  payee: ['badge-success', 'Payée'],
-  emise: ['badge-warning', 'Émise'],
-  brouillon: ['badge-muted', 'Brouillon'],
-};
-
-const SEV_LABEL = { critique: 'CRITIQUE', alerte: 'ALERTE', info: 'INFO' };
-const SEV_ORDER = { critique: 0, alerte: 1, info: 2 };
 
 const STATUT_META = [
   { id: 'brouillon', label: 'Brouillons', color: 'var(--text-muted)' },
@@ -32,13 +26,8 @@ export default function ProDashboard() {
   const { factures, getCompanyForUser, getSubscriptionForUser } = useData();
 
   const now = new Date();
-  const DAY = 86400000;
-  const ageDays = (iso) => (iso ? (now - new Date(iso)) / DAY : Infinity);
-  const isThisMonth = (iso) => {
-    if (!iso) return false;
-    const d = new Date(iso);
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  };
+  const ageDays = (iso) => ageInDays(iso, now);
+  const isThisMonth = (iso) => isSameMonth(iso, now);
 
   const company = getCompanyForUser(user.id);
   const myFactures = (factures || []).filter((f) => f.userId === user.id);
@@ -257,7 +246,7 @@ export default function ProDashboard() {
           {recentFactures.length ? (
             <div className="alert-feed">
               {recentFactures.map((f) => {
-                const [badgeClass, badgeLabel] = STATUT_BADGE[f.statut] || STATUT_BADGE.brouillon;
+                const [badgeClass, badgeLabel] = FACTURE_STATUT_BADGE[f.statut] || FACTURE_STATUT_BADGE.brouillon;
                 return (
                   <div key={f.id} className="alert-feed-row">
                     <span className={`badge ${badgeClass}`}>{badgeLabel}</span>

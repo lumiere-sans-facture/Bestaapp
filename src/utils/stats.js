@@ -1,11 +1,7 @@
 // Statistiques mensuelles calculées depuis les données réelles de suivi client.
-const MONTH_LABELS = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
+import { isInYearMonth as sameMonth } from './date';
 
-const sameMonth = (iso, year, month) => {
-  if (!iso) return false;
-  const d = new Date(iso);
-  return d.getFullYear() === year && d.getMonth() === month;
-};
+const MONTH_LABELS = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
 
 /**
  * Évolution sur les N derniers mois (mois courant inclus) :

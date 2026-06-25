@@ -4,11 +4,10 @@ import { useData } from '../context/DataContext';
 import { formatCFA } from '../utils/format';
 import { computeMonthlyStats } from '../utils/stats';
 import { effectiveStatus, daysLeft } from '../utils/subscription';
+import { isSameMonth, ageInDays } from '../utils/date';
+import { SEV_LABEL, SEV_ORDER } from '../utils/alerts';
 import PageHeader from '../components/PageHeader';
 import Ring from '../components/Ring';
-
-const SEV_LABEL = { critique: 'CRITIQUE', alerte: 'ALERTE', info: 'INFO' };
-const SEV_ORDER = { critique: 0, alerte: 1, info: 2 };
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -18,13 +17,8 @@ export default function Dashboard() {
   } = useData();
 
   const now = new Date();
-  const DAY = 86400000;
-  const sameMonth = (iso) => {
-    if (!iso) return false;
-    const d = new Date(iso);
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  };
-  const ageDays = (iso) => (iso ? (now - new Date(iso)) / DAY : Infinity);
+  const sameMonth = (iso) => isSameMonth(iso, now);
+  const ageDays = (iso) => ageInDays(iso, now);
 
   // ---- Pistes (selon le rôle) ----
   const myLeads = leadsForUser(user);
