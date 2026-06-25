@@ -153,8 +153,11 @@ export function DataProvider({ children }) {
 
     const refreshFromRemote = async () => {
       try {
-        const { collections } = await pullAll();
-        if (!cancelled) applyRemote(collections);
+        // Passer les tombstones est indispensable : sinon une suppression faite
+        // sur un autre appareil n'est pas appliquée au merge (l'item local serait
+        // traité comme « créé hors-ligne » puis ré-uploadé en zombie).
+        const { collections, tombstones } = await pullAll();
+        if (!cancelled) applyRemote(collections, tombstones);
       } catch (e) {
         console.error('Synchronisation Supabase impossible :', e.message);
       }
