@@ -1,22 +1,50 @@
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
 import { ModeProvider, useMode } from './context/ModeContext';
 import { captureRefFromUrl } from './utils/referral';
+import AppLayout from './components/AppLayout';
+import Login from './screens/Login';
 
 // Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
 captureRefFromUrl();
-import AppLayout from './components/AppLayout';
-import Login from './screens/Login';
-import Dashboard from './screens/Dashboard';
-import Pipeline from './screens/Pipeline';
-import Boutique from './screens/Boutique';
-import Devis from './screens/Devis';
-import Plus from './screens/Plus';
-import ProDashboard from './screens/ProDashboard';
-import ProGestion from './screens/pro/ProGestion';
+
+// Découpage par route : chaque écran est un chunk chargé à la demande, pour
+// alléger le bundle initial (parse/eval plus rapide au démarrage — déterminant
+// sur mobile bas de gamme). preload() expose l'import pour le préchargement.
+const lazyWithPreload = (factory) => {
+  const Comp = lazy(factory);
+  Comp.preload = factory;
+  return Comp;
+};
+
+const Dashboard = lazyWithPreload(() => import('./screens/Dashboard'));
+const Pipeline = lazyWithPreload(() => import('./screens/Pipeline'));
+const Boutique = lazyWithPreload(() => import('./screens/Boutique'));
+const Devis = lazyWithPreload(() => import('./screens/Devis'));
+const Plus = lazyWithPreload(() => import('./screens/Plus'));
+const ProDashboard = lazyWithPreload(() => import('./screens/ProDashboard'));
+const ProGestion = lazyWithPreload(() => import('./screens/pro/ProGestion'));
+
+const ALL_SCREENS = [Dashboard, Pipeline, Boutique, Devis, Plus, ProDashboard, ProGestion];
+
+// Précharge tous les chunks dès que le navigateur est inactif : la navigation
+// reste instantanée ET fonctionne hors-ligne pendant la session (invariant
+// local-first préservé — le découpage ne diffère le chargement que de l'initial).
+function usePreloadScreens() {
+  useEffect(() => {
+    const preload = () => ALL_SCREENS.forEach((c) => { c.preload?.(); });
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(preload);
+      return () => window.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(preload, 1500);
+    return () => clearTimeout(t);
+  }, []);
+}
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -43,6 +71,7 @@ function AppRoutes() {
 // mode === 'public' → routes publiques dans AppLayout
 function ModeSwitch() {
   const { mode } = useMode();
+  usePreloadScreens();
 
   if (mode === 'pro') {
     return (
