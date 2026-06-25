@@ -14,10 +14,13 @@ npm install
 npm run dev       # http://localhost:3000 (mode local, sans backend)
 npm run build     # bundle de production -> dist/  (À LANCER avant tout commit)
 npm run preview   # prévisualiser le build
+npm run test      # tests unitaires (Vitest) sur la logique métier pure
 ```
 
-Il n'y a pas de tests automatisés ni de linter configuré : **la vérification, c'est
-`npm run build` qui passe sans erreur**, plus une relecture du diff.
+Pas de linter configuré. **La vérification, c'est `npm run test` ET `npm run build`
+qui passent sans erreur**, plus une relecture du diff. Les tests couvrent les
+utilitaires purs de `src/utils/` (devis solaire, totaux facture, affiliation, dates,
+abonnement, format, puissance) — y ajouter un test quand on touche à cette logique.
 
 ## Invariants à préserver (ne pas casser)
 
