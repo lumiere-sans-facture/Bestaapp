@@ -167,7 +167,12 @@ export function DataProvider({ children }) {
       try {
         const { empty, collections, tombstones } = await pullAll();
         if (cancelled) return;
-        if (empty) {
+        // Ne bootstrapper que sur une base RÉELLEMENT vierge : aucune ligne ET
+        // aucun tombstone. Une base vidée volontairement porte des tombstones ;
+        // re-seeder depuis le localStorage de cet appareil ressusciterait alors
+        // les données effacées par l'équipe.
+        const pristine = empty && tombstones.size === 0;
+        if (pristine) {
           // Première initialisation : la base reçoit les données de cet appareil
           const initial = Object.fromEntries(SYNCED_COLLECTIONS.map((t) => [t, stateRef.current[t] || []]));
           lastPushAt.current = Date.now();
