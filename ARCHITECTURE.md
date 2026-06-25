@@ -84,7 +84,10 @@ Bestaapp/
     │
     ├── context/                ── ÉTAT GLOBAL (le « cerveau ») ──
     │   ├── AuthContext.jsx     Session, login/logout (Supabase Auth ou local)
-    │   ├── DataContext.jsx     État métier + actions + moteur de sync
+    │   ├── DataContext.jsx     Composition root : assemble les modules ci-dessous
+    │   ├── dataState.js        Forme initiale, chargement/migration, persistance
+    │   ├── dataActions.js      createActions(setState) : ~30 actions métier
+    │   ├── useRemoteSync.js    Moteur de réplication Supabase (hook isolé)
     │   ├── ModeContext.jsx     Bascule public/Pro (réservée aux abonnés)
     │   └── CartContext.jsx     Panier boutique
     │
@@ -248,7 +251,7 @@ Système     resetData
 - Effets de bord cohérents : confirmer une commande décrémente le stock, l'annuler le restitue ;
   apporter une piste déclenche les commissions N1/N2 selon le réseau de parrainage.
 
-### 4.3 — Moteur de synchronisation (`DataContext`)
+### 4.3 — Moteur de synchronisation (`useRemoteSync`)
 
 ```
 DÉMARRAGE
