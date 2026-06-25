@@ -52,8 +52,10 @@ abonnement, format, puissance) — y ajouter un test quand on touche à cette lo
   testable : le privilégier.
 - `src/context/` : état global (Auth, Data, Mode, Cart). `DataContext` est un
   *composition root* mince qui assemble `dataState.js` (forme/migration/persistance),
-  `dataActions.js` (les ~30 actions, `createActions(setState)`) et `useRemoteSync.js`
-  (moteur de réplication). Ajouter une action → `dataActions.js`, pas le Provider.
+  `dataActions.js` (assemble les actions par domaine dans `context/actions/` :
+  leads, partners, catalogue, devis, formations, pro) et `useRemoteSync.js`
+  (moteur de réplication). Ajouter une action → le module de domaine concerné
+  dans `context/actions/`, pas le Provider.
 - `src/lib/` : accès Supabase (client + réplication).
 - `src/data/` : données de référence (seed, catalogue, ensoleillement).
 - `src/screens/` : une page par route ; sous-dossiers `devis/`, `plus/`, `pro/`.

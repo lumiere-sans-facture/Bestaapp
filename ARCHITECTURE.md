@@ -86,7 +86,9 @@ Bestaapp/
     │   ├── AuthContext.jsx     Session, login/logout (Supabase Auth ou local)
     │   ├── DataContext.jsx     Composition root : assemble les modules ci-dessous
     │   ├── dataState.js        Forme initiale, chargement/migration, persistance
-    │   ├── dataActions.js      createActions(setState) : ~30 actions métier
+    │   ├── dataActions.js      Assemble les domaines d'actions (createActions)
+    │   ├── actions/            Actions par domaine : leads, partners, catalogue,
+    │   │                       devis, formations, pro (+ shared)
     │   ├── useRemoteSync.js    Moteur de réplication Supabase (hook isolé)
     │   ├── ModeContext.jsx     Bascule public/Pro (réservée aux abonnés)
     │   └── CartContext.jsx     Panier boutique
