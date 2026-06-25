@@ -105,10 +105,6 @@ const loadState = () => {
 export function DataProvider({ children }) {
   const [state, setState] = useState(loadState);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
-
   // Comptabilise le clic d'affiliation capturé à l'ouverture de l'app (?ref=…)
   useEffect(() => {
     const code = consumeRefClick();
@@ -126,6 +122,33 @@ export function DataProvider({ children }) {
   // et applique les changements venus des autres appareils en temps réel.
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // Persistance locale débattue : éviter de sérialiser tout l'état (coût
+  // O(taille des données) sur le thread principal) à chaque micro-mutation.
+  // On regroupe les écritures rapprochées en une seule.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* quota / mode privé */ }
+    }, 400);
+    return () => clearTimeout(id);
+  }, [state]);
+
+  // Flush immédiat de la dernière valeur avant fermeture ou passage en
+  // arrière-plan (crucial sur mobile) — garantit zéro perte malgré le débat.
+  useEffect(() => {
+    const flush = () => {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current)); } catch { /* idem */ }
+    };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+      flush();
+    };
+  }, []);
+
   const syncedRef = useRef(null); // dernier état répliqué/reçu, par collection
   const lastPushAt = useRef(0);
   const [syncStatus, setSyncStatus] = useState(isSupabaseConfigured ? 'connecting' : 'local');

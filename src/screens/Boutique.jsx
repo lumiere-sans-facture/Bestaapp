@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Pencil, Trash2, Camera, Check, ShoppingCart, FileText, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -106,23 +106,28 @@ export default function Boutique() {
     }
   };
 
-  const priceFilter = PRICE_RANGES.find((r) => r.id === priceRange);
-  const powerFilter = POWER_RANGES.find((r) => r.id === powerRange);
-
-  const filtered = products
-    .filter((p) => !selectedCategory || p.category === selectedCategory)
-    .filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase()))
-    .filter((p) => {
-      if (priceRange === 'all') return true;
-      const price = getPrice(p.basePrice);
-      return price >= priceFilter.min && price < priceFilter.max;
-    })
-    .filter((p) => {
-      if (powerRange === 'all') return true;
-      const w = extractPowerWatts(p.name);
-      return w !== null && w >= powerFilter.min && w < powerFilter.max;
-    })
-    .sort((a, b) => (a.stock === 0) - (b.stock === 0));
+  // Filtre + tri mémoïsés : ne recalcule (et ne relance les regex de puissance)
+  // que si une entrée réelle change — pas sur l'ajout au panier ou l'ouverture
+  // d'une fiche.
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    const priceFilter = PRICE_RANGES.find((r) => r.id === priceRange);
+    const powerFilter = POWER_RANGES.find((r) => r.id === powerRange);
+    return products
+      .filter((p) => !selectedCategory || p.category === selectedCategory)
+      .filter((p) => !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
+      .filter((p) => {
+        if (priceRange === 'all') return true;
+        const price = getPrice(p.basePrice);
+        return price >= priceFilter.min && price < priceFilter.max;
+      })
+      .filter((p) => {
+        if (powerRange === 'all') return true;
+        const w = extractPowerWatts(p.name);
+        return w !== null && w >= powerFilter.min && w < powerFilter.max;
+      })
+      .sort((a, b) => (a.stock === 0) - (b.stock === 0));
+  }, [products, selectedCategory, search, priceRange, powerRange, isManager]);
 
   const handlePayOnline = () => {
     setPayForm({ operator: 'MTN MoMo', phone: user.phone || '' });
