@@ -1,9 +1,9 @@
 // Module Devis Pro : règles de l'abonnement premium.
+import { DAY_MS } from './date';
+
 export const SUBSCRIPTION_PRICE = 5000; // F CFA / mois
 export const SUBSCRIPTION_DAYS = 30;
 export const RENEWAL_ALERT_DAYS = 3; // alerte à J-3
-
-const DAY = 86400000;
 
 /** Statut effectif : un abonnement « actif » dont la date de fin est passée est expiré. */
 export const effectiveStatus = (sub) => {
@@ -18,7 +18,7 @@ export const isSubscriptionActive = (sub) => effectiveStatus(sub) === 'actif';
 
 export const daysLeft = (sub) => {
   if (!sub?.dateFin) return 0;
-  return Math.max(0, Math.ceil((new Date(sub.dateFin).getTime() - Date.now()) / DAY));
+  return Math.max(0, Math.ceil((new Date(sub.dateFin).getTime() - Date.now()) / DAY_MS));
 };
 
 /** Vrai si l'abonnement actif expire dans RENEWAL_ALERT_DAYS jours ou moins. */

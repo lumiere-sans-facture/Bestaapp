@@ -8,13 +8,19 @@ export const SYNCED_COLLECTIONS = ['products', 'leads', 'partners', 'commissions
 
 /** Récupère toutes les collections + les tombstones. { empty, collections, tombstones } */
 export async function pullAll() {
+  // Lecture des collections en parallèle (au lieu de 15 allers-retours séquentiels).
+  const fetched = await Promise.all(
+    SYNCED_COLLECTIONS.map(async (table) => {
+      const { data, error } = await supabase.from(table).select('id, data');
+      if (error) throw error;
+      return [table, (data || []).map((row) => ({ ...row.data, id: row.id }))];
+    })
+  );
   const collections = {};
   let total = 0;
-  for (const table of SYNCED_COLLECTIONS) {
-    const { data, error } = await supabase.from(table).select('id, data');
-    if (error) throw error;
-    collections[table] = (data || []).map((row) => ({ ...row.data, id: row.id }));
-    total += collections[table].length;
+  for (const [table, items] of fetched) {
+    collections[table] = items;
+    total += items.length;
   }
 
   // Récupérer les tombstones pour filtrer les suppressions distantes.
@@ -42,14 +48,16 @@ export async function pullAll() {
 /** Réplique les collections passées : upsert uniquement, non-destructif.
  *  Les suppressions passent exclusivement par pushTombstone. */
 export async function pushCollections(collections) {
-  for (const [table, items] of Object.entries(collections)) {
-    if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items)) continue;
-    const rows = items.map((item) => ({ id: item.id, data: item, updated_at: new Date().toISOString() }));
-    if (rows.length) {
+  // Upserts indépendants (tables distinctes) exécutés en parallèle.
+  await Promise.all(
+    Object.entries(collections).map(async ([table, items]) => {
+      if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items)) return;
+      const rows = items.map((item) => ({ id: item.id, data: item, updated_at: new Date().toISOString() }));
+      if (!rows.length) return;
       const { error } = await supabase.from(table).upsert(rows);
       if (error) throw error;
-    }
-  }
+    })
+  );
 }
 
 /** Enregistre une suppression dans la table tombstones (non-destructif). */
