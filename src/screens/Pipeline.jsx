@@ -6,6 +6,7 @@ import { formatCFA, formatDate } from '../utils/format';
 import { daysSince } from '../utils/date';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import Field from '../components/Field';
 
 const STALE_DAYS = 5;
 
@@ -323,26 +324,21 @@ export default function Pipeline() {
       {/* Formulaire nouvelle piste */}
       <Sheet open={showAddForm} onClose={() => setShowAddForm(false)} title="Nouvelle piste">
         <form onSubmit={handleAddLead} className="form-grid">
-          <div className="input-group">
-            <label className="input-label">Entreprise / Client *</label>
+          <Field label="Entreprise / Client *">
             <input className="input" required value={newLead.name} onChange={(e) => setNewLead({ ...newLead, name: e.target.value })} placeholder="Ex : Hôtel du Parc" />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Personne de contact *</label>
+          </Field>
+          <Field label="Personne de contact *">
             <input className="input" required value={newLead.contact} onChange={(e) => setNewLead({ ...newLead, contact: e.target.value })} placeholder="Ex : M. Kossi Agboka" />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Téléphone</label>
+          </Field>
+          <Field label="Téléphone">
             <input className="input" type="tel" value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+229 ..." />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Adresse</label>
+          </Field>
+          <Field label="Adresse">
             <input className="input" value={newLead.address} onChange={(e) => setNewLead({ ...newLead, address: e.target.value })} placeholder="Quartier, ville" />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Valeur estimée (F CFA)</label>
+          </Field>
+          <Field label="Valeur estimée (F CFA)">
             <input className="input" type="number" min="0" value={newLead.estimatedValue} onChange={(e) => setNewLead({ ...newLead, estimatedValue: e.target.value })} placeholder="0" />
-          </div>
+          </Field>
           <div className="input-group">
             <label className="input-label">Type de client</label>
             <div className="client-type-toggle">
@@ -362,10 +358,9 @@ export default function Pipeline() {
               </button>
             </div>
           </div>
-          <div className="input-group">
-            <label className="input-label">Notes</label>
+          <Field label="Notes">
             <textarea className="input" rows="3" value={newLead.notes} onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })} placeholder="Détails du besoin…" />
-          </div>
+          </Field>
           <button type="submit" className="btn btn-primary btn-block"><Plus size={18} /> Créer la piste</button>
         </form>
       </Sheet>

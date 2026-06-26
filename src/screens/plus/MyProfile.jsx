@@ -5,6 +5,7 @@ import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate, initials } from '../../utils/format';
 import { fileToResizedDataUrl } from '../../utils/image';
 import { ENSOLEILLEMENT } from '../../data/ensoleillement';
+import Field from '../../components/Field';
 
 export default function MyProfile({ onBack }) {
   const { user } = useAuth();
@@ -95,31 +96,26 @@ export default function MyProfile({ onBack }) {
         {form ? (
           <form onSubmit={handleSave}>
             <div className="form-row-2">
-              <div className="input-group">
-                <label className="input-label">Nom complet</label>
+              <Field label="Nom complet">
                 <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Téléphone</label>
+              </Field>
+              <Field label="Téléphone">
                 <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Email</label>
+              </Field>
+              <Field label="Email">
                 <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="vous@..." />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Zone d'intervention</label>
+              </Field>
+              <Field label="Zone d'intervention">
                 <select className="input" value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })}>
                   <option value="">— Choisir une ville —</option>
                   {ENSOLEILLEMENT.map((c) => <option key={c.city} value={c.city}>{c.city}</option>)}
                   <option value="Autre">Autre / sous-région</option>
                 </select>
-              </div>
+              </Field>
             </div>
-            <div className="input-group">
-              <label className="input-label">Numéro Mobile Money (réception des commissions)</label>
+            <Field label="Numéro Mobile Money (réception des commissions)">
               <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+229 ..." />
-            </div>
+            </Field>
             <div className="cart-actions">
               <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>Annuler</button>
               <button type="submit" className="btn btn-primary btn-block"><Check size={16} /> Enregistrer</button>

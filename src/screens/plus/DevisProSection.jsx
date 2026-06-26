@@ -7,6 +7,7 @@ import { fileToResizedDataUrl } from '../../utils/image';
 import { SUBSCRIPTION_PRICE, effectiveStatus, isSubscriptionActive, daysLeft, needsRenewalAlert } from '../../utils/subscription';
 import { computeFactureTotals, FACTURE_STATUT_LABEL } from '../../utils/facture';
 import Sheet from '../../components/Sheet';
+import Field from '../../components/Field';
 
 const MODELES = [
   { id: 'classique', label: 'Classique', desc: 'Logo à gauche, tableau sobre' },
@@ -189,16 +190,14 @@ export default function DevisProSection({ onBack }) {
                     <option value="moov">Moov Money</option>
                   </select>
                 </div>
-                <div className="input-group">
-                  <label className="input-label">Votre numéro</label>
+                <Field label="Votre numéro">
                   <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+229 ..." />
-                </div>
+                </Field>
               </div>
-              <div className="input-group">
-                <label className="input-label">Référence de la transaction (optionnel)</label>
+              <Field label="Référence de la transaction (optionnel)">
                 <input className="input" value={subForm.reference} onChange={(e) => setSubForm({ ...subForm, reference: e.target.value })} placeholder="Ex : ID du transfert MoMo" />
                 <div className="field-hint">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} au +229 016 173 2956, puis validez ce formulaire.</div>
-              </div>
+              </Field>
               <button type="submit" className="btn btn-accent btn-block btn-lg">
                 <Crown size={18} /> S'abonner — {formatCFA(SUBSCRIPTION_PRICE)}/mois
               </button>
@@ -337,37 +336,30 @@ export default function DevisProSection({ onBack }) {
                   <input ref={logoInputRef} type="file" accept="image/*" className="photo-input" onChange={handleLogo} />
                 </div>
 
-                <div className="input-group">
-                  <label className="input-label">Nom de l'entreprise *</label>
+                <Field label="Nom de l'entreprise *">
                   <input className="input" required value={f.nomEntreprise} onChange={(e) => setCompanyForm({ ...f, nomEntreprise: e.target.value })} placeholder="Ex : Fatou Solaire Services" />
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Slogan</label>
+                </Field>
+                <Field label="Slogan">
                   <input className="input" value={f.slogan} onChange={(e) => setCompanyForm({ ...f, slogan: e.target.value })} placeholder="Ex : L'énergie à votre porte" />
-                </div>
+                </Field>
                 <div className="form-row-2">
-                  <div className="input-group">
-                    <label className="input-label">Téléphone</label>
+                  <Field label="Téléphone">
                     <input className="input" type="tel" value={f.telephone} onChange={(e) => setCompanyForm({ ...f, telephone: e.target.value })} placeholder="+229 ..." />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Email</label>
+                  </Field>
+                  <Field label="Email">
                     <input className="input" type="email" value={f.email} onChange={(e) => setCompanyForm({ ...f, email: e.target.value })} />
-                  </div>
+                  </Field>
                 </div>
-                <div className="input-group">
-                  <label className="input-label">Adresse</label>
+                <Field label="Adresse">
                   <input className="input" value={f.adresse} onChange={(e) => setCompanyForm({ ...f, adresse: e.target.value })} placeholder="Quartier, ville" />
-                </div>
+                </Field>
                 <div className="form-row-2">
-                  <div className="input-group">
-                    <label className="input-label">IFU (optionnel)</label>
+                  <Field label="IFU (optionnel)">
                     <input className="input" value={f.ifu} onChange={(e) => setCompanyForm({ ...f, ifu: e.target.value })} />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">RCCM (optionnel)</label>
+                  </Field>
+                  <Field label="RCCM (optionnel)">
                     <input className="input" value={f.rccm} onChange={(e) => setCompanyForm({ ...f, rccm: e.target.value })} />
-                  </div>
+                  </Field>
                 </div>
                 <div className="form-row-2">
                   <div className="input-group">
@@ -380,16 +372,14 @@ export default function DevisProSection({ onBack }) {
                   </div>
                 </div>
                 <div className="form-row-2">
-                  <div className="input-group">
-                    <label className="input-label">Modèle par défaut</label>
+                  <Field label="Modèle par défaut">
                     <select className="input" value={f.modeleDefaut} onChange={(e) => setCompanyForm({ ...f, modeleDefaut: e.target.value })}>
                       {MODELES.map((m) => <option key={m.id} value={m.id}>{m.label} — {m.desc}</option>)}
                     </select>
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Préfixe des factures</label>
+                  </Field>
+                  <Field label="Préfixe des factures">
                     <input className="input" value={f.facturePrefix} onChange={(e) => setCompanyForm({ ...f, facturePrefix: e.target.value.toUpperCase().slice(0, 6) })} />
-                  </div>
+                  </Field>
                 </div>
                 <label className="pro-tva-toggle">
                   <input type="checkbox" checked={!!f.assujettieVAT} onChange={(e) => setCompanyForm({ ...f, assujettieVAT: e.target.checked })} />
@@ -434,19 +424,16 @@ export default function DevisProSection({ onBack }) {
       {/* ---- Nouvelle facture ---- */}
       <Sheet open={factureOpen} onClose={() => setFactureOpen(false)} title="Nouvelle facture">
         <form onSubmit={submitFacture}>
-          <div className="input-group">
-            <label className="input-label">Client *</label>
+          <Field label="Client *">
             <input className="input" required value={factureForm.clientName} onChange={(e) => setFactureForm({ ...factureForm, clientName: e.target.value })} placeholder="Nom du client" />
-          </div>
+          </Field>
           <div className="form-row-2">
-            <div className="input-group">
-              <label className="input-label">Téléphone</label>
+            <Field label="Téléphone">
               <input className="input" type="tel" value={factureForm.clientPhone} onChange={(e) => setFactureForm({ ...factureForm, clientPhone: e.target.value })} />
-            </div>
-            <div className="input-group">
-              <label className="input-label">Ville</label>
+            </Field>
+            <Field label="Ville">
               <input className="input" value={factureForm.clientVille} onChange={(e) => setFactureForm({ ...factureForm, clientVille: e.target.value })} />
-            </div>
+            </Field>
           </div>
 
           <label className="input-label">Lignes de la facture *</label>
@@ -473,20 +460,18 @@ export default function DevisProSection({ onBack }) {
           </label>
 
           <div className="form-row-2">
-            <div className="input-group">
-              <label className="input-label">Statut</label>
+            <Field label="Statut">
               <select className="input" value={factureForm.statut} onChange={(e) => setFactureForm({ ...factureForm, statut: e.target.value })}>
                 <option value="brouillon">Brouillon</option>
                 <option value="emise">Émise</option>
                 <option value="payee">Payée</option>
               </select>
-            </div>
-            <div className="input-group">
-              <label className="input-label">Modèle</label>
+            </Field>
+            <Field label="Modèle">
               <select className="input" value={factureForm.modele || modeleDefaut} onChange={(e) => setFactureForm({ ...factureForm, modele: e.target.value })}>
                 {MODELES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
               </select>
-            </div>
+            </Field>
           </div>
 
           <div className="devis-summary">

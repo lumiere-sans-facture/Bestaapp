@@ -9,6 +9,8 @@ import { fileToResizedDataUrl } from '../utils/image';
 import { extractPowerWatts, POWER_RANGES, PRICE_RANGES } from '../utils/power';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import Field from '../components/Field';
+import EmptyState from '../components/EmptyState';
 
 const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', category: 'kits', image: '' };
 
@@ -235,7 +237,7 @@ export default function Boutique() {
               </div>
             );
           })}
-          {filtered.length === 0 && <div className="empty-state">Aucun produit ne correspond à votre recherche.</div>}
+          {filtered.length === 0 && <EmptyState>Aucun produit ne correspond à votre recherche.</EmptyState>}
         </div>
       </div>
 
@@ -354,10 +356,9 @@ export default function Boutique() {
                 ))}
               </div>
             </div>
-            <div className="input-group">
-              <label className="input-label">Numéro Mobile Money *</label>
+            <Field label="Numéro Mobile Money *">
               <input className="input" type="tel" required value={payForm.phone} onChange={(e) => setPayForm({ ...payForm, phone: e.target.value })} placeholder="+229 ..." />
-            </div>
+            </Field>
             <div className="devis-summary">
               <div className="devis-summary-row total"><span>Montant à payer</span><span>{formatCFA(cartTotal)}</span></div>
             </div>
@@ -409,33 +410,28 @@ export default function Boutique() {
             </button>
           </div>
 
-          <div className="input-group">
-            <label className="input-label">Nom du produit *</label>
+          <Field label="Nom du produit *">
             <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Panneau Solaire 550W" />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Description</label>
+          </Field>
+          <Field label="Description">
             <input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Courte description" />
-          </div>
+          </Field>
           <div className="form-row-2">
-            <div className="input-group">
-              <label className="input-label">Prix technicien (F CFA) *</label>
+            <Field label="Prix technicien (F CFA) *">
               <input className="input" type="number" min="0" required value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} placeholder="0" />
               {Number(form.basePrice) > 0 && (
                 <div className="field-hint">Prix public (+15 %) : {formatCFA(Math.round(Number(form.basePrice) * 1.15))}</div>
               )}
-            </div>
-            <div className="input-group">
-              <label className="input-label">Stock *</label>
+            </Field>
+            <Field label="Stock *">
               <input className="input" type="number" min="0" required value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="0" />
-            </div>
+            </Field>
           </div>
-          <div className="input-group">
-            <label className="input-label">Catégorie</label>
+          <Field label="Catégorie">
             <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               {productCategories.map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
             </select>
-          </div>
+          </Field>
 
           <button type="submit" className="btn btn-primary btn-block">
             <Check size={18} /> {editing === 'new' ? 'Ajouter au catalogue' : 'Enregistrer les modifications'}

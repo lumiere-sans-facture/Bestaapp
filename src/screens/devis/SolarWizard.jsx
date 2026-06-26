@@ -8,6 +8,8 @@ import { calculateSystemSize, buildQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOU
 import { ENSOLEILLEMENT, DEFAULT_CITY, pshForCity } from '../../data/ensoleillement';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
+import Field from '../../components/Field';
+import EmptyState from '../../components/EmptyState';
 
 let rowSeq = 0;
 
@@ -119,7 +121,7 @@ export default function SolarWizard({ onDone }) {
                   <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
                 </button>
               ))}
-              {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d’abord une piste dans Suivi clients.</div>}
+              {availableLeads.length === 0 && <EmptyState>Aucune piste disponible. Créez d’abord une piste dans Suivi clients.</EmptyState>}
             </div>
             {selectedLeadId && <PartnerField value={partnerId} onChange={setPartnerId} />}
           </div>
@@ -137,14 +139,12 @@ export default function SolarWizard({ onDone }) {
 
             {manualMode ? (
               <div className="manual-consumption-grid">
-                <div className="input-group">
-                  <label className="input-label"><Sun size={14} /> Consommation jour (kWh)</label>
+                <Field label={<><Sun size={14} /> Consommation jour (kWh)</>}>
                   <input className="input" type="number" min="0" step="0.1" value={manual.day} onChange={(e) => setManual({ ...manual, day: e.target.value })} placeholder="0" />
-                </div>
-                <div className="input-group">
-                  <label className="input-label"><Moon size={14} /> Consommation nuit (kWh)</label>
+                </Field>
+                <Field label={<><Moon size={14} /> Consommation nuit (kWh)</>}>
                   <input className="input" type="number" min="0" step="0.1" value={manual.night} onChange={(e) => setManual({ ...manual, night: e.target.value })} placeholder="0" />
-                </div>
+                </Field>
               </div>
             ) : (
               <>
@@ -202,7 +202,7 @@ export default function SolarWizard({ onDone }) {
                     })}
                   </div>
                 ) : (
-                  <div className="empty-state">Ajoutez les appareils du client pour estimer ses besoins.</div>
+                  <EmptyState>Ajoutez les appareils du client pour estimer ses besoins.</EmptyState>
                 )}
               </>
             )}
@@ -236,8 +236,7 @@ export default function SolarWizard({ onDone }) {
                 </button>
               ))}
             </div>
-            <div className="input-group sun-hours-field">
-              <label className="input-label"><Sun size={14} /> Ville d'installation (ensoleillement)</label>
+            <Field label={<><Sun size={14} /> Ville d'installation (ensoleillement)</>} className="sun-hours-field">
               <select className="input" value={city} onChange={(e) => handleCityChange(e.target.value)}>
                 {ENSOLEILLEMENT.map((e) => (
                   <option key={e.city} value={e.city}>{e.city} — {String(e.psh).replace('.', ',')} h/jour</option>
@@ -254,7 +253,7 @@ export default function SolarWizard({ onDone }) {
                 />
               )}
               <div className="field-hint">Le calcul utilise les heures de pic solaire de la ville sélectionnée.</div>
-            </div>
+            </Field>
             <label className="pro-tva-toggle">
               <input type="checkbox" checked={includeMaintenance} onChange={(e) => setIncludeMaintenance(e.target.checked)} />
               Inclure la maintenance annuelle (+{(50000).toLocaleString('fr-FR')} F CFA)
