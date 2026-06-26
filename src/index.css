@@ -866,6 +866,51 @@ textarea.input { resize: vertical; }
 .sun-hours-manual { margin-top: 8px; }
 .field-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; }
 
+/* Localisation (dimensionnement solaire) — géoloc + recherche + données NASA/PVGIS */
+.geo-locator { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.geo-locator-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.geo-search { display: flex; gap: 8px; }
+.geo-search .input { flex: 1; }
+.geo-search .btn { flex-shrink: 0; padding: 0 14px; }
+.geo-loading { font-size: 0.875rem; color: var(--text-secondary); padding: 4px 2px; }
+.geo-error {
+  font-size: 0.8125rem; color: var(--error); background: var(--error-light);
+  padding: 10px 12px; border-radius: 10px;
+}
+.geo-result {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 0.9375rem; color: var(--text-primary);
+  background: var(--success-light); border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 12px 14px; border-radius: 10px;
+}
+.geo-result svg { color: var(--success); flex-shrink: 0; }
+.geo-coords { color: var(--text-secondary); font-size: 0.875rem; }
+
+/* Carte d'ensoleillement (style de la photo de référence) */
+.solar-card {
+  background: var(--warning-light); border: 1px solid rgba(245, 166, 35, 0.35);
+  border-radius: var(--radius); padding: 14px 16px;
+}
+.solar-card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; margin-bottom: 14px;
+}
+.solar-card-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #92400e; }
+.solar-source {
+  font-size: 0.6875rem; color: #92400e; background: rgba(245, 166, 35, 0.25);
+  padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+}
+.solar-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.solar-stat {
+  background: white; border-radius: 10px; padding: 12px 8px; text-align: center;
+  box-shadow: var(--shadow);
+}
+.solar-stat-value { font-size: 1.375rem; font-weight: 700; color: var(--accent); }
+.solar-stat-label { font-size: 0.6875rem; color: var(--text-secondary); margin-top: 4px; }
+.geo-manual { margin-top: 2px; }
+.geo-manual summary { font-size: 0.8125rem; color: var(--text-secondary); cursor: pointer; }
+.geo-manual .input-group { margin-top: 10px; margin-bottom: 0; }
+
 @media (min-width: 640px) {
   .manual-consumption-grid { grid-template-columns: 1fr 1fr; }
 }

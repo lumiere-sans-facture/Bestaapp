@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Battery, Cpu, Calculator, PanelTop } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Battery, Cpu, Calculator, PanelTop, MapPin, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById } from '../../data/appliances';
 import { calculateSystemSize, buildQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
-import { ENSOLEILLEMENT, DEFAULT_CITY, pshForCity } from '../../data/ensoleillement';
+import { geocodeCity, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
 import Field from '../../components/Field';
@@ -24,14 +24,50 @@ export default function SolarWizard({ onDone }) {
   const [manualMode, setManualMode] = useState(false);
   const [manual, setManual] = useState({ day: '', night: '' });
   const [systemType, setSystemType] = useState('hybrid');
-  // Ensoleillement : déduit de la ville, saisie manuelle possible (« Autre »)
-  const [city, setCity] = useState(DEFAULT_CITY);
-  const [sunHours, setSunHours] = useState(pshForCity(DEFAULT_CITY) || DEFAULT_PEAK_SUN_HOURS);
+  // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
+  // ou recherche de ville ; repli en saisie manuelle des heures de pic.
+  const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
+  const [query, setQuery] = useState('');
+  const [location, setLocation] = useState(null); // { name, lat, lon }
+  const [solar, setSolar] = useState(null);        // { peakSunHours, yearlyYield, optimalAngle, source }
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState('');
 
-  const handleCityChange = (value) => {
-    setCity(value);
-    const psh = pshForCity(value);
-    if (psh) setSunHours(psh);
+  const loadSolar = async (loc) => {
+    setLocation(loc);
+    setSolar(null);
+    const s = await fetchSolarData(loc.lat, loc.lon);
+    setSolar(s);
+    setSunHours(s.peakSunHours);
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setGeoError('');
+    setGeoLoading(true);
+    try {
+      await loadSolar(await geocodeCity(query.trim()));
+    } catch (err) {
+      setGeoError(err.message || 'Données indisponibles — saisie manuelle possible.');
+    } finally {
+      setGeoLoading(false);
+    }
+  };
+
+  const handleGeolocate = () => {
+    if (!navigator.geolocation) { setGeoError('Géolocalisation indisponible sur cet appareil.'); return; }
+    setGeoError('');
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try { await loadSolar({ name: 'Ma position', lat: pos.coords.latitude, lon: pos.coords.longitude }); }
+        catch (err) { setGeoError(err.message || 'Données solaires indisponibles.'); }
+        finally { setGeoLoading(false); }
+      },
+      () => { setGeoError('Accès à la position refusé.'); setGeoLoading(false); },
+      { timeout: 10000, enableHighAccuracy: false }
+    );
   };
 
   const myLeads = leadsForUser(user);
@@ -87,7 +123,7 @@ export default function SolarWizard({ onDone }) {
         estimatedProduction: sizing.estimatedProduction,
         systemType: sizing.systemType,
         peakSunHours: sizing.peakSunHours,
-        city: city === 'autre' ? null : city,
+        city: location?.name || null,
       },
       quotation,
       total: quotation.total,
@@ -236,24 +272,69 @@ export default function SolarWizard({ onDone }) {
                 </button>
               ))}
             </div>
-            <Field label={<><Sun size={14} /> Ville d'installation (ensoleillement)</>} className="sun-hours-field">
-              <select className="input" value={city} onChange={(e) => handleCityChange(e.target.value)}>
-                {ENSOLEILLEMENT.map((e) => (
-                  <option key={e.city} value={e.city}>{e.city} — {String(e.psh).replace('.', ',')} h/jour</option>
-                ))}
-                <option value="autre">Autre ville (saisie manuelle)</option>
-              </select>
-              {city === 'autre' && (
+            <div className="geo-locator">
+              <div className="geo-locator-head">
+                <span className="card-title">Localisation</span>
+                <button type="button" className="btn btn-primary btn-sm" onClick={handleGeolocate} disabled={geoLoading}>
+                  <MapPin size={15} /> Ma position
+                </button>
+              </div>
+              <form className="geo-search" onSubmit={handleSearch}>
                 <input
-                  className="input sun-hours-manual"
-                  type="number" min="3" max="7" step="0.1"
-                  value={sunHours}
-                  onChange={(e) => setSunHours(e.target.value)}
-                  aria-label="Heures d'ensoleillement par jour"
+                  className="input" value={query} onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Rechercher une ville (ex : Dakar, Abidjan, Bamako…)"
+                  aria-label="Rechercher une ville"
                 />
+                <button type="submit" className="btn btn-outline" disabled={geoLoading} aria-label="Rechercher la ville">
+                  <Search size={16} />
+                </button>
+              </form>
+
+              {geoLoading && <div className="geo-loading">Récupération des données solaires…</div>}
+              {geoError && <div className="geo-error">{geoError}</div>}
+
+              {location && (
+                <div className="geo-result">
+                  <MapPin size={15} />
+                  <strong>{location.name}</strong>
+                  <span className="geo-coords">({location.lat.toFixed(2)}°, {location.lon.toFixed(2)}°)</span>
+                </div>
               )}
-              <div className="field-hint">Le calcul utilise les heures de pic solaire de la ville sélectionnée.</div>
-            </Field>
+
+              {solar && (
+                <div className="solar-card">
+                  <div className="solar-card-head">
+                    <span className="solar-card-title"><Sun size={15} /> Ensoleillement — {location?.name}</span>
+                    <span className="solar-source">Base de données {solar.source}</span>
+                  </div>
+                  <div className="solar-stats">
+                    <div className="solar-stat">
+                      <div className="solar-stat-value">{solar.peakSunHours}h</div>
+                      <div className="solar-stat-label">Heures pic / jour</div>
+                    </div>
+                    <div className="solar-stat">
+                      <div className="solar-stat-value">{solar.yearlyYield.toLocaleString('fr-FR')}</div>
+                      <div className="solar-stat-label">kWh/kWc/an</div>
+                    </div>
+                    <div className="solar-stat">
+                      <div className="solar-stat-value">{solar.optimalAngle}°</div>
+                      <div className="solar-stat-label">Angle optimal</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <details className="geo-manual">
+                <summary>Saisie manuelle (hors-ligne)</summary>
+                <Field label="Heures de pic solaire / jour">
+                  <input
+                    className="input" type="number" min="3" max="7" step="0.1"
+                    value={sunHours} onChange={(e) => setSunHours(e.target.value)}
+                    aria-label="Heures de pic solaire par jour"
+                  />
+                </Field>
+              </details>
+            </div>
             <label className="pro-tva-toggle">
               <input type="checkbox" checked={includeMaintenance} onChange={(e) => setIncludeMaintenance(e.target.checked)} />
               Inclure la maintenance annuelle (+{(50000).toLocaleString('fr-FR')} F CFA)
