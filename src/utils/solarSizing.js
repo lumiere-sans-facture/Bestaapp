@@ -40,7 +40,7 @@ export const SYSTEM_TYPES = [
 export const INSTALLATION_COST_PER_PANEL = 10000;
 export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
-export const DEFAULT_PEAK_SUN_HOURS = 5.5;
+export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PVGIS indisponibles
 
 // ---- Sélection des composants ----
 
