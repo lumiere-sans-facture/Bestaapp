@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { UserCheck, Pencil } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import Field from '../../components/Field';
 
 /**
  * Attribution du partenaire apporteur sur un devis.
@@ -31,8 +32,7 @@ export default function PartnerField({ value, onChange }) {
   }
 
   return (
-    <div className="input-group partner-field">
-      <label className="input-label">Partenaire apporteur (commission)</label>
+    <Field label="Partenaire apporteur (commission)" className="partner-field">
       <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Aucun partenaire</option>
         {partners.filter((p) => p.status === 'actif').map((p) => (
@@ -44,6 +44,6 @@ export default function PartnerField({ value, onChange }) {
           ? 'Le code du partenaire sera imprimé sur le devis.'
           : "Aucun partenaire détecté pour cette piste — sélectionnez-en un si un apporteur est à créditer."}
       </div>
-    </div>
+    </Field>
   );
 }

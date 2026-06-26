@@ -7,6 +7,8 @@ import { formatCFA, formatDate } from '../utils/format';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import Field from '../components/Field';
+import EmptyState from '../components/EmptyState';
 import PartnersSection from './plus/PartnersSection';
 import MyPartnerDashboard from './plus/MyPartnerDashboard';
 import OrdersSection from './plus/OrdersSection';
@@ -141,7 +143,7 @@ export default function Plus() {
             </div>
           </div>
         ))}
-        {filteredCommissions.length === 0 && <div className="empty-state card">Aucune commission dans ce filtre.</div>}
+        {filteredCommissions.length === 0 && <EmptyState card>Aucune commission dans ce filtre.</EmptyState>}
       </div>
     </>
   );
@@ -267,8 +269,7 @@ export default function Plus() {
       {/* Commission manuelle */}
       <Sheet open={showAddCommission} onClose={() => setShowAddCommission(false)} title="Commission manuelle">
         <form onSubmit={handleAddCommission} className="form-grid">
-          <div className="input-group">
-            <label className="input-label">Partenaire *</label>
+          <Field label="Partenaire *">
             <select
               className="input" required value={newCommission.partnerId}
               onChange={(e) => setNewCommission({ ...newCommission, partnerId: e.target.value })}
@@ -276,9 +277,8 @@ export default function Plus() {
               <option value="" disabled>Choisir un partenaire…</option>
               {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-          </div>
-          <div className="input-group">
-            <label className="input-label">Affaire liée (optionnel)</label>
+          </Field>
+          <Field label="Affaire liée (optionnel)">
             <select
               className="input" value={newCommission.leadId}
               onChange={(e) => {
@@ -289,9 +289,8 @@ export default function Plus() {
               <option value="">Aucune</option>
               {leads.map((l) => <option key={l.id} value={l.id}>{l.name} — {formatCFA(l.estimatedValue)}</option>)}
             </select>
-          </div>
-          <div className="input-group">
-            <label className="input-label">Niveau</label>
+          </Field>
+          <Field label="Niveau">
             <select
               className="input" value={newCommission.level}
               onChange={(e) => {
@@ -302,16 +301,15 @@ export default function Plus() {
               <option value={1}>Niveau 1 (3%)</option>
               <option value={2}>Niveau 2 (1,5%)</option>
             </select>
-          </div>
-          <div className="input-group">
-            <label className="input-label">Montant (F CFA) *</label>
+          </Field>
+          <Field label="Montant (F CFA) *">
             <input
               className="input" type="number" min="1" required
               value={newCommission.amount}
               onChange={(e) => setNewCommission({ ...newCommission, amount: e.target.value })}
               placeholder="0"
             />
-          </div>
+          </Field>
           <button type="submit" className="btn btn-primary btn-block"><PlusIcon size={18} /> Créer la commission</button>
         </form>
       </Sheet>
@@ -342,23 +340,20 @@ export default function Plus() {
         ) : (
           <form onSubmit={handleSubSubmit}>
             <div className="form-row-2">
-              <div className="input-group">
-                <label className="input-label">Opérateur</label>
+              <Field label="Opérateur">
                 <select className="input" value={subForm.methode} onChange={(e) => setSubForm({ ...subForm, methode: e.target.value })}>
                   <option value="momo">MTN MoMo</option>
                   <option value="moov">Moov Money</option>
                 </select>
-              </div>
-              <div className="input-group">
-                <label className="input-label">Votre numéro</label>
+              </Field>
+              <Field label="Votre numéro">
                 <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+229 ..." />
-              </div>
+              </Field>
             </div>
-            <div className="input-group">
-              <label className="input-label">Référence de la transaction (optionnel)</label>
+            <Field label="Référence de la transaction (optionnel)">
               <input className="input" value={subForm.reference} onChange={(e) => setSubForm({ ...subForm, reference: e.target.value })} placeholder="Ex : ID du transfert MoMo" />
               <div className="field-hint">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} au +229 016 173 2956, puis validez.</div>
-            </div>
+            </Field>
             <button type="submit" className="btn btn-accent btn-block btn-lg">
               <Crown size={18} /> S'abonner — {formatCFA(SUBSCRIPTION_PRICE)}/mois
             </button>

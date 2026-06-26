@@ -4,6 +4,7 @@ import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate, initials } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS, getActiveRef } from '../../utils/referral';
 import Sheet from '../../components/Sheet';
+import Field from '../../components/Field';
 
 const EMPTY_FORM = { name: '', phone: '', momoNumber: '', sponsorId: '', status: 'actif', tier: 'standard' };
 
@@ -332,41 +333,35 @@ export default function PartnersSection({ onBack }) {
         title={editing === 'new' ? 'Nouveau partenaire' : 'Modifier le partenaire'}
       >
         <form onSubmit={handleSave}>
-          <div className="input-group">
-            <label className="input-label">Nom complet *</label>
+          <Field label="Nom complet *">
             <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Mamadou Balogun" />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Téléphone *</label>
+          </Field>
+          <Field label="Téléphone *">
             <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Numéro Mobile Money (paiement des commissions)</label>
+          </Field>
+          <Field label="Numéro Mobile Money (paiement des commissions)">
             <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+229 ..." />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Parrain (recruteur)</label>
+          </Field>
+          <Field label="Parrain (recruteur)">
             <select className="input" value={form.sponsorId} onChange={(e) => setForm({ ...form, sponsorId: e.target.value })}>
               <option value="">Aucun — tête de réseau</option>
               {sponsorOptions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <div className="field-hint">Le parrain touche 1,5 % (niveau 2) sur chaque affaire gagnée apportée par ce partenaire.</div>
-          </div>
+          </Field>
           <div className="form-row-2">
-            <div className="input-group">
-              <label className="input-label">Statut</label>
+            <Field label="Statut">
               <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                 <option value="actif">Actif</option>
                 <option value="inactif">Inactif</option>
               </select>
-            </div>
-            <div className="input-group">
-              <label className="input-label">Niveau de partenariat</label>
+            </Field>
+            <Field label="Niveau de partenariat">
               <select className="input" value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value })}>
                 <option value="standard">Standard</option>
                 <option value="or">Or ⭐</option>
               </select>
-            </div>
+            </Field>
           </div>
           <button type="submit" className="btn btn-primary btn-block">
             <Check size={18} /> {editing === 'new' ? 'Ajouter le partenaire' : 'Enregistrer'}

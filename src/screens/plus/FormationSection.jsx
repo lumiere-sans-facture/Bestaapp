@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { toEmbed } from '../../utils/video';
 import Sheet from '../../components/Sheet';
+import Field from '../../components/Field';
+import EmptyState from '../../components/EmptyState';
 
 const EMPTY_FORM = { title: '', description: '', type: 'video', url: '', duration: '' };
 
@@ -136,7 +138,7 @@ export default function FormationSection({ onBack }) {
           );
         })}
         {(formations || []).length === 0 && (
-          <div className="empty-state card">Aucun module de formation pour le moment.</div>
+          <EmptyState card>Aucun module de formation pour le moment.</EmptyState>
         )}
       </div>
 
@@ -187,32 +189,27 @@ export default function FormationSection({ onBack }) {
         title={editing === 'new' ? 'Nouveau module' : 'Modifier le module'}
       >
         <form onSubmit={handleSave}>
-          <div className="input-group">
-            <label className="input-label">Titre *</label>
+          <Field label="Titre *">
             <input className="input" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex : Installer un kit 5 kWh" />
-          </div>
-          <div className="input-group">
-            <label className="input-label">Description</label>
+          </Field>
+          <Field label="Description">
             <textarea className="input" rows="2" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          </div>
+          </Field>
           <div className="form-row-2">
-            <div className="input-group">
-              <label className="input-label">Type</label>
+            <Field label="Type">
               <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                 <option value="video">Vidéo</option>
                 <option value="pdf">Document PDF</option>
               </select>
-            </div>
-            <div className="input-group">
-              <label className="input-label">Durée</label>
+            </Field>
+            <Field label="Durée">
               <input className="input" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="Ex : 20 min" />
-            </div>
+            </Field>
           </div>
-          <div className="input-group">
-            <label className="input-label">Lien (YouTube, Vimeo, mp4, PDF…) *</label>
+          <Field label="Lien (YouTube, Vimeo, mp4, PDF…) *">
             <input className="input" type="url" required value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://…" />
             <div className="field-hint">Les vidéos YouTube/Vimeo se lisent directement dans l'application.</div>
-          </div>
+          </Field>
           <button type="submit" className="btn btn-primary btn-block">
             <Check size={18} /> {editing === 'new' ? 'Ajouter le module' : 'Enregistrer'}
           </button>

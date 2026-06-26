@@ -182,9 +182,10 @@ export default function MyPartnerDashboard({ onBack }) {
           <span className="sheet-value">{filleuls.length ? filleuls.map((f) => f.name).join(', ') : 'Aucun'}</span>
         </div>
         <div className="momo-row">
-          <label className="input-label">Numéro Mobile Money (réception des commissions)</label>
+          <label className="input-label" htmlFor="mpd-momo">Numéro Mobile Money (réception des commissions)</label>
           <div className="momo-input-row">
             <input
+              id="mpd-momo"
               className="input"
               type="tel"
               placeholder="+229 ..."
