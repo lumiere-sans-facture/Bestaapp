@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
+import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
@@ -21,12 +22,13 @@ import { SyncStatusRow } from '../components/SyncStatus';
 export default function Plus() {
   const { user, logout } = useAuth();
   const { setMode, proActive } = useMode();
+  const data = useData();
   const {
     partners, commissions, leads, orders,
     getPartnerById, getLeadById,
     payCommission, addCommission,
-    getSubscriptionForUser, requestSubscription,
-  } = useData();
+    getSubscriptionForUser, requestSubscription, importData,
+  } = data;
 
   const sub = getSubscriptionForUser(user.id);
   const subStatus = effectiveStatus(sub);
@@ -38,6 +40,22 @@ export default function Plus() {
   const [subSheetOpen, setSubSheetOpen] = useState(false);
   const [subForm, setSubForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
   const [subSent, setSubSent] = useState(false);
+  const fileRef = useRef(null);
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const backup = await readBackupFile(file);
+      if (window.confirm('Importer cette sauvegarde remplacera les données actuelles. Continuer ?')) {
+        importData(backup);
+        window.alert('Sauvegarde restaurée avec succès.');
+      }
+    } catch (err) {
+      window.alert(err.message || 'Import impossible.');
+    }
+  };
 
   const handleProClick = () => {
     if (proActive) {
@@ -150,6 +168,31 @@ export default function Plus() {
 
   const renderProfile = () => <MyProfile onBack={() => setActiveTab('menu')} />;
 
+  const renderBackup = () => (
+    <>
+      <BackButton />
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="card-title">Sauvegarde des données</div>
+        <p className="text-sm text-secondary">
+          Exportez régulièrement toutes vos données (clients, devis, factures, partenaires, commissions…)
+          dans un fichier. Vous pourrez les restaurer en cas de perte ou de changement d'appareil.
+        </p>
+        <button className="btn btn-primary btn-block" onClick={() => downloadBackup(data)}>
+          <Download size={17} /> Exporter (télécharger)
+        </button>
+        <input
+          ref={fileRef} type="file" accept="application/json,.json"
+          onChange={handleImportFile} style={{ display: 'none' }}
+          aria-label="Fichier de sauvegarde à importer"
+        />
+        <button className="btn btn-outline btn-block" style={{ marginTop: 10 }} onClick={() => fileRef.current?.click()}>
+          <Upload size={17} /> Importer (restaurer)
+        </button>
+        <p className="field-hint">L'import remplace les données actuelles — exportez d'abord par sécurité.</p>
+      </div>
+    </>
+  );
+
   const renderMenu = () => (
     <div className="plus-grid">
       <div className="profile-card card">
@@ -213,6 +256,14 @@ export default function Plus() {
               </div>
               <ChevronRight size={18} className="menu-item-arrow" />
             </button>
+            <button className="menu-item" onClick={() => setActiveTab('backup')}>
+              <div className="menu-item-icon"><DatabaseBackup size={18} /></div>
+              <div className="menu-item-info">
+                <div className="menu-item-title">Sauvegarde des données</div>
+                <div className="menu-item-subtitle">Exporter / restaurer toutes les données</div>
+              </div>
+              <ChevronRight size={18} className="menu-item-arrow" />
+            </button>
           </>
         )}
         <button className="menu-item" onClick={() => setActiveTab('formation')}>
@@ -264,6 +315,7 @@ export default function Plus() {
         {activeTab === 'subsadmin' && <SubscriptionsAdmin onBack={() => setActiveTab('menu')} />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
         {activeTab === 'profile' && renderProfile()}
+        {activeTab === 'backup' && renderBackup()}
       </div>
 
       {/* Commission manuelle */}
