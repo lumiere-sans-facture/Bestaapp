@@ -342,13 +342,14 @@ export default function Boutique() {
         {payment === 'form' ? (
           <form onSubmit={confirmPayment}>
             <div className="input-group">
-              <label className="input-label">Opérateur Mobile Money</label>
-              <div className="client-type-toggle">
+              <span className="input-label" id="bq-operator-label">Opérateur Mobile Money</span>
+              <div className="client-type-toggle" role="group" aria-labelledby="bq-operator-label">
                 {['MTN MoMo', 'Moov Money'].map((op) => (
                   <button
                     key={op}
                     type="button"
                     className={`client-type-btn ${payForm.operator === op ? 'active' : ''}`}
+                    aria-pressed={payForm.operator === op}
                     onClick={() => setPayForm({ ...payForm, operator: op })}
                   >
                     <Smartphone size={16} /> {op}

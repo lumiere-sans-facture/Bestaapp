@@ -340,11 +340,12 @@ export default function Pipeline() {
             <input className="input" type="number" min="0" value={newLead.estimatedValue} onChange={(e) => setNewLead({ ...newLead, estimatedValue: e.target.value })} placeholder="0" />
           </Field>
           <div className="input-group">
-            <label className="input-label">Type de client</label>
-            <div className="client-type-toggle">
+            <span className="input-label" id="pipeline-clienttype-label">Type de client</span>
+            <div className="client-type-toggle" role="group" aria-labelledby="pipeline-clienttype-label">
               <button
                 type="button"
                 className={`client-type-btn ${newLead.clientType === 'particulier' ? 'active' : ''}`}
+                aria-pressed={newLead.clientType === 'particulier'}
                 onClick={() => setNewLead({ ...newLead, clientType: 'particulier' })}
               >
                 <User size={16} /> Particulier
@@ -352,6 +353,7 @@ export default function Pipeline() {
               <button
                 type="button"
                 className={`client-type-btn ${newLead.clientType === 'entreprise' ? 'active' : ''}`}
+                aria-pressed={newLead.clientType === 'entreprise'}
                 onClick={() => setNewLead({ ...newLead, clientType: 'entreprise' })}
               >
                 <Building2 size={16} /> Entreprise

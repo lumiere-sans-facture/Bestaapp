@@ -183,13 +183,12 @@ export default function DevisProSection({ onBack }) {
           ) : (
             <form className="pro-subscribe-form" onSubmit={(e) => { e.preventDefault(); requestSubscription(user.id, subForm); setSubSent(true); }}>
               <div className="form-row-2">
-                <div className="input-group">
-                  <label className="input-label">Opérateur</label>
+                <Field label="Opérateur">
                   <select className="input" value={subForm.methode} onChange={(e) => setSubForm({ ...subForm, methode: e.target.value })}>
                     <option value="momo">MTN MoMo</option>
                     <option value="moov">Moov Money</option>
                   </select>
-                </div>
+                </Field>
                 <Field label="Votre numéro">
                   <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+229 ..." />
                 </Field>
@@ -362,14 +361,12 @@ export default function DevisProSection({ onBack }) {
                   </Field>
                 </div>
                 <div className="form-row-2">
-                  <div className="input-group">
-                    <label className="input-label">Couleur principale</label>
+                  <Field label="Couleur principale">
                     <input className="input pro-color-input" type="color" value={f.couleurPrimaire} onChange={(e) => setCompanyForm({ ...f, couleurPrimaire: e.target.value })} />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Couleur secondaire</label>
+                  </Field>
+                  <Field label="Couleur secondaire">
                     <input className="input pro-color-input" type="color" value={f.couleurSecondaire} onChange={(e) => setCompanyForm({ ...f, couleurSecondaire: e.target.value })} />
-                  </div>
+                  </Field>
                 </div>
                 <div className="form-row-2">
                   <Field label="Modèle par défaut">
@@ -436,14 +433,14 @@ export default function DevisProSection({ onBack }) {
             </Field>
           </div>
 
-          <label className="input-label">Lignes de la facture *</label>
+          <div className="input-label">Lignes de la facture *</div>
           {factureForm.lignes.map((l, i) => (
             <div key={i} className="facture-ligne">
-              <input className="input" placeholder="Désignation" value={l.designation}
+              <input className="input" placeholder="Désignation" aria-label="Désignation" value={l.designation}
                 onChange={(e) => setFactureForm({ ...factureForm, lignes: factureForm.lignes.map((x, j) => j === i ? { ...x, designation: e.target.value } : x) })} />
-              <input className="input facture-qty" type="number" min="1" placeholder="Qté" value={l.qty}
+              <input className="input facture-qty" type="number" min="1" placeholder="Qté" aria-label="Quantité" value={l.qty}
                 onChange={(e) => setFactureForm({ ...factureForm, lignes: factureForm.lignes.map((x, j) => j === i ? { ...x, qty: e.target.value } : x) })} />
-              <input className="input facture-pu" type="number" min="0" placeholder="P.U." value={l.pu}
+              <input className="input facture-pu" type="number" min="0" placeholder="P.U." aria-label="Prix unitaire" value={l.pu}
                 onChange={(e) => setFactureForm({ ...factureForm, lignes: factureForm.lignes.map((x, j) => j === i ? { ...x, pu: e.target.value } : x) })} />
               {factureForm.lignes.length > 1 && (
                 <button type="button" className="cart-row-remove" onClick={() => setFactureForm({ ...factureForm, lignes: factureForm.lignes.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
