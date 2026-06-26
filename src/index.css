@@ -566,6 +566,7 @@ textarea.input { resize: vertical; }
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .sheet.active { transform: translateY(0); }
+.sheet:focus { outline: none; } /* focus programmatique du conteneur, pas atteint au clavier */
 .sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 10px auto 0; flex-shrink: 0; }
 .sheet-header {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
