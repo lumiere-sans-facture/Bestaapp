@@ -57,8 +57,19 @@ async function fromNASA(lat, lon) {
   return nasaToSolar(ann, lat);
 }
 
-/** Ensoleillement pour des coordonnées : PVGIS d'abord, repli NASA POWER. */
+/** Ensoleillement pour des coordonnées.
+ *  1) Proxy serveur /api/solar (web) : PVGIS + NASA combinés, sans souci CORS.
+ *  2) Repli appel direct (apps natives Capacitor, dev sans fonction serverless). */
 export async function fetchSolarData(lat, lon) {
+  try {
+    const res = await fetch(`/api/solar?lat=${lat}&lon=${lon}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.peakSunHours != null) return data;
+    }
+  } catch {
+    /* pas de proxy (app native / dev local) → repli direct ci-dessous */
+  }
   try {
     return await fromPVGIS(lat, lon);
   } catch {
