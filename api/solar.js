@@ -46,15 +46,17 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'Sources solaires indisponibles.' });
   }
 
-  // PVGIS prioritaire (plan optimal, angle réel) ; NASA en complément / repli.
-  const primary = pvgis || nasa;
-  const source = pvgis && nasa ? 'NASA/PVGIS' : (pvgis ? 'PVGIS' : 'NASA POWER');
+  // Valeurs réelles = NASA en priorité (irradiation horizontale, plus
+  // conservatrice → dimensionnement avec marge) ; angle optimal depuis PVGIS.
+  // Le libellé reste « NASA/PVGIS » quand les deux répondent.
+  const irr = nasa || pvgis;
+  const source = pvgis && nasa ? 'NASA/PVGIS' : (nasa ? 'NASA POWER' : 'PVGIS');
 
   // Données climatologiques stables → cache CDN agressif.
   res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
   return res.status(200).json({
-    peakSunHours: primary.peakSunHours,
-    yearlyYield: primary.yearlyYield,
+    peakSunHours: irr.peakSunHours,
+    yearlyYield: irr.yearlyYield,
     optimalAngle: pvgis?.optimalAngle ?? Math.round(Math.abs(lat)),
     source,
     sources: {

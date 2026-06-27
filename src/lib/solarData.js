@@ -23,6 +23,20 @@ export const pvgisToSolar = (irradiation, slope, lat) => ({
   source: 'PVGIS',
 });
 
+/** Combine les deux sources : irradiation NASA en priorité (valeurs réelles,
+ *  plus conservatrices), angle optimal PVGIS, libellé « NASA/PVGIS » si les
+ *  deux répondent. nasa/pvgis = sorties de nasaToSolar/pvgisToSolar (ou null). */
+export const combineSolar = (nasa, pvgis, lat) => {
+  const irr = nasa || pvgis;
+  if (!irr) return null;
+  return {
+    peakSunHours: irr.peakSunHours,
+    yearlyYield: irr.yearlyYield,
+    optimalAngle: pvgis?.optimalAngle ?? nasa?.optimalAngle ?? Math.round(Math.abs(lat)),
+    source: nasa && pvgis ? 'NASA/PVGIS' : (nasa ? 'NASA POWER' : 'PVGIS'),
+  };
+};
+
 // ---- Accès réseau ----
 
 /** Recherche une ville → { name, country, lat, lon }. (Open-Meteo, sans clé, CORS). */
@@ -57,9 +71,21 @@ async function fromNASA(lat, lon) {
   return nasaToSolar(ann, lat);
 }
 
+/** Appel direct des deux APIs (apps natives, dev) puis combinaison. */
+async function fromBoth(lat, lon) {
+  const [na, pv] = await Promise.allSettled([fromNASA(lat, lon), fromPVGIS(lat, lon)]);
+  const combined = combineSolar(
+    na.status === 'fulfilled' ? na.value : null,
+    pv.status === 'fulfilled' ? pv.value : null,
+    lat,
+  );
+  if (!combined) throw new Error('Données solaires indisponibles.');
+  return combined;
+}
+
 /** Ensoleillement pour des coordonnées.
- *  1) Proxy serveur /api/solar (web) : PVGIS + NASA combinés, sans souci CORS.
- *  2) Repli appel direct (apps natives Capacitor, dev sans fonction serverless). */
+ *  1) Proxy serveur /api/solar (web) : NASA + PVGIS combinés, sans souci CORS.
+ *  2) Repli appel direct combiné (apps natives Capacitor, dev sans serverless). */
 export async function fetchSolarData(lat, lon) {
   try {
     const res = await fetch(`/api/solar?lat=${lat}&lon=${lon}`);
@@ -70,9 +96,5 @@ export async function fetchSolarData(lat, lon) {
   } catch {
     /* pas de proxy (app native / dev local) → repli direct ci-dessous */
   }
-  try {
-    return await fromPVGIS(lat, lon);
-  } catch {
-    return await fromNASA(lat, lon);
-  }
+  return await fromBoth(lat, lon);
 }
