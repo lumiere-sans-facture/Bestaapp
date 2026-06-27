@@ -255,3 +255,31 @@ export const buildQuotation = (sizing, { products = [], includeMaintenance = tru
     roi,
   };
 };
+
+/**
+ * Devis à partir d'un kit préconfiguré : toutes les lignes du kit, sans calcul
+ * de composition. « Main d'œuvre » → prestation, le reste → équipements.
+ * Prix tout compris (sans TVA) : HT = TTC, comme les devis kit de référence.
+ * Format aligné sur buildQuotation pour réutiliser l'affichage et le PDF.
+ */
+export const buildKitQuotation = (kit) => {
+  const toItem = (l, type) => ({
+    type, name: l.designation, quantity: l.qty, unit: l.unit,
+    unitPrice: l.pu, totalPrice: l.qty * l.pu,
+  });
+  const components = kit.lines.filter((l) => !l.labor).map((l) => toItem(l, 'kit'));
+  const prestations = kit.lines.filter((l) => l.labor).map((l) => toItem(l, 'prestation'));
+  const total = kit.lines.reduce((s, l) => s + l.qty * l.pu, 0);
+  return {
+    components, prestations,
+    equipmentCost: components.reduce((s, c) => s + c.totalPrice, 0),
+    installationCost: prestations.reduce((s, c) => s + c.totalPrice, 0),
+    maintenanceCost: 0,
+    subtotalHT: total,
+    tva: 0,
+    total,
+    roi: 0,
+    kitId: kit.id,
+    kitName: kit.name,
+  };
+};

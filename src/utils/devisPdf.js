@@ -180,7 +180,7 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
   const totalRows = [];
   if (devis.type === 'solar' && devis.quotation) {
     totalRows.push(['Sous-total HT', fmt(devis.quotation.subtotalHT)]);
-    totalRows.push(['TVA (18 %)', fmt(devis.quotation.tva)]);
+    if (devis.quotation.tva > 0) totalRows.push(['TVA (18 %)', fmt(devis.quotation.tva)]);
     if (devis.quotation.roi) totalRows.push(['ROI estimé', `${Math.round(devis.quotation.roi)} mois`]);
   } else {
     totalRows.push(['Sous-total', fmt(devis.subtotal)]);

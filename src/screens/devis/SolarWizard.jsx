@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Battery, Cpu, Calculator, PanelTop, MapPin, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Battery, Cpu, Calculator, PanelTop, MapPin, Search, Package } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById } from '../../data/appliances';
-import { calculateSystemSize, buildQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
+import { calculateSystemSize, buildQuotation, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
+import { SOLAR_KITS } from '../../data/kits';
 import { geocodeCity, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -108,25 +109,53 @@ export default function SolarWizard({ onDone }) {
     [sizing, products, includeMaintenance]
   );
 
+  // Kits préconfigurés : null = dimensionnement calculé, sinon devis du kit choisi.
+  const [selectedKitId, setSelectedKitId] = useState(null);
+  const selectedKit = SOLAR_KITS.find((k) => k.id === selectedKitId) || null;
+  const kitQuotations = useMemo(() => Object.fromEntries(SOLAR_KITS.map((k) => [k.id, buildKitQuotation(k)])), []);
+  const displayQuotation = selectedKitId ? kitQuotations[selectedKitId] : quotation;
+  // Kit suggéré : capacité de batterie la plus proche du besoin calculé.
+  const suggestedKitId = useMemo(() => {
+    if (!sizing) return null;
+    const need = sizing.batteryCapacity || 0;
+    return [...SOLAR_KITS].sort((a, b) => Math.abs(a.battery - need) - Math.abs(b.battery - need))[0].id;
+  }, [sizing]);
+
   const handleSubmit = () => {
+    const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
+    const submitSizing = selectedKit
+      ? {
+          numberOfPanels: selectedKit.panels,
+          panelCapacity: (selectedKit.panels * 620) / 1000,
+          inverter: { brand: 'Growatt', model: `${selectedKit.inverter} kVA`, capacity: selectedKit.inverter },
+          batteries: [],
+          batteryCapacity: selectedKit.battery,
+          estimatedProduction: Math.round((selectedKit.panels * 620 * psh * 365) / 1000),
+          systemType,
+          peakSunHours: psh,
+          city: location?.name || null,
+          kit: selectedKit.name,
+        }
+      : {
+          numberOfPanels: sizing.numberOfPanels,
+          panelCapacity: sizing.panelCapacity,
+          inverter: { brand: sizing.inverter.brand, model: sizing.inverter.model, capacity: sizing.inverter.capacity },
+          batteries: sizing.batteries.map((b) => ({ brand: b.brand, model: b.model, capacity: b.capacity, quantity: b.quantity })),
+          batteryCapacity: sizing.batteryCapacity,
+          estimatedProduction: sizing.estimatedProduction,
+          systemType: sizing.systemType,
+          peakSunHours: sizing.peakSunHours,
+          city: location?.name || null,
+        };
     addDevis({
       type: 'solar',
       leadId: selectedLeadId,
       partnerId: partnerId || null,
       consumption,
-      sizing: {
-        numberOfPanels: sizing.numberOfPanels,
-        panelCapacity: sizing.panelCapacity,
-        inverter: { brand: sizing.inverter.brand, model: sizing.inverter.model, capacity: sizing.inverter.capacity },
-        batteries: sizing.batteries.map((b) => ({ brand: b.brand, model: b.model, capacity: b.capacity, quantity: b.quantity })),
-        batteryCapacity: sizing.batteryCapacity,
-        estimatedProduction: sizing.estimatedProduction,
-        systemType: sizing.systemType,
-        peakSunHours: sizing.peakSunHours,
-        city: location?.name || null,
-      },
-      quotation,
-      total: quotation.total,
+      sizing: submitSizing,
+      kit: selectedKit ? { id: selectedKit.id, name: selectedKit.name } : null,
+      quotation: displayQuotation,
+      total: displayQuotation.total,
       createdBy: user.id,
     });
     onDone();
@@ -347,39 +376,66 @@ export default function SolarWizard({ onDone }) {
           <div>
             <div className="wizard-step-title">4. Dimensionnement et devis</div>
 
-            <div className="sizing-grid">
-              <div className="sizing-card">
-                <div className="sizing-icon"><PanelTop size={18} /></div>
-                <div className="sizing-value">{sizing.numberOfPanels}</div>
-                <div className="sizing-label">Panneaux {sizing.panelCapacity.toFixed(1)} kWc</div>
-              </div>
-              <div className="sizing-card">
-                <div className="sizing-icon"><Cpu size={18} /></div>
-                <div className="sizing-value">{sizing.inverter.capacity} kVA</div>
-                <div className="sizing-label">{sizing.inverter.brand}</div>
-              </div>
-              <div className="sizing-card">
-                <div className="sizing-icon"><Battery size={18} /></div>
-                <div className="sizing-value">{sizing.batteryCapacity > 0 ? `${sizing.batteryCapacity.toFixed(1)} kWh` : '—'}</div>
-                <div className="sizing-label">{sizing.batteries.reduce((s, b) => s + b.quantity, 0)} batterie(s)</div>
-              </div>
-              <div className="sizing-card">
-                <div className="sizing-icon"><Zap size={18} /></div>
-                <div className="sizing-value">{Math.round(sizing.estimatedProduction).toLocaleString('fr-FR')}</div>
-                <div className="sizing-label">kWh / an estimés</div>
+            {/* Sélection d'un kit préconfiguré (ou dimensionnement calculé) */}
+            <div className="kit-selector">
+              <div className="kit-selector-title">Kit préconfiguré</div>
+              <div className="kit-options">
+                <button type="button" className={`kit-option ${!selectedKitId ? 'selected' : ''}`} onClick={() => setSelectedKitId(null)}>
+                  <span className="kit-option-name">Dimensionnement calculé</span>
+                  <span className="kit-option-meta">{formatCFA(quotation.total)}</span>
+                </button>
+                {SOLAR_KITS.map((k) => (
+                  <button type="button" key={k.id} className={`kit-option ${selectedKitId === k.id ? 'selected' : ''}`} onClick={() => setSelectedKitId(k.id)}>
+                    <span className="kit-option-name">
+                      {k.name}
+                      {k.id === suggestedKitId && <span className="kit-badge">Suggéré</span>}
+                    </span>
+                    <span className="kit-option-meta">{formatCFA(kitQuotations[k.id].total)}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
+            {selectedKit ? (
+              <div className="kit-summary">
+                <Package size={16} />
+                <span>{selectedKit.name} — {selectedKit.panels} panneaux 620Wc · batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA</span>
+              </div>
+            ) : (
+              <div className="sizing-grid">
+                <div className="sizing-card">
+                  <div className="sizing-icon"><PanelTop size={18} /></div>
+                  <div className="sizing-value">{sizing.numberOfPanels}</div>
+                  <div className="sizing-label">Panneaux {sizing.panelCapacity.toFixed(1)} kWc</div>
+                </div>
+                <div className="sizing-card">
+                  <div className="sizing-icon"><Cpu size={18} /></div>
+                  <div className="sizing-value">{sizing.inverter.capacity} kVA</div>
+                  <div className="sizing-label">{sizing.inverter.brand}</div>
+                </div>
+                <div className="sizing-card">
+                  <div className="sizing-icon"><Battery size={18} /></div>
+                  <div className="sizing-value">{sizing.batteryCapacity > 0 ? `${sizing.batteryCapacity.toFixed(1)} kWh` : '—'}</div>
+                  <div className="sizing-label">{sizing.batteries.reduce((s, b) => s + b.quantity, 0)} batterie(s)</div>
+                </div>
+                <div className="sizing-card">
+                  <div className="sizing-icon"><Zap size={18} /></div>
+                  <div className="sizing-value">{Math.round(sizing.estimatedProduction).toLocaleString('fr-FR')}</div>
+                  <div className="sizing-label">kWh / an estimés</div>
+                </div>
+              </div>
+            )}
+
             <div className="bom">
               <div className="bom-title">Équipements</div>
-              {quotation.components.map((c, i) => (
+              {displayQuotation.components.map((c, i) => (
                 <div key={i} className="bom-row">
                   <div className="bom-name">{c.name}{c.quantity > 1 ? <span className="bom-qty"> × {c.quantity % 1 === 0 ? c.quantity : c.quantity.toFixed(1)}</span> : ''}</div>
                   <div className="bom-price">{formatCFA(c.totalPrice)}</div>
                 </div>
               ))}
               <div className="bom-title">Prestations</div>
-              {quotation.prestations.map((c, i) => (
+              {displayQuotation.prestations.map((c, i) => (
                 <div key={i} className="bom-row">
                   <div className="bom-name">{c.name}</div>
                   <div className="bom-price">{formatCFA(c.totalPrice)}</div>
@@ -388,13 +444,17 @@ export default function SolarWizard({ onDone }) {
             </div>
 
             <div className="devis-summary">
-              <div className="devis-summary-row"><span>Sous-total HT</span><span>{formatCFA(quotation.subtotalHT)}</span></div>
-              <div className="devis-summary-row credit"><span>TVA (18 %)</span><span>{formatCFA(quotation.tva)}</span></div>
-              <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(quotation.total)}</span></div>
+              <div className="devis-summary-row"><span>Sous-total HT</span><span>{formatCFA(displayQuotation.subtotalHT)}</span></div>
+              {displayQuotation.tva > 0 && (
+                <div className="devis-summary-row credit"><span>TVA (18 %)</span><span>{formatCFA(displayQuotation.tva)}</span></div>
+              )}
+              <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(displayQuotation.total)}</span></div>
             </div>
-            <div className="roi-note">
-              <Zap size={14} /> Retour sur investissement estimé : <strong>{quotation.roi.toFixed(1)} mois</strong>
-            </div>
+            {displayQuotation.roi > 0 && (
+              <div className="roi-note">
+                <Zap size={14} /> Retour sur investissement estimé : <strong>{displayQuotation.roi.toFixed(1)} mois</strong>
+              </div>
+            )}
           </div>
         )}
 
