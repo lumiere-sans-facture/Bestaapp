@@ -158,7 +158,7 @@ export default function Devis() {
           title="Nouveau devis"
           actions={<button className="btn btn-outline-light" onClick={backToList}>Annuler</button>}
         />
-        <div className="page-content">
+        <div className="page-content page-content-narrow">
           <div className="devis-mode-grid">
             <button className="devis-mode-card" onClick={() => setView('solar')}>
               <div className="devis-mode-icon solar"><PanelTop size={26} /></div>
@@ -183,7 +183,7 @@ export default function Devis() {
         title={view === 'solar' ? 'Devis solaire' : 'Nouveau devis'}
         actions={<button className="btn btn-outline-light" onClick={backToList}>Annuler</button>}
       />
-      <div className="page-content">
+      <div className="page-content page-content-narrow">
         {view === 'solar' ? (
           <SolarWizard onDone={backToList} />
         ) : (
