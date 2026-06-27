@@ -1,0 +1,51 @@
+<!-- @dsCard group="Tokens" name="Rayons, ombres & rythme" subtitle="Radius, élévations et espacements" w="860" h="600" -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tokens — Rayons / Ombres / Espacements</title>
+  <link rel="stylesheet" href="../theme.css" />
+</head>
+<body>
+  <div class="ds-page">
+    <h1>Rayons, ombres & rythme</h1>
+    <p class="ds-lead">Élévations et arrondis du système. Le token <code>--radius</code> (12px) est la référence des cartes.</p>
+
+    <div class="ds-grid">
+      <div class="ds-specimen" style="flex:1;min-width:280px">
+        <h2>Arrondis</h2>
+        <div class="ds-row">
+          <div style="text-align:center"><div style="width:80px;height:60px;background:var(--primary);border-radius:6px"></div><div class="ds-swatch-val">6px — badges</div></div>
+          <div style="text-align:center"><div style="width:80px;height:60px;background:var(--primary);border-radius:8px"></div><div class="ds-swatch-val">8px — btn-sm</div></div>
+          <div style="text-align:center"><div style="width:80px;height:60px;background:var(--primary);border-radius:10px"></div><div class="ds-swatch-val">10px — btn, input</div></div>
+          <div style="text-align:center"><div style="width:80px;height:60px;background:var(--primary);border-radius:var(--radius)"></div><div class="ds-swatch-val">12px — --radius (cartes)</div></div>
+          <div style="text-align:center"><div style="width:80px;height:60px;background:var(--primary);border-radius:20px"></div><div class="ds-swatch-val">20px — chips, sheet</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ds-specimen" style="margin-top:16px">
+      <h2>Ombres (élévation)</h2>
+      <div class="ds-row" style="gap:28px">
+        <div style="text-align:center"><div style="width:160px;height:80px;background:white;border-radius:var(--radius);box-shadow:var(--shadow)"></div><div class="ds-swatch-val" style="margin-top:10px">--shadow — repos</div></div>
+        <div style="text-align:center"><div style="width:160px;height:80px;background:white;border-radius:var(--radius);box-shadow:var(--shadow-lg)"></div><div class="ds-swatch-val" style="margin-top:10px">--shadow-lg — survol / flottant</div></div>
+      </div>
+    </div>
+
+    <div class="ds-specimen" style="margin-top:16px">
+      <h2>Rythme d'espacement</h2>
+      <p class="ds-note" style="margin-top:0;margin-bottom:12px">Pas usuels (px). Padding de carte = 16, gap de grille = 12, marge de section = 20.</p>
+      <div class="ds-row" style="align-items:flex-end">
+        <div style="text-align:center"><div style="width:4px;height:40px;background:var(--accent)"></div><div class="ds-swatch-val">4</div></div>
+        <div style="text-align:center"><div style="width:8px;height:40px;background:var(--accent)"></div><div class="ds-swatch-val">8</div></div>
+        <div style="text-align:center"><div style="width:12px;height:40px;background:var(--accent)"></div><div class="ds-swatch-val">12</div></div>
+        <div style="text-align:center"><div style="width:16px;height:40px;background:var(--accent)"></div><div class="ds-swatch-val">16</div></div>
+        <div style="text-align:center"><div style="width:20px;height:40px;background:var(--accent)"></div><div class="ds-swatch-val">20</div></div>
+        <div style="text-align:center"><div style="width:24px;height:40px;background:var(--accent)"></div><div class="ds-swatch-val">24</div></div>
+        <div style="text-align:center"><div style="width:32px;height:40px;background:var(--accent)"></div><div class="ds-swatch-val">32</div></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

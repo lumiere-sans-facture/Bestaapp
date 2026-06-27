@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BestaSolar Pro — Bibliothèque de composants</title>
+  <link rel="stylesheet" href="theme.css" />
+  <style>
+    .ds-index-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .ds-index-link {
+      display: block; background: white; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .ds-index-link:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+    .ds-index-link h3 { font-size: 0.9375rem; font-weight: 600; }
+    .ds-index-link p { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 4px; }
+    .ds-index-group { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 24px 0 10px; }
+  </style>
+</head>
+<body>
+  <div class="ds-page">
+    <h1>Bibliothèque de composants — BestaSolar Pro</h1>
+    <p class="ds-lead">Aperçus des tokens et primitives du design system. Source : <code>src/index.css</code> (miroir dans <code>theme.css</code>). Prêt à synchroniser vers Claude Design.</p>
+
+    <div class="ds-index-group">Tokens</div>
+    <div class="ds-index-grid">
+      <a class="ds-index-link" href="tokens/colors.html"><h3>Couleurs</h3><p>Palette de marque & couleurs sémantiques</p></a>
+      <a class="ds-index-link" href="tokens/typography.html"><h3>Typographie</h3><p>Échelle de tailles & graisses (Inter)</p></a>
+      <a class="ds-index-link" href="tokens/spacing-radius-shadow.html"><h3>Rayons, ombres & rythme</h3><p>Radius, élévations, espacements</p></a>
+    </div>
+
+    <div class="ds-index-group">Composants</div>
+    <div class="ds-index-grid">
+      <a class="ds-index-link" href="components/buttons.html"><h3>Boutons</h3><p>Variantes, tailles, états</p></a>
+      <a class="ds-index-link" href="components/badges.html"><h3>Badges & puces</h3><p>Statuts, chips de catégorie</p></a>
+      <a class="ds-index-link" href="components/inputs.html"><h3>Champs de saisie</h3><p>Input, select, textarea, focus</p></a>
+      <a class="ds-index-link" href="components/cards.html"><h3>Cartes & KPI</h3><p>card, kpi-card (highlight)</p></a>
+      <a class="ds-index-link" href="components/stat-pills.html"><h3>Mini-stats</h3><p>stat-pill colorées</p></a>
+      <a class="ds-index-link" href="components/rings.html"><h3>Anneaux</h3><p>Jauges donut SVG</p></a>
+      <a class="ds-index-link" href="components/pipeline.html"><h3>Pipeline</h3><p>Stepper en chevrons, carte kanban</p></a>
+      <a class="ds-index-link" href="components/alerts.html"><h3>Feed d'alertes</h3><p>Lignes par sévérité</p></a>
+      <a class="ds-index-link" href="components/sheet.html"><h3>Panneau (sheet)</h3><p>Feuille mobile / fenêtre desktop</p></a>
+    </div>
+  </div>
+</body>
+</html>

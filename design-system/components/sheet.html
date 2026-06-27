@@ -1,0 +1,36 @@
+<!-- @dsCard group="Composants" name="Panneau (sheet)" subtitle="Feuille mobile / fenêtre desktop" w="620" h="560" -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Composants — Panneau</title>
+  <link rel="stylesheet" href="../theme.css" />
+</head>
+<body>
+  <div class="ds-page">
+    <h1>Panneau (sheet)</h1>
+    <p class="ds-lead">Conteneur de détail : feuille glissante en bas sur mobile, fenêtre centrée sur desktop. Aperçu statique ici.</p>
+
+    <div class="ds-specimen" style="background:var(--bg)">
+      <div class="ds-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div>
+            <div class="sheet-title">Villa Cocotiers</div>
+            <div class="sheet-subtitle">Devis BS-20260627-0001</div>
+          </div>
+          <button class="btn btn-sm btn-outline">✕</button>
+        </div>
+        <div class="sheet-body">
+          <div class="sheet-section-title">Détails</div>
+          <div class="sheet-row"><span class="sheet-label">Client</span><span class="sheet-value">Aminata D.</span></div>
+          <div class="sheet-row"><span class="sheet-label">Kit</span><span class="sheet-value">Kit 5 kWh</span></div>
+          <div class="sheet-row"><span class="sheet-label">Statut</span><span class="sheet-value"><span class="badge badge-warning">En attente</span></span></div>
+          <div class="sheet-row"><span class="sheet-label">Total TTC</span><span class="sheet-value amount">1 544 000 F</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

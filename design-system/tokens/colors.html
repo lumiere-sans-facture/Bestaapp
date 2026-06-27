@@ -1,0 +1,62 @@
+<!-- @dsCard group="Tokens" name="Couleurs" subtitle="Palette de marque & couleurs sémantiques" w="960" h="720" -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tokens — Couleurs</title>
+  <link rel="stylesheet" href="../theme.css" />
+</head>
+<body>
+  <div class="ds-page">
+    <h1>Couleurs</h1>
+    <p class="ds-lead">Variables CSS définies dans <code>:root</code> (src/index.css). Utiliser ces tokens, jamais des littéraux.</p>
+
+    <div class="ds-specimen" style="margin-bottom:16px">
+      <h2>Marque</h2>
+      <div class="ds-swatches">
+        <div><div class="ds-swatch" style="background:var(--primary)"></div><div class="ds-swatch-name">Primary</div><div class="ds-swatch-val">--primary · #0a2472</div></div>
+        <div><div class="ds-swatch" style="background:var(--primary-light)"></div><div class="ds-swatch-name">Primary light</div><div class="ds-swatch-val">--primary-light · #1a3a8c</div></div>
+        <div><div class="ds-swatch" style="background:var(--primary-dark)"></div><div class="ds-swatch-name">Primary dark</div><div class="ds-swatch-val">--primary-dark · #061540</div></div>
+        <div><div class="ds-swatch" style="background:var(--accent)"></div><div class="ds-swatch-name">Accent</div><div class="ds-swatch-val">--accent · #f5a623</div></div>
+        <div><div class="ds-swatch" style="background:var(--accent-light)"></div><div class="ds-swatch-name">Accent light</div><div class="ds-swatch-val">--accent-light · #f7b84a</div></div>
+        <div><div class="ds-swatch" style="background:var(--accent-dark)"></div><div class="ds-swatch-name">Accent dark</div><div class="ds-swatch-val">--accent-dark · #d48c1a</div></div>
+      </div>
+    </div>
+
+    <div class="ds-specimen" style="margin-bottom:16px">
+      <h2>Sémantique</h2>
+      <div class="ds-swatches">
+        <div><div class="ds-swatch" style="background:var(--success)"></div><div class="ds-swatch-name">Success</div><div class="ds-swatch-val">--success · #10b981</div></div>
+        <div><div class="ds-swatch" style="background:var(--success-light)"></div><div class="ds-swatch-name">Success light</div><div class="ds-swatch-val">--success-light · #d1fae5</div></div>
+        <div><div class="ds-swatch" style="background:var(--warning)"></div><div class="ds-swatch-name">Warning</div><div class="ds-swatch-val">--warning · #f59e0b</div></div>
+        <div><div class="ds-swatch" style="background:var(--warning-light)"></div><div class="ds-swatch-name">Warning light</div><div class="ds-swatch-val">--warning-light · #fef3c7</div></div>
+        <div><div class="ds-swatch" style="background:var(--error)"></div><div class="ds-swatch-name">Error</div><div class="ds-swatch-val">--error · #ef4444</div></div>
+        <div><div class="ds-swatch" style="background:var(--error-light)"></div><div class="ds-swatch-name">Error light</div><div class="ds-swatch-val">--error-light · #fee2e2</div></div>
+      </div>
+    </div>
+
+    <div class="ds-specimen" style="margin-bottom:16px">
+      <h2>Neutres & surfaces</h2>
+      <div class="ds-swatches">
+        <div><div class="ds-swatch" style="background:var(--bg)"></div><div class="ds-swatch-name">Background</div><div class="ds-swatch-val">--bg · #f4f6fb</div></div>
+        <div><div class="ds-swatch" style="background:var(--bg-card)"></div><div class="ds-swatch-name">Surface carte</div><div class="ds-swatch-val">--bg-card · #ffffff</div></div>
+        <div><div class="ds-swatch" style="background:var(--border)"></div><div class="ds-swatch-name">Bordure</div><div class="ds-swatch-val">--border · #e5e7eb</div></div>
+        <div><div class="ds-swatch" style="background:var(--text-primary)"></div><div class="ds-swatch-name">Texte principal</div><div class="ds-swatch-val">--text-primary · #1a1a2e</div></div>
+        <div><div class="ds-swatch" style="background:var(--text-secondary)"></div><div class="ds-swatch-name">Texte secondaire</div><div class="ds-swatch-val">--text-secondary · #6b7280</div></div>
+        <div><div class="ds-swatch" style="background:var(--text-muted)"></div><div class="ds-swatch-name">Texte atténué</div><div class="ds-swatch-val">--text-muted · #9ca3af</div></div>
+      </div>
+    </div>
+
+    <div class="ds-specimen">
+      <h2>⚠ Couleurs sémantiques non tokenisées</h2>
+      <p class="ds-note" style="margin-top:0;margin-bottom:12px">Ces teintes « foncées » servent au texte sur fond clair (badges, libellés) mais sont codées en dur dans src/index.css. Candidates à promouvoir en tokens (<code>--success-dark</code>, <code>--warning-dark</code>, <code>--info</code>).</p>
+      <div class="ds-swatches">
+        <div><div class="ds-swatch" style="background:#047857"></div><div class="ds-swatch-name">Success dark</div><div class="ds-swatch-val">#047857 (proposé : --success-dark)</div></div>
+        <div><div class="ds-swatch" style="background:#92400e"></div><div class="ds-swatch-name">Warning dark</div><div class="ds-swatch-val">#92400e (proposé : --warning-dark)</div></div>
+        <div><div class="ds-swatch" style="background:#2563eb"></div><div class="ds-swatch-name">Info</div><div class="ds-swatch-val">#2563eb (proposé : --info)</div></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
