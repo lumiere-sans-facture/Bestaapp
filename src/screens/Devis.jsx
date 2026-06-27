@@ -183,7 +183,7 @@ export default function Devis() {
         title={view === 'solar' ? 'Devis solaire' : 'Nouveau devis'}
         actions={<button className="btn btn-outline-light" onClick={backToList}>Annuler</button>}
       />
-      <div className="page-content page-content-narrow">
+      <div className="page-content">
         {view === 'solar' ? (
           <SolarWizard onDone={backToList} />
         ) : (
