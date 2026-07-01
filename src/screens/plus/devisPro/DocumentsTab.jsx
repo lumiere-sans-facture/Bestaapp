@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2, PanelTop, ChevronLeft, ShoppingCart } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, Search, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
@@ -8,24 +8,44 @@ import { exportDevisProPdf, exportFacturePdf } from './proPdf';
 import FactureSheet from './FactureSheet';
 import ProDevisBuilder from './ProDevisBuilder';
 import ProSolarWizard from './ProSolarWizard';
+import Sheet from '../../../components/Sheet';
 
-/** Onglet « Mes documents » : factures (création/statut/PDF) et devis convertibles. */
+const badgeClass = (s) => (s === 'payee' ? 'badge-success' : s === 'emise' ? 'badge-warning' : 'badge-muted');
+const nextStatut = (s) => (s === 'brouillon' ? 'emise' : 'payee');
+const nextStatutLabel = (s) => (s === 'brouillon' ? 'Marquer émise' : 'Marquer payée');
+
+const SORTS = [['recent', 'Plus récents'], ['ancien', 'Plus anciens'], ['montant', 'Montant décroissant']];
+const FACTURE_FILTERS = [['all', 'Tous'], ['emise', 'Émises'], ['payee', 'Payées'], ['brouillon', 'Brouillons']];
+const DEVIS_FILTERS = [['all', 'Tous'], ['tofacture', 'À facturer'], ['factured', 'Facturés']];
+
+/** Écran « Devis & Factures » : bascule Devis/Factures, recherche + filtres + tri,
+ *  cartes cliquables ouvrant un menu d'actions. */
 export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const { user } = useAuth();
   const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, markDevisPro } = useData();
-  const [factureOpen, setFactureOpen] = useState(false);
-  const [view, setView] = useState('docs'); // docs | create (création de devis)
+
+  const [tab, setTab] = useState('factures'); // devis | factures
+  const [view, setView] = useState('list'); // list | create
   const [createMode, setCreateMode] = useState('choose'); // choose | solar | manual
+  const [factureOpen, setFactureOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('recent');
+  const [actions, setActions] = useState(null); // { kind:'facture'|'devis', doc }
 
-  const myDevis = devis.filter((d) => d.createdBy === user.id);
-  const myFactures = (factures || []).filter((f) => f.userId === user.id);
-  // Devis déjà transformés en facture (pour l'indicateur + la garde anti-doublon).
-  const factureByDevis = new Map(myFactures.filter((f) => f.devisId).map((f) => [f.devisId, f]));
+  const myDevis = useMemo(() => devis.filter((d) => d.createdBy === user.id), [devis, user.id]);
+  const myFactures = useMemo(() => (factures || []).filter((f) => f.userId === user.id), [factures, user.id]);
+  const factureByDevis = useMemo(() => new Map(myFactures.filter((f) => f.devisId).map((f) => [f.devisId, f])), [myFactures]);
+  const devisById = useMemo(() => new Map(myDevis.map((d) => [d.id, d])), [myDevis]);
 
-  const createFacture = (data) => {
-    addFacture({ userId: user.id, ...data });
-    setFactureOpen(false);
-  };
+  const aEncaisser = myFactures.filter((f) => f.statut === 'emise').reduce((s, f) => s + f.totalTTC, 0);
+  const encaisse = myFactures.filter((f) => f.statut === 'payee').reduce((s, f) => s + f.totalTTC, 0);
+
+  const clientOf = (d) => d.clientName || getLeadById(d.leadId)?.name || 'Client';
+  const switchTab = (t) => { setTab(t); setStatusFilter('all'); setSearch(''); };
+  const closeCreate = () => { setView('list'); setCreateMode('choose'); };
+
+  const createFacture = (data) => { addFacture({ userId: user.id, ...data }); setFactureOpen(false); };
 
   const convertDevis = (d) => {
     const existing = factureByDevis.get(d.id);
@@ -33,28 +53,43 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     import('../../../utils/proDocPdf').then(({ devisToLignes }) => {
       const lead = getLeadById(d.leadId);
       const lignes = devisToLignes(d, products);
-      // Devis Pro : client figé sur le devis ; devis public : client = piste liée.
-      const clientName = d.clientName || lead?.contact || lead?.name || 'Client';
       const tvaActive = d.type === 'pro' ? !!d.tvaActive : (company?.assujettieVAT || false);
       const totals = computeFactureTotals(lignes, tvaActive);
       addFacture({
         userId: user.id,
-        clientName,
+        clientName: d.clientName || lead?.contact || lead?.name || 'Client',
         clientPhone: d.clientPhone || lead?.phone || '',
         clientVille: d.clientVille || lead?.address || '',
-        lignes,
-        ...totals,
-        tvaActive,
-        statut: 'emise',
-        modele: modeleDefaut,
-        devisId: d.id,
+        lignes, ...totals, tvaActive, statut: 'emise', modele: modeleDefaut, devisId: d.id,
       });
     });
   };
 
-  // Création d'un devis en mode Pro : choix entre le dimensionnement solaire
-  // (assistant automatique) et la sélection manuelle (builder Pro éditable).
-  const closeCreate = () => { setView('docs'); setCreateMode('choose'); };
+  const runAction = (fn) => { fn(); setActions(null); };
+
+  // --- Filtre + tri ---
+  const q = search.trim().toLowerCase();
+  const sortDocs = (arr, amountKey) => [...arr].sort((a, b) => {
+    if (sortBy === 'montant') return (b[amountKey] || 0) - (a[amountKey] || 0);
+    const diff = new Date(b.createdAt) - new Date(a.createdAt);
+    return sortBy === 'ancien' ? -diff : diff;
+  });
+  const visibleFactures = sortDocs(
+    myFactures
+      .filter((f) => statusFilter === 'all' || f.statut === statusFilter)
+      .filter((f) => !q || [f.numero, f.clientName].some((v) => v && v.toLowerCase().includes(q))),
+    'totalTTC'
+  );
+  const visibleDevis = sortDocs(
+    myDevis
+      .filter((d) => statusFilter === 'all' || (statusFilter === 'factured' ? factureByDevis.has(d.id) : !factureByDevis.has(d.id)))
+      .filter((d) => !q || [d.devisNumber, clientOf(d)].some((v) => v && v.toLowerCase().includes(q))),
+    'total'
+  );
+
+  const cardKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
+
+  // ============ Création de devis ============
   if (view === 'create') {
     return (
       <>
@@ -67,7 +102,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             <button className="devis-mode-card" onClick={() => setCreateMode('solar')}>
               <div className="devis-mode-icon solar"><PanelTop size={26} /></div>
               <div className="devis-mode-title">Dimensionnement solaire</div>
-              <div className="devis-mode-desc">Estimez la consommation, puis choisissez la marque d'onduleur (Growatt, Must Power) et les batteries, jusqu'au devis chiffré.</div>
+              <div className="devis-mode-desc">Estimez la consommation, puis choisissez la marque d'onduleur et les batteries (issus de la boutique), jusqu'au devis chiffré.</div>
             </button>
             <button className="devis-mode-card" onClick={() => setCreateMode('manual')}>
               <div className="devis-mode-icon"><ShoppingCart size={26} /></div>
@@ -82,75 +117,171 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     );
   }
 
+  // ============ Liste ============
+  const newLabel = tab === 'devis' ? 'Nouveau devis' : 'Nouvelle facture';
+  const onNew = () => {
+    if (tab === 'devis') { setCreateMode('choose'); setView('create'); }
+    else setFactureOpen(true);
+  };
+  const filters = tab === 'devis' ? DEVIS_FILTERS : FACTURE_FILTERS;
+
   return (
     <>
       {!company?.nomEntreprise && (
         <div className="pro-alert">
           <Building2 size={17} />
-          <span>Configurez d'abord <strong>votre entreprise</strong> (nom, logo, couleurs) pour personnaliser vos documents.</span>
+          <span>Configurez d'abord <strong>votre entreprise</strong> pour personnaliser vos documents.</span>
           <button className="btn btn-sm btn-primary" onClick={() => onGoTo('entreprise')}>Configurer</button>
         </div>
       )}
-      <div className="pro-actions-row">
-        <button className="btn btn-accent" onClick={() => { setCreateMode('choose'); setView('create'); }}>
-          <PanelTop size={16} /> Nouveau devis
+
+      {/* Résumé encaissement */}
+      <div className="doc-summary">
+        <div className="doc-summary-card due">
+          <div className="doc-summary-value">{formatCFA(aEncaisser)}</div>
+          <div className="doc-summary-label">À encaisser (émises)</div>
+        </div>
+        <div className="doc-summary-card paid">
+          <div className="doc-summary-value">{formatCFA(encaisse)}</div>
+          <div className="doc-summary-label">Encaissé (payées)</div>
+        </div>
+      </div>
+
+      {/* Bascule Devis / Factures */}
+      <div className="client-type-toggle" role="group" aria-label="Type de document">
+        <button type="button" className={`client-type-btn ${tab === 'devis' ? 'active' : ''}`} onClick={() => switchTab('devis')}>
+          <FileText size={16} /> Devis ({myDevis.length})
         </button>
-        <button className="btn btn-primary" onClick={() => setFactureOpen(true)} disabled={!company?.nomEntreprise}>
-          <Plus size={16} /> Nouvelle facture
+        <button type="button" className={`client-type-btn ${tab === 'factures' ? 'active' : ''}`} onClick={() => switchTab('factures')}>
+          <Receipt size={16} /> Factures ({myFactures.length})
         </button>
       </div>
 
-      <div className="card my-partner-section">
-        <div className="card-title"><Receipt size={15} /> Mes factures ({myFactures.length})</div>
-        {myFactures.length ? myFactures.map((f) => (
-          <div key={f.id} className="sheet-row">
-            <span className="sheet-label">
-              {f.numero} — {f.clientName}
-              <span className="text-secondary"> · {formatDate(f.createdAt)}</span>
-              {' '}<span className={`badge ${f.statut === 'payee' ? 'badge-success' : f.statut === 'emise' ? 'badge-warning' : 'badge-muted'}`}>
-                {FACTURE_STATUT_LABEL[f.statut]}
-              </span>
-            </span>
-            <span className="sheet-value pro-doc-actions">
-              {formatCFA(f.totalTTC)}
-              <button className="btn btn-sm btn-primary" onClick={() => exportFacturePdf(f, undefined, { company, modeleDefaut })} aria-label="Télécharger le PDF"><Download size={13} /></button>
-              {f.statut !== 'payee' && (
-                <button className="btn btn-sm btn-won" onClick={() => updateFacture(f.id, { statut: f.statut === 'brouillon' ? 'emise' : 'payee' })}>
-                  {f.statut === 'brouillon' ? 'Émettre' : 'Payée'}
-                </button>
-              )}
-              {f.statut === 'brouillon' && (
-                <button className="cart-row-remove" onClick={() => window.confirm('Supprimer ce brouillon ?') && deleteFacture(f.id)} aria-label="Supprimer"><Trash2 size={14} /></button>
-              )}
-            </span>
+      {/* Barre d'outils */}
+      <div className="doc-toolbar">
+        <div className="list-toolbar">
+          <div className="search-box">
+            <Search size={18} className="search-icon" />
+            <input className="input search-input" placeholder="Client, numéro…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-        )) : <div className="text-sm text-secondary">Aucune facture. Créez-en une ou convertissez un devis ci-dessous.</div>}
+          <button className="btn btn-accent" onClick={onNew} disabled={tab === 'factures' && !company?.nomEntreprise}>
+            <Plus size={16} /> {newLabel}
+          </button>
+        </div>
+        <div className="list-toolbar">
+          <div className="categories-scroll">
+            {filters.map(([id, label]) => (
+              <button key={id} className={`category-chip ${statusFilter === id ? 'active' : ''}`} onClick={() => setStatusFilter(id)}>{label}</button>
+            ))}
+          </div>
+          <select className="input sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Trier">
+            {SORTS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </div>
       </div>
 
-      <div className="card my-partner-section">
-        <div className="card-title"><FileText size={15} /> Mes devis — version Pro ({myDevis.length})</div>
-        {myDevis.length ? myDevis.map((d) => {
-          const facture = factureByDevis.get(d.id);
-          return (
-            <div key={d.id} className="sheet-row">
-              <span className="sheet-label">
-                {d.devisNumber} — {d.clientName || getLeadById(d.leadId)?.name || 'Client'}
-                <span className="text-secondary"> · {formatCFA(d.total)}</span>
-                {d.pro && <span className="badge badge-gold">Pro</span>}
-                {facture && <span className="badge badge-success">Facturé · {facture.numero}</span>}
-              </span>
-              <span className="sheet-value pro-doc-actions">
-                <button className="btn btn-sm btn-primary" onClick={() => exportDevisProPdf(d, modeleDefaut, { company, lead: getLeadById(d.leadId), products, markDevisPro })} disabled={!company?.nomEntreprise}>
-                  <Download size={13} /> PDF Pro
-                </button>
-                <button className="btn btn-sm btn-outline" onClick={() => convertDevis(d)}>
-                  <Receipt size={13} /> → Facture
-                </button>
-              </span>
-            </div>
-          );
-        }) : <div className="text-sm text-secondary">Créez d'abord un devis (onglet Devis) : il apparaîtra ici pour sa version Pro.</div>}
-      </div>
+      {/* Liste des factures */}
+      {tab === 'factures' && (
+        visibleFactures.length ? (
+          <div className="doc-list">
+            {visibleFactures.map((f) => {
+              const src = f.devisId && devisById.get(f.devisId);
+              return (
+                <div key={f.id} className="card doc-card" role="button" tabIndex={0}
+                  onClick={() => setActions({ kind: 'facture', doc: f })}
+                  onKeyDown={(e) => cardKey(e, () => setActions({ kind: 'facture', doc: f }))}>
+                  <div className="doc-card-info">
+                    <div className="doc-card-title">{f.clientName}</div>
+                    <div className="doc-card-meta">{f.numero} · {formatDate(f.createdAt)}{src ? ` · depuis ${src.devisNumber}` : ''}</div>
+                  </div>
+                  <div className="doc-card-end">
+                    <div className="doc-card-amount">{formatCFA(f.totalTTC)}</div>
+                    <span className={`badge ${badgeClass(f.statut)}`}>{FACTURE_STATUT_LABEL[f.statut]}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-state card">
+            <Receipt size={34} strokeWidth={1.5} />
+            <p>{myFactures.length ? 'Aucune facture pour ce filtre.' : 'Aucune facture. Créez-en une ou convertissez un devis.'}</p>
+            {!myFactures.length && <button className="btn btn-primary" onClick={onNew} disabled={!company?.nomEntreprise}><Plus size={16} /> Nouvelle facture</button>}
+          </div>
+        )
+      )}
+
+      {/* Liste des devis */}
+      {tab === 'devis' && (
+        visibleDevis.length ? (
+          <div className="doc-list">
+            {visibleDevis.map((d) => {
+              const facture = factureByDevis.get(d.id);
+              return (
+                <div key={d.id} className="card doc-card" role="button" tabIndex={0}
+                  onClick={() => setActions({ kind: 'devis', doc: d })}
+                  onKeyDown={(e) => cardKey(e, () => setActions({ kind: 'devis', doc: d }))}>
+                  <div className="doc-card-info">
+                    <div className="doc-card-title">{clientOf(d)}</div>
+                    <div className="doc-card-meta">{d.devisNumber} · {formatDate(d.createdAt)}</div>
+                  </div>
+                  <div className="doc-card-end">
+                    <div className="doc-card-amount">{formatCFA(d.total)}</div>
+                    {facture
+                      ? <span className="badge badge-success">Facturé</span>
+                      : <span className="badge badge-muted">À facturer</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-state card">
+            <FileText size={34} strokeWidth={1.5} />
+            <p>{myDevis.length ? 'Aucun devis pour ce filtre.' : 'Aucun devis. Créez votre premier devis.'}</p>
+            {!myDevis.length && <button className="btn btn-primary" onClick={onNew}><Plus size={16} /> Nouveau devis</button>}
+          </div>
+        )
+      )}
+
+      {/* Menu d'actions (facture ou devis) */}
+      <Sheet open={!!actions} onClose={() => setActions(null)} title={actions ? (actions.kind === 'facture' ? actions.doc.numero : actions.doc.devisNumber) : ''}>
+        {actions?.kind === 'facture' && (
+          <div className="doc-actions-list">
+            <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{actions.doc.clientName}</span></div>
+            <div className="sheet-row"><span className="sheet-label">Statut</span><span className="sheet-value"><span className={`badge ${badgeClass(actions.doc.statut)}`}>{FACTURE_STATUT_LABEL[actions.doc.statut]}</span></span></div>
+            <div className="sheet-row"><span className="sheet-label">Total TTC</span><span className="sheet-value amount">{formatCFA(actions.doc.totalTTC)}</span></div>
+            <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actions.doc, undefined, { company, modeleDefaut }))}>
+              <Download size={16} /> Télécharger le PDF
+            </button>
+            {actions.doc.statut !== 'payee' && (
+              <button className="btn btn-won btn-block" onClick={() => runAction(() => updateFacture(actions.doc.id, { statut: nextStatut(actions.doc.statut) }))}>
+                <CheckCircle size={16} /> {nextStatutLabel(actions.doc.statut)}
+              </button>
+            )}
+            {actions.doc.statut === 'brouillon' && (
+              <button className="btn btn-lost btn-block" onClick={() => { if (window.confirm('Supprimer ce brouillon ?')) runAction(() => deleteFacture(actions.doc.id)); }}>
+                <Trash2 size={16} /> Supprimer le brouillon
+              </button>
+            )}
+          </div>
+        )}
+        {actions?.kind === 'devis' && (
+          <div className="doc-actions-list">
+            <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{clientOf(actions.doc)}</span></div>
+            <div className="sheet-row"><span className="sheet-label">Total</span><span className="sheet-value amount">{formatCFA(actions.doc.total)}</span></div>
+            {factureByDevis.get(actions.doc.id) && (
+              <div className="sheet-row"><span className="sheet-label">Facturé</span><span className="sheet-value">{factureByDevis.get(actions.doc.id).numero}</span></div>
+            )}
+            <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise} onClick={() => runAction(() => exportDevisProPdf(actions.doc, modeleDefaut, { company, lead: getLeadById(actions.doc.leadId), products, markDevisPro }))}>
+              <Download size={16} /> Télécharger le PDF Pro
+            </button>
+            <button className="btn btn-outline btn-block" onClick={() => runAction(() => convertDevis(actions.doc))}>
+              <Receipt size={16} /> Convertir en facture
+            </button>
+          </div>
+        )}
+      </Sheet>
 
       <FactureSheet
         open={factureOpen}
