@@ -29,7 +29,26 @@ export const INVERTER_MODELS = [
   { id: 'growatt-5k', brand: 'Growatt', model: 'SPF 5000TL', capacity: 5, maxPower: 4000, price: 580000, efficiency: 96 },
   { id: 'growatt-8k', brand: 'Growatt', model: 'SPF 8000TL', capacity: 8, maxPower: 6400, price: 980000, efficiency: 96 },
   { id: 'growatt-10k', brand: 'Growatt', model: 'SPF 10000TL', capacity: 10, maxPower: 8000, price: 1300000, efficiency: 96 },
+  { id: 'must-1k', brand: 'Must Power', model: 'PV1800 1K', capacity: 1, maxPower: 800, price: 150000, efficiency: 93 },
+  { id: 'must-2k', brand: 'Must Power', model: 'PV1800 2K', capacity: 2, maxPower: 1600, price: 250000, efficiency: 93 },
+  { id: 'must-3k', brand: 'Must Power', model: 'PV1800 3K', capacity: 3, maxPower: 2400, price: 350000, efficiency: 93 },
+  { id: 'must-5k', brand: 'Must Power', model: 'PV1800 5K', capacity: 5, maxPower: 4000, price: 550000, efficiency: 94 },
 ];
+
+// Marques disponibles (ordre d'affichage dans le sélecteur d'onduleurs).
+export const INVERTER_BRANDS = ['Growatt', 'Must Power'];
+export const BATTERY_BRANDS = [...new Set(BATTERY_MODELS.map((b) => b.brand))];
+
+/** Onduleurs d'une marque, triés par capacité croissante. */
+export const invertersByBrand = (brand) =>
+  INVERTER_MODELS.filter((i) => i.brand === brand).sort((a, b) => a.capacity - b.capacity);
+
+/** Onduleur conseillé d'une marque pour une puissance requise (marge 20 %). */
+export const recommendedInverter = (requiredPower, brand) => {
+  const withMargin = requiredPower * 1.2;
+  const pool = brand ? invertersByBrand(brand) : INVERTER_MODELS;
+  return pool.find((i) => i.maxPower >= withMargin) || pool[pool.length - 1];
+};
 
 export const SYSTEM_TYPES = [
   { id: 'off-grid', label: 'Autonome (off-grid)', help: 'Sans raccordement réseau, batteries pour toute la nuit' },
@@ -110,6 +129,7 @@ export const calculateSystemSize = (consumption, systemType, peakSunHours = DEFA
 
   return {
     numberOfPanels,
+    requiredPanelPower, // W — utile pour filtrer les onduleurs par marque
     panelCapacity: (numberOfPanels * PANEL_SPEC.power) / 1000, // kWc
     inverter: selectedInverter,
     batteryCapacity,
