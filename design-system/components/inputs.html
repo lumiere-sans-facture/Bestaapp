@@ -1,0 +1,38 @@
+<!-- @dsCard group="Composants" name="Champs de saisie" subtitle="Input, textarea, select, label, focus" w="760" h="560" -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Composants — Champs</title>
+  <link rel="stylesheet" href="../theme.css" />
+</head>
+<body>
+  <div class="ds-page">
+    <h1>Champs de saisie</h1>
+    <p class="ds-lead">Base <code>.input</code> (texte, select, textarea). Focus = bordure <code>--primary</code>.</p>
+
+    <div class="ds-specimen" style="max-width:440px">
+      <div class="input-group">
+        <label class="input-label">Nom du client</label>
+        <input class="input" type="text" placeholder="Ex : Société Soleil SARL" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Champ avec focus (simulé)</label>
+        <input class="input" type="text" value="En cours de saisie…" style="border-color:var(--primary)" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Catégorie</label>
+        <select class="input">
+          <option>Particulier</option>
+          <option>Entreprise</option>
+        </select>
+      </div>
+      <div class="input-group" style="margin-bottom:0">
+        <label class="input-label">Notes</label>
+        <textarea class="input" rows="3" placeholder="Remarques…"></textarea>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

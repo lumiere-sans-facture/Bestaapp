@@ -86,7 +86,8 @@ export function createProActions(setState) {
     addFacture: (facture) => {
       let created = null;
       setState((s) => {
-        const company = (s.companies || []).find((c) => c.userId === facture.userId);
+        const companies = s.companies || [];
+        const company = companies.find((c) => c.userId === facture.userId);
         const counter = (company?.factureCounter || 0) + 1;
         const prefix = company?.facturePrefix || 'FAC';
         const numero = `${prefix}-${new Date().getFullYear()}-${String(counter).padStart(3, '0')}`;
@@ -94,15 +95,19 @@ export function createProActions(setState) {
           ...facture,
           id: crypto.randomUUID(),
           numero,
-          companySnapshot: company ? { ...company } : null,
+          // Snapshot d'identité seulement si l'entreprise est réellement configurée.
+          companySnapshot: company?.nomEntreprise ? { ...company } : (facture.companySnapshot || null),
           createdAt: new Date().toISOString(),
         };
+        // Le compteur DOIT être persisté même sans entreprise configurée, sinon
+        // deux factures porteraient le même numéro (FAC-2026-001 en double).
+        const companies2 = company
+          ? companies.map((c) => (c.id === company.id ? { ...c, factureCounter: counter } : c))
+          : [{ id: `comp-${facture.userId}`, userId: facture.userId, facturePrefix: prefix, factureCounter: counter }, ...companies];
         return {
           ...s,
           factures: [created, ...(s.factures || [])],
-          companies: company
-            ? s.companies.map((c) => (c.id === company.id ? { ...c, factureCounter: counter } : c))
-            : s.companies,
+          companies: companies2,
         };
       });
       return created;

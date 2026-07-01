@@ -1,0 +1,45 @@
+<!-- @dsCard group="Composants" name="Feed d'alertes" subtitle="Lignes d'alerte par sévérité" w="760" h="380" -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Composants — Alertes</title>
+  <link rel="stylesheet" href="../theme.css" />
+</head>
+<body>
+  <div class="ds-page">
+    <h1>Feed d'alertes</h1>
+    <p class="ds-lead"><code>.alert-feed</code> : liste compacte avec badge de sévérité (<code>.sev-critique</code>, <code>.sev-alerte</code>, <code>.sev-info</code>).</p>
+
+    <div class="ds-specimen">
+      <div class="card">
+        <div class="card-title">À traiter</div>
+        <div class="alert-feed">
+          <div class="alert-feed-row">
+            <span class="alert-badge sev-critique">CRITIQUE</span>
+            <div class="alert-feed-text">
+              <div class="alert-feed-title">Devis expiré sans relance</div>
+              <div class="alert-feed-entity">Villa Cocotiers — 1 544 000 F</div>
+            </div>
+          </div>
+          <div class="alert-feed-row">
+            <span class="alert-badge sev-alerte">ALERTE</span>
+            <div class="alert-feed-text">
+              <div class="alert-feed-title">Piste sans activité depuis 7 jours</div>
+              <div class="alert-feed-entity">Société Soleil SARL</div>
+            </div>
+          </div>
+          <div class="alert-feed-row">
+            <span class="alert-badge sev-info">INFO</span>
+            <div class="alert-feed-text">
+              <div class="alert-feed-title">Nouvelle commission en attente</div>
+              <div class="alert-feed-entity">Partenaire : K. Boukari</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

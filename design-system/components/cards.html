@@ -1,0 +1,42 @@
+<!-- @dsCard group="Composants" name="Cartes & KPI" subtitle="card, kpi-card (normale + highlight)" w="860" h="520" -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Composants — Cartes</title>
+  <link rel="stylesheet" href="../theme.css" />
+</head>
+<body>
+  <div class="ds-page">
+    <h1>Cartes & KPI</h1>
+    <p class="ds-lead">Conteneur de base <code>.card</code> et carte d'indicateur <code>.kpi-card</code> (variante <code>.highlight</code>).</p>
+
+    <div class="ds-specimen ds-stack">
+      <div>
+        <h2>Carte simple</h2>
+        <div class="card" style="max-width:360px">
+          <div class="card-title">Résumé du mois</div>
+          <p style="font-size:0.875rem;color:var(--text-secondary)">Contenu libre dans une carte. Padding 16px, ombre <code>--shadow</code>, rayon <code>--radius</code>.</p>
+        </div>
+      </div>
+
+      <div>
+        <h2>KPI</h2>
+        <div class="ds-row" style="align-items:stretch">
+          <div class="kpi-card" style="width:200px">
+            <div class="kpi-icon">⚡</div>
+            <div class="kpi-value">128</div>
+            <div class="kpi-label">Devis ce mois</div>
+          </div>
+          <div class="kpi-card highlight" style="width:200px">
+            <div class="kpi-icon">★</div>
+            <div class="kpi-value">8,4 M</div>
+            <div class="kpi-label">Chiffre d'affaires (F CFA)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

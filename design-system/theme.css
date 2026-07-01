@@ -1,0 +1,236 @@
+/* ============================================================
+   BestaSolar Pro — Thème de la bibliothèque de composants
+   Source unique des tokens + primitives, extraite de src/index.css.
+   Utilisé par les pages d'aperçu de design-system/ (et synchronisable
+   vers Claude Design). NE PAS éditer à la main sans répercuter dans
+   src/index.css : ce fichier est un miroir documentaire des primitives.
+   ============================================================ */
+
+:root {
+  --primary: #0a2472;
+  --primary-light: #1a3a8c;
+  --primary-dark: #061540;
+  --accent: #f5a623;
+  --accent-light: #f7b84a;
+  --accent-dark: #d48c1a;
+  --bg: #f4f6fb;
+  --bg-card: #ffffff;
+  --text-primary: #1a1a2e;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --success: #10b981;
+  --success-light: #d1fae5;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --error: #ef4444;
+  --error-light: #fee2e2;
+  --border: #e5e7eb;
+  --shadow: 0 2px 8px rgba(10, 36, 114, 0.08);
+  --shadow-lg: 0 8px 30px rgba(10, 36, 114, 0.16);
+  --radius: 12px;
+  --sidebar-width: 264px;
+  --tab-bar-height: 64px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+input, button, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
+button { cursor: pointer; border: none; background: none; text-align: left; }
+a { text-decoration: none; color: inherit; }
+img { max-width: 100%; }
+
+/* ============ Cartes ============ */
+.card { background: var(--bg-card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+.card-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 14px; }
+.section-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
+
+/* ============ Boutons ============ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 11px 18px; border-radius: 10px; font-weight: 500; font-size: 0.9375rem;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-light); }
+.btn-accent { background: var(--accent); color: var(--primary-dark); font-weight: 600; }
+.btn-accent:hover { background: var(--accent-light); }
+.btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text-primary); }
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.btn-sm { padding: 7px 12px; font-size: 0.875rem; border-radius: 8px; }
+.btn-lg { padding: 15px 28px; font-size: 1.0625rem; }
+.btn-block { width: 100%; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-won { background: var(--success); color: white; }
+.btn-lost { background: white; border: 1.5px solid var(--error); color: var(--error); }
+
+/* ============ Champs de saisie ============ */
+.input {
+  width: 100%; padding: 12px 14px;
+  border: 1.5px solid var(--border); border-radius: 10px;
+  font-size: 1rem; background: white; transition: border-color 0.2s ease;
+}
+.input:focus { outline: none; border-color: var(--primary); }
+.input-label { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+.input-group { margin-bottom: 16px; }
+textarea.input { resize: vertical; }
+
+/* ============ Badges ============ */
+.badge {
+  display: inline-flex; align-items: center; padding: 4px 10px;
+  border-radius: 6px; font-size: 0.75rem; font-weight: 500; white-space: nowrap;
+}
+.badge-success { background: var(--success-light); color: #047857; }
+.badge-warning { background: var(--warning-light); color: #92400e; }
+.badge-muted { background: var(--bg); color: var(--text-muted); }
+
+/* ============ KPI ============ */
+.kpi-card { background: white; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+.kpi-card.highlight { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; }
+.kpi-card.highlight .kpi-value { color: white; }
+.kpi-card.highlight .kpi-label { color: rgba(255, 255, 255, 0.7); }
+.kpi-card.highlight .kpi-icon { background: rgba(255, 255, 255, 0.15); color: white; }
+.kpi-icon {
+  width: 38px; height: 38px; border-radius: 10px; margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--primary);
+}
+.kpi-value { font-size: 1.375rem; font-weight: 700; color: var(--primary); overflow-wrap: anywhere; }
+.kpi-label { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 2px; }
+
+/* ============ Mini-cartes statistiques (stat-pill) ============ */
+.stat-pill {
+  display: flex; align-items: center; gap: 12px;
+  background: white; border-radius: var(--radius);
+  padding: 14px 16px; box-shadow: var(--shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-pill:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.stat-pill-num {
+  width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.0625rem; font-weight: 700;
+  background: var(--bg); color: var(--primary);
+}
+.stat-pill-label { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.25; }
+.stat-pill.is-primary .stat-pill-num { background: rgba(10, 36, 114, 0.1); color: var(--primary); }
+.stat-pill.is-info    .stat-pill-num { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.stat-pill.is-accent  .stat-pill-num { background: var(--accent); color: white; }
+.stat-pill.is-warning .stat-pill-num { background: var(--warning-light); color: #92400e; }
+.stat-pill.is-success .stat-pill-num { background: var(--success-light); color: #047857; }
+.stat-pill.is-error   .stat-pill-num { background: var(--error-light); color: var(--error); }
+
+/* ============ Anneaux (donut SVG) ============ */
+.ring { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.ring-arc { transition: stroke-dashoffset 0.7s ease; }
+.ring-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.ring-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+.ring-row { display: flex; justify-content: space-around; gap: 16px; flex-wrap: wrap; }
+.ring-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ring-label { font-size: 0.8125rem; color: var(--text-secondary); font-weight: 600; text-align: center; }
+
+/* ============ Puces de catégorie (chips) ============ */
+.category-chip {
+  padding: 8px 16px; border-radius: 20px; white-space: nowrap;
+  font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);
+  background: white; border: 1.5px solid var(--border);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.category-chip:hover { border-color: var(--primary); color: var(--primary); }
+.category-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* ============ Stepper d'étapes (chevrons) ============ */
+.stage-stepper { display: flex; }
+.stage-step {
+  flex: 1; min-width: 0; padding: 9px 4px 9px 10px;
+  background: var(--bg); color: var(--text-secondary);
+  font-size: 0.6875rem; font-weight: 600; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
+  margin-left: -4px; transition: background 0.15s ease, color 0.15s ease;
+}
+.stage-step:first-child { margin-left: 0; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%); border-radius: 6px 0 0 6px; }
+.stage-step:last-child { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%); border-radius: 0 6px 6px 0; }
+.stage-step.reached { background: var(--primary-light); color: white; }
+.stage-step.current { background: var(--primary); color: white; }
+
+/* ============ Carte kanban ============ */
+.kanban-card {
+  display: block; width: 100%;
+  background: white; border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px;
+  box-shadow: var(--shadow); transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.kanban-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+.kanban-card-title { font-size: 0.875rem; font-weight: 600; line-height: 1.3; }
+.kanban-card-contact { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+.kanban-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.kanban-card-value { font-size: 0.8125rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+.assignee-avatar {
+  width: 20px; height: 20px; background: var(--primary); color: white;
+  border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.625rem; font-weight: 600;
+}
+
+/* ============ Feed d'alertes ============ */
+.alert-feed { display: flex; flex-direction: column; }
+.alert-feed-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.alert-feed-row:last-child { border-bottom: none; }
+.alert-badge {
+  font-size: 0.625rem; font-weight: 700; letter-spacing: 0.03em;
+  padding: 3px 7px; border-radius: 5px; flex-shrink: 0; min-width: 64px; text-align: center;
+}
+.sev-critique { background: var(--error-light); color: var(--error); }
+.sev-alerte   { background: var(--warning-light); color: #92400e; }
+.sev-info     { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.alert-feed-text { min-width: 0; }
+.alert-feed-title { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
+.alert-feed-entity { font-size: 0.75rem; color: var(--text-secondary); }
+
+/* ============ Panneau (sheet) — statique pour l'aperçu ============ */
+.ds-sheet {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow-lg); overflow: hidden;
+  display: flex; flex-direction: column; max-width: 420px;
+}
+.sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 10px auto 0; }
+.sheet-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 12px 20px 14px; border-bottom: 1px solid var(--border);
+}
+.sheet-title { font-size: 1.125rem; font-weight: 600; }
+.sheet-subtitle { font-size: 0.875rem; color: var(--text-secondary); margin-top: 2px; }
+.sheet-body { padding: 18px 20px; }
+.sheet-section-title {
+  font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+}
+.sheet-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.sheet-row:last-child { border-bottom: none; }
+.sheet-label { font-size: 0.875rem; color: var(--text-secondary); }
+.sheet-value { font-size: 0.875rem; font-weight: 500; text-align: right; }
+.sheet-value.amount { font-weight: 700; color: var(--primary); }
+
+/* ============ Échafaudage commun aux pages d'aperçu ============ */
+.ds-page { padding: 28px; background: var(--bg); min-height: 100vh; }
+.ds-page > h1 { font-size: 1.25rem; font-weight: 700; margin-bottom: 4px; }
+.ds-page > p.ds-lead { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 24px; }
+.ds-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.ds-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.ds-stack { display: flex; flex-direction: column; gap: 12px; }
+.ds-specimen {
+  background: white; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px; box-shadow: var(--shadow);
+}
+.ds-specimen h2 { font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 12px; }
+.ds-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 10px; }
+.ds-swatch { width: 100%; height: 56px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.05); }
+.ds-swatch-name { font-size: 0.8125rem; font-weight: 600; margin-top: 8px; }
+.ds-swatch-val { font-size: 0.6875rem; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ds-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }

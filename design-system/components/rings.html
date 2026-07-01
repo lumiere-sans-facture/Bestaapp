@@ -1,0 +1,57 @@
+<!-- @dsCard group="Composants" name="Anneaux (donut)" subtitle="Jauges circulaires SVG faites main" w="760" h="440" -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Composants — Anneaux</title>
+  <link rel="stylesheet" href="../theme.css" />
+</head>
+<body>
+  <div class="ds-page">
+    <h1>Anneaux (donut SVG)</h1>
+    <p class="ds-lead">Jauges circulaires <code>.ring</code> dessinées en SVG (pas de librairie de charts). L'arc utilise <code>stroke-dasharray</code>/<code>stroke-dashoffset</code>.</p>
+
+    <div class="ds-specimen">
+      <div class="ring-row">
+        <!-- Chaque anneau : circonférence ≈ 326.7 (r=52). offset = C * (1 - ratio) -->
+        <div class="ring-item">
+          <div class="ring" style="width:120px;height:120px">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="var(--bg)" stroke-width="12" />
+              <circle class="ring-arc" cx="60" cy="60" r="52" fill="none" stroke="var(--primary)" stroke-width="12"
+                      stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="98" transform="rotate(-90 60 60)" />
+            </svg>
+            <div class="ring-center"><span class="ring-value">70%</span></div>
+          </div>
+          <span class="ring-label">Taux de conversion</span>
+        </div>
+
+        <div class="ring-item">
+          <div class="ring" style="width:120px;height:120px">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="var(--bg)" stroke-width="12" />
+              <circle class="ring-arc" cx="60" cy="60" r="52" fill="none" stroke="var(--success)" stroke-width="12"
+                      stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="49" transform="rotate(-90 60 60)" />
+            </svg>
+            <div class="ring-center"><span class="ring-value">85%</span></div>
+          </div>
+          <span class="ring-label">Objectif atteint</span>
+        </div>
+
+        <div class="ring-item">
+          <div class="ring" style="width:120px;height:120px">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="var(--bg)" stroke-width="12" />
+              <circle class="ring-arc" cx="60" cy="60" r="52" fill="none" stroke="var(--accent)" stroke-width="12"
+                      stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="212" transform="rotate(-90 60 60)" />
+            </svg>
+            <div class="ring-center"><span class="ring-value">35%</span></div>
+          </div>
+          <span class="ring-label">Marge moyenne</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

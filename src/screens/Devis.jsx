@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FileText, Plus, Sun, ShoppingCart, PanelTop, Download, Search } from 'lucide-react';
+import { FileText, Plus, Sun, ShoppingCart, Download, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
-import ManualWizard from './devis/ManualWizard';
-import SolarWizard from './devis/SolarWizard';
+import DevisCreator from './devis/DevisCreator';
 
 const SORT_OPTIONS = [
   { id: 'recent', label: 'Plus récents' },
@@ -30,8 +29,8 @@ export default function Devis() {
   const fromCart = Boolean(location.state?.fromCart);
   const { items: cartItems, clearCart } = useCart();
 
-  // 'list' | 'choose' | 'solar' | 'manual'
-  const [view, setView] = useState(fromCart ? 'manual' : 'list');
+  // 'list' | 'create'  (le choix du type + les assistants vivent dans DevisCreator)
+  const [view, setView] = useState(fromCart ? 'create' : 'list');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all'); // all | solar | manual
   const [sortBy, setSortBy] = useState('recent');
@@ -76,7 +75,7 @@ export default function Devis() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <button className="btn btn-accent" onClick={() => setView('choose')}>
+              <button className="btn btn-accent" onClick={() => setView('create')}>
                 <Plus size={18} /> Nouveau devis
               </button>
             </>
@@ -87,7 +86,7 @@ export default function Devis() {
             <div className="empty-state card">
               <FileText size={40} strokeWidth={1.5} />
               <p>Aucun devis pour le moment.</p>
-              <button className="btn btn-primary" onClick={() => setView('choose')}>
+              <button className="btn btn-primary" onClick={() => setView('create')}>
                 <Plus size={18} /> Créer un devis
               </button>
             </div>
@@ -129,9 +128,9 @@ export default function Devis() {
                     </div>
                     <div className="devis-card-meta">
                       {isSolar ? (
-                        <span className="devis-type-tag solar"><Sun size={13} /> {d.sizing.numberOfPanels} panneaux · {d.sizing.panelCapacity.toFixed(1)} kWc</span>
+                        <span className="devis-type-tag solar"><Sun size={13} /> {d.sizing?.numberOfPanels ?? '—'} panneaux · {(d.sizing?.panelCapacity ?? 0).toFixed(1)} kWc</span>
                       ) : (
-                        <span className="devis-type-tag"><ShoppingCart size={13} /> {d.items.reduce((s, it) => s + it.qty, 0)} article(s)</span>
+                        <span className="devis-type-tag"><ShoppingCart size={13} /> {(d.items || []).reduce((s, it) => s + it.qty, 0)} article(s)</span>
                       )}
                       <span className="devis-card-actions">
                         <button className="btn btn-sm btn-primary" onClick={() => downloadPdf(d)}>
@@ -150,48 +149,19 @@ export default function Devis() {
     );
   }
 
-  // ---- Choix du type de devis ----
-  if (view === 'choose') {
-    return (
-      <div className="page">
-        <PageHeader
-          title="Nouveau devis"
-          actions={<button className="btn btn-outline-light" onClick={backToList}>Annuler</button>}
-        />
-        <div className="page-content page-content-narrow">
-          <div className="devis-mode-grid">
-            <button className="devis-mode-card" onClick={() => setView('solar')}>
-              <div className="devis-mode-icon solar"><PanelTop size={26} /></div>
-              <div className="devis-mode-title">Dimensionnement solaire</div>
-              <div className="devis-mode-desc">Estimez la consommation du client et générez automatiquement le système (panneaux, onduleur, batteries) et son devis chiffré.</div>
-            </button>
-            <button className="devis-mode-card" onClick={() => setView('manual')}>
-              <div className="devis-mode-icon"><ShoppingCart size={26} /></div>
-              <div className="devis-mode-title">Sélection manuelle</div>
-              <div className="devis-mode-desc">Composez le devis en choisissant directement des produits de la boutique et un mode de paiement.</div>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ---- Assistants ----
+  // ---- Création (choix du type + assistants, mutualisés via DevisCreator) ----
   return (
     <div className="page">
       <PageHeader
-        title={view === 'solar' ? 'Devis solaire' : 'Nouveau devis'}
+        title="Nouveau devis"
         actions={<button className="btn btn-outline-light" onClick={backToList}>Annuler</button>}
       />
       <div className="page-content">
-        {view === 'solar' ? (
-          <SolarWizard onDone={backToList} />
-        ) : (
-          <ManualWizard
-            initialItems={fromCart ? cartItems : undefined}
-            onDone={() => { if (fromCart) clearCart(); backToList(); }}
-          />
-        )}
+        <DevisCreator
+          startManual={fromCart}
+          initialManualItems={fromCart ? cartItems : undefined}
+          onDone={() => { if (fromCart) clearCart(); backToList(); }}
+        />
       </div>
     </div>
   );
