@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2 } from 'lucide-react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, PanelTop, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
 import { computeFactureTotals, FACTURE_STATUT_LABEL } from '../../../utils/facture';
 import { exportDevisProPdf, exportFacturePdf } from './proPdf';
 import FactureSheet from './FactureSheet';
+import DevisCreator from '../../devis/DevisCreator';
 
 /** Onglet « Mes documents » : factures (création/statut/PDF) et devis convertibles. */
 export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const { user } = useAuth();
   const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, markDevisPro } = useData();
   const [factureOpen, setFactureOpen] = useState(false);
+  const [view, setView] = useState('docs'); // docs | create (création de devis)
 
   const myDevis = devis.filter((d) => d.createdBy === user.id);
   const myFactures = (factures || []).filter((f) => f.userId === user.id);
@@ -46,6 +48,20 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     });
   };
 
+  // Création d'un devis directement depuis l'Espace Pro (même flux + outil de
+  // dimensionnement que le mode public, via le composant partagé DevisCreator).
+  if (view === 'create') {
+    return (
+      <>
+        <button className="btn btn-outline btn-sm back-button" onClick={() => setView('docs')}>
+          <ChevronLeft size={16} /> Retour aux documents
+        </button>
+        <div className="section-title">Nouveau devis</div>
+        <DevisCreator onDone={() => setView('docs')} />
+      </>
+    );
+  }
+
   return (
     <>
       {!company?.nomEntreprise && (
@@ -56,7 +72,10 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         </div>
       )}
       <div className="pro-actions-row">
-        <button className="btn btn-accent" onClick={() => setFactureOpen(true)} disabled={!company?.nomEntreprise}>
+        <button className="btn btn-accent" onClick={() => setView('create')}>
+          <PanelTop size={16} /> Nouveau devis
+        </button>
+        <button className="btn btn-primary" onClick={() => setFactureOpen(true)} disabled={!company?.nomEntreprise}>
           <Plus size={16} /> Nouvelle facture
         </button>
       </div>
