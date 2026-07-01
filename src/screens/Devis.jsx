@@ -129,9 +129,9 @@ export default function Devis() {
                     </div>
                     <div className="devis-card-meta">
                       {isSolar ? (
-                        <span className="devis-type-tag solar"><Sun size={13} /> {d.sizing.numberOfPanels} panneaux · {d.sizing.panelCapacity.toFixed(1)} kWc</span>
+                        <span className="devis-type-tag solar"><Sun size={13} /> {d.sizing?.numberOfPanels ?? '—'} panneaux · {(d.sizing?.panelCapacity ?? 0).toFixed(1)} kWc</span>
                       ) : (
-                        <span className="devis-type-tag"><ShoppingCart size={13} /> {d.items.reduce((s, it) => s + it.qty, 0)} article(s)</span>
+                        <span className="devis-type-tag"><ShoppingCart size={13} /> {(d.items || []).reduce((s, it) => s + it.qty, 0)} article(s)</span>
                       )}
                       <span className="devis-card-actions">
                         <button className="btn btn-sm btn-primary" onClick={() => downloadPdf(d)}>
