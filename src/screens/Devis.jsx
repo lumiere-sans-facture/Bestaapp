@@ -35,7 +35,9 @@ export default function Devis() {
   const [typeFilter, setTypeFilter] = useState('all'); // all | solar | manual
   const [sortBy, setSortBy] = useState('recent');
 
-  const myDevis = user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id);
+  // Les devis créés dans l'Espace Pro (type 'pro') restent cantonnés au mode Pro.
+  const myDevis = (user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id))
+    .filter((d) => d.type !== 'pro');
 
   // Recherche (client, numéro, partenaire/code) + filtre type + tri
   const visibleDevis = myDevis

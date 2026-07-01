@@ -124,5 +124,33 @@ export function createProActions(setState) {
         ...s,
         factures: (s.factures || []).filter((f) => f.id !== factureId),
       })),
+
+    // ---- Clients Pro (carnet propre à chaque technicien abonné) ----
+    // Collection dédiée, étanche des pistes publiques (invariant mode public/Pro).
+    addProClient: (client) => {
+      let created = null;
+      setState((s) => {
+        created = {
+          id: crypto.randomUUID(),
+          name: '', phone: '', ville: '', type: 'particulier',
+          ...client,
+          createdAt: new Date().toISOString(),
+        };
+        return { ...s, proClients: [created, ...(s.proClients || [])] };
+      });
+      return created;
+    },
+
+    updateProClient: (clientId, patch) =>
+      setState((s) => ({
+        ...s,
+        proClients: (s.proClients || []).map((c) => (c.id === clientId ? { ...c, ...patch } : c)),
+      })),
+
+    deleteProClient: (clientId) =>
+      setState((s) => ({
+        ...s,
+        proClients: (s.proClients || []).filter((c) => c.id !== clientId),
+      })),
   };
 }

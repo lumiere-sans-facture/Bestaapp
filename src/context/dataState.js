@@ -20,6 +20,7 @@ export const buildInitialState = () => ({
   subscriptionPayments: [],
   companies: [],
   factures: [],
+  proClients: [],
   devisCounter: 0,
   orderCounter: 0,
 });
@@ -54,6 +55,7 @@ export const loadState = () => {
       if (!saved.subscriptionPayments) saved.subscriptionPayments = [];
       if (!saved.companies) saved.companies = [];
       if (!saved.factures) saved.factures = [];
+      if (!saved.proClients) saved.proClients = [];
       const isNameBased = (p) => p.code && p.code.startsWith(`BESTA-${codeBaseFromName(p.name)}`);
       // 1re passe : réserver les codes déjà conformes (basés sur le nom)
       const codes = saved.partners.filter(isNameBased).map((p) => p.code);

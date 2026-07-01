@@ -6,6 +6,7 @@ import { formatDate } from '../../utils/format';
 import { effectiveStatus, isSubscriptionActive, daysLeft, needsRenewalAlert } from '../../utils/subscription';
 import ProPaywall from './devisPro/ProPaywall';
 import DocumentsTab from './devisPro/DocumentsTab';
+import ClientsTab from './devisPro/ClientsTab';
 import CompanyTab from './devisPro/CompanyTab';
 import SubscriptionTab from './devisPro/SubscriptionTab';
 
@@ -44,12 +45,13 @@ export default function DevisProSection({ onBack }) {
       )}
 
       <div className="categories-scroll pro-tabs">
-        {[['documents', 'Mes documents'], ['entreprise', 'Mon entreprise'], ['abonnement', 'Mon abonnement']].map(([id, label]) => (
+        {[['documents', 'Mes documents'], ['clients', 'Clients'], ['entreprise', 'Mon entreprise'], ['abonnement', 'Mon abonnement']].map(([id, label]) => (
           <button key={id} className={`category-chip ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
 
       {tab === 'documents' && <DocumentsTab company={company} modeleDefaut={modeleDefaut} onGoTo={setTab} />}
+      {tab === 'clients' && <ClientsTab />}
       {tab === 'entreprise' && <CompanyTab company={company} />}
       {tab === 'abonnement' && <SubscriptionTab sub={sub} />}
     </>

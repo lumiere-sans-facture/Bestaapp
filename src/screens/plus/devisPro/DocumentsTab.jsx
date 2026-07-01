@@ -6,7 +6,7 @@ import { formatCFA, formatDate } from '../../../utils/format';
 import { computeFactureTotals, FACTURE_STATUT_LABEL } from '../../../utils/facture';
 import { exportDevisProPdf, exportFacturePdf } from './proPdf';
 import FactureSheet from './FactureSheet';
-import DevisCreator from '../../devis/DevisCreator';
+import ProDevisBuilder from './ProDevisBuilder';
 
 /** Onglet « Mes documents » : factures (création/statut/PDF) et devis convertibles. */
 export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
@@ -31,13 +31,15 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     import('../../../utils/proDocPdf').then(({ devisToLignes }) => {
       const lead = getLeadById(d.leadId);
       const lignes = devisToLignes(d, products);
-      const tvaActive = company?.assujettieVAT || false;
+      // Devis Pro : client figé sur le devis ; devis public : client = piste liée.
+      const clientName = d.clientName || lead?.contact || lead?.name || 'Client';
+      const tvaActive = d.type === 'pro' ? !!d.tvaActive : (company?.assujettieVAT || false);
       const totals = computeFactureTotals(lignes, tvaActive);
       addFacture({
         userId: user.id,
-        clientName: lead?.contact || lead?.name || 'Client',
-        clientPhone: lead?.phone || '',
-        clientVille: lead?.address || '',
+        clientName,
+        clientPhone: d.clientPhone || lead?.phone || '',
+        clientVille: d.clientVille || lead?.address || '',
         lignes,
         ...totals,
         tvaActive,
@@ -48,8 +50,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     });
   };
 
-  // Création d'un devis directement depuis l'Espace Pro (même flux + outil de
-  // dimensionnement que le mode public, via le composant partagé DevisCreator).
+  // Création d'un devis en mode Pro : sélection manuelle des produits (catalogue
+  // boutique éditable + produits personnalisés), sans suggestion de dimensionnement.
   if (view === 'create') {
     return (
       <>
@@ -57,7 +59,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
           <ChevronLeft size={16} /> Retour aux documents
         </button>
         <div className="section-title">Nouveau devis</div>
-        <DevisCreator onDone={() => setView('docs')} />
+        <ProDevisBuilder onDone={() => setView('docs')} />
       </>
     );
   }
@@ -114,7 +116,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
           return (
             <div key={d.id} className="sheet-row">
               <span className="sheet-label">
-                {d.devisNumber} — {getLeadById(d.leadId)?.name || 'Client'}
+                {d.devisNumber} — {d.clientName || getLeadById(d.leadId)?.name || 'Client'}
                 <span className="text-secondary"> · {formatCFA(d.total)}</span>
                 {d.pro && <span className="badge badge-gold">Pro</span>}
                 {facture && <span className="badge badge-success">Facturé · {facture.numero}</span>}

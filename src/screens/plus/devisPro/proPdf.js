@@ -6,7 +6,15 @@
 export async function exportDevisProPdf(d, modele, { company, lead, products, markDevisPro }) {
   const { generateProPdf, devisToLignes } = await import('../../../utils/proDocPdf');
   markDevisPro(d.id, { modele, companySnapshot: company });
-  const solarTva = d.type === 'solar' ? (d.quotation?.tva || 0) : 0;
+
+  // TVA effective : devis Pro → selon le devis ; devis solaire → celle du chiffrage.
+  const tva = d.type === 'pro' ? (d.tva || 0) : (d.type === 'solar' ? (d.quotation?.tva || 0) : 0);
+  const totalHT = d.type === 'solar' ? d.quotation?.subtotalHT : d.subtotal;
+  // Client : devis Pro → figé sur le devis ; sinon → piste liée.
+  const client = d.type === 'pro'
+    ? { name: d.clientName || 'Client', phone: d.clientPhone, ville: d.clientVille }
+    : { name: lead?.contact || lead?.name || 'Client', phone: lead?.phone, ville: lead?.address };
+
   generateProPdf({
     kind: 'devis',
     company,
@@ -14,11 +22,11 @@ export async function exportDevisProPdf(d, modele, { company, lead, products, ma
     doc: {
       numero: d.devisNumber,
       date: d.createdAt,
-      client: { name: lead?.contact || lead?.name || 'Client', phone: lead?.phone, ville: lead?.address },
+      client,
       lignes: devisToLignes(d, products),
-      totalHT: d.type === 'solar' ? d.quotation?.subtotalHT : d.subtotal,
-      tvaActive: solarTva > 0,
-      tva: solarTva,
+      totalHT,
+      tvaActive: tva > 0,
+      tva,
       totalTTC: d.total,
       validiteJours: 30,
     },
