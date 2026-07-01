@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
 import { SyncDot } from './SyncStatus';
@@ -16,7 +16,10 @@ const publicNavItems = [
 
 const proNavItems = [
   { path: '/pro', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
-  { path: '/pro/gestion', label: 'Devis & Factures', shortLabel: 'Gestion', icon: FileText },
+  { path: '/pro/documents', label: 'Devis & Factures', shortLabel: 'Devis', icon: FileText },
+  { path: '/pro/clients', label: 'Clients', shortLabel: 'Clients', icon: Users },
+  { path: '/pro/entreprise', label: 'Mon entreprise', shortLabel: 'Société', icon: Building2 },
+  { path: '/pro/abonnement', label: 'Mon abonnement', shortLabel: 'Abo', icon: CreditCard },
 ];
 
 export default function AppLayout() {
