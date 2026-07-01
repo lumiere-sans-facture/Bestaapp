@@ -5,9 +5,8 @@ import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { applianceCategories, getApplianceById } from '../../../data/appliances';
 import {
-  calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS,
-  INVERTER_MODELS, INVERTER_BRANDS, invertersByBrand, recommendedInverter,
-  BATTERY_MODELS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
+  calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
+  inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, recommendInverterOption, suggestBatteryCombo,
 } from '../../../utils/solarSizing';
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
@@ -24,16 +23,23 @@ const accessoryLines = (numberOfPanels) => [
 
 /**
  * Dimensionnement Pro guidé : consommation → aperçu → choix de l'onduleur (par
- * marque) → choix des batteries → génération du devis. Inspiré de l'appli
- * besta-solar de référence, adapté à notre moteur (calculateSystemSize) et à
- * notre modèle de devis Pro (lignes éditables + carnet clients).
+ * marque) → choix des batteries → devis. Les onduleurs, batteries et panneaux
+ * proviennent du CATALOGUE BOUTIQUE (marques + prix réels), pas de listes en dur.
  */
 export default function ProSolarWizard({ onDone }) {
   const { user } = useAuth();
-  const { proClientsForUser, addProClient, addDevis, getCompanyForUser } = useData();
+  const { products, proClientsForUser, addProClient, addDevis, getCompanyForUser } = useData();
 
   const myClients = proClientsForUser(user.id);
   const company = getCompanyForUser(user.id);
+
+  // Options matériel issues de la boutique
+  const inverterOptions = useMemo(() => inverterOptionsFromCatalog(products), [products]);
+  const batteryOptions = useMemo(() => batteryOptionsFromCatalog(products), [products]);
+  const brands = useMemo(() => brandsOf(inverterOptions), [inverterOptions]);
+  const panelProduct = useMemo(() => products.find((p) => p.category === 'panneaux'), [products]);
+  const panelName = panelProduct?.name || `Panneau ${PANEL_SPEC.brand} ${PANEL_SPEC.model} ${PANEL_SPEC.power}W ${PANEL_SPEC.type}`;
+  const panelPrice = panelProduct?.basePrice ?? PANEL_SPEC.price;
 
   const [step, setStep] = useState(1);
 
@@ -48,7 +54,7 @@ export default function ProSolarWizard({ onDone }) {
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
 
   // --- Sélection matériel ---
-  const [inverterBrand, setInverterBrand] = useState(INVERTER_BRANDS[0]);
+  const [inverterBrand, setInverterBrand] = useState('');
   const [selectedInverterId, setSelectedInverterId] = useState(null); // null = onduleur conseillé
   const [batteryQty, setBatteryQty] = useState(null); // null = combinaison suggérée à venir
 
@@ -83,23 +89,24 @@ export default function ProSolarWizard({ onDone }) {
   // Nouveau dimensionnement → on repart des sélections conseillées.
   useEffect(() => { setSelectedInverterId(null); setBatteryQty(null); }, [sizing]);
 
-  // Onduleur effectif : choix explicite, sinon conseillé dans la marque.
+  const brand = inverterBrand || brands[0] || '';
+  const brandInverters = useMemo(() => inverterOptions.filter((o) => o.brand === brand), [inverterOptions, brand]);
+
+  // Onduleur effectif : choix explicite, sinon conseillé dans la marque courante.
   const inverter = useMemo(() => {
     if (!sizing) return null;
-    if (selectedInverterId) return INVERTER_MODELS.find((i) => i.id === selectedInverterId) || null;
-    return recommendedInverter(sizing.requiredPanelPower, inverterBrand);
-  }, [sizing, selectedInverterId, inverterBrand]);
+    if (selectedInverterId) return inverterOptions.find((o) => o.id === selectedInverterId) || null;
+    return recommendInverterOption(brandInverters, sizing.requiredPanelPower);
+  }, [sizing, selectedInverterId, brandInverters, inverterOptions]);
 
-  // Semence de la combinaison de batteries (suggestion) à l'arrivée sur l'étape.
+  // Semence de la combinaison de batteries (suggestion catalogue) à l'arrivée.
   useEffect(() => {
     if (step === 4 && sizing && batteryQty === null) {
-      const seed = {};
-      sizing.batteries.forEach((b) => { seed[b.id] = b.quantity; });
-      setBatteryQty(seed);
+      setBatteryQty(suggestBatteryCombo(batteryOptions, sizing.batteryCapacity));
     }
-  }, [step, sizing, batteryQty]);
+  }, [step, sizing, batteryQty, batteryOptions]);
 
-  const batteryList = BATTERY_MODELS
+  const batteryList = batteryOptions
     .filter((b) => (batteryQty?.[b.id] || 0) > 0)
     .map((b) => ({ ...b, qty: batteryQty[b.id] }));
   const totalBatteryCapacity = batteryList.reduce((s, b) => s + b.capacity * b.qty, 0);
@@ -108,13 +115,13 @@ export default function ProSolarWizard({ onDone }) {
   const lignes = useMemo(() => {
     if (!sizing || !inverter) return [];
     return [
-      { designation: `Panneau ${PANEL_SPEC.brand} ${PANEL_SPEC.model} ${PANEL_SPEC.power}W ${PANEL_SPEC.type}`, qty: sizing.numberOfPanels, pu: PANEL_SPEC.price },
-      { designation: `Onduleur ${inverter.brand} ${inverter.model} (${inverter.capacity} kVA)`, qty: 1, pu: inverter.price },
-      ...batteryList.map((b) => ({ designation: `Batterie ${b.brand} ${b.model} (${b.capacity} kWh)`, qty: b.qty, pu: b.price })),
+      { designation: panelName, qty: sizing.numberOfPanels, pu: panelPrice },
+      { designation: inverter.model, qty: 1, pu: inverter.price },
+      ...batteryList.map((b) => ({ designation: b.model, qty: b.qty, pu: b.price })),
       ...accessoryLines(sizing.numberOfPanels),
       { designation: "Main d'œuvre et installation", qty: 1, pu: sizing.numberOfPanels * INSTALLATION_COST_PER_PANEL },
     ];
-  }, [sizing, inverter, batteryList]);
+  }, [sizing, inverter, batteryList, panelName, panelPrice]);
 
   const totals = useMemo(() => computeFactureTotals(lignes, tvaActive), [lignes, tvaActive]);
 
@@ -252,57 +259,63 @@ export default function ProSolarWizard({ onDone }) {
           </div>
         )}
 
-        {/* Étape 3 : onduleur par marque */}
+        {/* Étape 3 : onduleur par marque (catalogue) */}
         {step === 3 && sizing && (
           <div>
             <div className="wizard-step-title">3. Onduleur</div>
-            <div className="categories-scroll">
-              {INVERTER_BRANDS.map((b) => (
-                <button key={b} className={`category-chip ${inverterBrand === b ? 'active' : ''}`} onClick={() => { setInverterBrand(b); setSelectedInverterId(null); }}>{b}</button>
-              ))}
-            </div>
-            <div className="kit-options" style={{ marginTop: 12 }}>
-              {invertersByBrand(inverterBrand).map((i) => {
-                const suffisant = i.maxPower >= sizing.requiredPanelPower * 1.2;
-                return (
-                  <button key={i.id} className={`kit-option ${inverter?.id === i.id ? 'selected' : ''}`} onClick={() => setSelectedInverterId(i.id)}>
-                    <span className="kit-option-name">{i.model} · {i.capacity} kVA{suffisant && <span className="kit-badge">OK</span>}</span>
-                    <span className="kit-option-meta">{formatCFA(i.price)}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {inverter && <div className="field-hint" style={{ marginTop: 10 }}>Sélection : {inverter.brand} {inverter.model} ({inverter.capacity} kVA) · rendement {inverter.efficiency} %</div>}
+            {brands.length ? (
+              <>
+                <div className="categories-scroll">
+                  {brands.map((b) => (
+                    <button key={b} className={`category-chip ${brand === b ? 'active' : ''}`} onClick={() => { setInverterBrand(b); setSelectedInverterId(null); }}>{b}</button>
+                  ))}
+                </div>
+                <div className="kit-options" style={{ marginTop: 12 }}>
+                  {brandInverters.map((i) => {
+                    const suffisant = i.maxPower >= sizing.requiredPanelPower * 1.2;
+                    return (
+                      <button key={i.id} className={`kit-option ${inverter?.id === i.id ? 'selected' : ''}`} onClick={() => setSelectedInverterId(i.id)}>
+                        <span className="kit-option-name">{i.model}{suffisant && <span className="kit-badge">OK</span>}</span>
+                        <span className="kit-option-meta">{formatCFA(i.price)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {inverter && <div className="field-hint" style={{ marginTop: 10 }}>Sélection : {inverter.model} — {inverter.capacity} kVA</div>}
+              </>
+            ) : <div className="empty-state">Aucun onduleur dans la boutique. Ajoutez-en dans le catalogue.</div>}
           </div>
         )}
 
-        {/* Étape 4 : batteries */}
+        {/* Étape 4 : batteries (catalogue) */}
         {step === 4 && sizing && (
           <div>
             <div className="wizard-step-title">4. Batteries</div>
             {systemType === 'on-grid' ? (
               <div className="field-hint">Système raccordé réseau : aucune batterie nécessaire. Vous pouvez tout de même en ajouter ci-dessous.</div>
             ) : (
-              <div className="field-hint">Besoin estimé : <strong>{sizing.batteryCapacity.toFixed(1)} kWh</strong> — combinaison sélectionnée : <strong>{totalBatteryCapacity.toFixed(1)} kWh</strong></div>
+              <div className="field-hint">Besoin estimé : <strong>{sizing.batteryCapacity.toFixed(1)} kWh</strong> — sélectionné : <strong>{totalBatteryCapacity.toFixed(1)} kWh</strong></div>
             )}
-            <div className="appliance-list" style={{ marginTop: 12 }}>
-              {BATTERY_MODELS.map((b) => {
-                const qty = batteryQty?.[b.id] || 0;
-                return (
-                  <div key={b.id} className="appliance-row">
-                    <div className="appliance-row-main">
-                      <div className="appliance-name">{b.model} · {b.capacity} kWh <span className="text-secondary">({b.brand})</span></div>
-                      <div className="qty-stepper">
-                        <button type="button" className="btn btn-sm btn-outline" onClick={() => setBattery(b.id, qty - 1)}>−</button>
-                        <span className="qty-value">{qty}</span>
-                        <button type="button" className="btn btn-sm btn-outline" onClick={() => setBattery(b.id, qty + 1)}>+</button>
+            {batteryOptions.length ? (
+              <div className="appliance-list" style={{ marginTop: 12 }}>
+                {batteryOptions.map((b) => {
+                  const qty = batteryQty?.[b.id] || 0;
+                  return (
+                    <div key={b.id} className="appliance-row">
+                      <div className="appliance-row-main">
+                        <div className="appliance-name">{b.model} <span className="text-secondary">· {b.capacity} kWh</span></div>
+                        <div className="qty-stepper">
+                          <button type="button" className="btn btn-sm btn-outline" onClick={() => setBattery(b.id, qty - 1)}>−</button>
+                          <span className="qty-value">{qty}</span>
+                          <button type="button" className="btn btn-sm btn-outline" onClick={() => setBattery(b.id, qty + 1)}>+</button>
+                        </div>
                       </div>
+                      <div className="appliance-row-consumption"><span>{formatCFA(b.price)} / unité{qty > 0 ? ` · ${formatCFA(b.price * qty)}` : ''}</span></div>
                     </div>
-                    <div className="appliance-row-consumption"><span>{formatCFA(b.price)} / unité{qty > 0 ? ` · ${formatCFA(b.price * qty)}` : ''}</span></div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : <div className="empty-state">Aucune batterie dans la boutique. Ajoutez-en dans le catalogue.</div>}
           </div>
         )}
 
