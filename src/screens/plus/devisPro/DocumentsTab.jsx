@@ -7,7 +7,7 @@ import { computeFactureTotals, FACTURE_STATUT_LABEL } from '../../../utils/factu
 import { exportDevisProPdf, exportFacturePdf } from './proPdf';
 import FactureSheet from './FactureSheet';
 import ProDevisBuilder from './ProDevisBuilder';
-import SolarWizard from '../../devis/SolarWizard';
+import ProSolarWizard from './ProSolarWizard';
 
 /** Onglet « Mes documents » : factures (création/statut/PDF) et devis convertibles. */
 export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
@@ -67,7 +67,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             <button className="devis-mode-card" onClick={() => setCreateMode('solar')}>
               <div className="devis-mode-icon solar"><PanelTop size={26} /></div>
               <div className="devis-mode-title">Dimensionnement solaire</div>
-              <div className="devis-mode-desc">Estimez la consommation du client et générez automatiquement le système (panneaux, onduleur, batteries) et son devis chiffré.</div>
+              <div className="devis-mode-desc">Estimez la consommation, puis choisissez la marque d'onduleur (Growatt, Must Power) et les batteries, jusqu'au devis chiffré.</div>
             </button>
             <button className="devis-mode-card" onClick={() => setCreateMode('manual')}>
               <div className="devis-mode-icon"><ShoppingCart size={26} /></div>
@@ -76,7 +76,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             </button>
           </div>
         )}
-        {createMode === 'solar' && <SolarWizard onDone={closeCreate} />}
+        {createMode === 'solar' && <ProSolarWizard onDone={closeCreate} />}
         {createMode === 'manual' && <ProDevisBuilder onDone={closeCreate} />}
       </>
     );

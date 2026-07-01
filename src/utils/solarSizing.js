@@ -31,6 +31,66 @@ export const INVERTER_MODELS = [
   { id: 'growatt-10k', brand: 'Growatt', model: 'SPF 10000TL', capacity: 10, maxPower: 8000, price: 1300000, efficiency: 96 },
 ];
 
+// ---- Options matériel dérivées du catalogue boutique ----
+// Les marques et prix proviennent des produits réels (catégories 'onduleurs'
+// et 'batteries'), pas de listes codées en dur. Marque et capacité sont
+// extraites du nom du produit ; le prix est le basePrice (prix partenaire).
+
+const BRAND_KEYWORDS = ['Growatt', 'Felicity', 'Luxsun', 'Taico', 'Itel Energy', 'Itel', 'Marstek', 'Pylontech', 'Must Power', 'Jinko'];
+const parseNum = (s) => parseFloat(String(s).replace(',', '.'));
+
+export const detectBrand = (name = '') => {
+  const low = name.toLowerCase();
+  return BRAND_KEYWORDS.find((b) => low.includes(b.toLowerCase())) || 'Autre';
+};
+export const parseKva = (name = '') => { const m = name.match(/(\d+(?:[.,]\d+)?)\s*kva/i); return m ? parseNum(m[1]) : null; };
+export const parseKwh = (name = '') => { const m = name.match(/(\d+(?:[.,]\d+)?)\s*kwh/i); return m ? parseNum(m[1]) : null; };
+
+/** Onduleurs boutique → { id, brand, model, capacity (kVA), maxPower (W), price }. */
+export const inverterOptionsFromCatalog = (products = []) =>
+  products
+    .filter((p) => p.category === 'onduleurs')
+    .map((p) => {
+      const capacity = parseKva(p.name);
+      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, maxPower: Math.round(capacity * 800), price: p.basePrice } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.capacity - b.capacity);
+
+/** Batteries boutique → { id, brand, model, capacity (kWh), price }. */
+export const batteryOptionsFromCatalog = (products = []) =>
+  products
+    .filter((p) => p.category === 'batteries')
+    .map((p) => {
+      const capacity = parseKwh(p.name);
+      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, price: p.basePrice } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.capacity - b.capacity);
+
+/** Marques distinctes d'une liste d'options, dans l'ordre d'apparition. */
+export const brandsOf = (options = []) => [...new Set(options.map((o) => o.brand))];
+
+/** Onduleur conseillé : le plus petit couvrant la puissance requise + 20 %. */
+export const recommendInverterOption = (options = [], requiredPower = 0) =>
+  options.find((o) => o.maxPower >= requiredPower * 1.2) || options[options.length - 1] || null;
+
+/** Combinaison de batteries (glouton) approchant la capacité requise. */
+export const suggestBatteryCombo = (options = [], requiredCapacity = 0) => {
+  const combo = {};
+  if (!options.length || requiredCapacity <= 0) return combo;
+  const desc = [...options].sort((a, b) => b.capacity - a.capacity);
+  const smallest = desc[desc.length - 1];
+  let remaining = requiredCapacity;
+  let guard = 0;
+  while (remaining > smallest.capacity * 0.5 && guard++ < 100) {
+    const fit = desc.find((o) => o.capacity <= remaining + smallest.capacity * 0.5) || smallest;
+    combo[fit.id] = (combo[fit.id] || 0) + 1;
+    remaining -= fit.capacity;
+  }
+  return combo;
+};
+
 export const SYSTEM_TYPES = [
   { id: 'off-grid', label: 'Autonome (off-grid)', help: 'Sans raccordement réseau, batteries pour toute la nuit' },
   { id: 'hybrid', label: 'Hybride', help: 'Réseau + batteries (80% des besoins nuit stockés)' },
@@ -110,6 +170,7 @@ export const calculateSystemSize = (consumption, systemType, peakSunHours = DEFA
 
   return {
     numberOfPanels,
+    requiredPanelPower, // W — utile pour filtrer les onduleurs par marque
     panelCapacity: (numberOfPanels * PANEL_SPEC.power) / 1000, // kWc
     inverter: selectedInverter,
     batteryCapacity,
