@@ -66,6 +66,8 @@ export function DataProvider({ children }) {
     getCompanyForUser: (userId) => (state.companies || []).find((c) => c.userId === userId),
     getLeadById: (id) => state.leads.find((l) => l.id === id),
     getUserById: (id) => seed.users.find((u) => u.id === id),
+    proClientsForUser: (userId) => (state.proClients || []).filter((c) => c.userId === userId),
+    getProClientById: (id) => (state.proClients || []).find((c) => c.id === id),
     leadsForUser: (user) =>
       user.role === 'gerant' ? state.leads : state.leads.filter((l) => l.assignedTo === user.id),
   }), [state]);
