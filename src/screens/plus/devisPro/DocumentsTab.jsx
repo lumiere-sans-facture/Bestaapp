@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2, PanelTop, ChevronLeft } from 'lucide-react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, PanelTop, ChevronLeft, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
@@ -7,6 +7,7 @@ import { computeFactureTotals, FACTURE_STATUT_LABEL } from '../../../utils/factu
 import { exportDevisProPdf, exportFacturePdf } from './proPdf';
 import FactureSheet from './FactureSheet';
 import ProDevisBuilder from './ProDevisBuilder';
+import SolarWizard from '../../devis/SolarWizard';
 
 /** Onglet « Mes documents » : factures (création/statut/PDF) et devis convertibles. */
 export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
@@ -14,6 +15,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, markDevisPro } = useData();
   const [factureOpen, setFactureOpen] = useState(false);
   const [view, setView] = useState('docs'); // docs | create (création de devis)
+  const [createMode, setCreateMode] = useState('choose'); // choose | solar | manual
 
   const myDevis = devis.filter((d) => d.createdBy === user.id);
   const myFactures = (factures || []).filter((f) => f.userId === user.id);
@@ -50,16 +52,32 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     });
   };
 
-  // Création d'un devis en mode Pro : sélection manuelle des produits (catalogue
-  // boutique éditable + produits personnalisés), sans suggestion de dimensionnement.
+  // Création d'un devis en mode Pro : choix entre le dimensionnement solaire
+  // (assistant automatique) et la sélection manuelle (builder Pro éditable).
+  const closeCreate = () => { setView('docs'); setCreateMode('choose'); };
   if (view === 'create') {
     return (
       <>
-        <button className="btn btn-outline btn-sm back-button" onClick={() => setView('docs')}>
-          <ChevronLeft size={16} /> Retour aux documents
+        <button className="btn btn-outline btn-sm back-button" onClick={createMode === 'choose' ? closeCreate : () => setCreateMode('choose')}>
+          <ChevronLeft size={16} /> {createMode === 'choose' ? 'Retour aux documents' : 'Changer de type'}
         </button>
         <div className="section-title">Nouveau devis</div>
-        <ProDevisBuilder onDone={() => setView('docs')} />
+        {createMode === 'choose' && (
+          <div className="devis-mode-grid">
+            <button className="devis-mode-card" onClick={() => setCreateMode('solar')}>
+              <div className="devis-mode-icon solar"><PanelTop size={26} /></div>
+              <div className="devis-mode-title">Dimensionnement solaire</div>
+              <div className="devis-mode-desc">Estimez la consommation du client et générez automatiquement le système (panneaux, onduleur, batteries) et son devis chiffré.</div>
+            </button>
+            <button className="devis-mode-card" onClick={() => setCreateMode('manual')}>
+              <div className="devis-mode-icon"><ShoppingCart size={26} /></div>
+              <div className="devis-mode-title">Sélection manuelle</div>
+              <div className="devis-mode-desc">Composez le devis produit par produit depuis le catalogue (prix modifiables) et ajoutez des produits personnalisés.</div>
+            </button>
+          </div>
+        )}
+        {createMode === 'solar' && <SolarWizard onDone={closeCreate} />}
+        {createMode === 'manual' && <ProDevisBuilder onDone={closeCreate} />}
       </>
     );
   }
@@ -74,7 +92,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         </div>
       )}
       <div className="pro-actions-row">
-        <button className="btn btn-accent" onClick={() => setView('create')}>
+        <button className="btn btn-accent" onClick={() => { setCreateMode('choose'); setView('create'); }}>
           <PanelTop size={16} /> Nouveau devis
         </button>
         <button className="btn btn-primary" onClick={() => setFactureOpen(true)} disabled={!company?.nomEntreprise}>
