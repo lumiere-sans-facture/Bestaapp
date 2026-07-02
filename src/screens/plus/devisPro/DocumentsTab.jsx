@@ -99,10 +99,11 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         <div className="section-title">Nouveau devis</div>
         {createMode === 'choose' && (
           <div className="devis-mode-grid">
-            <button className="devis-mode-card" onClick={() => setCreateMode('solar')}>
+            <button className="devis-mode-card featured" onClick={() => setCreateMode('solar')}>
+              <span className="devis-mode-badge">Recommandé</span>
               <div className="devis-mode-icon solar"><PanelTop size={26} /></div>
               <div className="devis-mode-title">Dimensionnement solaire</div>
-              <div className="devis-mode-desc">Estimez la consommation, puis choisissez la marque d'onduleur et les batteries (issus de la boutique), jusqu'au devis chiffré.</div>
+              <div className="devis-mode-desc">Estimez la consommation, géolocalisez le client pour l'ensoleillement, puis choisissez la marque d'onduleur et les batteries — jusqu'au devis chiffré.</div>
             </button>
             <button className="devis-mode-card" onClick={() => setCreateMode('manual')}>
               <div className="devis-mode-icon"><ShoppingCart size={26} /></div>
