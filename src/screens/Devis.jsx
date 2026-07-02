@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FileText, Plus, Sun, ShoppingCart, Download, Search } from 'lucide-react';
+import { FileText, Plus, Sun, ShoppingCart, Download, Search, Check, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
@@ -17,7 +17,7 @@ const SORT_OPTIONS = [
 
 export default function Devis() {
   const { user } = useAuth();
-  const { devis, getLeadById, getPartnerById, products } = useData();
+  const { devis, getLeadById, getPartnerById, products, updateDevis, deleteDevis } = useData();
 
   // jsPDF est chargé à la demande pour ne pas alourdir le chargement initial
   const downloadPdf = async (d) => {
@@ -41,7 +41,9 @@ export default function Devis() {
 
   // Recherche (client, numéro, partenaire/code) + filtre type + tri
   const visibleDevis = myDevis
-    .filter((d) => typeFilter === 'all' || (typeFilter === 'solar' ? d.type === 'solar' : d.type !== 'solar'))
+    .filter((d) => typeFilter === 'all'
+      || (typeFilter === 'brouillon' ? d.statut === 'brouillon'
+        : typeFilter === 'solar' ? d.type === 'solar' : d.type !== 'solar'))
     .filter((d) => {
       if (!search.trim()) return true;
       const q = search.trim().toLowerCase();
@@ -96,7 +98,7 @@ export default function Devis() {
             <>
             <div className="list-toolbar">
               <div className="categories-scroll">
-                {[['all', 'Tous'], ['solar', 'Solaires'], ['manual', 'Manuels']].map(([id, label]) => (
+                {[['all', 'Tous'], ['brouillon', 'Brouillons'], ['solar', 'Solaires'], ['manual', 'Manuels']].map(([id, label]) => (
                   <button key={id} className={`category-chip ${typeFilter === id ? 'active' : ''}`} onClick={() => setTypeFilter(id)}>{label}</button>
                 ))}
               </div>
@@ -113,7 +115,10 @@ export default function Devis() {
                   <div key={d.id} className="card devis-card">
                     <div className="devis-card-header">
                       <div>
-                        <div className="devis-card-lead">{lead?.name || 'Client supprimé'}</div>
+                        <div className="devis-card-lead">
+                          {lead?.name || 'Client supprimé'}
+                          {d.statut === 'brouillon' && <span className="badge badge-muted" style={{ marginLeft: 8 }}>Brouillon</span>}
+                        </div>
                         <div className="text-sm text-secondary">
                           {d.devisNumber ? `${d.devisNumber} · ` : ''}{formatDate(d.createdAt)} · {isSolar ? 'Devis solaire' : 'Comptant'}
                         </div>
@@ -138,6 +143,16 @@ export default function Devis() {
                         <button className="btn btn-sm btn-primary" onClick={() => downloadPdf(d)}>
                           <Download size={14} /> PDF
                         </button>
+                        {d.statut === 'brouillon' && (
+                          <>
+                            <button className="btn btn-sm btn-won" onClick={() => updateDevis(d.id, { statut: 'finalise' })}>
+                              <Check size={14} /> Finaliser
+                            </button>
+                            <button className="cart-row-remove" onClick={() => window.confirm('Supprimer ce brouillon ?') && deleteDevis(d.id)} aria-label="Supprimer">
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
