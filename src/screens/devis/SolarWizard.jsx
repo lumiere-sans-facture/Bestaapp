@@ -119,7 +119,7 @@ export default function SolarWizard({ onDone }) {
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0];
   const displayQuotation = kitQuotations[effectiveKitId];
 
-  const handleSubmit = () => {
+  const handleSubmit = (statut = 'finalise') => {
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const submitSizing = {
       numberOfPanels: selectedKit.panels,
@@ -142,6 +142,7 @@ export default function SolarWizard({ onDone }) {
       kit: { id: selectedKit.id, name: selectedKit.name },
       quotation: displayQuotation,
       total: displayQuotation.total,
+      statut,
       createdBy: user.id,
     });
     onDone();
@@ -422,9 +423,14 @@ export default function SolarWizard({ onDone }) {
               Suivant <ChevronRight size={18} />
             </button>
           ) : (
-            <button className="btn btn-accent btn-block" onClick={handleSubmit}>
-              <Check size={18} /> Créer le devis{selectedLead ? ` pour ${selectedLead.name}` : ''}
-            </button>
+            <>
+              <button className="btn btn-outline btn-block" onClick={() => handleSubmit('brouillon')}>
+                Brouillon
+              </button>
+              <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')}>
+                <Check size={18} /> Créer le devis{selectedLead ? ` pour ${selectedLead.name}` : ''}
+              </button>
+            </>
           )}
         </div>
       </div>

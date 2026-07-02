@@ -43,7 +43,7 @@ export default function ManualWizard({ onDone, initialItems }) {
     [items, products] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = (statut = 'finalise') => {
     // Prix unitaires figés au moment de la création (ils dépendent du rôle)
     const unitPrices = {};
     Object.keys(items).forEach((id) => {
@@ -58,6 +58,7 @@ export default function ManualWizard({ onDone, initialItems }) {
       unitPrices,
       subtotal,
       total: subtotal, // paiement comptant uniquement
+      statut,
       createdBy: user.id,
     });
     onDone();
@@ -133,9 +134,14 @@ export default function ManualWizard({ onDone, initialItems }) {
               Suivant <ChevronRight size={18} />
             </button>
           ) : (
-            <button className="btn btn-accent btn-block" onClick={handleSubmit} disabled={Object.keys(items).length === 0}>
-              <Check size={18} /> Créer le devis{selectedLead ? ` pour ${selectedLead.name}` : ''}
-            </button>
+            <>
+              <button className="btn btn-outline btn-block" onClick={() => handleSubmit('brouillon')} disabled={Object.keys(items).length === 0}>
+                Brouillon
+              </button>
+              <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')} disabled={Object.keys(items).length === 0}>
+                <Check size={18} /> Créer le devis{selectedLead ? ` pour ${selectedLead.name}` : ''}
+              </button>
+            </>
           )}
         </div>
       </div>
