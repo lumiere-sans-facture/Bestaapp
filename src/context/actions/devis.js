@@ -51,5 +51,19 @@ export function createDevisActions(setState) {
         ...s,
         devis: s.devis.map((d) => (d.id === devisId ? { ...d, pro: true, modele, companySnapshot } : d)),
       })),
+
+    // Mise à jour partielle d'un devis (ex. finaliser un brouillon : statut).
+    updateDevis: (devisId, patch) =>
+      setState((s) => ({
+        ...s,
+        devis: s.devis.map((d) => (d.id === devisId ? { ...d, ...patch } : d)),
+      })),
+
+    // Suppression d'un devis (la réplication gère les tombstones automatiquement).
+    deleteDevis: (devisId) =>
+      setState((s) => ({
+        ...s,
+        devis: s.devis.filter((d) => d.id !== devisId),
+      })),
   };
 }

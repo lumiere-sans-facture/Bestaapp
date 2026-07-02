@@ -52,7 +52,7 @@ export default function ProDevisBuilder({ onDone }) {
   const canSubmit =
     (clientMode === 'new' ? newClient.name.trim() : clientId) && cleanLignes().length > 0;
 
-  const submit = () => {
+  const submit = (statut = 'finalise') => {
     const finalLignes = cleanLignes();
     if (!finalLignes.length) return;
 
@@ -79,6 +79,7 @@ export default function ProDevisBuilder({ onDone }) {
       tvaActive,
       tva: t.tva,
       total: t.totalTTC,
+      statut,
       createdBy: user.id,
       pro: true,
     });
@@ -187,9 +188,14 @@ export default function ProDevisBuilder({ onDone }) {
         <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(totals.totalTTC)}</span></div>
       </div>
 
-      <button className="btn btn-accent btn-block" onClick={submit} disabled={!canSubmit}>
-        <Check size={18} /> Créer le devis
-      </button>
+      <div className="wizard-actions">
+        <button className="btn btn-outline btn-block" onClick={() => submit('brouillon')} disabled={!canSubmit}>
+          Enregistrer en brouillon
+        </button>
+        <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!canSubmit}>
+          <Check size={18} /> Créer le devis
+        </button>
+      </div>
     </div>
   );
 }
