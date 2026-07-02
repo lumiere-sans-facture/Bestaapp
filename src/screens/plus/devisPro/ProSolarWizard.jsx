@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, PanelTop, Cpu, Battery, User, Building2, MapPin, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, PanelTop, Cpu, Battery, User, Building2, MapPin, Search, FileText } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
@@ -182,6 +182,29 @@ export default function ProSolarWizard({ onDone }) {
 
   const totals = useMemo(() => computeFactureTotals(lignes, tvaActive), [lignes, tvaActive]);
 
+  // Fiche de dimensionnement (PDF) — synthèse technique du dimensionnement calculé.
+  const openSizingSheet = async () => {
+    if (!sizing) return;
+    const { generateSizingSheetPdf } = await import('../../../utils/sizingSheetPdf');
+    const combo = suggestBatteryCombo(brandBatteries, sizing.batteryCapacity);
+    const sheetBatteries = brandBatteries.filter((b) => (combo[b.id] || 0) > 0).map((b) => ({ ...b, qty: combo[b.id] }));
+    const sheetAppliances = manualMode ? [] : rows.map((r) => ({
+      name: r.name, power: r.power, quantity: r.quantity, hours: r.day + r.night, dailyWh: r.power * r.quantity * (r.day + r.night),
+    }));
+    generateSizingSheetPdf({
+      company,
+      client: { name: '', ville: location?.name || '' },
+      appliances: sheetAppliances,
+      manualMode,
+      consumption,
+      sizing,
+      inverter,
+      batteries: sheetBatteries,
+      systemType,
+      sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+    });
+  };
+
   const submit = () => {
     if (!sizing || !inverter || !lignes.length) return;
     let client;
@@ -352,6 +375,9 @@ export default function ProSolarWizard({ onDone }) {
               <div className="sizing-card"><div className="sizing-icon"><Battery size={18} /></div><div className="sizing-value">{sizing.batteryCapacity > 0 ? `${sizing.batteryCapacity.toFixed(1)} kWh` : '—'}</div><div className="sizing-label">Batterie conseillée</div></div>
               <div className="sizing-card"><div className="sizing-icon"><Zap size={18} /></div><div className="sizing-value">{Math.round(sizing.estimatedProduction).toLocaleString('fr-FR')}</div><div className="sizing-label">kWh / an</div></div>
             </div>
+            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 14 }} onClick={openSizingSheet}>
+              <FileText size={16} /> Fiche de dimensionnement (PDF)
+            </button>
           </div>
         )}
 
