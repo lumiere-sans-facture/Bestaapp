@@ -1,20 +1,31 @@
-import { useState } from 'react';
-import { Users, Plus, Trash2, Pencil, User, Building2, Phone, MapPin, Check } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Trash2, User, Building2, Phone, MapPin, Check } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
+import { formatDate } from '../../../utils/format';
 import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
 
 const EMPTY = { name: '', phone: '', ville: '', type: 'particulier' };
+const nf = (v) => Math.round(v || 0).toLocaleString('fr-FR');
 
 /** Onglet « Clients » : carnet d'adresses propre au technicien abonné. */
 export default function ClientsTab() {
   const { user } = useAuth();
-  const { proClientsForUser, addProClient, updateProClient, deleteProClient } = useData();
+  const { proClientsForUser, devis, addProClient, updateProClient, deleteProClient } = useData();
 
   const myClients = proClientsForUser(user.id);
   const [editingId, setEditingId] = useState(null); // null = fermé, 'new' = création, sinon id
   const [form, setForm] = useState(EMPTY);
+
+  // Total facturé par client (somme des devis rattachés).
+  const totalByClient = useMemo(() => {
+    const m = new Map();
+    (devis || []).forEach((d) => {
+      if (d.clientId) m.set(d.clientId, (m.get(d.clientId) || 0) + (d.total || 0));
+    });
+    return m;
+  }, [devis]);
 
   const openNew = () => { setForm(EMPTY); setEditingId('new'); };
   const openEdit = (c) => { setForm({ name: c.name, phone: c.phone || '', ville: c.ville || '', type: c.type || 'particulier' }); setEditingId(c.id); };
@@ -29,6 +40,12 @@ export default function ClientsTab() {
     close();
   };
 
+  const removeClient = () => {
+    if (window.confirm(`Supprimer le client « ${form.name} » ?`)) { deleteProClient(editingId); close(); }
+  };
+
+  const rowKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
+
   return (
     <>
       <div className="pro-actions-row">
@@ -36,24 +53,28 @@ export default function ClientsTab() {
           <Plus size={16} /> Nouveau client
         </button>
       </div>
+      <div className="section-title">Mes clients ({myClients.length})</div>
 
-      <div className="card my-partner-section">
-        <div className="card-title"><Users size={15} /> Mes clients ({myClients.length})</div>
-        {myClients.length ? myClients.map((c) => (
-          <div key={c.id} className="sheet-row">
-            <span className="sheet-label">
-              {c.type === 'entreprise' ? <Building2 size={14} /> : <User size={14} />}{' '}
-              <strong>{c.name}</strong>
-              {c.phone && <span className="text-secondary"> · {c.phone}</span>}
-              {c.ville && <span className="text-secondary"> · {c.ville}</span>}
-            </span>
-            <span className="sheet-value pro-doc-actions">
-              <button className="btn btn-sm btn-outline" onClick={() => openEdit(c)} aria-label="Modifier"><Pencil size={13} /></button>
-              <button className="cart-row-remove" onClick={() => window.confirm(`Supprimer le client « ${c.name} » ?`) && deleteProClient(c.id)} aria-label="Supprimer"><Trash2 size={14} /></button>
-            </span>
-          </div>
-        )) : <div className="text-sm text-secondary">Aucun client. Ajoutez-en un pour l'utiliser dans vos devis et factures.</div>}
-      </div>
+      {myClients.length ? (
+        <div className="flat-list">
+          {myClients.map((c) => {
+            const total = totalByClient.get(c.id) || 0;
+            return (
+              <div key={c.id} className="flat-row" role="button" tabIndex={0}
+                onClick={() => openEdit(c)} onKeyDown={(e) => rowKey(e, () => openEdit(c))}>
+                <div className="flat-row-main">
+                  <div className="flat-row-title">{c.name}</div>
+                  <div className="flat-row-sub">
+                    <span className={`flat-badge ${c.type === 'entreprise' ? '' : 'muted'}`}>{c.type === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
+                    <span className="flat-row-date">{c.phone || c.ville || formatDate(c.createdAt)}</span>
+                  </div>
+                </div>
+                {total > 0 && <div className="flat-row-amount">{nf(total)}<span className="flat-amount-unit">F CFA</span></div>}
+              </div>
+            );
+          })}
+        </div>
+      ) : <div className="empty-state card">Aucun client. Ajoutez-en un pour l'utiliser dans vos devis et factures.</div>}
 
       <Sheet open={editingId !== null} onClose={close} title={editingId === 'new' ? 'Nouveau client' : 'Modifier le client'}>
         <form onSubmit={submit}>
@@ -77,6 +98,11 @@ export default function ClientsTab() {
             </Field>
           </div>
           <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> {editingId === 'new' ? 'Ajouter le client' : 'Enregistrer'}</button>
+          {editingId !== 'new' && (
+            <button type="button" className="btn btn-lost btn-block" style={{ marginTop: 10 }} onClick={removeClient}>
+              <Trash2 size={16} /> Supprimer le client
+            </button>
+          )}
         </form>
       </Sheet>
     </>

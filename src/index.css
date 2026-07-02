@@ -1353,6 +1353,27 @@ textarea.input { resize: vertical; }
 .doc-actions-list .sheet-row { padding: 6px 0; }
 .doc-actions-list .btn { justify-content: center; }
 
+/* Liste plate (devis, factures, clients) — lignes séparées, titre + pastille + montant */
+.flat-list { background: white; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.flat-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 15px 16px; border-bottom: 1px solid var(--border); background: white;
+  cursor: pointer; transition: background 0.12s ease;
+}
+.flat-row:last-child { border-bottom: none; }
+.flat-row:hover { background: var(--bg); }
+.flat-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.flat-row-main { flex: 1; min-width: 0; }
+.flat-row-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flat-row-sub { display: flex; align-items: center; gap: 10px; margin-top: 7px; min-width: 0; }
+.flat-row-date { font-size: 0.8125rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flat-badge { flex-shrink: 0; padding: 3px 11px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; background: rgba(10, 36, 114, 0.1); color: var(--primary); }
+.flat-badge.success { background: var(--success-light); color: #047857; }
+.flat-badge.warning { background: var(--warning-light); color: #92400e; }
+.flat-badge.muted { background: var(--bg); color: var(--text-muted); }
+.flat-row-amount { flex-shrink: 0; font-size: 1rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; text-align: right; }
+.flat-amount-unit { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-left: 4px; }
+
 @media (min-width: 640px) {
   .doc-summary { grid-template-columns: repeat(2, minmax(0, 260px)); }
 }
