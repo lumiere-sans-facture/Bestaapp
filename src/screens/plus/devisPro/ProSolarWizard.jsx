@@ -95,6 +95,8 @@ export default function ProSolarWizard({ onDone }) {
   // --- Sélection matériel ---
   const [inverterBrand, setInverterBrand] = useState('');
   const [selectedInverterId, setSelectedInverterId] = useState(null); // null = onduleur conseillé
+  const [showAllInverters, setShowAllInverters] = useState(false);
+  const [batteryBrand, setBatteryBrand] = useState('');
   const [batteryQty, setBatteryQty] = useState(null); // null = combinaison suggérée à venir
 
   // --- Client / devis ---
@@ -138,12 +140,28 @@ export default function ProSolarWizard({ onDone }) {
     return recommendInverterOption(brandInverters, sizing.requiredPanelPower);
   }, [sizing, selectedInverterId, brandInverters, inverterOptions]);
 
-  // Semence de la combinaison de batteries (suggestion catalogue) à l'arrivée.
+  // Onduleur conseillé de la marque (badge) + filtrage sur la puissance requise.
+  const recommendedInv = useMemo(
+    () => (sizing ? recommendInverterOption(brandInverters, sizing.requiredPanelPower) : null),
+    [sizing, brandInverters]
+  );
+  const suitableInverters = useMemo(
+    () => brandInverters.filter((i) => i.maxPower >= (sizing?.requiredPanelPower || 0) * 1.2),
+    [brandInverters, sizing]
+  );
+  const shownInverters = (showAllInverters || suitableInverters.length === 0) ? brandInverters : suitableInverters;
+
+  // Batteries : une marque à la fois (réaliste sur le terrain).
+  const batteryBrands = useMemo(() => brandsOf(batteryOptions), [batteryOptions]);
+  const bBrand = batteryBrand || batteryBrands[0] || '';
+  const brandBatteries = useMemo(() => batteryOptions.filter((o) => o.brand === bBrand), [batteryOptions, bBrand]);
+
+  // Semence de la combinaison de batteries (suggestion, dans la marque) à l'étape Matériel.
   useEffect(() => {
-    if (step === 4 && sizing && batteryQty === null) {
-      setBatteryQty(suggestBatteryCombo(batteryOptions, sizing.batteryCapacity));
+    if (step === 3 && sizing && batteryQty === null) {
+      setBatteryQty(suggestBatteryCombo(brandBatteries, sizing.batteryCapacity));
     }
-  }, [step, sizing, batteryQty, batteryOptions]);
+  }, [step, sizing, batteryQty, brandBatteries]);
 
   const batteryList = batteryOptions
     .filter((b) => (batteryQty?.[b.id] || 0) > 0)
@@ -206,14 +224,13 @@ export default function ProSolarWizard({ onDone }) {
   const canNext =
     (step === 1 && totalConsumption > 0) ||
     step === 2 ||
-    (step === 3 && !!inverter) ||
-    step === 4;
+    (step === 3 && !!inverter);
   const clientReady = clientMode === 'new' ? newClient.name.trim() : clientId;
 
   return (
     <div className="wizard">
       <div className="steps-indicator">
-        {[1, 2, 3, 4, 5].map((s) => (
+        {[1, 2, 3, 4].map((s) => (
           <div key={s} className={`step-dot ${step >= s ? 'active' : ''} ${step > s ? 'completed' : ''}`} />
         ))}
       </div>
@@ -338,10 +355,16 @@ export default function ProSolarWizard({ onDone }) {
           </div>
         )}
 
-        {/* Étape 3 : onduleur par marque (catalogue) */}
+        {/* Étape 3 : matériel (onduleur + batteries) */}
         {step === 3 && sizing && (
           <div>
-            <div className="wizard-step-title">3. Onduleur</div>
+            <div className="wizard-step-title">3. Matériel</div>
+
+            {/* --- Onduleur --- */}
+            <div className="mat-section-head">
+              <span className="mat-section-title"><Cpu size={15} /> Onduleur</span>
+              <span className="mat-section-need">Requis : {Math.round(sizing.requiredPanelPower)} W</span>
+            </div>
             {brands.length ? (
               <>
                 <div className="categories-scroll">
@@ -350,58 +373,71 @@ export default function ProSolarWizard({ onDone }) {
                   ))}
                 </div>
                 <div className="kit-options" style={{ marginTop: 12 }}>
-                  {brandInverters.map((i) => {
-                    const suffisant = i.maxPower >= sizing.requiredPanelPower * 1.2;
-                    return (
-                      <button key={i.id} className={`kit-option ${inverter?.id === i.id ? 'selected' : ''}`} onClick={() => setSelectedInverterId(i.id)}>
-                        <span className="kit-option-name">{i.model}{suffisant && <span className="kit-badge">OK</span>}</span>
-                        <span className="kit-option-meta">{formatCFA(i.price)}</span>
-                      </button>
-                    );
-                  })}
+                  {shownInverters.map((i) => (
+                    <button key={i.id} className={`kit-option ${inverter?.id === i.id ? 'selected' : ''}`} onClick={() => setSelectedInverterId(i.id)}>
+                      <span className="kit-option-name">{i.model}{recommendedInv?.id === i.id && <span className="kit-badge">Conseillé</span>}</span>
+                      <span className="kit-option-meta">{formatCFA(i.price)}</span>
+                    </button>
+                  ))}
                 </div>
-                {inverter && <div className="field-hint" style={{ marginTop: 10 }}>Sélection : {inverter.model} — {inverter.capacity} kVA</div>}
+                {suitableInverters.length > 0 && suitableInverters.length < brandInverters.length && (
+                  <label className="pro-tva-toggle">
+                    <input type="checkbox" checked={showAllInverters} onChange={(e) => setShowAllInverters(e.target.checked)} />
+                    Voir aussi les modèles plus petits
+                  </label>
+                )}
               </>
-            ) : <div className="empty-state">Aucun onduleur dans la boutique. Ajoutez-en dans le catalogue.</div>}
-          </div>
-        )}
+            ) : <div className="empty-state">Aucun onduleur dans la boutique.</div>}
 
-        {/* Étape 4 : batteries (catalogue) */}
-        {step === 4 && sizing && (
-          <div>
-            <div className="wizard-step-title">4. Batteries</div>
-            {systemType === 'on-grid' ? (
-              <div className="field-hint">Système raccordé réseau : aucune batterie nécessaire. Vous pouvez tout de même en ajouter ci-dessous.</div>
-            ) : (
-              <div className="field-hint">Besoin estimé : <strong>{sizing.batteryCapacity.toFixed(1)} kWh</strong> — sélectionné : <strong>{totalBatteryCapacity.toFixed(1)} kWh</strong></div>
-            )}
-            {batteryOptions.length ? (
-              <div className="appliance-list" style={{ marginTop: 12 }}>
-                {batteryOptions.map((b) => {
-                  const qty = batteryQty?.[b.id] || 0;
-                  return (
-                    <div key={b.id} className="appliance-row">
-                      <div className="appliance-row-main">
-                        <div className="appliance-name">{b.model} <span className="text-secondary">· {b.capacity} kWh</span></div>
+            {/* --- Batteries --- */}
+            <div className="mat-section-head" style={{ marginTop: 18 }}>
+              <span className="mat-section-title"><Battery size={15} /> Batteries</span>
+              {systemType !== 'on-grid' && (
+                <span className={`mat-section-need ${totalBatteryCapacity >= sizing.batteryCapacity ? 'ok' : ''}`}>
+                  {totalBatteryCapacity.toFixed(1)} / {sizing.batteryCapacity.toFixed(1)} kWh{totalBatteryCapacity >= sizing.batteryCapacity ? ' ✓' : ''}
+                </span>
+              )}
+            </div>
+            {systemType === 'on-grid' && <div className="field-hint">Raccordé réseau : batteries optionnelles.</div>}
+            {batteryBrands.length ? (
+              <>
+                <div className="categories-scroll">
+                  {batteryBrands.map((b) => (
+                    <button key={b} className={`category-chip ${bBrand === b ? 'active' : ''}`}
+                      onClick={() => { setBatteryBrand(b); setBatteryQty(suggestBatteryCombo(batteryOptions.filter((o) => o.brand === b), sizing.batteryCapacity)); }}>{b}</button>
+                  ))}
+                </div>
+                <div className="appliance-list" style={{ marginTop: 12 }}>
+                  {brandBatteries.map((b) => {
+                    const qty = batteryQty?.[b.id] || 0;
+                    return (
+                      <div key={b.id} className={`bat-row ${qty > 0 ? 'active' : ''}`}>
+                        <div className="bat-row-info">
+                          <div className="bat-row-name">{b.model}</div>
+                          <div className="bat-row-meta">{b.capacity} kWh · {formatCFA(b.price)}</div>
+                        </div>
                         <div className="qty-stepper">
                           <button type="button" className="btn btn-sm btn-outline" onClick={() => setBattery(b.id, qty - 1)}>−</button>
                           <span className="qty-value">{qty}</span>
                           <button type="button" className="btn btn-sm btn-outline" onClick={() => setBattery(b.id, qty + 1)}>+</button>
                         </div>
                       </div>
-                      <div className="appliance-row-consumption"><span>{formatCFA(b.price)} / unité{qty > 0 ? ` · ${formatCFA(b.price * qty)}` : ''}</span></div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : <div className="empty-state">Aucune batterie dans la boutique. Ajoutez-en dans le catalogue.</div>}
+                    );
+                  })}
+                </div>
+                <button type="button" className="btn btn-sm btn-outline" style={{ marginTop: 10 }}
+                  onClick={() => setBatteryQty(suggestBatteryCombo(brandBatteries, sizing.batteryCapacity))}>
+                  ↻ Combinaison suggérée
+                </button>
+              </>
+            ) : <div className="empty-state">Aucune batterie dans la boutique.</div>}
           </div>
         )}
 
-        {/* Étape 5 : client + devis */}
-        {step === 5 && sizing && inverter && (
+        {/* Étape 4 : client + devis */}
+        {step === 4 && sizing && inverter && (
           <div>
-            <div className="wizard-step-title">5. Client & devis</div>
+            <div className="wizard-step-title">4. Client & devis</div>
             <div className="client-type-toggle" role="group" aria-label="Source du client" style={{ marginBottom: 14 }}>
               <button type="button" className={`client-type-btn ${clientMode === 'existing' ? 'active' : ''}`} onClick={() => setClientMode('existing')} disabled={!myClients.length}>Client existant</button>
               <button type="button" className={`client-type-btn ${clientMode === 'new' ? 'active' : ''}`} onClick={() => setClientMode('new')}><Plus size={15} /> Nouveau client</button>
@@ -451,7 +487,7 @@ export default function ProSolarWizard({ onDone }) {
 
         <div className="wizard-actions">
           {step > 1 && <button className="btn btn-outline btn-block" onClick={() => setStep(step - 1)}><ChevronLeft size={18} /> Précédent</button>}
-          {step < 5 ? (
+          {step < 4 ? (
             <button className="btn btn-primary btn-block" onClick={() => setStep(step + 1)} disabled={!canNext}>Suivant <ChevronRight size={18} /></button>
           ) : (
             <button className="btn btn-accent btn-block" onClick={submit} disabled={!clientReady || !lignes.length}><Check size={18} /> Créer le devis</button>
