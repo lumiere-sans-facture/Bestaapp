@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
@@ -33,7 +34,13 @@ export default function Plus() {
   const sub = getSubscriptionForUser(user.id);
   const subStatus = effectiveStatus(sub);
 
-  const [activeTab, setActiveTab] = useState('menu');
+  // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
+  // sous-sections soient accessibles directement depuis la barre latérale.
+  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  const { section } = useParams();
+  const navigate = useNavigate();
+  const activeTab = KNOWN_TABS.includes(section) ? section : 'menu';
+  const setActiveTab = (x) => navigate(x === 'menu' ? '/plus' : `/plus/${x}`);
   const [comFilter, setComFilter] = useState('all');
   const [showAddCommission, setShowAddCommission] = useState(false);
   const [newCommission, setNewCommission] = useState({ partnerId: '', leadId: '', level: 1, amount: '' });
