@@ -16,13 +16,13 @@ const nextStatutLabel = (s) => (s === 'brouillon' ? 'Marquer émise' : 'Marquer 
 
 const SORTS = [['recent', 'Plus récents'], ['ancien', 'Plus anciens'], ['montant', 'Montant décroissant']];
 const FACTURE_FILTERS = [['all', 'Tous'], ['emise', 'Émises'], ['payee', 'Payées'], ['brouillon', 'Brouillons']];
-const DEVIS_FILTERS = [['all', 'Tous'], ['tofacture', 'À facturer'], ['factured', 'Facturés']];
+const DEVIS_FILTERS = [['all', 'Tous'], ['brouillon', 'Brouillons'], ['tofacture', 'À facturer'], ['factured', 'Facturés']];
 
 /** Écran « Devis & Factures » : bascule Devis/Factures, recherche + filtres + tri,
  *  cartes cliquables ouvrant un menu d'actions. */
 export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const { user } = useAuth();
-  const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, markDevisPro } = useData();
+  const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, markDevisPro, updateDevis, deleteDevis } = useData();
 
   const [tab, setTab] = useState('factures'); // devis | factures
   const [view, setView] = useState('list'); // list | create
@@ -82,7 +82,12 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   );
   const visibleDevis = sortDocs(
     myDevis
-      .filter((d) => statusFilter === 'all' || (statusFilter === 'factured' ? factureByDevis.has(d.id) : !factureByDevis.has(d.id)))
+      .filter((d) => {
+        if (statusFilter === 'all') return true;
+        if (statusFilter === 'brouillon') return d.statut === 'brouillon';
+        if (statusFilter === 'factured') return factureByDevis.has(d.id);
+        return d.statut !== 'brouillon' && !factureByDevis.has(d.id); // à facturer
+      })
       .filter((d) => !q || [d.devisNumber, clientOf(d)].some((v) => v && v.toLowerCase().includes(q))),
     'total'
   );
@@ -228,9 +233,11 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                   </div>
                   <div className="doc-card-end">
                     <div className="doc-card-amount">{formatCFA(d.total)}</div>
-                    {facture
-                      ? <span className="badge badge-success">Facturé</span>
-                      : <span className="badge badge-muted">À facturer</span>}
+                    {d.statut === 'brouillon'
+                      ? <span className="badge badge-muted">Brouillon</span>
+                      : facture
+                        ? <span className="badge badge-success">Facturé</span>
+                        : <span className="badge badge-warning">À facturer</span>}
                   </div>
                 </div>
               );
@@ -280,6 +287,16 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             <button className="btn btn-outline btn-block" onClick={() => runAction(() => convertDevis(actions.doc))}>
               <Receipt size={16} /> Convertir en facture
             </button>
+            {actions.doc.statut === 'brouillon' && (
+              <>
+                <button className="btn btn-won btn-block" onClick={() => runAction(() => updateDevis(actions.doc.id, { statut: 'finalise' }))}>
+                  <CheckCircle size={16} /> Finaliser le devis
+                </button>
+                <button className="btn btn-lost btn-block" onClick={() => { if (window.confirm('Supprimer ce brouillon ?')) runAction(() => deleteDevis(actions.doc.id)); }}>
+                  <Trash2 size={16} /> Supprimer le brouillon
+                </button>
+              </>
+            )}
           </div>
         )}
       </Sheet>

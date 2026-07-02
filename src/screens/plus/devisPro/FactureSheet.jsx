@@ -8,7 +8,7 @@ import { MODELES, EMPTY_LIGNE } from './constants';
 
 const emptyForm = (tvaActive, modele) => ({
   clientName: '', clientPhone: '', clientVille: '',
-  tvaActive, statut: 'emise', modele, lignes: [{ ...EMPTY_LIGNE }],
+  tvaActive, modele, lignes: [{ ...EMPTY_LIGNE }],
 });
 
 /**
@@ -26,8 +26,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
   const setLigne = (i, patch) =>
     setForm((f) => ({ ...f, lignes: f.lignes.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
 
-  const submit = (e) => {
-    e.preventDefault();
+  const save = (statut) => {
     const lignes = form.lignes
       .filter((l) => l.designation.trim() && Number(l.pu) > 0)
       .map((l) => ({ designation: l.designation.trim(), qty: Math.max(1, Number(l.qty) || 1), pu: Number(l.pu) }));
@@ -40,7 +39,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
       lignes,
       ...totals,
       tvaActive: form.tvaActive,
-      statut: form.statut,
+      statut,
       modele: form.modele || modeleDefaut,
     });
   };
@@ -52,7 +51,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
 
   return (
     <Sheet open={open} onClose={onClose} title="Nouvelle facture">
-      <form onSubmit={submit}>
+      <form onSubmit={(e) => { e.preventDefault(); save('emise'); }}>
         <Field label="Client *">
           <input className="input" required value={form.clientName}
             onChange={(e) => setForm({ ...form, clientName: e.target.value })} placeholder="Nom du client" />
@@ -96,27 +95,21 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
           Appliquer la TVA 18 % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
         </label>
 
-        <div className="form-row-2">
-          <Field label="Statut">
-            <select className="input" value={form.statut} onChange={(e) => setForm({ ...form, statut: e.target.value })}>
-              <option value="brouillon">Brouillon</option>
-              <option value="emise">Émise</option>
-              <option value="payee">Payée</option>
-            </select>
-          </Field>
-          <Field label="Modèle">
-            <select className="input" value={form.modele || modeleDefaut} onChange={(e) => setForm({ ...form, modele: e.target.value })}>
-              {MODELES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
-          </Field>
-        </div>
+        <Field label="Modèle de document">
+          <select className="input" value={form.modele || modeleDefaut} onChange={(e) => setForm({ ...form, modele: e.target.value })}>
+            {MODELES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </Field>
 
         <div className="devis-summary">
           <div className="devis-summary-row"><span>Total HT</span><span>{formatCFA(preview.totalHT)}</span></div>
           <div className="devis-summary-row"><span>TVA</span><span>{form.tvaActive ? formatCFA(preview.tva) : 'Exonérée'}</span></div>
           <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(preview.totalTTC)}</span></div>
         </div>
-        <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Créer la facture</button>
+        <div className="wizard-actions">
+          <button type="button" className="btn btn-outline btn-block" onClick={() => save('brouillon')}>Enregistrer en brouillon</button>
+          <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Créer la facture</button>
+        </div>
       </form>
     </Sheet>
   );

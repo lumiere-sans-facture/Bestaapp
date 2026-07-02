@@ -205,7 +205,7 @@ export default function ProSolarWizard({ onDone }) {
     });
   };
 
-  const submit = () => {
+  const submit = (statut = 'finalise') => {
     if (!sizing || !inverter || !lignes.length) return;
     let client;
     if (clientMode === 'new') {
@@ -228,6 +228,7 @@ export default function ProSolarWizard({ onDone }) {
       tvaActive,
       tva: t.tva,
       total: t.totalTTC,
+      statut,
       createdBy: user.id,
       pro: true,
       sizing: {
@@ -516,7 +517,10 @@ export default function ProSolarWizard({ onDone }) {
           {step < 4 ? (
             <button className="btn btn-primary btn-block" onClick={() => setStep(step + 1)} disabled={!canNext}>Suivant <ChevronRight size={18} /></button>
           ) : (
-            <button className="btn btn-accent btn-block" onClick={submit} disabled={!clientReady || !lignes.length}><Check size={18} /> Créer le devis</button>
+            <>
+              <button className="btn btn-outline btn-block" onClick={() => submit('brouillon')} disabled={!clientReady || !lignes.length}>Brouillon</button>
+              <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!clientReady || !lignes.length}><Check size={18} /> Créer le devis</button>
+            </>
           )}
         </div>
       </div>
