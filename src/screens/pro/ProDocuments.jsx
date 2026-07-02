@@ -6,6 +6,7 @@ import { useData } from '../../context/DataContext';
 import { needsRenewalAlert, daysLeft } from '../../utils/subscription';
 import { formatDate } from '../../utils/format';
 import DocumentsTab from '../plus/devisPro/DocumentsTab';
+import { normalizeModele } from '../plus/devisPro/constants';
 
 // Écran Pro « Devis & Factures » (route /pro/documents).
 export default function ProDocuments() {
@@ -14,7 +15,7 @@ export default function ProDocuments() {
   const navigate = useNavigate();
   const company = getCompanyForUser(user.id);
   const sub = getSubscriptionForUser(user.id);
-  const modeleDefaut = company?.modeleDefaut || 'classique';
+  const modeleDefaut = normalizeModele(company?.modeleDefaut);
 
   return (
     <div className="page">

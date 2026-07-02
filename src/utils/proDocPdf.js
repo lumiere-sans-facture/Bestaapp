@@ -1,9 +1,9 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Module Devis Pro : documents (devis / factures) à l'identité de
-// l'entreprise du technicien, en 3 modèles de mise en page.
-// Paiement comptant uniquement (pas de crédit).
+// Module Devis Pro : documents (devis / factures) à l'identité de l'entreprise
+// du technicien, en 2 modèles : « couleur » (bandeau aux couleurs de
+// l'entreprise) et « sobre » (noir & blanc, imprimable partout).
 
 const fmt = (n) => Math.round(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' F CFA';
 const fmtDate = (d) => {
@@ -25,17 +25,19 @@ const DARK = [25, 28, 40];
  * @param {object} opts
  * @param {'devis'|'facture'} opts.kind
  * @param {object} opts.company  identité de l'entreprise du technicien
- * @param {'classique'|'moderne'|'compact'} opts.modele
+ * @param {'couleur'|'sobre'} opts.modele  couleur = bandeau aux couleurs ; sobre = noir & blanc
  * @param {object} opts.doc  { numero, date, client: {name, phone, ville}, lignes:[{designation, qty, pu}], totalHT, tvaActive, tva, totalTTC, statut?, validiteJours? }
+ * @param {boolean} [opts.preview]  n'enregistre pas le fichier, renvoie le blob URL (aperçu)
  */
-export function generateProPdf({ kind, company = {}, modele = 'classique', doc: d }) {
+export function generateProPdf({ kind, company = {}, modele = 'couleur', doc: d, preview = false }) {
   const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
-  const compact = modele === 'compact';
-  const M = compact ? 32 : 40;
-  const primary = hexToRgb(company.couleurPrimaire, [10, 36, 114]);
-  const secondary = hexToRgb(company.couleurSecondaire, [245, 166, 35]);
+  const bw = modele === 'sobre';
+  const M = 40;
+  // En noir & blanc, on force une palette neutre (ignore les couleurs de l'entreprise).
+  const primary = bw ? [33, 37, 41] : hexToRgb(company.couleurPrimaire, [10, 36, 114]);
+  const secondary = bw ? [90, 96, 104] : hexToRgb(company.couleurSecondaire, [245, 166, 35]);
   const title = kind === 'facture' ? 'FACTURE' : 'DEVIS';
   const name = company.nomEntreprise || 'Mon Entreprise';
 
@@ -62,8 +64,9 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
 
   let y;
 
-  // ---------- En-tête selon le modèle ----------
-  if (modele === 'moderne') {
+  // ---------- En-tête ----------
+  if (!bw) {
+    // Modèle Couleur : bandeau plein aux couleurs de l'entreprise
     const bandH = 92;
     pdf.setFillColor(...primary);
     pdf.rect(0, 0, W, bandH, 'F');
@@ -84,14 +87,14 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
     pdf.text(d.numero, W - M, 68, { align: 'right' });
     y = bandH + 26;
   } else {
-    // classique & compact : logo à gauche / coordonnées à droite
-    const logoSize = compact ? 36 : 46;
+    // Modèle Sobre (N&B) : logo à gauche, coordonnées à droite, filet noir
+    const logoSize = 46;
     drawLogo(M, 32, logoSize);
     pdf.setTextColor(...DARK);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(compact ? 13 : 16);
-    pdf.text(name, M + logoSize + 12, compact ? 48 : 52);
-    if (company.slogan && !compact) {
+    pdf.setFontSize(16);
+    pdf.text(name, M + logoSize + 12, 52);
+    if (company.slogan) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(...GRAY);
@@ -102,25 +105,25 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
     pdf.setTextColor(...GRAY);
     coordLines.forEach((l, i) => pdf.text(l, W - M, 38 + i * 11, { align: 'right' }));
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(compact ? 16 : 20);
-    pdf.setTextColor(...primary);
-    pdf.text(title, W - M, compact ? 64 : 76, { align: 'right' });
+    pdf.setFontSize(20);
+    pdf.setTextColor(...DARK);
+    pdf.text(title, W - M, 76, { align: 'right' });
     pdf.setDrawColor(...primary);
-    pdf.setLineWidth(compact ? 1.2 : 2);
-    pdf.line(M, compact ? 76 : 90, W - M, compact ? 76 : 90);
-    y = compact ? 92 : 110;
+    pdf.setLineWidth(2);
+    pdf.line(M, 90, W - M, 90);
+    y = 110;
   }
 
   // ---------- Références + client ----------
-  pdf.setFontSize(compact ? 8 : 8.5);
+  pdf.setFontSize(8.5);
   pdf.setFont('helvetica', 'bold');
   pdf.setTextColor(...GRAY);
   pdf.text(kind === 'facture' ? 'FACTURÉ À' : 'DEVIS ÉTABLI POUR', M, y);
   pdf.setTextColor(...DARK);
-  pdf.setFontSize(compact ? 10.5 : 12);
+  pdf.setFontSize(12);
   pdf.text(d.client?.name || 'Client', M, y + 15);
   pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(compact ? 8 : 9);
+  pdf.setFontSize(9);
   let cy = y + 28;
   if (d.client?.phone) { pdf.text(`Tél : ${d.client.phone}`, M, cy); cy += 11; }
   if (d.client?.ville) { pdf.text(d.client.ville, M, cy); cy += 11; }
@@ -133,7 +136,7 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
       : ['Statut', { brouillon: 'Brouillon', emise: 'Émise', payee: 'Payée' }[d.statut] || d.statut],
   ];
   let my = y;
-  pdf.setFontSize(compact ? 8 : 8.5);
+  pdf.setFontSize(8.5);
   metaRows.forEach(([label, value]) => {
     pdf.setTextColor(...GRAY);
     pdf.setFont('helvetica', 'normal');
@@ -141,7 +144,7 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
     pdf.setTextColor(...DARK);
     pdf.setFont('helvetica', 'bold');
     pdf.text(String(value), W - M, my, { align: 'right' });
-    my += compact ? 11 : 13;
+    my += 13;
   });
 
   // ---------- Tableau des lignes ----------
@@ -154,18 +157,13 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
   ]);
 
   autoTable(pdf, {
-    startY: Math.max(cy, my) + (compact ? 10 : 18),
+    startY: Math.max(cy, my) + 18,
     margin: { left: M, right: M },
     head: [['N°', 'DÉSIGNATION', 'PRIX UNIT.', 'QTÉ', 'MONTANT']],
     body,
-    theme: modele === 'classique' ? 'grid' : 'plain',
-    styles: {
-      fontSize: compact ? 7.5 : 8.5,
-      cellPadding: compact ? { top: 4, bottom: 4, left: 6, right: 6 } : { top: 6, bottom: 6, left: 8, right: 8 },
-      textColor: DARK,
-      lineColor: [225, 228, 235],
-    },
-    headStyles: { fillColor: primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: compact ? 7.5 : 8 },
+    theme: bw ? 'grid' : 'plain',
+    styles: { fontSize: 8.5, cellPadding: { top: 6, bottom: 6, left: 8, right: 8 }, textColor: DARK, lineColor: [225, 228, 235] },
+    headStyles: { fillColor: primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
     columnStyles: {
       0: { cellWidth: 26 },
       1: { cellWidth: 'auto' },
@@ -173,17 +171,17 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
       3: { cellWidth: 38, halign: 'center' },
       4: { cellWidth: 90, halign: 'right' },
     },
-    alternateRowStyles: modele === 'moderne' ? { fillColor: [248, 249, 252] } : undefined,
+    alternateRowStyles: bw ? undefined : { fillColor: [248, 249, 252] },
   });
 
-  let endY = pdf.lastAutoTable.finalY + (compact ? 14 : 22);
+  let endY = pdf.lastAutoTable.finalY + 22;
 
   // ---------- Totaux ----------
   const totalsX = W - M - 210;
   const rows = [['Total HT', fmt(d.totalHT)]];
   if (d.tvaActive) rows.push([`TVA (${d.tvaRate || 18} %)`, fmt(d.tva)]);
   else rows.push(['TVA', 'Exonérée']);
-  pdf.setFontSize(compact ? 8.5 : 9);
+  pdf.setFontSize(9);
   rows.forEach(([label, value]) => {
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(...GRAY);
@@ -191,33 +189,37 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(...DARK);
     pdf.text(value, W - M, endY, { align: 'right' });
-    endY += compact ? 13 : 15;
+    endY += 15;
   });
   pdf.setFillColor(...primary);
-  pdf.rect(totalsX - 10, endY - 9, 220 + 10, compact ? 20 : 24, 'F');
+  pdf.rect(totalsX - 10, endY - 9, 230, 24, 'F');
   pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(compact ? 9 : 10);
-  pdf.text(kind === 'facture' ? 'TOTAL À PAYER' : 'TOTAL TTC', totalsX, endY + (compact ? 5 : 7));
-  pdf.text(fmt(d.totalTTC), W - M, endY + (compact ? 5 : 7), { align: 'right' });
-  endY += compact ? 30 : 38;
+  pdf.setFontSize(10);
+  pdf.text(kind === 'facture' ? 'TOTAL À PAYER' : 'TOTAL TTC', totalsX, endY + 7);
+  pdf.text(fmt(d.totalTTC), W - M, endY + 7, { align: 'right' });
+  endY += 38;
 
   // ---------- Règlement + mentions ----------
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(compact ? 8 : 8.5);
+  pdf.setFontSize(8.5);
   pdf.setTextColor(...primary);
   pdf.text('Règlement', M, endY);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(...GRAY);
-  pdf.setFontSize(compact ? 7.5 : 8);
-  pdf.text('Paiement comptant. Mobile Money ou espèces à la livraison.', M, endY + 12);
-  const mentions = kind === 'devis'
+  pdf.setFontSize(8);
+  const reglement = company.momo
+    ? `Mobile Money : ${company.momo}${company.momoNom ? ` (${company.momoNom})` : ''} — ou espèces à la livraison.`
+    : 'Paiement comptant. Mobile Money ou espèces à la livraison.';
+  pdf.text(reglement, M, endY + 12);
+  const defaultMentions = kind === 'devis'
     ? `Devis valable ${d.validiteJours || 30} jours à compter de sa date d'émission. Prix exprimés en F CFA.`
     : 'Facture exonérée de TVA sur équipements solaires (sauf mention contraire). Prix en F CFA.';
+  const mentions = company.conditions?.trim() || defaultMentions;
   pdf.text(pdf.splitTextToSize(mentions, W - 2 * M), M, endY + 24);
 
   // ---------- Pied de page ----------
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(compact ? 8.5 : 9.5);
+  pdf.setFontSize(9.5);
   pdf.setTextColor(...primary);
   pdf.text('MERCI DE VOTRE CONFIANCE', W / 2, H - 52, { align: 'center' });
   pdf.setFont('helvetica', 'normal');
@@ -231,6 +233,7 @@ export function generateProPdf({ kind, company = {}, modele = 'classique', doc: 
   pdf.rect(0, H - 12, W, 12, 'F');
 
   const fileName = `${title === 'FACTURE' ? 'Facture' : 'Devis'}-${d.numero}.pdf`;
+  if (preview) return pdf.output('bloburl');
   pdf.save(fileName);
   return fileName;
 }
