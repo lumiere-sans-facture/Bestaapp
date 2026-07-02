@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, PanelTop, Cpu, Battery, User, Building2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, PanelTop, Cpu, Battery, User, Building2, MapPin, Search } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
@@ -8,6 +8,7 @@ import {
   calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, recommendInverterOption, suggestBatteryCombo,
 } from '../../../utils/solarSizing';
+import { geocodeCity, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
 
@@ -52,6 +53,44 @@ export default function ProSolarWizard({ onDone }) {
   // --- Système ---
   const [systemType, setSystemType] = useState('hybrid');
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
+
+  // --- Localisation / ensoleillement (PVGIS / NASA) ---
+  const [query, setQuery] = useState('');
+  const [location, setLocation] = useState(null); // { name, lat, lon }
+  const [solar, setSolar] = useState(null);        // { peakSunHours, yearlyYield, optimalAngle, source }
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState('');
+
+  const loadSolar = async (loc) => {
+    setLocation(loc);
+    setSolar(null);
+    const s = await fetchSolarData(loc.lat, loc.lon);
+    setSolar(s);
+    setSunHours(s.peakSunHours);
+  };
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setGeoError('');
+    setGeoLoading(true);
+    try { await loadSolar(await geocodeCity(query.trim())); }
+    catch (err) { setGeoError(err.message || 'Données indisponibles — saisie manuelle possible.'); }
+    finally { setGeoLoading(false); }
+  };
+  const handleGeolocate = () => {
+    if (!navigator.geolocation) { setGeoError('Géolocalisation indisponible sur cet appareil.'); return; }
+    setGeoError('');
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try { await loadSolar({ name: 'Ma position', lat: pos.coords.latitude, lon: pos.coords.longitude }); }
+        catch (err) { setGeoError(err.message || 'Données solaires indisponibles.'); }
+        finally { setGeoLoading(false); }
+      },
+      () => { setGeoError('Accès à la position refusé.'); setGeoLoading(false); },
+      { timeout: 10000, enableHighAccuracy: false }
+    );
+  };
 
   // --- Sélection matériel ---
   const [inverterBrand, setInverterBrand] = useState('');
@@ -158,6 +197,7 @@ export default function ProSolarWizard({ onDone }) {
         systemType,
         peakSunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
         estimatedProduction: sizing.estimatedProduction,
+        city: location?.name || null,
       },
     });
     onDone();
@@ -249,7 +289,46 @@ export default function ProSolarWizard({ onDone }) {
                 </button>
               ))}
             </div>
-            <Field label="Heures de pic solaire / jour"><input className="input" type="number" min="3" max="7" step="0.1" value={sunHours} onChange={(e) => setSunHours(e.target.value)} /></Field>
+            <div className="geo-locator">
+              <div className="geo-locator-head">
+                <span className="card-title">Localisation</span>
+                <button type="button" className="btn btn-primary btn-sm" onClick={handleGeolocate} disabled={geoLoading}>
+                  <MapPin size={15} /> Ma position
+                </button>
+              </div>
+              <form className="geo-search" onSubmit={handleSearch}>
+                <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher une ville (ex : Cotonou, Parakou…)" aria-label="Rechercher une ville" />
+                <button type="submit" className="btn btn-outline" disabled={geoLoading} aria-label="Rechercher la ville"><Search size={16} /></button>
+              </form>
+              {geoLoading && <div className="geo-loading">Récupération des données solaires…</div>}
+              {geoError && <div className="geo-error">{geoError}</div>}
+              {location && (
+                <div className="geo-result">
+                  <MapPin size={15} />
+                  <strong>{location.name}</strong>
+                  <span className="geo-coords">({location.lat.toFixed(2)}°, {location.lon.toFixed(2)}°)</span>
+                </div>
+              )}
+              {solar && (
+                <div className="solar-card">
+                  <div className="solar-card-head">
+                    <span className="solar-card-title"><Sun size={15} /> Ensoleillement — {location?.name}</span>
+                    <span className="solar-source">Base de données {solar.source}</span>
+                  </div>
+                  <div className="solar-stats">
+                    <div className="solar-stat"><div className="solar-stat-value">{solar.peakSunHours}h</div><div className="solar-stat-label">Heures pic / jour</div></div>
+                    <div className="solar-stat"><div className="solar-stat-value">{solar.yearlyYield.toLocaleString('fr-FR')}</div><div className="solar-stat-label">kWh/kWc/an</div></div>
+                    <div className="solar-stat"><div className="solar-stat-value">{solar.optimalAngle}°</div><div className="solar-stat-label">Angle optimal</div></div>
+                  </div>
+                </div>
+              )}
+              <details className="geo-manual">
+                <summary>Saisie manuelle (hors-ligne)</summary>
+                <Field label="Heures de pic solaire / jour">
+                  <input className="input" type="number" min="3" max="7" step="0.1" value={sunHours} onChange={(e) => setSunHours(e.target.value)} aria-label="Heures de pic solaire par jour" />
+                </Field>
+              </details>
+            </div>
             <div className="sizing-grid" style={{ marginTop: 16 }}>
               <div className="sizing-card"><div className="sizing-icon"><PanelTop size={18} /></div><div className="sizing-value">{sizing.numberOfPanels}</div><div className="sizing-label">Panneaux · {sizing.panelCapacity.toFixed(1)} kWc</div></div>
               <div className="sizing-card"><div className="sizing-icon"><Cpu size={18} /></div><div className="sizing-value">{Math.round(sizing.requiredPanelPower)} W</div><div className="sizing-label">Puissance requise</div></div>

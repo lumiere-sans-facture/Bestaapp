@@ -1356,3 +1356,13 @@ textarea.input { resize: vertical; }
 @media (min-width: 640px) {
   .doc-summary { grid-template-columns: repeat(2, minmax(0, 260px)); }
 }
+
+/* Mise en avant de l'option de dimensionnement (choix du type de devis) */
+.devis-mode-card { position: relative; }
+.devis-mode-card.featured { border-color: var(--primary); box-shadow: var(--shadow-lg); }
+.devis-mode-badge {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--accent); color: white;
+  font-size: 0.625rem; font-weight: 700; letter-spacing: 0.02em;
+  padding: 3px 9px; border-radius: 20px;
+}
