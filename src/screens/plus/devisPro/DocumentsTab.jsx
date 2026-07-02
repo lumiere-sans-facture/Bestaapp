@@ -12,6 +12,8 @@ import Sheet from '../../../components/Sheet';
 import DevisEditSheet from '../../devis/DevisEditSheet';
 
 const badgeClass = (s) => (s === 'payee' ? 'badge-success' : s === 'emise' ? 'badge-warning' : 'badge-muted');
+const flatFactureBadge = (s) => (s === 'payee' ? 'success' : s === 'emise' ? 'warning' : 'muted');
+const nf = (v) => Math.round(v || 0).toLocaleString('fr-FR');
 const nextStatut = (s) => (s === 'brouillon' ? 'emise' : 'payee');
 const nextStatutLabel = (s) => (s === 'brouillon' ? 'Marquer émise' : 'Marquer payée');
 
@@ -197,21 +199,21 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       {/* Liste des factures */}
       {tab === 'factures' && (
         visibleFactures.length ? (
-          <div className="doc-list">
+          <div className="flat-list">
             {visibleFactures.map((f) => {
               const src = f.devisId && devisById.get(f.devisId);
               return (
-                <div key={f.id} className="card doc-card" role="button" tabIndex={0}
+                <div key={f.id} className="flat-row" role="button" tabIndex={0}
                   onClick={() => setActions({ kind: 'facture', doc: f })}
                   onKeyDown={(e) => cardKey(e, () => setActions({ kind: 'facture', doc: f }))}>
-                  <div className="doc-card-info">
-                    <div className="doc-card-title">{f.clientName}</div>
-                    <div className="doc-card-meta">{f.numero} · {formatDate(f.createdAt)}{src ? ` · depuis ${src.devisNumber}` : ''}</div>
+                  <div className="flat-row-main">
+                    <div className="flat-row-title">{f.numero} - {f.clientName}</div>
+                    <div className="flat-row-sub">
+                      <span className={`flat-badge ${flatFactureBadge(f.statut)}`}>{FACTURE_STATUT_LABEL[f.statut]}</span>
+                      <span className="flat-row-date">{formatDate(f.createdAt)}{src ? ` · ${src.devisNumber}` : ''}</span>
+                    </div>
                   </div>
-                  <div className="doc-card-end">
-                    <div className="doc-card-amount">{formatCFA(f.totalTTC)}</div>
-                    <span className={`badge ${badgeClass(f.statut)}`}>{FACTURE_STATUT_LABEL[f.statut]}</span>
-                  </div>
+                  <div className="flat-row-amount">{nf(f.totalTTC)}<span className="flat-amount-unit">F CFA</span></div>
                 </div>
               );
             })}
@@ -228,25 +230,24 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       {/* Liste des devis */}
       {tab === 'devis' && (
         visibleDevis.length ? (
-          <div className="doc-list">
+          <div className="flat-list">
             {visibleDevis.map((d) => {
               const facture = factureByDevis.get(d.id);
+              const [bcls, blabel] = d.statut === 'brouillon'
+                ? ['muted', 'Brouillon']
+                : facture ? ['success', 'Facturé'] : ['', 'Créé'];
               return (
-                <div key={d.id} className="card doc-card" role="button" tabIndex={0}
+                <div key={d.id} className="flat-row" role="button" tabIndex={0}
                   onClick={() => setActions({ kind: 'devis', doc: d })}
                   onKeyDown={(e) => cardKey(e, () => setActions({ kind: 'devis', doc: d }))}>
-                  <div className="doc-card-info">
-                    <div className="doc-card-title">{clientOf(d)}</div>
-                    <div className="doc-card-meta">{d.devisNumber} · {formatDate(d.createdAt)}</div>
+                  <div className="flat-row-main">
+                    <div className="flat-row-title">{d.devisNumber} - {clientOf(d)}</div>
+                    <div className="flat-row-sub">
+                      <span className={`flat-badge ${bcls}`}>{blabel}</span>
+                      <span className="flat-row-date">{formatDate(d.createdAt)}</span>
+                    </div>
                   </div>
-                  <div className="doc-card-end">
-                    <div className="doc-card-amount">{formatCFA(d.total)}</div>
-                    {d.statut === 'brouillon'
-                      ? <span className="badge badge-muted">Brouillon</span>
-                      : facture
-                        ? <span className="badge badge-success">Facturé</span>
-                        : <span className="badge badge-warning">À facturer</span>}
-                  </div>
+                  <div className="flat-row-amount">{nf(d.total)}<span className="flat-amount-unit">F CFA</span></div>
                 </div>
               );
             })}
