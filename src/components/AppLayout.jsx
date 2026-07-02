@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
 import { SyncDot } from './SyncStatus';
@@ -20,6 +20,21 @@ const proNavItems = [
   { path: '/pro/clients', label: 'Clients', shortLabel: 'Clients', icon: Users },
   { path: '/pro/entreprise', label: 'Mon entreprise', shortLabel: 'Société', icon: Building2 },
   { path: '/pro/abonnement', label: 'Mon abonnement', shortLabel: 'Abo', icon: CreditCard },
+];
+
+// Sous-sections de « Plus » remontées dans la barre latérale (desktop), par rôle.
+const plusSections = (role) => [
+  ...(role === 'gerant' ? [
+    { path: '/plus/team', label: 'Équipe', icon: Users },
+    { path: '/plus/partners', label: 'Partenaires', icon: Share2 },
+    { path: '/plus/orders', label: 'Commandes en ligne', icon: ShoppingCart },
+    { path: '/plus/commissions', label: 'Commissions', icon: DollarSign },
+    { path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown },
+    { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },
+  ] : []),
+  { path: '/plus/formation', label: 'Formation', icon: GraduationCap },
+  { path: '/plus/mypartner', label: 'Mon espace partenaire', icon: Users },
+  { path: '/plus/profile', label: 'Mon profil', icon: User },
 ];
 
 export default function AppLayout() {
@@ -44,13 +59,28 @@ export default function AppLayout() {
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/pro'}
+              end={item.path === '/pro' || item.path === '/plus'}
               className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
             >
               <item.icon size={20} strokeWidth={2} />
               <span>{item.label}</span>
             </NavLink>
           ))}
+          {!isPro && (
+            <>
+              <div className="sidebar-group-label">Plus</div>
+              {plusSections(user.role).map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                >
+                  <item.icon size={20} strokeWidth={2} />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
         <div className="sidebar-footer">
           {isPro && (
@@ -85,7 +115,7 @@ export default function AppLayout() {
           <NavLink
             key={item.path}
             to={item.path}
-            end={item.path === '/pro'}
+            end={item.path === '/pro' || item.path === '/plus'}
             className={({ isActive }) => `tab-item ${isActive ? 'active' : ''}`}
           >
             <item.icon size={22} strokeWidth={2} />

@@ -99,6 +99,7 @@ function ModeSwitch() {
         <Route path="/boutique" element={<Boutique />} />
         <Route path="/devis" element={<Devis />} />
         <Route path="/plus" element={<Plus />} />
+        <Route path="/plus/:section" element={<Plus />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

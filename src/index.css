@@ -115,6 +115,7 @@ img { max-width: 100%; }
 }
 .sidebar-link:hover { background: rgba(255, 255, 255, 0.07); color: white; }
 .sidebar-link.active { background: var(--primary-light); color: white; }
+.sidebar-group-label { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.4); padding: 16px 14px 6px; }
 .sidebar-footer { padding: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 .sidebar-pro-btn { margin-bottom: 12px; }
 .sidebar-user { display: flex; align-items: center; gap: 10px; }
