@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FileText, Plus, Sun, ShoppingCart, Download, Search, Check, Trash2, Pencil } from 'lucide-react';
+import { FileText, Plus, Download, Search, Check, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
+import Sheet from '../components/Sheet';
 import DevisCreator from './devis/DevisCreator';
 import DevisEditSheet from './devis/DevisEditSheet';
+
+const nf = (v) => Math.round(v || 0).toLocaleString('fr-FR');
 
 const SORT_OPTIONS = [
   { id: 'recent', label: 'Plus récents' },
@@ -36,6 +39,9 @@ export default function Devis() {
   const [typeFilter, setTypeFilter] = useState('all'); // all | brouillon | solar | manual
   const [sortBy, setSortBy] = useState('recent');
   const [editDevis, setEditDevis] = useState(null);
+  const [actions, setActions] = useState(null);
+  const runAction = (fn) => { fn(); setActions(null); };
+  const rowKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
 
   // Les devis créés dans l'Espace Pro (type 'pro') restent cantonnés au mode Pro.
   const myDevis = (user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id))
@@ -109,57 +115,21 @@ export default function Devis() {
               </select>
             </div>
             {visibleDevis.length === 0 && <div className="empty-state card">Aucun devis ne correspond à votre recherche.</div>}
-            <div className="devis-list">
+            <div className="flat-list">
               {visibleDevis.map((d) => {
                 const lead = getLeadById(d.leadId);
-                const isSolar = d.type === 'solar';
+                const [bcls, blabel] = d.statut === 'brouillon' ? ['muted', 'Brouillon'] : ['', 'Créé'];
                 return (
-                  <div key={d.id} className="card devis-card">
-                    <div className="devis-card-header">
-                      <div>
-                        <div className="devis-card-lead">
-                          {lead?.name || 'Client supprimé'}
-                          {d.statut === 'brouillon' && <span className="badge badge-muted" style={{ marginLeft: 8 }}>Brouillon</span>}
-                        </div>
-                        <div className="text-sm text-secondary">
-                          {d.devisNumber ? `${d.devisNumber} · ` : ''}{formatDate(d.createdAt)} · {isSolar ? 'Devis solaire' : 'Comptant'}
-                        </div>
-                        {d.partnerId && (
-                          <div className="devis-partner-tag">
-                            Partenaire : {getPartnerById(d.partnerId)?.name}
-                            {(d.partnerCode || getPartnerById(d.partnerId)?.code) && (
-                              <span className="partner-code-chip">{d.partnerCode || getPartnerById(d.partnerId)?.code}</span>
-                            )}
-                          </div>
-                        )}
+                  <div key={d.id} className="flat-row" role="button" tabIndex={0}
+                    onClick={() => setActions(d)} onKeyDown={(e) => rowKey(e, () => setActions(d))}>
+                    <div className="flat-row-main">
+                      <div className="flat-row-title">{d.devisNumber ? `${d.devisNumber} - ` : ''}{lead?.name || 'Client supprimé'}</div>
+                      <div className="flat-row-sub">
+                        <span className={`flat-badge ${bcls}`}>{blabel}</span>
+                        <span className="flat-row-date">{formatDate(d.createdAt)} · {d.type === 'solar' ? 'Solaire' : 'Comptant'}</span>
                       </div>
-                      <div className="devis-card-total">{formatCFA(d.total)}</div>
                     </div>
-                    <div className="devis-card-meta">
-                      {isSolar ? (
-                        <span className="devis-type-tag solar"><Sun size={13} /> {d.sizing?.numberOfPanels ?? '—'} panneaux · {(d.sizing?.panelCapacity ?? 0).toFixed(1)} kWc</span>
-                      ) : (
-                        <span className="devis-type-tag"><ShoppingCart size={13} /> {(d.items || []).reduce((s, it) => s + it.qty, 0)} article(s)</span>
-                      )}
-                      <span className="devis-card-actions">
-                        <button className="btn btn-sm btn-primary" onClick={() => downloadPdf(d)}>
-                          <Download size={14} /> PDF
-                        </button>
-                        <button className="btn btn-sm btn-outline" onClick={() => setEditDevis(d)}>
-                          <Pencil size={14} /> Éditer
-                        </button>
-                        {d.statut === 'brouillon' && (
-                          <>
-                            <button className="btn btn-sm btn-won" onClick={() => updateDevis(d.id, { statut: 'finalise' })}>
-                              <Check size={14} /> Finaliser
-                            </button>
-                            <button className="cart-row-remove" onClick={() => window.confirm('Supprimer ce brouillon ?') && deleteDevis(d.id)} aria-label="Supprimer">
-                              <Trash2 size={14} />
-                            </button>
-                          </>
-                        )}
-                      </span>
-                    </div>
+                    <div className="flat-row-amount">{nf(d.total)}<span className="flat-amount-unit">F CFA</span></div>
                   </div>
                 );
               })}
@@ -168,6 +138,25 @@ export default function Devis() {
           )}
         </div>
         <DevisEditSheet open={!!editDevis} onClose={() => setEditDevis(null)} devis={editDevis} />
+        <Sheet open={!!actions} onClose={() => setActions(null)} title={actions?.devisNumber || 'Devis'}>
+          {actions && (
+            <div className="doc-actions-list">
+              <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{getLeadById(actions.leadId)?.name || 'Client'}</span></div>
+              <div className="sheet-row"><span className="sheet-label">Total</span><span className="sheet-value amount">{formatCFA(actions.total)}</span></div>
+              {actions.partnerId && (
+                <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{getPartnerById(actions.partnerId)?.name}{(actions.partnerCode || getPartnerById(actions.partnerId)?.code) ? ` · ${actions.partnerCode || getPartnerById(actions.partnerId)?.code}` : ''}</span></div>
+              )}
+              <button className="btn btn-primary btn-block" onClick={() => runAction(() => downloadPdf(actions))}><Download size={16} /> Télécharger le PDF</button>
+              <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions); setActions(null); }}><Pencil size={16} /> Éditer</button>
+              {actions.statut === 'brouillon' && (
+                <>
+                  <button className="btn btn-won btn-block" onClick={() => runAction(() => updateDevis(actions.id, { statut: 'finalise' }))}><Check size={16} /> Finaliser</button>
+                  <button className="btn btn-lost btn-block" onClick={() => { if (window.confirm('Supprimer ce brouillon ?')) runAction(() => deleteDevis(actions.id)); }}><Trash2 size={16} /> Supprimer le brouillon</button>
+                </>
+              )}
+            </div>
+          )}
+        </Sheet>
       </div>
     );
   }
