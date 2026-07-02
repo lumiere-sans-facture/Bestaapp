@@ -10,18 +10,24 @@ const emptyForm = (tvaActive, modele) => ({
   clientName: '', clientPhone: '', clientVille: '',
   tvaActive, modele, lignes: [{ ...EMPTY_LIGNE }],
 });
+const formFromFacture = (f, modeleDefaut) => ({
+  clientName: f.clientName || '', clientPhone: f.clientPhone || '', clientVille: f.clientVille || '',
+  tvaActive: !!f.tvaActive, modele: f.modele || modeleDefaut,
+  lignes: (f.lignes || []).length ? f.lignes.map((l) => ({ designation: l.designation, qty: l.qty, pu: l.pu })) : [{ ...EMPTY_LIGNE }],
+});
 
 /**
- * Formulaire de création d'une facture. Gère son propre état ; à la validation,
- * remonte les données prêtes (lignes nettoyées + totaux) via onSubmit.
+ * Formulaire de facture (création ou édition). Gère son propre état ; à la
+ * validation, remonte les données prêtes (lignes nettoyées + totaux) via onSubmit.
+ * @param {object|null} initial  facture existante à éditer (sinon création)
  */
-export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDefaut, onSubmit }) {
+export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDefaut, onSubmit, initial = null }) {
   const [form, setForm] = useState(() => emptyForm(defaultTvaActive, modeleDefaut));
 
-  // Réinitialise le formulaire à chaque ouverture (TVA/ modèle selon l'entreprise).
+  // Réinitialise / pré-remplit le formulaire à chaque ouverture.
   useEffect(() => {
-    if (open) setForm(emptyForm(defaultTvaActive, modeleDefaut));
-  }, [open, defaultTvaActive, modeleDefaut]);
+    if (open) setForm(initial ? formFromFacture(initial, modeleDefaut) : emptyForm(defaultTvaActive, modeleDefaut));
+  }, [open, initial, defaultTvaActive, modeleDefaut]);
 
   const setLigne = (i, patch) =>
     setForm((f) => ({ ...f, lignes: f.lignes.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
@@ -50,8 +56,8 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
   );
 
   return (
-    <Sheet open={open} onClose={onClose} title="Nouvelle facture">
-      <form onSubmit={(e) => { e.preventDefault(); save('emise'); }}>
+    <Sheet open={open} onClose={onClose} title={initial ? `Modifier ${initial.numero}` : 'Nouvelle facture'}>
+      <form onSubmit={(e) => { e.preventDefault(); save(initial ? (initial.statut || 'emise') : 'emise'); }}>
         <Field label="Client *">
           <input className="input" required value={form.clientName}
             onChange={(e) => setForm({ ...form, clientName: e.target.value })} placeholder="Nom du client" />
@@ -106,10 +112,14 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
           <div className="devis-summary-row"><span>TVA</span><span>{form.tvaActive ? formatCFA(preview.tva) : 'Exonérée'}</span></div>
           <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(preview.totalTTC)}</span></div>
         </div>
-        <div className="wizard-actions">
-          <button type="button" className="btn btn-outline btn-block" onClick={() => save('brouillon')}>Enregistrer en brouillon</button>
-          <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Créer la facture</button>
-        </div>
+        {initial ? (
+          <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer les modifications</button>
+        ) : (
+          <div className="wizard-actions">
+            <button type="button" className="btn btn-outline btn-block" onClick={() => save('brouillon')}>Enregistrer en brouillon</button>
+            <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Créer la facture</button>
+          </div>
+        )}
       </form>
     </Sheet>
   );

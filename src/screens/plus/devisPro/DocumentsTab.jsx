@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, Search, CheckCircle } from 'lucide-react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, Search, CheckCircle, Pencil } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
@@ -9,6 +9,7 @@ import FactureSheet from './FactureSheet';
 import ProDevisBuilder from './ProDevisBuilder';
 import ProSolarWizard from './ProSolarWizard';
 import Sheet from '../../../components/Sheet';
+import DevisEditSheet from '../../devis/DevisEditSheet';
 
 const badgeClass = (s) => (s === 'payee' ? 'badge-success' : s === 'emise' ? 'badge-warning' : 'badge-muted');
 const nextStatut = (s) => (s === 'brouillon' ? 'emise' : 'payee');
@@ -32,6 +33,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
   const [actions, setActions] = useState(null); // { kind:'facture'|'devis', doc }
+  const [editDevis, setEditDevis] = useState(null);
+  const [factureEdit, setFactureEdit] = useState(null);
 
   const myDevis = useMemo(() => devis.filter((d) => d.createdBy === user.id), [devis, user.id]);
   const myFactures = useMemo(() => (factures || []).filter((f) => f.userId === user.id), [factures, user.id]);
@@ -45,7 +48,12 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const switchTab = (t) => { setTab(t); setStatusFilter('all'); setSearch(''); };
   const closeCreate = () => { setView('list'); setCreateMode('choose'); };
 
-  const createFacture = (data) => { addFacture({ userId: user.id, ...data }); setFactureOpen(false); };
+  const submitFacture = (data) => {
+    if (factureEdit) updateFacture(factureEdit.id, data);
+    else addFacture({ userId: user.id, ...data });
+    setFactureOpen(false);
+    setFactureEdit(null);
+  };
 
   const convertDevis = (d) => {
     const existing = factureByDevis.get(d.id);
@@ -262,6 +270,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actions.doc, undefined, { company, modeleDefaut }))}>
               <Download size={16} /> Télécharger le PDF
             </button>
+            <button className="btn btn-outline btn-block" onClick={() => { setFactureEdit(actions.doc); setActions(null); }}>
+              <Pencil size={16} /> Modifier la facture
+            </button>
             {actions.doc.statut !== 'payee' && (
               <button className="btn btn-won btn-block" onClick={() => runAction(() => updateFacture(actions.doc.id, { statut: nextStatut(actions.doc.statut) }))}>
                 <CheckCircle size={16} /> {nextStatutLabel(actions.doc.statut)}
@@ -284,6 +295,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise} onClick={() => runAction(() => exportDevisProPdf(actions.doc, modeleDefaut, { company, lead: getLeadById(actions.doc.leadId), products, markDevisPro }))}>
               <Download size={16} /> Télécharger le PDF Pro
             </button>
+            <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions.doc); setActions(null); }}>
+              <Pencil size={16} /> Modifier le devis
+            </button>
             <button className="btn btn-outline btn-block" onClick={() => runAction(() => convertDevis(actions.doc))}>
               <Receipt size={16} /> Convertir en facture
             </button>
@@ -302,12 +316,15 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       </Sheet>
 
       <FactureSheet
-        open={factureOpen}
-        onClose={() => setFactureOpen(false)}
+        open={factureOpen || !!factureEdit}
+        onClose={() => { setFactureOpen(false); setFactureEdit(null); }}
         defaultTvaActive={company?.assujettieVAT || false}
         modeleDefaut={modeleDefaut}
-        onSubmit={createFacture}
+        initial={factureEdit}
+        onSubmit={submitFacture}
       />
+
+      <DevisEditSheet open={!!editDevis} onClose={() => setEditDevis(null)} devis={editDevis} editableClient withTva />
     </>
   );
 }

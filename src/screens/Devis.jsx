@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FileText, Plus, Sun, ShoppingCart, Download, Search, Check, Trash2 } from 'lucide-react';
+import { FileText, Plus, Sun, ShoppingCart, Download, Search, Check, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import DevisCreator from './devis/DevisCreator';
+import DevisEditSheet from './devis/DevisEditSheet';
 
 const SORT_OPTIONS = [
   { id: 'recent', label: 'Plus récents' },
@@ -32,8 +33,9 @@ export default function Devis() {
   // 'list' | 'create'  (le choix du type + les assistants vivent dans DevisCreator)
   const [view, setView] = useState(fromCart ? 'create' : 'list');
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all'); // all | solar | manual
+  const [typeFilter, setTypeFilter] = useState('all'); // all | brouillon | solar | manual
   const [sortBy, setSortBy] = useState('recent');
+  const [editDevis, setEditDevis] = useState(null);
 
   // Les devis créés dans l'Espace Pro (type 'pro') restent cantonnés au mode Pro.
   const myDevis = (user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id))
@@ -143,6 +145,9 @@ export default function Devis() {
                         <button className="btn btn-sm btn-primary" onClick={() => downloadPdf(d)}>
                           <Download size={14} /> PDF
                         </button>
+                        <button className="btn btn-sm btn-outline" onClick={() => setEditDevis(d)}>
+                          <Pencil size={14} /> Éditer
+                        </button>
                         {d.statut === 'brouillon' && (
                           <>
                             <button className="btn btn-sm btn-won" onClick={() => updateDevis(d.id, { statut: 'finalise' })}>
@@ -162,6 +167,7 @@ export default function Devis() {
             </>
           )}
         </div>
+        <DevisEditSheet open={!!editDevis} onClose={() => setEditDevis(null)} devis={editDevis} />
       </div>
     );
   }
