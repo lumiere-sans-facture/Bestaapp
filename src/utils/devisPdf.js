@@ -127,7 +127,11 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
     return [String(sl), designation, fmt(item.unitPrice), qtyLabel(item.quantity), fmt(item.totalPrice)];
   };
 
-  if (devis.type === 'solar' && devis.quotation) {
+  if (Array.isArray(devis.lignes) && devis.lignes.length) {
+    // Devis édité : lignes personnalisées (désignation / qté / p.u.)
+    body.push(sectionRow('ARTICLES'));
+    devis.lignes.forEach((l) => body.push(itemRow({ name: l.designation, quantity: l.qty, unitPrice: l.pu, totalPrice: l.pu * l.qty })));
+  } else if (devis.type === 'solar' && devis.quotation) {
     body.push(sectionRow('ÉQUIPEMENTS'));
     devis.quotation.components.forEach((c) => body.push(itemRow(c)));
     body.push(sectionRow('PRESTATIONS'));
@@ -178,7 +182,10 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
 
   // ---------- Totaux (droite) ----------
   const totalRows = [];
-  if (devis.type === 'solar' && devis.quotation) {
+  if (Array.isArray(devis.lignes) && devis.lignes.length) {
+    totalRows.push(['Sous-total', fmt(devis.subtotal ?? devis.total)]);
+    if (devis.tvaActive && devis.tva) totalRows.push(['TVA (18 %)', fmt(devis.tva)]);
+  } else if (devis.type === 'solar' && devis.quotation) {
     totalRows.push(['Sous-total HT', fmt(devis.quotation.subtotalHT)]);
     if (devis.quotation.tva > 0) totalRows.push(['TVA (18 %)', fmt(devis.quotation.tva)]);
     if (devis.quotation.roi) totalRows.push(['ROI estimé', `${Math.round(devis.quotation.roi)} mois`]);

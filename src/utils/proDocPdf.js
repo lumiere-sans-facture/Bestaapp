@@ -240,9 +240,9 @@ export function generateProPdf({ kind, company = {}, modele = 'couleur', doc: d,
 
 /** Convertit un devis existant (Pro, manuel ou solaire) en lignes de document Pro. */
 export function devisToLignes(devisDoc, products = []) {
-  // Devis Pro : les lignes sont déjà stockées telles quelles (désignation/qté/pu).
-  if (devisDoc.type === 'pro') {
-    return (devisDoc.lignes || []).map((l) => ({ designation: l.designation, qty: l.qty, pu: l.pu }));
+  // Lignes déjà stockées (devis Pro ou devis édité) : on les prend telles quelles.
+  if (Array.isArray(devisDoc.lignes) && devisDoc.lignes.length) {
+    return devisDoc.lignes.map((l) => ({ designation: l.designation, qty: l.qty, pu: l.pu }));
   }
   if (devisDoc.type === 'solar' && devisDoc.quotation) {
     return [...devisDoc.quotation.components, ...(devisDoc.quotation.prestations || [])].map((c) => ({
