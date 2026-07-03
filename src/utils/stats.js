@@ -1,5 +1,6 @@
 // Statistiques mensuelles calculées depuis les données réelles de suivi client.
 import { isInYearMonth as sameMonth } from './date';
+import { paiementEntries } from './paiement';
 
 const MONTH_LABELS = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
 
@@ -28,19 +29,21 @@ export const computeMonthlyStats = (leads, months = 6) => {
 
 /**
  * Chiffre d'affaires Pro sur les N derniers mois (mois courant inclus),
- * calculé depuis les factures encaissées (statut « payee »).
+ * calculé depuis les encaissements réels (paiements datés, acomptes compris ;
+ * repli sur les factures payées sans détail).
  */
 export const computeMonthlyRevenue = (factures, months = 6) => {
+  const entries = factures.flatMap((f) => paiementEntries(f));
   const now = new Date();
   const out = [];
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const year = d.getFullYear();
     const month = d.getMonth();
-    const paid = factures.filter((f) => f.statut === 'payee' && sameMonth(f.createdAt, year, month));
+    const paid = entries.filter((e) => sameMonth(e.date, year, month));
     out.push({
       month: MONTH_LABELS[month],
-      revenue: paid.reduce((sum, f) => sum + (f.totalTTC || 0), 0),
+      revenue: paid.reduce((sum, e) => sum + e.montant, 0),
       count: paid.length,
     });
   }

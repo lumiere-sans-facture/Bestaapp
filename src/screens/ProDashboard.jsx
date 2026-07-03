@@ -4,15 +4,21 @@ import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { computeMonthlyRevenue } from '../utils/stats';
 import { effectiveStatus, daysLeft } from '../utils/subscription';
-import { isSameMonth, ageInDays } from '../utils/date';
+import { isSameMonth } from '../utils/date';
 import { SEV_LABEL, SEV_ORDER } from '../utils/alerts';
-import { FACTURE_STATUT_BADGE } from '../utils/facture';
+import {
+  paiementEntries, resteAPayer, montantPaye, isEnRetard, joursRetard, joursAvantEcheance,
+  statutEffectif, STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE,
+} from '../utils/paiement';
 import PageHeader from '../components/PageHeader';
 import Ring from '../components/Ring';
 
+// Statuts effectifs (dérivés paiements + échéance) présentés sur les anneaux.
 const STATUT_META = [
   { id: 'brouillon', label: 'Brouillons', color: 'var(--text-muted)' },
   { id: 'emise', label: 'Émises', color: 'var(--accent)' },
+  { id: 'partiel', label: 'Partielles', color: 'var(--primary-light)' },
+  { id: 'retard', label: 'En retard', color: 'var(--error)' },
   { id: 'payee', label: 'Payées', color: 'var(--success)' },
 ];
 
@@ -26,30 +32,38 @@ export default function ProDashboard() {
   const { factures, getCompanyForUser, getSubscriptionForUser } = useData();
 
   const now = new Date();
-  const ageDays = (iso) => ageInDays(iso, now);
   const isThisMonth = (iso) => isSameMonth(iso, now);
 
   const company = getCompanyForUser(user.id);
   const myFactures = (factures || []).filter((f) => f.userId === user.id);
 
-  // ---- Comptages par statut ----
+  // ---- Comptages par statut effectif (paiements + échéance) ----
   const brouillons = myFactures.filter((f) => f.statut === 'brouillon');
-  const emises = myFactures.filter((f) => f.statut === 'emise');
-  const payees = myFactures.filter((f) => f.statut === 'payee');
+  const payees = myFactures.filter((f) => statutEffectif(f) === 'payee');
+  const impayees = myFactures.filter((f) => f.statut !== 'brouillon' && resteAPayer(f) > 0);
+  const retards = impayees.filter((f) => isEnRetard(f));
   const facturesThisMonth = myFactures.filter((f) => isThisMonth(f.createdAt));
   const payeesThisMonth = payees.filter((f) => isThisMonth(f.createdAt));
 
-  // ---- Montants ----
-  const caEncaisseMois = payeesThisMonth.reduce((s, f) => s + (f.totalTTC || 0), 0);
-  const impayeesTotal = emises.reduce((s, f) => s + (f.totalTTC || 0), 0);
+  // ---- Montants (encaissements réels, acomptes compris) ----
+  const caEncaisseMois = myFactures
+    .flatMap((f) => paiementEntries(f))
+    .filter((e) => isThisMonth(e.date))
+    .reduce((s, e) => s + e.montant, 0);
+  const encaisseTotal = myFactures.reduce((s, f) => s + montantPaye(f), 0);
+  const resteTotal = impayees.reduce((s, f) => s + resteAPayer(f), 0);
+  const retardTotal = retards.reduce((s, f) => s + resteAPayer(f), 0);
+  const factureTotal = myFactures
+    .filter((f) => f.statut !== 'brouillon')
+    .reduce((s, f) => s + (f.totalTTC || 0), 0);
   const clientsCount = new Set(
     myFactures.map((f) => (f.clientName || '').trim().toLowerCase()).filter(Boolean)
   ).size;
   const convertis = myFactures.filter((f) => f.devisId).length;
 
   // ---- Taux & score ----
-  const closedTotal = emises.length + payees.length;
-  const tauxEncaissement = closedTotal ? Math.round((payees.length / closedTotal) * 100) : 0;
+  // Taux d'encaissement en montant : F CFA encaissés / F CFA facturés (hors brouillons).
+  const tauxEncaissement = factureTotal ? Math.round((encaisseTotal / factureTotal) * 100) : 0;
   const tauxConversion = myFactures.length ? Math.round((convertis / myFactures.length) * 100) : 0;
   const partTVA = myFactures.length
     ? Math.round((myFactures.filter((f) => f.tvaActive).length / myFactures.length) * 100)
@@ -60,7 +74,9 @@ export default function ProDashboard() {
   const monthlyRevenue = computeMonthlyRevenue(myFactures);
   const maxRevenue = Math.max(1, ...monthlyRevenue.map((m) => m.revenue));
   const sixMonthRevenue = monthlyRevenue.reduce((sum, m) => sum + m.revenue, 0);
-  const maxStatut = Math.max(1, brouillons.length, emises.length, payees.length);
+  const countByStatut = Object.fromEntries(STATUT_META.map((st) => [st.id, 0]));
+  myFactures.forEach((f) => { countByStatut[statutEffectif(f)] += 1; });
+  const maxStatut = Math.max(1, ...Object.values(countByStatut));
 
   // ---- Abonnement ----
   const sub = getSubscriptionForUser(user.id);
@@ -71,24 +87,33 @@ export default function ProDashboard() {
   const stats = [
     { key: 'mois', value: facturesThisMonth.length, label: 'Factures · ce mois', tone: 'info' },
     { key: 'payees', value: payeesThisMonth.length, label: 'Payées · ce mois', tone: 'success' },
-    { key: 'impayees', value: emises.length, label: 'Impayées', tone: 'warning' },
+    { key: 'impayees', value: impayees.length, label: 'Impayées', tone: 'warning' },
+    { key: 'retards', value: retards.length, label: 'En retard', tone: 'error' },
     { key: 'brouillons', value: brouillons.length, label: 'Brouillons', tone: 'accent' },
     { key: 'clients', value: clientsCount, label: 'Clients facturés', tone: 'primary' },
-    { key: 'convertis', value: convertis, label: 'Devis convertis', tone: 'success' },
   ];
 
   // ---- Feed d'alertes (trié par sévérité) ----
   const feed = [];
   if (!company?.nomEntreprise)
     feed.push({ id: 'company', sev: 'critique', label: 'Entreprise non configurée', entity: 'Plus → Devis Pro → Mon entreprise' });
-  emises
+  // Factures en retard d'échéance : priorité maximale, du plus ancien retard au plus récent.
+  retards
     .slice()
-    .sort((a, b) => ageDays(b.createdAt) - ageDays(a.createdAt))
+    .sort((a, b) => joursRetard(b) - joursRetard(a))
     .slice(0, 4)
     .forEach((f) => {
-      const age = ageDays(f.createdAt);
-      const label = Number.isFinite(age) ? `Impayée depuis ${Math.round(age)} j` : 'Facture impayée';
-      feed.push({ id: `imp-${f.id}`, sev: 'alerte', label, entity: `${f.numero || '—'} · ${formatCFA(f.totalTTC)}` });
+      feed.push({ id: `ret-${f.id}`, sev: 'critique', label: `En retard de ${joursRetard(f)} j`, entity: `${f.numero || '—'} · reste ${formatCFA(resteAPayer(f))}` });
+    });
+  // Impayées dans les temps : signale celles dont l'échéance approche (≤ 7 j).
+  impayees
+    .filter((f) => !isEnRetard(f))
+    .map((f) => [f, joursAvantEcheance(f)])
+    .filter(([, j]) => j != null && j <= 7)
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, 3)
+    .forEach(([f, j]) => {
+      feed.push({ id: `ech-${f.id}`, sev: 'alerte', label: `Échéance dans ${j} j`, entity: `${f.numero || '—'} · reste ${formatCFA(resteAPayer(f))}` });
     });
   if (sub && subStatus === 'actif' && subDays != null && subDays <= 7)
     feed.push({ id: 'sub', sev: 'info', label: `Abonnement Pro expire dans ${subDays} j`, entity: 'À renouveler' });
@@ -132,7 +157,7 @@ export default function ProDashboard() {
             </div>
             <div className="bar-chart bar-chart-lg">
               {monthlyRevenue.map((m) => (
-                <div key={m.month} className="bar-group" title={`${m.month} : ${formatCFA(m.revenue)} · ${m.count} facture(s)`}>
+                <div key={m.month} className="bar-group" title={`${m.month} : ${formatCFA(m.revenue)} · ${m.count} encaissement(s)`}>
                   <div className="bar-wrapper">
                     <div className="bar bar-won" style={{ height: `${(m.revenue / maxRevenue) * 100}%` }} />
                   </div>
@@ -144,6 +169,10 @@ export default function ProDashboard() {
             <div className="chart-legend">
               <span className="legend-item legend-revenue">Encaissé ce mois : <strong>{formatCFA(caEncaisseMois)}</strong></span>
               <span className="legend-item legend-revenue">CA 6 mois : <strong>{formatCFA(sixMonthRevenue)}</strong></span>
+              <span className="legend-item legend-revenue">Reste à encaisser : <strong>{formatCFA(resteTotal)}</strong></span>
+              {retardTotal > 0 && (
+                <span className="legend-item legend-revenue text-danger">dont en retard : <strong>{formatCFA(retardTotal)}</strong></span>
+              )}
             </div>
           </div>
 
@@ -192,7 +221,10 @@ export default function ProDashboard() {
             </div>
             <div className="ring-legend">
               <span className="legend-item"><span className="stat-dot" style={{ background: 'var(--success)' }} /> {payees.length} payée(s)</span>
-              <span className="legend-item"><span className="stat-dot" style={{ background: 'var(--accent)' }} /> {emises.length} en attente</span>
+              <span className="legend-item"><span className="stat-dot" style={{ background: 'var(--accent)' }} /> {impayees.length} en attente</span>
+              {retards.length > 0 && (
+                <span className="legend-item"><span className="stat-dot" style={{ background: 'var(--error)' }} /> {retards.length} en retard</span>
+              )}
             </div>
           </div>
 
@@ -223,17 +255,14 @@ export default function ProDashboard() {
             <span className="dash-head-meta">{myFactures.length} au total</span>
           </div>
           <div className="stage-ring-grid">
-            {STATUT_META.map((st) => {
-              const count = myFactures.filter((f) => f.statut === st.id).length;
-              return (
-                <div key={st.id} className="stage-ring-card">
-                  <Ring value={(count / maxStatut) * 100} color={st.color} size={72} stroke={7}>
-                    <span className="stage-ring-count">{count}</span>
-                  </Ring>
-                  <div className="stage-ring-label">{st.label}</div>
-                </div>
-              );
-            })}
+            {STATUT_META.map((st) => (
+              <div key={st.id} className="stage-ring-card">
+                <Ring value={(countByStatut[st.id] / maxStatut) * 100} color={st.color} size={72} stroke={7}>
+                  <span className="stage-ring-count">{countByStatut[st.id]}</span>
+                </Ring>
+                <div className="stage-ring-label">{st.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -246,10 +275,10 @@ export default function ProDashboard() {
           {recentFactures.length ? (
             <div className="alert-feed">
               {recentFactures.map((f) => {
-                const [badgeClass, badgeLabel] = FACTURE_STATUT_BADGE[f.statut] || FACTURE_STATUT_BADGE.brouillon;
+                const eff = statutEffectif(f);
                 return (
                   <div key={f.id} className="alert-feed-row">
-                    <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
+                    <span className={`badge badge-${STATUT_EFFECTIF_BADGE[eff]}`}>{STATUT_EFFECTIF_LABEL[eff]}</span>
                     <div className="alert-feed-text">
                       <div className="alert-feed-title">{f.numero} — {f.clientName}</div>
                       <div className="alert-feed-entity">{formatDate(f.createdAt)}</div>

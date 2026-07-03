@@ -33,6 +33,18 @@ export const montantPaye = (f) => {
 /** Reste dû sur une facture (jamais négatif). */
 export const resteAPayer = (f) => Math.max(0, (Number(f?.totalTTC) || 0) - montantPaye(f));
 
+/**
+ * Encaissements datés d'une facture : [{ date, montant }].
+ * Détail des paiements si présent ; sinon repli sur les factures soldées sans
+ * détail (marquées payées ou montantPaye direct), datées à la création.
+ */
+export const paiementEntries = (f) => {
+  if (Array.isArray(f?.paiements) && f.paiements.length)
+    return f.paiements.map((p) => ({ date: p.date, montant: Number(p.montant) || 0 }));
+  const paye = f?.statut === 'payee' ? (Number(f.totalTTC) || 0) : (Number(f?.montantPaye) || 0);
+  return paye > 0 ? [{ date: f.createdAt, montant: paye }] : [];
+};
+
 /** Une facture est en retard si elle n'est pas soldée et l'échéance est dépassée. */
 export const isEnRetard = (f, now = Date.now()) => {
   if (!f || f.statut === 'brouillon' || f.statut === 'payee') return false;
