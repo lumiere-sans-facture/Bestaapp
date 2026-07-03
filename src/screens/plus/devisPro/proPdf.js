@@ -50,6 +50,8 @@ export async function exportFacturePdf(f, modele, { company, modeleDefaut }) {
       tva: f.tva,
       totalTTC: f.totalTTC,
       statut: f.statut,
+      echeance: f.echeance,
+      montantPaye: f.montantPaye || 0,
     },
   });
 }

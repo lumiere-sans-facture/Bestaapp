@@ -1,5 +1,7 @@
 // Domaine Devis Pro (abonnement premium 5 000 F/mois) : abonnements + paiements
 // Mobile Money, identité d'entreprise du technicien et facturation.
+import { defaultEcheance } from '../../utils/paiement';
+
 export function createProActions(setState) {
   return {
     // Le technicien initie le paiement Mobile Money (stub) : l'abonnement
@@ -91,13 +93,16 @@ export function createProActions(setState) {
         const counter = (company?.factureCounter || 0) + 1;
         const prefix = company?.facturePrefix || 'FAC';
         const numero = `${prefix}-${new Date().getFullYear()}-${String(counter).padStart(3, '0')}`;
+        const createdAt = new Date().toISOString();
         created = {
           ...facture,
           id: crypto.randomUUID(),
           numero,
           // Snapshot d'identité seulement si l'entreprise est réellement configurée.
           companySnapshot: company?.nomEntreprise ? { ...company } : (facture.companySnapshot || null),
-          createdAt: new Date().toISOString(),
+          createdAt,
+          // Échéance de paiement : fixée à l'émission (les brouillons n'en ont pas).
+          echeance: facture.echeance || (facture.statut === 'brouillon' ? null : defaultEcheance(createdAt)),
         };
         // Le compteur DOIT être persisté même sans entreprise configurée, sinon
         // deux factures porteraient le même numéro (FAC-2026-001 en double).
@@ -116,7 +121,51 @@ export function createProActions(setState) {
     updateFacture: (factureId, patch) =>
       setState((s) => ({
         ...s,
-        factures: (s.factures || []).map((f) => (f.id === factureId ? { ...f, ...patch } : f)),
+        factures: (s.factures || []).map((f) => {
+          if (f.id !== factureId) return f;
+          const next = { ...f, ...patch };
+          // Émission d'un brouillon → on fixe l'échéance si elle manque.
+          if (patch.statut && patch.statut !== 'brouillon' && !next.echeance) next.echeance = defaultEcheance(next.createdAt);
+          return next;
+        }),
+      })),
+
+    // Encaissement (total ou partiel) : ajoute au détail, recalcule le solde et
+    // solde la facture dès que le total TTC est atteint.
+    addPaiement: (factureId, paiement) =>
+      setState((s) => ({
+        ...s,
+        factures: (s.factures || []).map((f) => {
+          if (f.id !== factureId) return f;
+          const entry = {
+            id: crypto.randomUUID(),
+            montant: Math.max(0, Number(paiement.montant) || 0),
+            mode: paiement.mode || 'momo',
+            note: (paiement.note || '').trim(),
+            date: new Date().toISOString(),
+          };
+          const paiements = [...(f.paiements || []), entry];
+          const paye = paiements.reduce((sum, p) => sum + (Number(p.montant) || 0), 0);
+          const solde = paye >= (Number(f.totalTTC) || 0);
+          return {
+            ...f,
+            paiements,
+            montantPaye: paye,
+            statut: solde ? 'payee' : f.statut === 'brouillon' ? 'emise' : f.statut,
+            echeance: f.echeance || defaultEcheance(f.createdAt),
+          };
+        }),
+      })),
+
+    // Trace une relance client (WhatsApp/SMS) pour l'historique et l'affichage.
+    addRelance: (factureId, canal = 'whatsapp') =>
+      setState((s) => ({
+        ...s,
+        factures: (s.factures || []).map((f) => {
+          if (f.id !== factureId) return f;
+          const date = new Date().toISOString();
+          return { ...f, relances: [...(f.relances || []), { date, canal }], derniereRelance: date };
+        }),
       })),
 
     deleteFacture: (factureId) =>
