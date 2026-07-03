@@ -135,6 +135,7 @@ export function generateProPdf({ kind, company = {}, modele = 'couleur', doc: d,
       ? ["Valide jusqu'au", fmtDate(new Date(new Date(d.date).getTime() + (d.validiteJours || 30) * 86400000))]
       : ['Statut', { brouillon: 'Brouillon', emise: 'Émise', payee: 'Payée' }[d.statut] || d.statut],
   ];
+  if (kind === 'facture' && d.echeance && d.statut !== 'payee') metaRows.push(['Échéance', fmtDate(d.echeance)]);
   let my = y;
   pdf.setFontSize(8.5);
   metaRows.forEach(([label, value]) => {
@@ -198,6 +199,26 @@ export function generateProPdf({ kind, company = {}, modele = 'couleur', doc: d,
   pdf.text(kind === 'facture' ? 'TOTAL À PAYER' : 'TOTAL TTC', totalsX, endY + 7);
   pdf.text(fmt(d.totalTTC), W - M, endY + 7, { align: 'right' });
   endY += 38;
+
+  // Suivi du règlement (factures partiellement encaissées) : déjà réglé + reste dû.
+  const paye = Number(d.montantPaye) || 0;
+  if (kind === 'facture' && paye > 0 && paye < (d.totalTTC || 0)) {
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(...GRAY);
+    pdf.text('Déjà réglé', totalsX, endY);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(...DARK);
+    pdf.text(fmt(paye), W - M, endY, { align: 'right' });
+    endY += 15;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(...GRAY);
+    pdf.text('Reste à payer', totalsX, endY);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(...primary);
+    pdf.text(fmt((d.totalTTC || 0) - paye), W - M, endY, { align: 'right' });
+    endY += 24;
+  }
 
   // ---------- Règlement + mentions ----------
   pdf.setFont('helvetica', 'bold');

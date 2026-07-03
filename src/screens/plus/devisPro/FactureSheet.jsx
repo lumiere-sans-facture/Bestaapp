@@ -7,11 +7,12 @@ import Field from '../../../components/Field';
 import { MODELES, EMPTY_LIGNE } from './constants';
 
 const emptyForm = (tvaActive, modele) => ({
-  clientName: '', clientPhone: '', clientVille: '',
+  clientName: '', clientPhone: '', clientVille: '', echeance: '',
   tvaActive, modele, lignes: [{ ...EMPTY_LIGNE }],
 });
 const formFromFacture = (f, modeleDefaut) => ({
   clientName: f.clientName || '', clientPhone: f.clientPhone || '', clientVille: f.clientVille || '',
+  echeance: f.echeance ? f.echeance.slice(0, 10) : '',
   tvaActive: !!f.tvaActive, modele: f.modele || modeleDefaut,
   lignes: (f.lignes || []).length ? f.lignes.map((l) => ({ designation: l.designation, qty: l.qty, pu: l.pu })) : [{ ...EMPTY_LIGNE }],
 });
@@ -42,6 +43,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
       clientName: form.clientName.trim(),
       clientPhone: form.clientPhone.trim(),
       clientVille: form.clientVille.trim(),
+      echeance: form.echeance ? new Date(form.echeance).toISOString() : undefined,
       lignes,
       ...totals,
       tvaActive: form.tvaActive,
@@ -72,6 +74,12 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
               onChange={(e) => setForm({ ...form, clientVille: e.target.value })} />
           </Field>
         </div>
+
+        <Field label="Échéance de paiement">
+          <input className="input" type="date" value={form.echeance}
+            onChange={(e) => setForm({ ...form, echeance: e.target.value })} />
+        </Field>
+        <div className="field-hint">Laisser vide pour appliquer le délai par défaut (30 jours).</div>
 
         <div className="input-label">Lignes de la facture *</div>
         {form.lignes.map((l, i) => (

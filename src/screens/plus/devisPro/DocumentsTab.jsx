@@ -1,31 +1,35 @@
 import { useMemo, useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, Search, CheckCircle, Pencil } from 'lucide-react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, Search, CheckCircle, Pencil, Wallet, Send } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
-import { computeFactureTotals, FACTURE_STATUT_LABEL } from '../../../utils/facture';
+import { computeFactureTotals } from '../../../utils/facture';
+import {
+  statutEffectif, STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE,
+  resteAPayer, montantPaye, isEnRetard, joursRetard, joursAvantEcheance,
+  relanceMessage, whatsappLink,
+} from '../../../utils/paiement';
 import { exportDevisProPdf, exportFacturePdf } from './proPdf';
 import FactureSheet from './FactureSheet';
+import PaiementSheet from './PaiementSheet';
 import ProDevisBuilder from './ProDevisBuilder';
 import ProSolarWizard from './ProSolarWizard';
 import Sheet from '../../../components/Sheet';
 import DevisEditSheet from '../../devis/DevisEditSheet';
 
-const badgeClass = (s) => (s === 'payee' ? 'badge-success' : s === 'emise' ? 'badge-warning' : 'badge-muted');
-const flatFactureBadge = (s) => (s === 'payee' ? 'success' : s === 'emise' ? 'warning' : 'muted');
 const nf = (v) => Math.round(v || 0).toLocaleString('fr-FR');
 const nextStatut = (s) => (s === 'brouillon' ? 'emise' : 'payee');
 const nextStatutLabel = (s) => (s === 'brouillon' ? 'Marquer émise' : 'Marquer payée');
 
 const SORTS = [['recent', 'Plus récents'], ['ancien', 'Plus anciens'], ['montant', 'Montant décroissant']];
-const FACTURE_FILTERS = [['all', 'Tous'], ['emise', 'Émises'], ['payee', 'Payées'], ['brouillon', 'Brouillons']];
+const FACTURE_FILTERS = [['all', 'Tous'], ['emise', 'Émises'], ['retard', 'En retard'], ['partiel', 'Partiel'], ['payee', 'Payées'], ['brouillon', 'Brouillons']];
 const DEVIS_FILTERS = [['all', 'Tous'], ['brouillon', 'Brouillons'], ['tofacture', 'À facturer'], ['factured', 'Facturés']];
 
 /** Écran « Devis & Factures » : bascule Devis/Factures, recherche + filtres + tri,
  *  cartes cliquables ouvrant un menu d'actions. */
 export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const { user } = useAuth();
-  const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, markDevisPro, updateDevis, deleteDevis } = useData();
+  const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, addPaiement, addRelance, markDevisPro, updateDevis, deleteDevis } = useData();
 
   const [tab, setTab] = useState('factures'); // devis | factures
   const [view, setView] = useState('list'); // list | create
@@ -37,14 +41,19 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const [actions, setActions] = useState(null); // { kind:'facture'|'devis', doc }
   const [editDevis, setEditDevis] = useState(null);
   const [factureEdit, setFactureEdit] = useState(null);
+  const [payFacture, setPayFacture] = useState(null); // facture en cours d'encaissement
 
   const myDevis = useMemo(() => devis.filter((d) => d.createdBy === user.id), [devis, user.id]);
   const myFactures = useMemo(() => (factures || []).filter((f) => f.userId === user.id), [factures, user.id]);
   const factureByDevis = useMemo(() => new Map(myFactures.filter((f) => f.devisId).map((f) => [f.devisId, f])), [myFactures]);
   const devisById = useMemo(() => new Map(myDevis.map((d) => [d.id, d])), [myDevis]);
 
-  const aEncaisser = myFactures.filter((f) => f.statut === 'emise').reduce((s, f) => s + f.totalTTC, 0);
-  const encaisse = myFactures.filter((f) => f.statut === 'payee').reduce((s, f) => s + f.totalTTC, 0);
+  // Reste réellement dû (émise/partiel, hors brouillons & soldées) et cumul encaissé.
+  const impayees = myFactures.filter((f) => f.statut !== 'brouillon' && resteAPayer(f) > 0);
+  const aEncaisser = impayees.reduce((s, f) => s + resteAPayer(f), 0);
+  const encaisse = myFactures.reduce((s, f) => s + montantPaye(f), 0);
+  const enRetardList = myFactures.filter((f) => isEnRetard(f));
+  const montantRetard = enRetardList.reduce((s, f) => s + resteAPayer(f), 0);
 
   const clientOf = (d) => d.clientName || getLeadById(d.leadId)?.name || 'Client';
   const switchTab = (t) => { setTab(t); setStatusFilter('all'); setSearch(''); };
@@ -75,6 +84,22 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     });
   };
 
+  // Marquer payée = solder la facture (statut + montant intégralement encaissé).
+  const marquerPayee = (f) => updateFacture(f.id, { statut: 'payee', montantPaye: f.totalTTC });
+
+  // Relance WhatsApp : ouvre un message pré-rempli et trace la relance.
+  const relancer = (f) => {
+    const url = whatsappLink(f.clientPhone, relanceMessage(f, company));
+    window.open(url, '_blank', 'noopener');
+    addRelance(f.id, 'whatsapp');
+  };
+
+  const submitPaiement = (data) => {
+    if (payFacture) addPaiement(payFacture.id, data);
+    setPayFacture(null);
+    setActions(null);
+  };
+
   const runAction = (fn) => { fn(); setActions(null); };
 
   // --- Filtre + tri ---
@@ -86,7 +111,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   });
   const visibleFactures = sortDocs(
     myFactures
-      .filter((f) => statusFilter === 'all' || f.statut === statusFilter)
+      .filter((f) => statusFilter === 'all' || statutEffectif(f) === statusFilter)
       .filter((f) => !q || [f.numero, f.clientName].some((v) => v && v.toLowerCase().includes(q))),
     'totalTTC'
   );
@@ -103,6 +128,10 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   );
 
   const cardKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
+
+  // Facture « live » (relit l'état à jour après encaissement/relance depuis le snapshot d'ouverture).
+  const actionFacture = actions?.kind === 'facture' ? (myFactures.find((x) => x.id === actions.doc.id) || actions.doc) : null;
+  const payFactureLive = payFacture ? (myFactures.find((x) => x.id === payFacture.id) || payFacture) : null;
 
   // ============ Création de devis ============
   if (view === 'create') {
@@ -155,11 +184,18 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       <div className="doc-summary">
         <div className="doc-summary-card due">
           <div className="doc-summary-value">{formatCFA(aEncaisser)}</div>
-          <div className="doc-summary-label">À encaisser (émises)</div>
+          <div className="doc-summary-label">Reste à encaisser</div>
+        </div>
+        <div className={`doc-summary-card late${montantRetard > 0 ? '' : ' is-empty'}`}
+          role={montantRetard > 0 ? 'button' : undefined} tabIndex={montantRetard > 0 ? 0 : undefined}
+          onClick={montantRetard > 0 ? () => { switchTab('factures'); setStatusFilter('retard'); } : undefined}
+          onKeyDown={montantRetard > 0 ? (e) => cardKey(e, () => { switchTab('factures'); setStatusFilter('retard'); }) : undefined}>
+          <div className="doc-summary-value">{formatCFA(montantRetard)}</div>
+          <div className="doc-summary-label">En retard{enRetardList.length ? ` (${enRetardList.length})` : ''}</div>
         </div>
         <div className="doc-summary-card paid">
           <div className="doc-summary-value">{formatCFA(encaisse)}</div>
-          <div className="doc-summary-label">Encaissé (payées)</div>
+          <div className="doc-summary-label">Encaissé</div>
         </div>
       </div>
 
@@ -202,6 +238,11 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
           <div className="flat-list">
             {visibleFactures.map((f) => {
               const src = f.devisId && devisById.get(f.devisId);
+              const eff = statutEffectif(f);
+              const reste = resteAPayer(f);
+              const note = eff === 'retard' ? `Retard ${joursRetard(f)} j · reste ${nf(reste)} F`
+                : eff === 'partiel' ? `Reste ${nf(reste)} F`
+                : '';
               return (
                 <div key={f.id} className="flat-row" role="button" tabIndex={0}
                   onClick={() => setActions({ kind: 'facture', doc: f })}
@@ -209,8 +250,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                   <div className="flat-row-main">
                     <div className="flat-row-title">{f.numero} - {f.clientName}</div>
                     <div className="flat-row-sub">
-                      <span className={`flat-badge ${flatFactureBadge(f.statut)}`}>{FACTURE_STATUT_LABEL[f.statut]}</span>
-                      <span className="flat-row-date">{formatDate(f.createdAt)}{src ? ` · ${src.devisNumber}` : ''}</span>
+                      <span className={`flat-badge ${STATUT_EFFECTIF_BADGE[eff]}`}>{STATUT_EFFECTIF_LABEL[eff]}</span>
+                      <span className="flat-row-date">{note || formatDate(f.createdAt)}{src ? ` · ${src.devisNumber}` : ''}</span>
                     </div>
                   </div>
                   <div className="flat-row-amount">{nf(f.totalTTC)}<span className="flat-amount-unit">F CFA</span></div>
@@ -263,29 +304,63 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
 
       {/* Menu d'actions (facture ou devis) */}
       <Sheet open={!!actions} onClose={() => setActions(null)} title={actions ? (actions.kind === 'facture' ? actions.doc.numero : actions.doc.devisNumber) : ''}>
-        {actions?.kind === 'facture' && (
+        {actionFacture && (() => {
+          const eff = statutEffectif(actionFacture);
+          const reste = resteAPayer(actionFacture);
+          const paye = montantPaye(actionFacture);
+          const jae = joursAvantEcheance(actionFacture);
+          return (
           <div className="doc-actions-list">
-            <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{actions.doc.clientName}</span></div>
-            <div className="sheet-row"><span className="sheet-label">Statut</span><span className="sheet-value"><span className={`badge ${badgeClass(actions.doc.statut)}`}>{FACTURE_STATUT_LABEL[actions.doc.statut]}</span></span></div>
-            <div className="sheet-row"><span className="sheet-label">Total TTC</span><span className="sheet-value amount">{formatCFA(actions.doc.totalTTC)}</span></div>
-            <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actions.doc, undefined, { company, modeleDefaut }))}>
+            <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{actionFacture.clientName}</span></div>
+            <div className="sheet-row"><span className="sheet-label">Statut</span><span className="sheet-value"><span className={`badge badge-${STATUT_EFFECTIF_BADGE[eff]}`}>{STATUT_EFFECTIF_LABEL[eff]}</span></span></div>
+            <div className="sheet-row"><span className="sheet-label">Total TTC</span><span className="sheet-value amount">{formatCFA(actionFacture.totalTTC)}</span></div>
+            {paye > 0 && actionFacture.statut !== 'payee' && (
+              <div className="sheet-row"><span className="sheet-label">Encaissé</span><span className="sheet-value">{formatCFA(paye)}</span></div>
+            )}
+            {reste > 0 && actionFacture.statut !== 'brouillon' && (
+              <div className="sheet-row"><span className="sheet-label">Reste à payer</span><span className="sheet-value amount">{formatCFA(reste)}</span></div>
+            )}
+            {actionFacture.echeance && actionFacture.statut !== 'brouillon' && actionFacture.statut !== 'payee' && (
+              <div className="sheet-row">
+                <span className="sheet-label">Échéance</span>
+                <span className={`sheet-value${eff === 'retard' ? ' text-danger' : ''}`}>
+                  {formatDate(actionFacture.echeance)}
+                  {eff === 'retard' ? ` · retard ${joursRetard(actionFacture)} j` : jae != null && jae >= 0 ? ` · dans ${jae} j` : ''}
+                </span>
+              </div>
+            )}
+            {actionFacture.derniereRelance && (
+              <div className="sheet-row"><span className="sheet-label">Dernière relance</span><span className="sheet-value">{formatDate(actionFacture.derniereRelance)}</span></div>
+            )}
+            <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actionFacture, undefined, { company, modeleDefaut }))}>
               <Download size={16} /> Télécharger le PDF
             </button>
-            <button className="btn btn-outline btn-block" onClick={() => { setFactureEdit(actions.doc); setActions(null); }}>
-              <Pencil size={16} /> Modifier la facture
-            </button>
-            {actions.doc.statut !== 'payee' && (
-              <button className="btn btn-won btn-block" onClick={() => runAction(() => updateFacture(actions.doc.id, { statut: nextStatut(actions.doc.statut) }))}>
-                <CheckCircle size={16} /> {nextStatutLabel(actions.doc.statut)}
+            {actionFacture.statut !== 'payee' && reste > 0 && (
+              <button className="btn btn-won btn-block" onClick={() => { setPayFacture(actionFacture); setActions(null); }}>
+                <Wallet size={16} /> Enregistrer un encaissement
               </button>
             )}
-            {actions.doc.statut === 'brouillon' && (
-              <button className="btn btn-lost btn-block" onClick={() => { if (window.confirm('Supprimer ce brouillon ?')) runAction(() => deleteFacture(actions.doc.id)); }}>
+            {reste > 0 && actionFacture.statut !== 'brouillon' && actionFacture.clientPhone && (
+              <button className="btn btn-outline btn-block" onClick={() => runAction(() => relancer(actionFacture))}>
+                <Send size={16} /> Relancer par WhatsApp
+              </button>
+            )}
+            <button className="btn btn-outline btn-block" onClick={() => { setFactureEdit(actionFacture); setActions(null); }}>
+              <Pencil size={16} /> Modifier la facture
+            </button>
+            {actionFacture.statut !== 'payee' && (
+              <button className="btn btn-outline btn-block" onClick={() => runAction(() => (actionFacture.statut === 'brouillon' ? updateFacture(actionFacture.id, { statut: nextStatut(actionFacture.statut) }) : marquerPayee(actionFacture)))}>
+                <CheckCircle size={16} /> {nextStatutLabel(actionFacture.statut)}
+              </button>
+            )}
+            {actionFacture.statut === 'brouillon' && (
+              <button className="btn btn-lost btn-block" onClick={() => { if (window.confirm('Supprimer ce brouillon ?')) runAction(() => deleteFacture(actionFacture.id)); }}>
                 <Trash2 size={16} /> Supprimer le brouillon
               </button>
             )}
           </div>
-        )}
+          );
+        })()}
         {actions?.kind === 'devis' && (
           <div className="doc-actions-list">
             <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{clientOf(actions.doc)}</span></div>
@@ -324,6 +399,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         initial={factureEdit}
         onSubmit={submitFacture}
       />
+
+      <PaiementSheet open={!!payFacture} onClose={() => setPayFacture(null)} facture={payFactureLive} onSubmit={submitPaiement} />
 
       <DevisEditSheet open={!!editDevis} onClose={() => setEditDevis(null)} devis={editDevis} editableClient withTva />
     </>
