@@ -182,26 +182,25 @@ export default function ProSolarWizard({ onDone }) {
 
   const totals = useMemo(() => computeFactureTotals(lignes, tvaActive), [lignes, tvaActive]);
 
-  // Fiche de dimensionnement (PDF) — synthèse technique du dimensionnement calculé.
-  const openSizingSheet = async () => {
+  // Fiche de dimensionnement — récapitulatif technique complet (HTML imprimable),
+  // généré à la dernière étape avec le client et le matériel réellement retenus.
+  const openSheet = async () => {
     if (!sizing) return;
-    const { generateSizingSheetPdf } = await import('../../../utils/sizingSheetPdf');
-    const combo = suggestBatteryCombo(brandBatteries, sizing.batteryCapacity);
-    const sheetBatteries = brandBatteries.filter((b) => (combo[b.id] || 0) > 0).map((b) => ({ ...b, qty: combo[b.id] }));
-    const sheetAppliances = manualMode ? [] : rows.map((r) => ({
-      name: r.name, power: r.power, quantity: r.quantity, hours: r.day + r.night, dailyWh: r.power * r.quantity * (r.day + r.night),
-    }));
-    generateSizingSheetPdf({
-      company,
-      client: { name: '', ville: location?.name || '' },
-      appliances: sheetAppliances,
+    const { openSizingSheet } = await import('../../../utils/sizingSheetHtml');
+    const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
+    openSizingSheet({
+      client: { name: client.name || '', phone: client.phone || '', ville: client.ville || '' },
+      appliances: rows,
       manualMode,
       consumption,
-      sizing,
-      inverter,
-      batteries: sheetBatteries,
       systemType,
       sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+      cityName: location?.name || client.ville || null,
+      solarSource: solar?.source || null,
+      sizing,
+      inverter,
+      batteries: batteryList,
+      panelName,
     });
   };
 
@@ -376,9 +375,6 @@ export default function ProSolarWizard({ onDone }) {
               <div className="sizing-card"><div className="sizing-icon"><Battery size={18} /></div><div className="sizing-value">{sizing.batteryCapacity > 0 ? `${sizing.batteryCapacity.toFixed(1)} kWh` : '—'}</div><div className="sizing-label">Batterie conseillée</div></div>
               <div className="sizing-card"><div className="sizing-icon"><Zap size={18} /></div><div className="sizing-value">{Math.round(sizing.estimatedProduction).toLocaleString('fr-FR')}</div><div className="sizing-label">kWh / an</div></div>
             </div>
-            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 14 }} onClick={openSizingSheet}>
-              <FileText size={16} /> Fiche de dimensionnement (PDF)
-            </button>
           </div>
         )}
 
@@ -499,6 +495,10 @@ export default function ProSolarWizard({ onDone }) {
                 </div>
               ))}
             </div>
+
+            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
+              <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
+            </button>
 
             <label className="pro-tva-toggle">
               <input type="checkbox" checked={tvaActive} onChange={(e) => setTvaActive(e.target.checked)} />
