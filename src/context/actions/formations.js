@@ -1,10 +1,23 @@
-// Domaine formation des techniciens : modules et avancement par utilisateur.
+// Domaine formation « école » : cours → modules → leçons, avancement par leçon.
 export function createFormationActions(setState) {
+  // Applique un patch fonctionnel à un cours donné.
+  const patchCourse = (formationId, fn) => (s) => ({
+    ...s,
+    formations: (s.formations || []).map((f) => (f.id === formationId ? fn(f) : f)),
+  });
+  // Idem pour un module au sein d'un cours.
+  const patchModule = (formationId, moduleId, fn) =>
+    patchCourse(formationId, (f) => ({
+      ...f,
+      modules: (f.modules || []).map((m) => (m.id === moduleId ? fn(m) : m)),
+    }));
+
   return {
-    addFormation: (formation) =>
+    // ---- Cours ----
+    addFormation: (course) =>
       setState((s) => ({
         ...s,
-        formations: [...(s.formations || []), { ...formation, id: crypto.randomUUID() }],
+        formations: [...(s.formations || []), { modules: [], ...course, id: crypto.randomUUID() }],
       })),
 
     updateFormation: (formationId, patch) =>
@@ -20,15 +33,57 @@ export function createFormationActions(setState) {
         formationProgress: (s.formationProgress || []).filter((p) => p.formationId !== formationId),
       })),
 
-    setFormationProgress: (userId, formationId, status) =>
+    // ---- Modules ----
+    addModule: (formationId, data) =>
+      setState(patchCourse(formationId, (f) => ({
+        ...f,
+        modules: [...(f.modules || []), { id: crypto.randomUUID(), title: data.title, lecons: [] }],
+      }))),
+
+    updateModule: (formationId, moduleId, patch) =>
+      setState(patchModule(formationId, moduleId, (m) => ({ ...m, ...patch }))),
+
+    deleteModule: (formationId, moduleId) =>
       setState((s) => {
-        const rest = (s.formationProgress || []).filter((p) => !(p.userId === userId && p.formationId === formationId));
+        const course = (s.formations || []).find((f) => f.id === formationId);
+        const removed = new Set((course?.modules || []).find((m) => m.id === moduleId)?.lecons?.map((l) => l.id) || []);
+        return {
+          ...patchCourse(formationId, (f) => ({ ...f, modules: (f.modules || []).filter((m) => m.id !== moduleId) }))(s),
+          formationProgress: (s.formationProgress || []).filter((p) => !removed.has(p.leconId)),
+        };
+      }),
+
+    // ---- Leçons ----
+    addLecon: (formationId, moduleId, data) =>
+      setState(patchModule(formationId, moduleId, (m) => ({
+        ...m,
+        lecons: [...(m.lecons || []), { ...data, id: crypto.randomUUID() }],
+      }))),
+
+    updateLecon: (formationId, moduleId, leconId, patch) =>
+      setState(patchModule(formationId, moduleId, (m) => ({
+        ...m,
+        lecons: (m.lecons || []).map((l) => (l.id === leconId ? { ...l, ...patch } : l)),
+      }))),
+
+    deleteLecon: (formationId, moduleId, leconId) =>
+      setState((s) => ({
+        ...patchModule(formationId, moduleId, (m) => ({
+          ...m,
+          lecons: (m.lecons || []).filter((l) => l.id !== leconId),
+        }))(s),
+        formationProgress: (s.formationProgress || []).filter((p) => p.leconId !== leconId),
+      })),
+
+    // ---- Avancement (par leçon) ----
+    setLeconDone: (userId, formationId, leconId, done = true) =>
+      setState((s) => {
+        const rest = (s.formationProgress || []).filter((p) => !(p.userId === userId && p.leconId === leconId));
         return {
           ...s,
-          formationProgress: [
-            { id: `fp-${userId}-${formationId}`, userId, formationId, status, date: new Date().toISOString() },
-            ...rest,
-          ],
+          formationProgress: done
+            ? [{ id: `fp-${userId}-${leconId}`, userId, formationId, leconId, status: 'complete', date: new Date().toISOString() }, ...rest]
+            : rest,
         };
       }),
   };

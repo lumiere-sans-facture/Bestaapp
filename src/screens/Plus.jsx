@@ -277,7 +277,7 @@ export default function Plus() {
           <div className="menu-item-icon success"><GraduationCap size={18} /></div>
           <div className="menu-item-info">
             <div className="menu-item-title">Formation</div>
-            <div className="menu-item-subtitle">Modules vidéo et documents techniques</div>
+            <div className="menu-item-subtitle">Cours en ligne : modules, leçons et suivi de progression</div>
           </div>
           <ChevronRight size={18} className="menu-item-arrow" />
         </button>
