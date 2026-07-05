@@ -51,6 +51,25 @@ export const loadState = () => {
       if (!saved.orders) saved.orders = [];
       if (!saved.formations) saved.formations = seed.formations;
       if (!saved.formationProgress) saved.formationProgress = [];
+      // Migration formation : structure « école » (cours → modules → leçons).
+      // Les anciens modules plats ajoutés par le gérant sont conservés dans un
+      // cours dédié ; ceux du seed sont remplacés par les nouveaux cours.
+      if ((saved.formations || []).some((f) => !Array.isArray(f.modules))) {
+        const seedIds = new Set(seed.formations.map((c) => c.id));
+        const custom = saved.formations.filter((f) => !Array.isArray(f.modules) && !seedIds.has(f.id));
+        const customCourse = custom.length ? [{
+          id: 'fperso',
+          title: 'Modules ajoutés',
+          description: 'Vos modules créés avant la mise à jour de l’espace formation.',
+          modules: [{
+            id: 'fperso-m1', title: 'Modules',
+            lecons: custom.map((f) => ({ id: f.id, title: f.title, type: f.type === 'pdf' ? 'pdf' : 'video', url: f.url, duration: f.duration || '' })),
+          }],
+        }] : [];
+        saved.formations = [...seed.formations, ...customCourse, ...saved.formations.filter((f) => Array.isArray(f.modules))];
+        // L'avancement par module n'a pas d'équivalent leçon : on ne garde que les lignes par leçon.
+        saved.formationProgress = (saved.formationProgress || []).filter((p) => p.leconId);
+      }
       if (!saved.subscriptions) saved.subscriptions = [];
       if (!saved.subscriptionPayments) saved.subscriptionPayments = [];
       if (!saved.companies) saved.companies = [];
