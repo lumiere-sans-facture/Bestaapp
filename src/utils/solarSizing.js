@@ -36,7 +36,7 @@ export const INVERTER_MODELS = [
 // et 'batteries'), pas de listes codées en dur. Marque et capacité sont
 // extraites du nom du produit ; le prix est le basePrice (prix partenaire).
 
-const BRAND_KEYWORDS = ['Growatt', 'Felicity', 'Luxsun', 'Taico', 'Itel Energy', 'Itel', 'Marstek', 'Pylontech', 'Must Power', 'Jinko'];
+const BRAND_KEYWORDS = ['Growatt', 'Felicity', 'Luxsun', 'Taico', 'Itel Energy', 'Itel', 'Marstek', 'Pylontech', 'Must Power', 'Must', 'Deye', 'Jinko'];
 const parseNum = (s) => parseFloat(String(s).replace(',', '.'));
 
 export const detectBrand = (name = '') => {
@@ -73,7 +73,7 @@ export const brandsOf = (options = []) => [...new Set(options.map((o) => o.brand
 
 /** Onduleur conseillé : le plus petit couvrant la puissance requise + 20 %. */
 export const recommendInverterOption = (options = [], requiredPower = 0) =>
-  options.find((o) => o.maxPower >= requiredPower * 1.2) || options[options.length - 1] || null;
+  options.find((o) => o.maxPower >= requiredPower * SIZING_PARAMS.inverterMargin) || options[options.length - 1] || null;
 
 /** Combinaison de batteries (glouton) approchant la capacité requise. */
 export const suggestBatteryCombo = (options = [], requiredCapacity = 0) => {
@@ -102,10 +102,22 @@ export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
 export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PVGIS indisponibles
 
+// Hypothèses de dimensionnement — exportées pour être affichées telles quelles
+// sur la fiche de dimensionnement (ne pas dupliquer ces valeurs ailleurs).
+export const SIZING_PARAMS = {
+  systemEfficiency: 0.75,   // rendement global (pertes câblage, température, salissures)
+  batteryEfficiency: 0.85,  // rendement charge/décharge des batteries
+  depthOfDischarge: 0.8,    // profondeur de décharge maximale (DoD)
+  hybridBatteryRatio: 0.8,  // part de la consommation nocturne stockée en hybride
+  inverterMargin: 1.2,      // marge de sécurité sur la puissance onduleur (+20 %)
+};
+// Tension du parc batterie (modules lithium 48 V du catalogue).
+export const SYSTEM_VOLTAGE = BATTERY_MODELS[0].voltage;
+
 // ---- Sélection des composants ----
 
 const findInverterForPower = (requiredPower) => {
-  const powerWithMargin = requiredPower * 1.2;
+  const powerWithMargin = requiredPower * SIZING_PARAMS.inverterMargin;
   return INVERTER_MODELS.find((inv) => inv.maxPower >= powerWithMargin) || INVERTER_MODELS[INVERTER_MODELS.length - 1];
 };
 
@@ -146,10 +158,7 @@ const groupBatteries = (batteries) => {
  * @param {number} peakSunHours
  */
 export const calculateSystemSize = (consumption, systemType, peakSunHours = DEFAULT_PEAK_SUN_HOURS) => {
-  const systemEfficiency = 0.75;
-  const batteryEfficiency = 0.85;
-  const depthOfDischarge = 0.8;
-  const hybridBatteryRatio = 0.8;
+  const { systemEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio } = SIZING_PARAMS;
 
   const totalDaily = consumption.day + consumption.night; // kWh
   const requiredDailyEnergy = totalDaily / systemEfficiency; // kWh
