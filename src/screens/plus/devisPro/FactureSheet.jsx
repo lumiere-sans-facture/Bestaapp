@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Plus, Trash2 } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
+import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { computeFactureTotals } from '../../../utils/facture';
 import Sheet from '../../../components/Sheet';
@@ -20,15 +22,27 @@ const formFromFacture = (f, modeleDefaut) => ({
 /**
  * Formulaire de facture (création ou édition). Gère son propre état ; à la
  * validation, remonte les données prêtes (lignes nettoyées + totaux) via onSubmit.
+ * En création, le client vient du carnet Pro (ou y est ajouté) — même modèle
+ * que les créateurs de devis, pour rattacher la facture au client (clientId).
  * @param {object|null} initial  facture existante à éditer (sinon création)
  */
 export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDefaut, onSubmit, initial = null }) {
+  const { user } = useAuth();
+  const { proClientsForUser, addProClient } = useData();
+  const myClients = proClientsForUser(user.id);
+
   const [form, setForm] = useState(() => emptyForm(defaultTvaActive, modeleDefaut));
+  const [clientMode, setClientMode] = useState('existing'); // existing | new (création seulement)
+  const [clientId, setClientId] = useState('');
 
   // Réinitialise / pré-remplit le formulaire à chaque ouverture.
   useEffect(() => {
-    if (open) setForm(initial ? formFromFacture(initial, modeleDefaut) : emptyForm(defaultTvaActive, modeleDefaut));
-  }, [open, initial, defaultTvaActive, modeleDefaut]);
+    if (!open) return;
+    setForm(initial ? formFromFacture(initial, modeleDefaut) : emptyForm(defaultTvaActive, modeleDefaut));
+    setClientMode(myClients.length ? 'existing' : 'new');
+    setClientId(myClients[0]?.id || '');
+    // myClients volontairement hors dépendances : ne réinitialiser qu'à l'ouverture.
+  }, [open, initial, defaultTvaActive, modeleDefaut]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setLigne = (i, patch) =>
     setForm((f) => ({ ...f, lignes: f.lignes.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
@@ -38,11 +52,27 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
       .filter((l) => l.designation.trim() && Number(l.pu) > 0)
       .map((l) => ({ designation: l.designation.trim(), qty: Math.max(1, Number(l.qty) || 1), pu: Number(l.pu) }));
     if (!lignes.length) return;
+
+    // Client : carnet existant, nouveau (ajouté au carnet), ou champs de la facture éditée.
+    let client = { id: initial?.clientId, name: form.clientName.trim(), phone: form.clientPhone.trim(), ville: form.clientVille.trim() };
+    if (!initial) {
+      if (clientMode === 'existing') {
+        const c = myClients.find((x) => x.id === clientId);
+        if (!c) return;
+        client = { id: c.id, name: c.name, phone: c.phone || '', ville: c.ville || '' };
+      } else {
+        if (!client.name) return;
+        const created = addProClient({ userId: user.id, name: client.name, phone: client.phone, ville: client.ville, type: 'particulier' });
+        client.id = created.id;
+      }
+    }
+
     const totals = computeFactureTotals(lignes, form.tvaActive);
     onSubmit({
-      clientName: form.clientName.trim(),
-      clientPhone: form.clientPhone.trim(),
-      clientVille: form.clientVille.trim(),
+      clientId: client.id,
+      clientName: client.name,
+      clientPhone: client.phone,
+      clientVille: client.ville,
       echeance: form.echeance ? new Date(form.echeance).toISOString() : undefined,
       lignes,
       ...totals,
@@ -60,20 +90,40 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
   return (
     <Sheet open={open} onClose={onClose} title={initial ? `Modifier ${initial.numero}` : 'Nouvelle facture'}>
       <form onSubmit={(e) => { e.preventDefault(); save(initial ? (initial.statut || 'emise') : 'emise'); }}>
-        <Field label="Client *">
-          <input className="input" required value={form.clientName}
-            onChange={(e) => setForm({ ...form, clientName: e.target.value })} placeholder="Nom du client" />
-        </Field>
-        <div className="form-row-2">
-          <Field label="Téléphone">
-            <input className="input" type="tel" value={form.clientPhone}
-              onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} />
+        {!initial && (
+          <div className="client-type-toggle" role="group" aria-label="Source du client" style={{ marginBottom: 14 }}>
+            <button type="button" className={`client-type-btn ${clientMode === 'existing' ? 'active' : ''}`}
+              onClick={() => setClientMode('existing')} disabled={!myClients.length}>Client existant</button>
+            <button type="button" className={`client-type-btn ${clientMode === 'new' ? 'active' : ''}`}
+              onClick={() => setClientMode('new')}><Plus size={15} /> Nouveau client</button>
+          </div>
+        )}
+        {!initial && clientMode === 'existing' ? (
+          <Field label="Choisir un client *">
+            <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+              {!myClients.length && <option value="">Aucun client — créez-en un</option>}
+              {myClients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.ville ? ` — ${c.ville}` : ''}</option>)}
+            </select>
           </Field>
-          <Field label="Ville">
-            <input className="input" value={form.clientVille}
-              onChange={(e) => setForm({ ...form, clientVille: e.target.value })} />
-          </Field>
-        </div>
+        ) : (
+          <>
+            <Field label="Client *">
+              <input className="input" required value={form.clientName}
+                onChange={(e) => setForm({ ...form, clientName: e.target.value })} placeholder="Nom du client" />
+            </Field>
+            <div className="form-row-2">
+              <Field label="Téléphone">
+                <input className="input" type="tel" value={form.clientPhone}
+                  onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} />
+              </Field>
+              <Field label="Ville">
+                <input className="input" value={form.clientVille}
+                  onChange={(e) => setForm({ ...form, clientVille: e.target.value })} />
+              </Field>
+            </div>
+            {!initial && <div className="field-hint" style={{ marginTop: -6, marginBottom: 10 }}>Ce client sera ajouté à votre carnet.</div>}
+          </>
+        )}
 
         <Field label="Échéance de paiement">
           <input className="input" type="date" value={form.echeance}

@@ -76,6 +76,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       const totals = computeFactureTotals(lignes, tvaActive);
       addFacture({
         userId: user.id,
+        clientId: d.clientId,
         clientName: d.clientName || lead?.contact || lead?.name || 'Client',
         clientPhone: d.clientPhone || lead?.phone || '',
         clientVille: d.clientVille || lead?.address || '',

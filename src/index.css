@@ -1338,6 +1338,20 @@ textarea.input { resize: vertical; }
 .doc-summary-card.late.is-empty .doc-summary-value { color: var(--text-secondary); }
 .doc-summary-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
 
+/* Fiche client Pro : bilan (facturé / encaissé / reste dû) + historique */
+.client-bilan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.client-bilan-item { background: var(--bg); border-radius: var(--radius); padding: 10px 8px; text-align: center; }
+.client-bilan-value { font-size: 0.875rem; font-weight: 700; overflow-wrap: anywhere; }
+.client-bilan-item.ok .client-bilan-value { color: #047857; }
+.client-bilan-item.ko { background: var(--error-light); }
+.client-bilan-item.ko .client-bilan-value { color: var(--error); }
+.client-bilan-label { font-size: 0.6875rem; color: var(--text-secondary); margin-top: 3px; }
+.client-history { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; max-height: 220px; overflow-y: auto; }
+.client-history-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 0.875rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.client-history-row:last-child { border-bottom: none; }
+.client-history-title { font-weight: 600; color: var(--text-primary); }
+.client-history-amount { margin-left: auto; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+
 /* Encaissements (PaiementSheet) */
 .pay-quick { display: flex; gap: 8px; margin: -4px 0 12px; flex-wrap: wrap; }
 .pay-history { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
