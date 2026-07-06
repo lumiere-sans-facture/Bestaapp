@@ -64,12 +64,19 @@ describe('buildSizingSheetHtml', () => {
     expect(html).toContain('4,71 kWh');
     const ah = Math.round((sizing.batteryCapacity * 1000) / SYSTEM_VOLTAGE);
     expect(html).toContain(`${ah} Ah`);
-    expect(html).toContain('Felicity');
   });
 
-  it('liste le matériel avec marque et quantité, sans aucun montant', () => {
-    expect(html).toContain('Batterie Taico 5kWh');
+  it('liste le matériel en désignations techniques, sans marque ni référence', () => {
+    // Type + tension / capacité / puissance + quantité — rien d'autre.
+    expect(html).toContain('Panneau photovoltaïque 550 Wc');
+    expect(html).toContain('Onduleur hybride 5 kVA');
+    expect(html).toContain(`Batterie lithium ${SYSTEM_VOLTAGE}V ${Math.round(5000 / SYSTEM_VOLTAGE)}Ah (5 kWh)`);
     expect(html).toContain('Coffret de protection DC/AC');
+    // Les marques du catalogue servent au calcul mais n'apparaissent JAMAIS.
+    for (const marque of ['Felicity', 'Taico', 'Jinko', 'Growatt', 'Itel', 'Luxsun', 'Must', 'Deye', 'Pylontech']) {
+      expect(html).not.toContain(marque);
+    }
+    expect(html).not.toContain('Marque');
     expect(html).not.toContain('F CFA');
     // Document technique : aucune devise, et mention explicite « ni un devis ni une offre de prix ».
     expect(html).toContain('ne constitue ni un devis ni une offre de prix');

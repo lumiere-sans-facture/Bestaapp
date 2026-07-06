@@ -60,14 +60,23 @@ export function buildSizingSheetHtml(d) {
         return `<tr><td>${esc(a.name)}</td><td class="num">${nf(a.power)}</td><td class="num">${nf(a.quantity)}</td><td class="num">${h(a.day)}</td><td class="num">${h(a.night)}</td><td class="num">${nf(wh)}</td></tr>`;
       }).join('');
 
-  // --- Récapitulatif matériel (référence, marque, quantité — sans prix) ---
+  // --- Récapitulatif matériel : désignations TECHNIQUES uniquement (type,
+  // tension, capacité, puissance) + quantité. Les marques et références du
+  // catalogue servent au calcul mais n'apparaissent jamais sur le document.
+  const panelWc = (String(d.panelName || '').match(/(\d{3,4})\s*W/i) || [])[1] || PANEL_SPEC.power;
+  // Batteries regroupées par capacité (les marques disparaissent → fusion des identiques).
+  const batParCapacite = new Map();
+  d.batteries.forEach((b) => batParCapacite.set(b.capacity, (batParCapacite.get(b.capacity) || 0) + b.qty));
   const materiel = [
-    { ref: d.panelName, marque: PANEL_SPEC.brand, qty: d.sizing.numberOfPanels },
-    ...(d.inverter ? [{ ref: d.inverter.model, marque: d.inverter.brand, qty: 1 }] : []),
-    ...d.batteries.map((b) => ({ ref: b.model, marque: b.brand, qty: b.qty })),
-    { ref: 'Structure de montage', marque: '—', qty: Math.max(1, Math.round(d.sizing.numberOfPanels / 10)) },
-    { ref: 'Kit de câblage solaire', marque: '—', qty: 1 },
-    { ref: 'Coffret de protection DC/AC', marque: '—', qty: 1 },
+    { ref: `Panneau photovoltaïque ${nf(panelWc)} Wc`, qty: d.sizing.numberOfPanels },
+    ...(d.inverter ? [{ ref: `Onduleur hybride ${nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0)} kVA`, qty: 1 }] : []),
+    ...[...batParCapacite.entries()].map(([capacite, qty]) => ({
+      ref: `Batterie lithium ${SYSTEM_VOLTAGE}V ${nf(Math.round((capacite * 1000) / SYSTEM_VOLTAGE))}Ah (${nf(capacite, capacite % 1 ? 1 : 0)} kWh)`,
+      qty,
+    })),
+    { ref: 'Structure de montage', qty: Math.max(1, Math.round(d.sizing.numberOfPanels / 10)) },
+    { ref: 'Kit de câblage solaire', qty: 1 },
+    { ref: 'Coffret de protection DC/AC', qty: 1 },
   ];
 
   const paramRows = [
@@ -232,7 +241,7 @@ export function buildSizingSheetHtml(d) {
         <div class="calc-head">Onduleur hybride recommandé</div>
         <div class="calc-formula">Puissance onduleur ≥ puissance requise × ${nf(inverterMargin, 1)}</div>
         <div class="calc-apply">≥ ${nf(Math.round(puissanceRequise))} W × ${nf(inverterMargin, 1)} = ${nf(Math.round(puissanceRequise * inverterMargin))} W
-          → <strong>${esc(d.inverter.brand)} ${esc(d.inverter.model)}</strong> (${nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0)} kVA · ${nf(d.inverter.maxPower)} W)</div>
+          → <strong>Onduleur hybride ${nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0)} kVA</strong> (${nf(d.inverter.maxPower)} W)</div>
         <div class="calc-result">Régulateur MPPT intégré à l’onduleur hybride · tension système ${SYSTEM_VOLTAGE} V</div>
       </div>` : ''}
 
@@ -247,9 +256,9 @@ export function buildSizingSheetHtml(d) {
     <section>
       <h2>5 · Récapitulatif matériel</h2>
       <table>
-        <thead><tr><th>Référence</th><th>Marque</th><th class="num">Quantité</th></tr></thead>
+        <thead><tr><th>Désignation technique</th><th class="num">Quantité</th></tr></thead>
         <tbody>
-          ${materiel.map((m) => `<tr><td>${esc(m.ref)}</td><td>${esc(m.marque)}</td><td class="num">${nf(m.qty)}</td></tr>`).join('')}
+          ${materiel.map((m) => `<tr><td>${esc(m.ref)}</td><td class="num">${nf(m.qty)}</td></tr>`).join('')}
         </tbody>
       </table>
     </section>
