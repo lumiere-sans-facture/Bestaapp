@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, PanelTop, Cpu, Battery, User, Building2, MapPin, Search, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, User, Building2, MapPin, Search, FileText } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
@@ -121,6 +121,8 @@ export default function ProSolarWizard({ onDone }) {
     return { day: Number(day.toFixed(2)), night: Number(night.toFixed(2)) };
   }, [rows, manualMode, manual]);
   const totalConsumption = consumption.day + consumption.night;
+  // Pic de charge : toutes les charges branchées en même temps (dimensionne l'onduleur).
+  const peakLoad = useMemo(() => rows.reduce((s, r) => s + r.power * r.quantity, 0), [rows]);
 
   const sizing = useMemo(
     () => (totalConsumption > 0 ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS) : null),
@@ -312,6 +314,9 @@ export default function ProSolarWizard({ onDone }) {
             <div className="consumption-summary">
               <div className="consumption-stat day"><Sun size={16} /><div><div className="consumption-value">{consumption.day.toFixed(2)}</div><div className="consumption-label">Jour kWh</div></div></div>
               <div className="consumption-stat night"><Moon size={16} /><div><div className="consumption-value">{consumption.night.toFixed(2)}</div><div className="consumption-label">Nuit kWh</div></div></div>
+              {!manualMode && (
+                <div className="consumption-stat peak"><Gauge size={16} /><div><div className="consumption-value">{peakLoad.toLocaleString('fr-FR')}</div><div className="consumption-label">Pic de charge (W)</div></div></div>
+              )}
               <div className="consumption-stat total"><Zap size={16} /><div><div className="consumption-value">{totalConsumption.toFixed(2)}</div><div className="consumption-label">Total / jour</div></div></div>
             </div>
           </div>

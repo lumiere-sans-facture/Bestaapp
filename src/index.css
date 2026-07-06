@@ -933,6 +933,7 @@ textarea.input { resize: vertical; }
 .consumption-stat { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
 .consumption-stat.day { color: var(--accent-dark); }
 .consumption-stat.night { color: var(--primary-light); }
+.consumption-stat.peak { color: var(--error); }
 .consumption-stat.total { color: var(--text-primary); }
 .consumption-value { font-size: 1rem; font-weight: 700; }
 .consumption-label { font-size: 0.6875rem; color: var(--text-muted); }
