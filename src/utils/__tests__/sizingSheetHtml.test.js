@@ -48,7 +48,8 @@ describe('buildSizingSheetHtml', () => {
   it('affiche les hypothèses réelles de solarSizing.js', () => {
     expect(html).toContain('5,2 h/jour'); // HSP
     expect(html).toContain('PVGIS');
-    expect(html).toContain(`${Math.round(SIZING_PARAMS.systemEfficiency * 100)} %`);
+    expect(html).toContain('Rendement des panneaux');
+    expect(html).toContain(`${Math.round(SIZING_PARAMS.panelEfficiency * 100)} %`);
     expect(html).toContain(`${Math.round(SIZING_PARAMS.depthOfDischarge * 100)} %`);
     expect(html).toContain(`${SYSTEM_VOLTAGE} V`);
   });

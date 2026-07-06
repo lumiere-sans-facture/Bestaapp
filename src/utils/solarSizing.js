@@ -105,7 +105,7 @@ export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PV
 // Hypothèses de dimensionnement — exportées pour être affichées telles quelles
 // sur la fiche de dimensionnement (ne pas dupliquer ces valeurs ailleurs).
 export const SIZING_PARAMS = {
-  systemEfficiency: 0.75,   // rendement global (pertes câblage, température, salissures)
+  panelEfficiency: 0.75,    // rendement des panneaux appliqué au calcul
   batteryEfficiency: 0.85,  // rendement charge/décharge des batteries
   depthOfDischarge: 0.8,    // profondeur de décharge maximale (DoD)
   hybridBatteryRatio: 0.8,  // part de la consommation nocturne stockée en hybride
@@ -158,10 +158,10 @@ const groupBatteries = (batteries) => {
  * @param {number} peakSunHours
  */
 export const calculateSystemSize = (consumption, systemType, peakSunHours = DEFAULT_PEAK_SUN_HOURS) => {
-  const { systemEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio } = SIZING_PARAMS;
+  const { panelEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio } = SIZING_PARAMS;
 
   const totalDaily = consumption.day + consumption.night; // kWh
-  const requiredDailyEnergy = totalDaily / systemEfficiency; // kWh
+  const requiredDailyEnergy = totalDaily / panelEfficiency; // kWh
   const requiredPanelPower = (requiredDailyEnergy / peakSunHours) * 1000; // W
   const numberOfPanels = Math.max(1, Math.ceil(requiredPanelPower / PANEL_SPEC.power));
 

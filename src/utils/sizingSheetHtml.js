@@ -31,14 +31,14 @@ const SYSTEM_LABEL = Object.fromEntries(SYSTEM_TYPES.map((t) => [t.id, t.label])
  * @param {string} d.panelName          désignation du panneau (catalogue)
  */
 export function buildSizingSheetHtml(d) {
-  const { systemEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio, inverterMargin } = SIZING_PARAMS;
+  const { panelEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio, inverterMargin } = SIZING_PARAMS;
   const conso = d.consumption;
   const totalKwh = conso.day + conso.night;
   const totalWh = Math.round(totalKwh * 1000);
   const date = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
   // --- Détail des calculs (mêmes formules que calculateSystemSize) ---
-  const energieNecessaire = totalKwh / systemEfficiency; // kWh/j à produire
+  const energieNecessaire = totalKwh / panelEfficiency; // kWh/j à produire
   const puissanceRequise = d.sizing.requiredPanelPower;  // W crête
   const batterieKwh = d.sizing.batteryCapacity;          // kWh (0 en on-grid)
   const batterieWh = Math.round(batterieKwh * 1000);
@@ -73,7 +73,7 @@ export function buildSizingSheetHtml(d) {
   const paramRows = [
     ['Localisation retenue', d.cityName ? esc(d.cityName) : 'Non précisée'],
     ['Heures d’ensoleillement pic (HSP)', `${nf(d.sunHours, 1)} h/jour${d.solarSource ? ` <span class="muted">(source ${esc(d.solarSource)})</span>` : ''}`],
-    ['Rendement global du système <span class="muted">(pertes câblage, température, salissures)</span>', pct(systemEfficiency)],
+    ['Rendement des panneaux appliqué au calcul', pct(panelEfficiency)],
     ['Autonomie couverte par les batteries', autonomie],
     ['Profondeur de décharge batterie (DoD)', pct(depthOfDischarge)],
     ['Rendement charge/décharge batterie', pct(batteryEfficiency)],
@@ -215,8 +215,8 @@ export function buildSizingSheetHtml(d) {
 
       <div class="calc">
         <div class="calc-head">Énergie journalière à produire</div>
-        <div class="calc-formula">E = Consommation totale ÷ rendement global</div>
-        <div class="calc-apply">E = ${nf(totalKwh, 2)} kWh ÷ ${nf(systemEfficiency, 2)} = <strong>${nf(energieNecessaire, 2)} kWh/jour</strong></div>
+        <div class="calc-formula">E = Consommation totale ÷ rendement des panneaux</div>
+        <div class="calc-apply">E = ${nf(totalKwh, 2)} kWh ÷ ${nf(panelEfficiency, 2)} = <strong>${nf(energieNecessaire, 2)} kWh/jour</strong></div>
       </div>
 
       <div class="calc">
