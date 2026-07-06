@@ -33,11 +33,14 @@ describe('buildSizingSheetHtml', () => {
     expect(html).toContain('Autonome (off-grid)');
   });
 
-  it('détaille chaque charge avec sa consommation journalière', () => {
+  it('détaille chaque charge avec heures jour/nuit séparées et conso journalière', () => {
+    expect(html).toContain('☀ Jour (h)');
+    expect(html).toContain('☾ Nuit (h)');
+    // Téléviseur : 3 h jour et 2 h nuit dans des colonnes distinctes
+    expect(html).toContain('<td class="num">3</td><td class="num">2</td><td class="num">600</td>'); // 60 W × 2 × 5 h
     expect(html).toContain('Téléviseur LED 32&quot;');
-    expect(html).toContain('600'); // 60 W × 2 × 5 h = 600 Wh/j
     expect(html).toContain('Réfrigérateur 200 L');
-    expect(html).toContain('3 600'); // 150 × 1 × 24
+    expect(html).toContain('<td class="num">12</td><td class="num">12</td><td class="num">3 600</td>'); // 150 × 1 × 24
     expect(html).toContain('5 400 Wh/j'); // total, séparateur espace
     expect(html).toContain('5,40 kWh/j');
   });

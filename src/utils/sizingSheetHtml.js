@@ -50,14 +50,14 @@ export function buildSizingSheetHtml(d) {
       ? `${pct(hybridBatteryRatio)} de la consommation nocturne (appoint réseau)`
       : 'Sans batterie (injection réseau)';
 
-  // --- Tableau des charges ---
+  // --- Tableau des charges — heures jour / nuit séparées, comme dans le wizard ---
+  const h = (v) => (v ? nf(v, v % 1 ? 1 : 0) : '—');
   const chargesRows = d.manualMode
-    ? `<tr><td>Consommation de jour (saisie directe)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(conso.day * 1000)}</td></tr>
-       <tr><td>Consommation de nuit (saisie directe)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(conso.night * 1000)}</td></tr>`
+    ? `<tr><td>Consommation de jour (saisie directe)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(conso.day * 1000)}</td></tr>
+       <tr><td>Consommation de nuit (saisie directe)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(conso.night * 1000)}</td></tr>`
     : d.appliances.map((a) => {
-        const hours = (a.day || 0) + (a.night || 0);
-        const wh = a.power * a.quantity * hours;
-        return `<tr><td>${esc(a.name)}</td><td class="num">${nf(a.power)}</td><td class="num">${nf(a.quantity)}</td><td class="num">${nf(hours, hours % 1 ? 1 : 0)}</td><td class="num">${nf(wh)}</td></tr>`;
+        const wh = a.power * a.quantity * ((a.day || 0) + (a.night || 0));
+        return `<tr><td>${esc(a.name)}</td><td class="num">${nf(a.power)}</td><td class="num">${nf(a.quantity)}</td><td class="num">${h(a.day)}</td><td class="num">${h(a.night)}</td><td class="num">${nf(wh)}</td></tr>`;
       }).join('');
 
   // --- Récapitulatif matériel (référence, marque, quantité — sans prix) ---
@@ -191,11 +191,11 @@ export function buildSizingSheetHtml(d) {
       <h2>2 · Charges saisies</h2>
       <table>
         <thead>
-          <tr><th>Désignation</th><th class="num">Puissance (W)</th><th class="num">Qté</th><th class="num">Durée (h/j)</th><th class="num">Conso. (Wh/j)</th></tr>
+          <tr><th>Désignation</th><th class="num">Puissance (W)</th><th class="num">Qté</th><th class="num">☀ Jour (h)</th><th class="num">☾ Nuit (h)</th><th class="num">Conso. (Wh/j)</th></tr>
         </thead>
         <tbody>${chargesRows}</tbody>
         <tfoot>
-          <tr><td colspan="4">Total consommation journalière</td><td class="num">${nf(totalWh)} Wh/j — ${nf(totalKwh, 2)} kWh/j</td></tr>
+          <tr><td colspan="5">Total consommation journalière</td><td class="num">${nf(totalWh)} Wh/j — ${nf(totalKwh, 2)} kWh/j</td></tr>
         </tfoot>
       </table>
       <div class="muted" style="margin-top:4px">Dont jour : ${nf(conso.day, 2)} kWh — nuit : ${nf(conso.night, 2)} kWh.</div>
