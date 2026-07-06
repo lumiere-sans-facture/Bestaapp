@@ -43,6 +43,9 @@ describe('buildSizingSheetHtml', () => {
     expect(html).toContain('<td class="num">12</td><td class="num">12</td><td class="num">3 600</td>'); // 150 × 1 × 24
     expect(html).toContain('5 400 Wh/j'); // total, séparateur espace
     expect(html).toContain('5,40 kWh/j');
+    // Pic de charge : 60×2 + 150×1 = 270 W (toutes charges simultanées)
+    expect(html).toContain('Pic de charge');
+    expect(html).toContain('270 W');
   });
 
   it('affiche les hypothèses réelles de solarSizing.js', () => {

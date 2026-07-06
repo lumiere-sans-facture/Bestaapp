@@ -204,6 +204,7 @@ export function buildSizingSheetHtml(d) {
         </thead>
         <tbody>${chargesRows}</tbody>
         <tfoot>
+          ${d.manualMode ? '' : `<tr><td colspan="5">Pic de charge <span class="muted">(toutes charges simultanées)</span></td><td class="num">${nf(d.appliances.reduce((s, a) => s + a.power * a.quantity, 0))} W</td></tr>`}
           <tr><td colspan="5">Total consommation journalière</td><td class="num">${nf(totalWh)} Wh/j — ${nf(totalKwh, 2)} kWh/j</td></tr>
         </tfoot>
       </table>

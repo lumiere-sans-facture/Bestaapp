@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Calculator, PanelTop, MapPin, Search, Package } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
@@ -98,6 +98,8 @@ export default function SolarWizard({ onDone }) {
   }, [rows, manualMode, manual]);
 
   const totalConsumption = consumption.day + consumption.night;
+  // Pic de charge : toutes les charges branchées en même temps (dimensionne l'onduleur).
+  const peakLoad = useMemo(() => rows.reduce((s, r) => s + r.power * r.quantity, 0), [rows]);
 
   const sizing = useMemo(
     () => (totalConsumption > 0 ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS) : null),
@@ -266,6 +268,11 @@ export default function SolarWizard({ onDone }) {
               <div className="consumption-stat night">
                 <Moon size={16} /><div><div className="consumption-value">{consumption.night.toFixed(2)} kWh</div><div className="consumption-label">Nuit</div></div>
               </div>
+              {!manualMode && (
+                <div className="consumption-stat peak">
+                  <Gauge size={16} /><div><div className="consumption-value">{peakLoad.toLocaleString('fr-FR')} W</div><div className="consumption-label">Pic de charge</div></div>
+                </div>
+              )}
               <div className="consumption-stat total">
                 <Zap size={16} /><div><div className="consumption-value">{totalConsumption.toFixed(2)} kWh</div><div className="consumption-label">Total / jour</div></div>
               </div>
