@@ -1,0 +1,1332 @@
+#!/usr/bin/env python3
+"""
+Solar analysis script — computes all metrics from hourly CSV data.
+
+Usage:
+    python3 analyze.py < config.json
+    python3 analyze.py config.json
+
+Input: JSON config on stdin or as file argument with keys:
+    pv_kwp              float   PV system size in kWp
+    inverter_kw         float   Inverter AC output capacity in kW
+    battery_nominal_kwh float   Battery nominal capacity in kWh
+    has_ev              bool    Whether household has EV/PHEV
+    feedin_ratio        float   Feed-in tariff as ratio of import rate (0 = no feed-in, 0.5 = typical)
+    feedin_rate         float   Optional absolute feed-in credit per kWh (same currency as
+                                import_rate). Overrides feedin_ratio when set. Per-entry
+                                feedin_rate is also allowed inside tariff_history.
+    additional_kwp      float   Additional panel capacity (0 if none)
+    seasonal_factors    dict    Month number (str) -> adjustment factor
+    grid_emission_factor float  kg CO2/kWh for the user's grid
+    tariff.type         str     "flat", "tiered", or "tou" (the current tariff)
+    tariff.import_rate  float   Flat rate per kWh
+    tariff.tiers        list    [{threshold, rate}, ...] for tiered (optional)
+    tariff.tou          dict    {peak_hours: [...], peak_rate, offpeak_rate} (optional)
+    tariff_history      list    Optional effective-dated tariff overrides:
+                                [{effective: "YYYY-MM", type, import_rate, tiers?,
+                                  tou?, feedin_ratio?}, ...]. Each month is billed
+                                at the latest entry whose `effective` <= that month;
+                                months before every entry use the current `tariff`.
+                                The forward-looking annual projection always uses
+                                the current `tariff`.
+    roi                 dict    {total_cost, system_age_years} or null
+    currency            str     Currency symbol
+
+Output: JSON to stdout with all computed metrics.
+
+Must be run from the project root directory (where data/ lives).
+"""
+
+import csv
+import datetime
+import json
+import math
+import os
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def resolve_data_dir() -> Path:
+    """Resolve the directory holding solar_hourly_*.csv exports.
+
+    Override with the ``SOLAR_DATA_DIR`` environment variable (absolute, or
+    relative to the current working directory); defaults to ``data`` under the
+    current working directory.
+    """
+    override = os.environ.get("SOLAR_DATA_DIR", "").strip()
+    return Path(override).expanduser() if override else Path("data")
+
+
+def load_csv_files(data_dir: Path) -> list[dict]:
+    """Load all solar_hourly_*.csv files, return list of row dicts."""
+    files = sorted(data_dir.glob("solar_hourly_*.csv"))
+    if not files:
+        print(json.dumps({"error": "No solar_hourly_*.csv files found in data/"}))
+        sys.exit(1)
+
+    rows = []
+    filenames = []
+    for f in files:
+        filenames.append(f.name)
+        with open(f) as fh:
+            reader = csv.DictReader(fh)
+            for r in reader:
+                # Convert numeric fields
+                for k in r:
+                    if k in ("Date", "Hour"):
+                        continue
+                    try:
+                        r[k] = float(r[k])
+                    except (ValueError, TypeError):
+                        r[k] = 0.0
+                rows.append(r)
+    return rows, filenames
+
+
+def median(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    s = sorted(values)
+    n = len(s)
+    if n % 2 == 1:
+        return s[n // 2]
+    return (s[n // 2 - 1] + s[n // 2]) / 2
+
+
+def mean(values: list[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
+
+
+def stdev(values: list[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    m = mean(values)
+    return math.sqrt(sum((v - m) ** 2 for v in values) / (len(values) - 1))
+
+
+# ---------------------------------------------------------------------------
+# Group data
+# ---------------------------------------------------------------------------
+
+def group_by(rows, key_fn):
+    groups = defaultdict(list)
+    for r in rows:
+        groups[key_fn(r)].append(r)
+    return groups
+
+
+def row_month(r):
+    return r["Date"][:7]  # YYYY-MM
+
+
+def row_day(r):
+    return r["Date"][:10]  # YYYY-MM-DD
+
+
+def row_hour(r):
+    return r["Hour"]
+
+
+# Derived fields per row
+def enrich(r):
+    """Compute derived fields from raw CSV columns.
+
+    Note:
+        Assumption: Energy values use 1-hour buckets, so *_Energy_kWh numerically
+        equals Avg_*_W / 1000. Sign conventions: battery positive = charge,
+        grid positive = export. These must match the CSV contract from the
+        inverter/monitoring system.
+    """
+    r["Load_kWh"] = r["GridLoad_Energy_kWh"] + r["BackupLoad_Energy_kWh"]
+    r["Load_W"] = r["Avg_GridLoad_W"] + r["Avg_BackupLoad_W"]
+    r["Grid_Import_kWh"] = abs(min(0, r["Grid_Energy_kWh"]))
+    r["Grid_Export_kWh"] = max(0, r["Grid_Energy_kWh"])
+    r["Battery_Charge_kWh"] = max(0, r["Battery_Energy_kWh"])
+    r["Battery_Discharge_kWh"] = abs(min(0, r["Battery_Energy_kWh"]))
+    return r
+
+
+# ---------------------------------------------------------------------------
+# Analysis sections
+# ---------------------------------------------------------------------------
+
+def compute_monthly_totals(rows):
+    """3a. Monthly totals.
+
+    Note:
+        Assumption: self_consumed = total_load - grid_import. This measures actual
+        solar offset and avoids inflating by battery round-trip losses, but can go
+        negative if metering errors cause import > load.
+    """
+    by_month = group_by(rows, row_month)
+    result = {}
+    for m, mrows in sorted(by_month.items()):
+        total_pv = sum(r["PV_Energy_kWh"] for r in mrows)
+        total_load = sum(r["Load_kWh"] for r in mrows)
+        grid_export = sum(r["Grid_Export_kWh"] for r in mrows)
+        grid_import = sum(r["Grid_Import_kWh"] for r in mrows)
+        battery_charge = sum(r["Battery_Charge_kWh"] for r in mrows)
+        battery_discharge = sum(r["Battery_Discharge_kWh"] for r in mrows)
+        self_consumed = total_load - grid_import  # ASSUMPTION: see docstring
+        sc_rate = (self_consumed / total_pv * 100) if total_pv > 0 else 0
+        ss = (1 - grid_import / total_load) * 100 if total_load > 0 else None
+        days = len(set(row_day(r) for r in mrows))
+
+        result[m] = {
+            "total_pv": round(total_pv, 1),
+            "total_load": round(total_load, 1),
+            "grid_export": round(grid_export, 1),
+            "grid_import": round(grid_import, 1),
+            "battery_charge": round(battery_charge, 1),
+            "battery_discharge": round(battery_discharge, 1),
+            "self_consumed": round(self_consumed, 1),
+            "self_consumption_rate": round(sc_rate, 1),
+            "self_sufficiency": round(ss, 1) if ss is not None else None,
+            "days": days,
+        }
+    return result
+
+
+def detect_ev_days(rows):
+    """3b. EV day detection.
+
+    Note:
+        Heuristic: Days with ≤20 of 24 hourly rows are excluded to avoid skewing
+        averages with incomplete data.
+
+        Heuristic: Threshold is max(8, avg_daily_load * 0.3) kWh above mean daily
+        load. The 8 kWh floor catches small PHEV charges; the 30% factor scales
+        with household size. Days near the threshold may be misclassified.
+
+        Caveat: Does not distinguish EV charging from other high-load events
+        (e.g., guests, space heaters).
+    """
+    by_day = group_by(rows, row_day)
+    daily_loads = {}
+    for day, drows in by_day.items():
+        if len(drows) > 20:  # HEURISTIC: exclude partial days (≤20 of 24 rows)
+            daily_loads[day] = sum(r["Load_kWh"] for r in drows)
+
+    if not daily_loads:
+        return set(), set(), {}
+
+    avg_load = mean(list(daily_loads.values()))
+    threshold = max(8, avg_load * 0.3)  # HEURISTIC: 8 kWh floor, 30% scaling
+
+    ev_days = set()
+    non_ev_days = set()
+    for day, load in daily_loads.items():
+        if load > avg_load + threshold:
+            ev_days.add(day)
+        else:
+            non_ev_days.add(day)
+
+    info = {
+        "avg_daily_load": round(avg_load, 1),
+        "threshold": round(threshold, 1),
+        "ev_day_count": len(ev_days),
+        "non_ev_day_count": len(non_ev_days),
+        "total_full_days": len(daily_loads),
+        "ev_dates": sorted(ev_days),
+    }
+    if ev_days:
+        info["ev_avg_load"] = round(mean([daily_loads[d] for d in ev_days]), 1)
+    if non_ev_days:
+        info["non_ev_avg_load"] = round(
+            mean([daily_loads[d] for d in non_ev_days]), 1
+        )
+
+    return ev_days, non_ev_days, info
+
+
+def compute_hourly_patterns(rows, ev_days, non_ev_days):
+    """3c. Hourly patterns."""
+    result = {}
+    for label, day_set in [("non_ev", non_ev_days), ("ev", ev_days)]:
+        subset = [r for r in rows if row_day(r) in day_set]
+        if not subset:
+            continue
+        by_hour = group_by(subset, row_hour)
+        hourly = {}
+        for h, hrows in sorted(by_hour.items()):
+            hourly[h] = {
+                "avg_pv_w": round(mean([r["Avg_PV_W"] for r in hrows]), 0),
+                "avg_load_w": round(mean([r["Load_W"] for r in hrows]), 0),
+                "avg_battery_w": round(mean([r["Avg_Battery_W"] for r in hrows]), 0),
+                "avg_grid_w": round(mean([r["Avg_Grid_W"] for r in hrows]), 0),
+                "avg_soc": round(mean([r["Avg_SOC_Pct"] for r in hrows]), 1),
+                "avg_grid_import": round(mean([r["Grid_Import_kWh"] for r in hrows]), 3),
+                "avg_grid_export": round(mean([r["Grid_Export_kWh"] for r in hrows]), 3),
+            }
+        result[label] = hourly
+
+    # Peak PV hours
+    all_by_hour = group_by(rows, row_hour)
+    pv_hourly = {h: mean([r["Avg_PV_W"] for r in hrs]) for h, hrs in all_by_hour.items()}
+    max_pv = max(pv_hourly.values()) if pv_hourly else 0
+    peak_pv_hours = sorted([h for h, v in pv_hourly.items() if v > max_pv * 0.5])
+
+    # Export hours
+    export_hourly = {
+        h: mean([r["Grid_Export_kWh"] for r in hrs]) for h, hrs in all_by_hour.items()
+    }
+    export_hours = sorted([h for h, v in export_hourly.items() if v > 0.05])
+
+    # EV charging hours
+    ev_charging_hours = []
+    if "ev" in result and "non_ev" in result:
+        for h in sorted(result["ev"].keys()):
+            if h in result["non_ev"]:
+                diff = result["ev"][h]["avg_load_w"] - result["non_ev"][h]["avg_load_w"]
+                if diff > 500:
+                    ev_charging_hours.append(h)
+
+    # Overnight SOC drain
+    soc_drain = {}
+    for label, day_set in [("non_ev", non_ev_days), ("ev", ev_days)]:
+        subset = [r for r in rows if row_day(r) in day_set]
+        evening = [r for r in subset if r["Hour"] in ("18:00", "19:00", "20:00")]
+        morning = [r for r in subset if r["Hour"] in ("05:00", "06:00")]
+        if evening and morning:
+            eve_soc = mean([r["Max_SOC_Pct"] for r in evening])
+            morn_soc = mean([r["Min_SOC_Pct"] for r in morning])
+            soc_drain[label] = {
+                "evening_soc": round(eve_soc, 0),
+                "morning_soc": round(morn_soc, 0),
+                "drain": round(eve_soc - morn_soc, 0),
+            }
+
+    return {
+        "hourly": result,
+        "peak_pv_hours": peak_pv_hours,
+        "export_hours": export_hours,
+        "ev_charging_hours": ev_charging_hours,
+        "soc_drain": soc_drain,
+    }
+
+
+def compute_weekday_weekend(rows, non_ev_days):
+    """3c2. Weekday vs weekend patterns (non-EV days only)."""
+    non_ev_rows = [r for r in rows if row_day(r) in non_ev_days]
+    if not non_ev_rows:
+        return None
+
+    def is_weekend(date_str):
+        d = datetime.date.fromisoformat(date_str)
+        return d.weekday() >= 5  # 5=Sat, 6=Sun
+
+    weekday_days = {d for d in non_ev_days if not is_weekend(d)}
+    weekend_days = {d for d in non_ev_days if is_weekend(d)}
+
+    if not weekday_days or not weekend_days:
+        return None
+
+    by_day = group_by(non_ev_rows, row_day)
+
+    result = {}
+    for label, day_set in [("weekday", weekday_days), ("weekend", weekend_days)]:
+        days_data = {d: drows for d, drows in by_day.items() if d in day_set and len(drows) > 20}  # HEURISTIC: exclude partial days
+        if not days_data:
+            continue
+        daily_loads = [sum(r["Load_kWh"] for r in drows) for drows in days_data.values()]
+        daily_pvs = [sum(r["PV_Energy_kWh"] for r in drows) for drows in days_data.values()]
+        daily_imports = [sum(r["Grid_Import_kWh"] for r in drows) for drows in days_data.values()]
+        daily_exports = [sum(r["Grid_Export_kWh"] for r in drows) for drows in days_data.values()]
+
+        avg_load = mean(daily_loads)
+        avg_import = mean(daily_imports)
+        ss = (1 - avg_import / avg_load) * 100 if avg_load > 0 else 0
+
+        # Hourly load profile
+        all_rows_for_type = [r for d in days_data for r in days_data[d]]
+        hourly_load = {}
+        by_hour = group_by(all_rows_for_type, row_hour)
+        for h, hrows in sorted(by_hour.items()):
+            hourly_load[h] = round(mean([r["Load_W"] for r in hrows]), 0)
+
+        result[label] = {
+            "days": len(days_data),
+            "avg_daily_load": round(avg_load, 1),
+            "avg_daily_pv": round(mean(daily_pvs), 1),
+            "avg_daily_import": round(avg_import, 1),
+            "avg_daily_export": round(mean(daily_exports), 1),
+            "self_sufficiency": round(ss, 0),
+            "hourly_load_w": hourly_load,
+        }
+
+    # Find hours with significant difference (>200W)
+    if "weekday" in result and "weekend" in result:
+        sig_hours = []
+        for h in result["weekday"]["hourly_load_w"]:
+            if h in result["weekend"]["hourly_load_w"]:
+                diff = result["weekend"]["hourly_load_w"][h] - result["weekday"]["hourly_load_w"][h]
+                if abs(diff) > 200:
+                    sig_hours.append({"hour": h, "diff_w": round(diff, 0)})
+        result["significant_hourly_diffs"] = sig_hours
+
+    return result
+
+
+def compute_system_sizing(rows, pv_kwp, inverter_kw, non_ev_days, ev_days):
+    """3d. System sizing and inverter check."""
+    by_day = group_by(rows, row_day)
+    daily_pv = [sum(r["PV_Energy_kWh"] for r in drows) for drows in by_day.values()]
+    avg_daily_pv = mean(daily_pv)
+    capacity_factor = avg_daily_pv / (pv_kwp * 24)
+    peak_sun_hours = avg_daily_pv / pv_kwp
+
+    max_pv_w = max(r["Avg_PV_W"] for r in rows)
+    nameplate_w = pv_kwp * 1000
+    inverter_ac_w = inverter_kw * 1000
+
+    # Clipping checks
+    panel_clip_hours = sum(1 for r in rows if r["Avg_PV_W"] > nameplate_w * 0.85)
+    inverter_clip_hours = sum(1 for r in rows if r["Avg_PV_W"] > inverter_ac_w)
+    inverter_limited = max_pv_w >= inverter_ac_w * 0.95
+
+    # PV/load ratio for non-EV
+    non_ev_rows = [r for r in rows if row_day(r) in non_ev_days]
+    non_ev_by_day = group_by(non_ev_rows, row_day)
+    non_ev_daily_pv = [sum(r["PV_Energy_kWh"] for r in d) for d in non_ev_by_day.values()]
+    non_ev_daily_load = [sum(r["Load_kWh"] for r in d) for d in non_ev_by_day.values()]
+    pv_load_ratio = mean(non_ev_daily_pv) / mean(non_ev_daily_load) if non_ev_daily_load and mean(non_ev_daily_load) > 0 else 0
+
+    # Per-month breakdown
+    by_month = group_by(rows, row_month)
+    monthly_sizing = {}
+    for m, mrows in sorted(by_month.items()):
+        m_by_day = group_by(mrows, row_day)
+        m_daily_pv = [sum(r["PV_Energy_kWh"] for r in d) for d in m_by_day.values()]
+        m_avg = mean(m_daily_pv)
+        m_total_load = sum(r["Load_kWh"] for r in mrows)
+        m_total_import = sum(r["Grid_Import_kWh"] for r in mrows)
+        grid_dep = (m_total_import / m_total_load * 100) if m_total_load > 0 else 0
+        monthly_sizing[m] = {
+            "avg_daily_pv": round(m_avg, 1),
+            "peak_sun_hours": round(m_avg / pv_kwp, 1),
+            "capacity_factor": round(m_avg / (pv_kwp * 24) * 100, 1),
+            "grid_dependence": round(grid_dep, 0),
+        }
+
+    return {
+        "avg_daily_pv": round(avg_daily_pv, 2),
+        "capacity_factor": round(capacity_factor * 100, 1),
+        "peak_sun_hours": round(peak_sun_hours, 2),
+        "max_pv_w": round(max_pv_w, 0),
+        "nameplate_w": nameplate_w,
+        "inverter_ac_w": round(inverter_ac_w, 0),
+        "inverter_kw": inverter_kw,
+        "dc_ac_ratio": round(pv_kwp / inverter_kw, 2),
+        "max_pv_pct_nameplate": round(max_pv_w / nameplate_w * 100, 0),
+        "max_pv_pct_inverter": round(max_pv_w / inverter_ac_w * 100, 0),
+        "panel_clip_hours": panel_clip_hours,
+        "inverter_clip_hours": inverter_clip_hours,
+        "inverter_limited": inverter_limited,
+        "pv_load_ratio": round(pv_load_ratio, 2),
+        "monthly": monthly_sizing,
+    }
+
+
+def compute_battery_analysis(rows, nominal_kwh, ev_days, non_ev_days):
+    """3e. Battery analysis.
+
+    Note:
+        Heuristic (usable capacity): Estimates usable capacity by finding the
+        deepest monotonic SOC decline per day, computing
+        discharge_kWh / (SOC_drop / 100), and taking the median across days with
+        >30% SOC swing.
+
+        Caveat (usable capacity): Accuracy depends on the inverter's SOC and
+        energy reporting. BMS-reported SOC may not be linear (especially at
+        extremes). The >30% swing filter excludes shallow cycles which could bias
+        the estimate upward.
+
+        Assumption (monthly efficiency): Computed on monthly aggregates
+        (total_discharge / total_charge) to smooth out daily SOC imbalances.
+        Assumes SOC roughly balances over a month. If the battery trends toward a
+        different SOC at month-end vs month-start, the efficiency figure will be
+        skewed.
+
+        Caveat (avoidable import): Uses daily upper-bound:
+        daily_import - max(0, load - pv). This overstates avoidable import because
+        it ignores hourly timing mismatches — a battery can't simultaneously store
+        afternoon surplus and discharge during morning demand.
+    """
+    by_day = group_by(rows, row_day)
+
+    # Usable capacity estimation via deepest monotonic SOC decline
+    usable_estimates = []
+    for day, drows in by_day.items():
+        drows_sorted = sorted(drows, key=lambda r: r["Hour"])
+        soc_vals = [r["Avg_SOC_Pct"] for r in drows_sorted]
+        discharge_vals = [r["Battery_Discharge_kWh"] for r in drows_sorted]
+
+        best_start = best_end = 0
+        best_drop = 0
+        i = 0
+        while i < len(soc_vals) - 1:
+            if soc_vals[i] > soc_vals[i + 1]:
+                j = i + 1
+                while j < len(soc_vals) - 1 and soc_vals[j] >= soc_vals[j + 1]:
+                    j += 1
+                drop = soc_vals[i] - soc_vals[j]
+                if drop > best_drop:
+                    best_drop = drop
+                    best_start = i
+                    best_end = j
+                i = j
+            else:
+                i += 1
+
+        if best_drop > 30:  # HEURISTIC: require >30% SOC swing for reliable estimate
+            discharge_in_window = sum(discharge_vals[best_start : best_end + 1])
+            if best_drop > 0 and discharge_in_window > 0:
+                est = discharge_in_window / (best_drop / 100)
+                usable_estimates.append(est)
+
+    estimated_usable = median(usable_estimates) if usable_estimates else nominal_kwh * 0.9
+    usable_pct = estimated_usable / nominal_kwh * 100
+
+    # Daily charge/discharge
+    daily_batt = {}
+    for day, drows in by_day.items():
+        ch = sum(r["Battery_Charge_kWh"] for r in drows)
+        dis = sum(r["Battery_Discharge_kWh"] for r in drows)
+        mx_soc = max(r["Max_SOC_Pct"] for r in drows)
+        mn_soc = min(r["Min_SOC_Pct"] for r in drows)
+        daily_batt[day] = {
+            "charge": ch,
+            "discharge": dis,
+            "max_soc": mx_soc,
+            "min_soc": mn_soc,
+            "cycle_depth": dis / estimated_usable * 100 if estimated_usable > 0 else 0,
+        }
+
+    all_charges = [d["charge"] for d in daily_batt.values()]
+    all_discharges = [d["discharge"] for d in daily_batt.values()]
+    all_depths = [d["cycle_depth"] for d in daily_batt.values()]
+    all_min_soc = [d["min_soc"] for d in daily_batt.values()]
+    all_max_soc = [d["max_soc"] for d in daily_batt.values()]
+
+    # Per-type stats
+    type_stats = {}
+    for label, day_set in [("non_ev", non_ev_days), ("ev", ev_days)]:
+        subset = {d: v for d, v in daily_batt.items() if d in day_set}
+        if subset:
+            type_stats[label] = {
+                "avg_charge": round(mean([v["charge"] for v in subset.values()]), 1),
+                "avg_discharge": round(mean([v["discharge"] for v in subset.values()]), 1),
+                "avg_cycle_depth": round(mean([v["cycle_depth"] for v in subset.values()]), 0),
+            }
+
+    # Monthly round-trip efficiency — ASSUMPTION: see docstring
+    by_month = group_by(rows, row_month)
+    monthly_efficiency = {}
+    for m, mrows in sorted(by_month.items()):
+        ch = sum(r["Battery_Charge_kWh"] for r in mrows)
+        dis = sum(r["Battery_Discharge_kWh"] for r in mrows)
+        eff = (dis / ch * 100) if ch > 0 else 0
+        monthly_efficiency[m] = {
+            "efficiency": round(eff, 1),
+            "charge": round(ch, 1),
+            "discharge": round(dis, 1),
+        }
+
+    # Avoidable import (daily upper-bound) — CAVEAT: see docstring
+    avoidable_total = 0
+    for day, drows in by_day.items():
+        day_import = sum(r["Grid_Import_kWh"] for r in drows)
+        day_load = sum(r["Load_kWh"] for r in drows)
+        day_pv = sum(r["PV_Energy_kWh"] for r in drows)
+        theoretical_min = max(0, day_load - day_pv)
+        avoidable_total += max(0, day_import - theoretical_min)
+
+    num_days = len([d for d, drows in by_day.items() if len(drows) > 20])
+    avg_avoidable = avoidable_total / num_days if num_days > 0 else 0
+
+    return {
+        "nominal_kwh": round(nominal_kwh, 1),
+        "estimated_usable_kwh": round(estimated_usable, 1),
+        "usable_pct": round(usable_pct, 0),
+        "usable_estimate_days": len(usable_estimates),
+        "avg_charge": round(mean(all_charges), 1),
+        "avg_discharge": round(mean(all_discharges), 1),
+        "avg_cycle_depth": round(mean(all_depths), 0),
+        "avg_min_soc": round(mean(all_min_soc), 0),
+        "avg_max_soc": round(mean(all_max_soc), 0),
+        "type_stats": type_stats,
+        "monthly_efficiency": monthly_efficiency,
+        "avoidable_import_total": round(avoidable_total, 1),
+        "avg_avoidable_per_day": round(avg_avoidable, 1),
+    }
+
+
+def compute_additional_panels(rows, current_kwp, additional_kwp, feedin_ratio, import_rate,
+                              feedin_rate=None):
+    """3f. Additional panels projection.
+
+    Note:
+        Assumption: Scales PV output linearly — assumes additional panels have the
+        same orientation, tilt, and shading as existing panels. Does not model
+        inverter clipping from the additional capacity.
+
+        Caveat: If inverter clipping was detected in system sizing, this projection
+        is optimistic.
+    """
+    if additional_kwp <= 0:
+        return None
+
+    total_kwp = current_kwp + additional_kwp
+    scale = total_kwp / current_kwp
+    extra_self_consumed = 0
+    extra_exported = 0
+
+    for r in rows:
+        extra_pv = r["PV_Energy_kWh"] * (scale - 1)
+        if r["Grid_Import_kWh"] > 0:
+            offset = min(extra_pv, r["Grid_Import_kWh"])
+            extra_self_consumed += offset
+            extra_exported += extra_pv - offset
+        else:
+            extra_exported += extra_pv
+
+    by_day = group_by(rows, row_day)
+    num_days = len([d for d, drows in by_day.items() if len(drows) > 20])
+
+    return {
+        "additional_kwp": additional_kwp,
+        "total_kwp": total_kwp,
+        "extra_self_consumed_total": round(extra_self_consumed, 1),
+        "extra_exported_total": round(extra_exported, 1),
+        "extra_self_consumed_daily": round(extra_self_consumed / num_days, 1) if num_days else 0,
+        "extra_exported_daily": round(extra_exported / num_days, 1) if num_days else 0,
+        "extra_daily_savings": round(
+            (extra_self_consumed / num_days * import_rate
+             + extra_exported / num_days * feedin_credit_rate(import_rate, feedin_ratio, feedin_rate))
+            if num_days else 0, 1
+        ),
+    }
+
+
+def compute_peak_demand(rows, ev_days, non_ev_days, inverter_ac_w):
+    """3g. Peak demand analysis."""
+    # Peak grid draw when importing
+    importing_rows = [r for r in rows if r["Grid_Energy_kWh"] < 0]
+    if importing_rows:
+        peak_import_row = max(importing_rows, key=lambda r: abs(r["Avg_Grid_W"]))
+        peak_grid_draw_w = abs(peak_import_row["Avg_Grid_W"])
+        peak_grid_date = peak_import_row["Date"]
+        peak_grid_hour = peak_import_row["Hour"]
+        peak_grid_is_ev = row_day(peak_import_row) in ev_days
+    else:
+        peak_grid_draw_w = 0
+        peak_grid_date = peak_grid_hour = ""
+        peak_grid_is_ev = False
+
+    # Average daily peak grid draw by type
+    by_day = group_by(rows, row_day)
+    avg_peaks = {}
+    for label, day_set in [("non_ev", non_ev_days), ("ev", ev_days)]:
+        day_peaks = []
+        for day in day_set:
+            if day in by_day:
+                imp_rows = [r for r in by_day[day] if r["Grid_Energy_kWh"] < 0]
+                if imp_rows:
+                    day_peaks.append(max(abs(r["Avg_Grid_W"]) for r in imp_rows))
+        if day_peaks:
+            avg_peaks[label] = round(mean(day_peaks), 0)
+
+    # Peak PV output
+    peak_pv_row = max(rows, key=lambda r: r["Avg_PV_W"])
+    peak_pv_w = peak_pv_row["Avg_PV_W"]
+
+    return {
+        "peak_grid_draw_w": round(peak_grid_draw_w, 0),
+        "peak_grid_draw_kw": round(peak_grid_draw_w / 1000, 1),
+        "peak_grid_date": peak_grid_date,
+        "peak_grid_hour": peak_grid_hour,
+        "peak_grid_is_ev": peak_grid_is_ev,
+        "avg_daily_peak_grid": avg_peaks,
+        "peak_pv_w": round(peak_pv_w, 0),
+        "peak_pv_kw": round(peak_pv_w / 1000, 1),
+        "peak_pv_date": peak_pv_row["Date"],
+        "peak_pv_hour": peak_pv_row["Hour"],
+        "peak_pv_pct_inverter": round(peak_pv_w / inverter_ac_w * 100, 0) if inverter_ac_w > 0 else 0,
+    }
+
+
+def compute_anomalies(rows, ev_days, non_ev_days):
+    """3h. Anomaly detection.
+
+    Note:
+        Heuristic (PV): Flags days where PV generation is <60% of the rolling
+        14-day mean. The first 3 days are excluded (insufficient baseline).
+        Caveat: Cannot distinguish equipment faults from weather events. Heavy
+        cloud cover will trigger false positives.
+
+        Heuristic (load): Flags non-EV days where load exceeds mean + 2 standard
+        deviations. Requires ≥5 non-EV days for a meaningful baseline.
+
+        Heuristic (battery): Flags days where round-trip efficiency < 80%, but
+        only for days where start and end SOC are within 5% (to ensure a roughly
+        complete cycle). Requires >1 kWh of charging to avoid noise from idle days.
+    """
+    by_day = group_by(rows, row_day)
+    sorted_days = sorted(by_day.keys())
+
+    # --- PV anomalies ---
+    daily_pv = {d: sum(r["PV_Energy_kWh"] for r in drows) for d, drows in by_day.items()}
+    pv_anomalies = []
+    for i, day in enumerate(sorted_days):
+        if i < 3:
+            continue
+        # Rolling 14-day mean
+        window_start = max(0, i - 14)
+        window_days = sorted_days[window_start:i]
+        ref_mean = mean([daily_pv[d] for d in window_days])
+        if ref_mean > 0 and daily_pv[day] < ref_mean * 0.6:  # HEURISTIC: <60% of rolling mean
+            pv_anomalies.append({
+                "date": day,
+                "daily_pv": round(daily_pv[day], 1),
+                "expected": round(ref_mean, 1),
+                "deviation_pct": round((daily_pv[day] - ref_mean) / ref_mean * 100, 0),
+            })
+
+    # --- Load anomalies ---
+    non_ev_loads = [
+        sum(r["Load_kWh"] for r in by_day[d])
+        for d in non_ev_days
+        if d in by_day and len(by_day[d]) > 20
+    ]
+    load_anomalies = []
+    if len(non_ev_loads) >= 5:  # HEURISTIC: require ≥5 days for meaningful baseline
+        load_mean = mean(non_ev_loads)
+        load_std = stdev(non_ev_loads)
+        threshold = load_mean + 2 * load_std  # HEURISTIC: mean + 2σ
+        for d in non_ev_days:
+            if d in by_day and len(by_day[d]) > 20:
+                day_load = sum(r["Load_kWh"] for r in by_day[d])
+                if day_load > threshold:
+                    load_anomalies.append({
+                        "date": d,
+                        "daily_load": round(day_load, 1),
+                        "expected_mean": round(load_mean, 1),
+                        "expected_std": round(load_std, 1),
+                    })
+
+    # --- Battery anomalies ---
+    battery_anomalies = []
+    for day, drows in by_day.items():
+        drows_sorted = sorted(drows, key=lambda r: r["Hour"])
+        if len(drows_sorted) < 20:
+            continue
+        start_soc = drows_sorted[0]["Avg_SOC_Pct"]
+        end_soc = drows_sorted[-1]["Avg_SOC_Pct"]
+        if abs(start_soc - end_soc) > 5:  # HEURISTIC: require SOC within 5% for complete cycle
+            continue
+        ch = sum(r["Battery_Charge_kWh"] for r in drows_sorted)
+        dis = sum(r["Battery_Discharge_kWh"] for r in drows_sorted)
+        if ch > 1:  # HEURISTIC: >1 kWh charging to avoid noise from idle days
+            eff = dis / ch * 100
+            if eff < 80:  # HEURISTIC: flag efficiency below 80%
+                battery_anomalies.append({
+                    "date": day,
+                    "efficiency": round(eff, 1),
+                    "charge": round(ch, 1),
+                    "discharge": round(dis, 1),
+                })
+
+    return {
+        "pv": pv_anomalies,
+        "load": load_anomalies,
+        "battery": battery_anomalies,
+    }
+
+
+def feedin_credit_rate(import_rate, feedin_ratio=0.0, feedin_rate=None):
+    """Absolute feed-in credit per exported kWh (currency/kWh).
+
+    An explicit ``feedin_rate`` (absolute) takes precedence; otherwise the credit
+    is ``import_rate * feedin_ratio``. Use this everywhere export revenue is
+    valued so the two ways of expressing feed-in stay consistent.
+    """
+    if feedin_rate is not None:
+        return feedin_rate
+    return import_rate * (feedin_ratio or 0.0)
+
+
+def resolve_month_tariff(month, base_tariff, base_feedin_ratio, base_feedin_rate, tariff_history):
+    """Pick the tariff in effect for a ``YYYY-MM`` month.
+
+    ``tariff_history`` is an optional list of effective-dated overrides, each a
+    full tariff object plus ``effective`` (``YYYY-MM``) and an optional feed-in
+    spec — ``feedin_rate`` (absolute) and/or ``feedin_ratio``. The entry with the
+    latest ``effective`` that is <= ``month`` wins; months earlier than every
+    entry fall back to ``base_tariff`` and the base feed-in (the current tariff).
+
+    Returns ``(tariff, feedin_ratio, feedin_rate)``. An entry that sets either
+    feed-in field defines its own feed-in (an explicit ``feedin_ratio`` clears the
+    inherited absolute rate, and vice versa); an entry with neither inherits both
+    base values.
+    """
+    chosen = None
+    for entry in tariff_history or []:
+        eff = entry.get("effective", "")
+        if eff and eff <= month and (chosen is None or eff > chosen.get("effective", "")):
+            chosen = entry
+    if chosen is None:
+        return base_tariff, base_feedin_ratio, base_feedin_rate
+    if "feedin_rate" in chosen:
+        return chosen, chosen.get("feedin_ratio", base_feedin_ratio), chosen["feedin_rate"]
+    if "feedin_ratio" in chosen:
+        return chosen, chosen["feedin_ratio"], None
+    return chosen, base_feedin_ratio, base_feedin_rate
+
+
+def _bill_for_month(mrows, total_load, grid_import, grid_export, tariff,
+                    feedin_ratio, feedin_rate=None):
+    """Cost of one month's import with/without solar, plus feed-in credit.
+
+    Assumption (tiered): tier thresholds are cumulative (each tier covers
+    threshold[i] - threshold[i-1] kWh). Caveat (feed-in credit): a flat per-kWh
+    rate (absolute ``feedin_rate`` or ``import_rate * feedin_ratio``) is applied
+    regardless of TOU period.
+    """
+    tariff_type = tariff.get("type", "flat")
+    import_rate = tariff.get("import_rate", 0)
+
+    def calc_flat(kwh):
+        return kwh * import_rate
+
+    def calc_tiered(kwh):
+        tiers = tariff.get("tiers", [])
+        if not tiers:
+            return kwh * import_rate
+        cost = 0
+        remaining = kwh
+        for i, tier in enumerate(tiers):
+            thresh = tier.get("threshold", float("inf"))
+            rate = tier.get("rate", import_rate)
+            if i == 0:
+                tier_kwh = min(remaining, thresh)
+            else:
+                prev_thresh = tiers[i - 1].get("threshold", 0)
+                tier_kwh = min(remaining, thresh - prev_thresh)
+            cost += tier_kwh * rate
+            remaining -= tier_kwh
+            if remaining <= 0:
+                break
+        if remaining > 0:
+            cost += remaining * tiers[-1].get("rate", import_rate)
+        return cost
+
+    def calc_tou_monthly(rate_fn):
+        tou = tariff.get("tou", {})
+        peak_hours = set(tou.get("peak_hours", []))
+        peak_rate = tou.get("peak_rate", import_rate)
+        offpeak_rate = tou.get("offpeak_rate", import_rate)
+        cost = 0
+        for r in mrows:
+            kwh = rate_fn(r)
+            cost += kwh * (peak_rate if r["Hour"] in peak_hours else offpeak_rate)
+        return cost
+
+    if tariff_type == "tou":
+        without_solar = calc_tou_monthly(lambda r: r["Load_kWh"])
+        with_solar = calc_tou_monthly(lambda r: r["Grid_Import_kWh"])
+    elif tariff_type == "tiered":
+        without_solar = calc_tiered(total_load)
+        with_solar = calc_tiered(grid_import)
+    else:
+        without_solar = calc_flat(total_load)
+        with_solar = calc_flat(grid_import)
+
+    # CAVEAT: flat per-kWh rate, ignores TOU period
+    feedin_credit = grid_export * feedin_credit_rate(import_rate, feedin_ratio, feedin_rate)
+    return without_solar, with_solar, feedin_credit
+
+
+def compute_bill_impact(rows, tariff, feedin_ratio, monthly_totals,
+                        tariff_history=None, feedin_rate=None):
+    """3i. Bill impact estimate.
+
+    Each month is costed at the tariff in effect that month (``tariff_history``,
+    optional). The forward-looking annual projection always uses the current
+    ``tariff`` and base feed-in (``feedin_ratio`` / absolute ``feedin_rate``), so
+    it reflects today's rates regardless of history. With no ``tariff_history``
+    the two coincide and the output is unchanged.
+
+    See ``_bill_for_month`` for the tiered/feed-in assumptions.
+    """
+    tariff_type = tariff.get("type", "flat")
+    history_applied = False
+
+    by_month = group_by(rows, row_month)
+    monthly_bill = {}
+    # Current-tariff sums drive the forward-looking annual projection.
+    cur_without = cur_with = cur_credit = cur_days = 0
+    for m, mrows in sorted(by_month.items()):
+        total_load = sum(r["Load_kWh"] for r in mrows)
+        grid_import = sum(r["Grid_Import_kWh"] for r in mrows)
+        grid_export = sum(r["Grid_Export_kWh"] for r in mrows)
+        days = monthly_totals[m]["days"] if m in monthly_totals else 30
+
+        m_tariff, m_ratio, m_rate = resolve_month_tariff(
+            m, tariff, feedin_ratio, feedin_rate, tariff_history)
+        if m_tariff is not tariff:
+            history_applied = True
+
+        # Historical (as-billed) figures for this month.
+        without_solar, with_solar, feedin_credit = _bill_for_month(
+            mrows, total_load, grid_import, grid_export, m_tariff, m_ratio, m_rate)
+        net_savings = without_solar - with_solar + feedin_credit
+
+        monthly_bill[m] = {
+            "without_solar": round(without_solar, 0),
+            "with_solar": round(with_solar, 0),
+            "feedin_credit": round(feedin_credit, 0),
+            "net_savings": round(net_savings, 0),
+            "days": days,
+            "tariff_type": m_tariff.get("type", "flat"),
+            "import_rate": m_tariff.get("import_rate", 0),
+            "feedin_rate": round(feedin_credit_rate(
+                m_tariff.get("import_rate", 0), m_ratio, m_rate), 4),
+        }
+
+        # Current-tariff figures for the annual projection basis.
+        c_without, c_with, c_credit = _bill_for_month(
+            mrows, total_load, grid_import, grid_export, tariff, feedin_ratio, feedin_rate)
+        cur_without += c_without
+        cur_with += c_with
+        cur_credit += c_credit
+        cur_days += days
+
+        # Tier reduction info for tiered tariffs (using the month's tariff).
+        if m_tariff.get("type") == "tiered":
+            tiers = m_tariff.get("tiers", [])
+            if tiers:
+                for i, t in enumerate(tiers):
+                    if total_load <= t.get("threshold", float("inf")):
+                        without_tier = i + 1
+                        break
+                else:
+                    without_tier = len(tiers) + 1
+                for i, t in enumerate(tiers):
+                    if grid_import <= t.get("threshold", float("inf")):
+                        with_tier = i + 1
+                        break
+                else:
+                    with_tier = len(tiers) + 1
+                monthly_bill[m]["without_tier"] = without_tier
+                monthly_bill[m]["with_tier"] = with_tier
+
+    # Annual projection — current tariff applied to all tracked months.
+    cur_savings = cur_without - cur_with + cur_credit
+    annual_without = cur_without / cur_days * 365 if cur_days > 0 else 0
+    annual_with = cur_with / cur_days * 365 if cur_days > 0 else 0
+    annual_credit = cur_credit / cur_days * 365 if cur_days > 0 else 0
+    annual_savings = cur_savings / cur_days * 365 if cur_days > 0 else 0
+
+    return {
+        "tariff_type": tariff_type,
+        "tariff_history_applied": history_applied,
+        "monthly": monthly_bill,
+        "annual_without_solar": round(annual_without, 0),
+        "annual_with_solar": round(annual_with, 0),
+        "annual_feedin_credit": round(annual_credit, 0),
+        "annual_savings": round(annual_savings, 0),
+        "annual_reduction_pct": round(
+            (annual_savings / annual_without * 100) if annual_without > 0 else 0, 0
+        ),
+    }
+
+
+def compute_roi(bill_impact, roi_config, annual_savings_override=None):
+    """3j. ROI estimate with panel degradation.
+
+    Note:
+        Assumption: Panel degradation at 0.5%/year (industry standard for
+        monocrystalline silicon). Does not model inverter replacement (~10-15
+        years), battery degradation beyond cycle count, or electricity price
+        inflation.
+    """
+    if not roi_config:
+        return None
+
+    total_cost = roi_config.get("total_cost", 0)
+    system_age = roi_config.get("system_age_years", 0)
+    annual_savings = annual_savings_override or bill_impact.get("annual_savings", 0)
+
+    if annual_savings <= 0:
+        return {"error": "No savings to compute ROI"}
+
+    # Find payback year with 0.5%/year degradation — ASSUMPTION: see docstring
+    cumulative = 0
+    payback_year = None
+    yearly_savings = []
+    for n in range(26):
+        year_savings = annual_savings * (1 - 0.005) ** n
+        yearly_savings.append(round(year_savings, 0))
+        cumulative += year_savings
+        if payback_year is None and cumulative >= total_cost:
+            # Interpolate within the year
+            prev_cum = cumulative - year_savings
+            fraction = (total_cost - prev_cum) / year_savings if year_savings > 0 else 0
+            payback_year = n + fraction
+
+    lifetime_savings_25 = sum(
+        annual_savings * (1 - 0.005) ** n for n in range(25)
+    )
+
+    daily_savings = annual_savings / 365
+
+    return {
+        "total_cost": total_cost,
+        "system_age_years": system_age,
+        "daily_savings": round(daily_savings, 1),
+        "annual_savings_year1": round(annual_savings, 0),
+        "simple_payback": round(payback_year, 1) if payback_year else None,
+        "remaining_payback": round(max(0, payback_year - system_age), 1) if payback_year else None,
+        "lifetime_savings_25yr": round(lifetime_savings_25, 0),
+        "yearly_savings_sample": {
+            "year_1": yearly_savings[0] if len(yearly_savings) > 0 else 0,
+            "year_10": yearly_savings[9] if len(yearly_savings) > 9 else 0,
+            "year_25": yearly_savings[24] if len(yearly_savings) > 24 else 0,
+        },
+    }
+
+
+def compute_trends(monthly_totals, monthly_efficiency):
+    """3k. Month-over-month trends."""
+    months = sorted(monthly_totals.keys())
+    if len(months) < 2:
+        return None
+
+    trends = []
+    for i in range(1, len(months)):
+        m1, m2 = months[i - 1], months[i]
+        d1, d2 = monthly_totals[m1], monthly_totals[m2]
+
+        avg_pv1 = d1["total_pv"] / d1["days"]
+        avg_pv2 = d2["total_pv"] / d2["days"]
+        avg_load1 = d1["total_load"] / d1["days"]
+        avg_load2 = d2["total_load"] / d2["days"]
+        gd1 = (d1["grid_import"] / d1["total_load"] * 100) if d1["total_load"] > 0 else 0
+        gd2 = (d2["grid_import"] / d2["total_load"] * 100) if d2["total_load"] > 0 else 0
+
+        eff1 = monthly_efficiency.get(m1, {}).get("efficiency", 0)
+        eff2 = monthly_efficiency.get(m2, {}).get("efficiency", 0)
+
+        trends.append({
+            "from": m1,
+            "to": m2,
+            "avg_daily_pv": [round(avg_pv1, 1), round(avg_pv2, 1)],
+            "avg_daily_pv_change_pct": round((avg_pv2 - avg_pv1) / avg_pv1 * 100, 0) if avg_pv1 > 0 else 0,
+            "avg_daily_load": [round(avg_load1, 1), round(avg_load2, 1)],
+            "avg_daily_load_change_pct": round((avg_load2 - avg_load1) / avg_load1 * 100, 0) if avg_load1 > 0 else 0,
+            "self_sufficiency": [d1.get("self_sufficiency"), d2.get("self_sufficiency")],
+            "self_sufficiency_change_pp": round(
+                (d2.get("self_sufficiency", 0) or 0) - (d1.get("self_sufficiency", 0) or 0), 0
+            ),
+            "grid_dependence": [round(gd1, 0), round(gd2, 0)],
+            "grid_dependence_change_pp": round(gd2 - gd1, 0),
+            "battery_efficiency": [eff1, eff2],
+            "battery_efficiency_change_pp": round(eff2 - eff1, 1),
+        })
+
+    return trends
+
+
+def compute_battery_health(battery_analysis, system_age_years):
+    """3l. Battery health indicators.
+
+    Note:
+        Assumption: Uses 6,000-cycle rating (typical LFP). Actual cycle life
+        varies by manufacturer, depth of discharge, temperature, and charge rate.
+        Does not account for calendar aging.
+    """
+    usable = battery_analysis["estimated_usable_kwh"]
+    avg_discharge = battery_analysis["avg_discharge"]
+    daily_cycles = avg_discharge / usable if usable > 0 else 0
+    annual_cycles = daily_cycles * 365
+    cycles_used = annual_cycles * system_age_years
+    remaining_cycles = max(0, 6000 - cycles_used)  # ASSUMPTION: 6000-cycle LFP rating
+    remaining_years = remaining_cycles / annual_cycles if annual_cycles > 0 else float("inf")
+
+    return {
+        "usable_kwh": battery_analysis["estimated_usable_kwh"],
+        "usable_pct": battery_analysis["usable_pct"],
+        "nominal_kwh": battery_analysis["nominal_kwh"],
+        "daily_equiv_cycles": round(daily_cycles, 2),
+        "annual_cycles": round(annual_cycles, 0),
+        "cycles_used": round(cycles_used, 0),
+        "remaining_cycle_years": round(remaining_years, 0) if remaining_years != float("inf") else None,
+        "monthly_efficiency": battery_analysis["monthly_efficiency"],
+    }
+
+
+def compute_annual_projection(monthly_totals, seasonal_factors, monthly_efficiency, sc_rate):
+    """3m. Annual generation projection.
+
+    Note:
+        Assumption: De-seasonalizes by dividing out monthly seasonal factors, then
+        re-applies all 12 to project. Accuracy depends entirely on the seasonal
+        factors provided in the config (which are AI-inferred from the user's
+        location).
+
+        Caveat: Uses a fixed 30.44 days/month for projection. With <3 months of
+        data, confidence is low — the de-seasonalized baseline may not be
+        representative.
+    """
+    months = sorted(monthly_totals.keys())
+
+    deseasonalized = []
+    for m in months:
+        month_num = str(int(m.split("-")[1]))
+        factor = seasonal_factors.get(month_num, 1.0)
+        avg_daily = monthly_totals[m]["total_pv"] / monthly_totals[m]["days"]
+        deseasonalized.append(avg_daily / factor)
+
+    baseline_daily = mean(deseasonalized)
+
+    projected_annual_pv = sum(
+        baseline_daily * seasonal_factors.get(str(m), 1.0) * 30.44  # CAVEAT: fixed 30.44 days/month
+        for m in range(1, 13)
+    )
+
+    projected_self_consumed = projected_annual_pv * (sc_rate / 100) if sc_rate > 0 else 0
+    projected_export = projected_annual_pv - projected_self_consumed
+
+    confidence = "low" if len(months) < 3 else "moderate" if len(months) < 6 else "high"
+
+    # Degradation
+    year10 = projected_annual_pv * (1 - 0.005) ** 10
+    year25 = projected_annual_pv * (1 - 0.005) ** 25
+
+    return {
+        "months_count": len(months),
+        "confidence": confidence,
+        "baseline_daily_pv": round(baseline_daily, 1),
+        "projected_annual_pv": round(projected_annual_pv, 0),
+        "projected_annual_self_consumed": round(projected_self_consumed, 0),
+        "projected_annual_export": round(projected_export, 0),
+        "projected_annual_pv_year10": round(year10, 0),
+        "projected_annual_pv_year25": round(year25, 0),
+        "deseasonalized_months": {
+            m: {
+                "avg_daily": round(monthly_totals[m]["total_pv"] / monthly_totals[m]["days"], 1),
+                "factor": seasonal_factors.get(str(int(m.split("-")[1])), 1.0),
+                "deseasonalized": round(d, 1),
+            }
+            for m, d in zip(months, deseasonalized)
+        },
+    }
+
+
+def compute_best_worst_days(rows, ev_days):
+    """3n. Best and worst days."""
+    by_day = group_by(rows, row_day)
+    stats = {}
+    for day, drows in by_day.items():
+        if len(drows) <= 20:
+            continue
+        pv = sum(r["PV_Energy_kWh"] for r in drows)
+        load = sum(r["Load_kWh"] for r in drows)
+        imp = sum(r["Grid_Import_kWh"] for r in drows)
+        exp = sum(r["Grid_Export_kWh"] for r in drows)
+        peak_soc = max(r["Max_SOC_Pct"] for r in drows)
+        ss = (1 - imp / load) * 100 if load > 0 else 0
+        stats[day] = {
+            "pv": round(pv, 1),
+            "load": round(load, 1),
+            "grid_import": round(imp, 1),
+            "grid_export": round(exp, 1),
+            "peak_soc": round(peak_soc, 0),
+            "self_sufficiency": round(ss, 0),
+            "is_ev": day in ev_days,
+        }
+
+    if not stats:
+        return None
+
+    best = max(stats, key=lambda d: stats[d]["self_sufficiency"])
+    worst = min(stats, key=lambda d: stats[d]["self_sufficiency"])
+
+    return {
+        "best": {"date": best, **stats[best]},
+        "worst": {"date": worst, **stats[worst]},
+    }
+
+
+def compute_carbon_offset(projected_self_consumed, grid_emission_factor):
+    """3o. Carbon offset estimate.
+
+    Note:
+        Assumption: Uses fixed equivalents: 22 kg CO₂/tree/year (mature deciduous
+        tree, temperate climate), 0.21 kg CO₂/km (average passenger car). These
+        are rough order-of-magnitude figures; actual values vary significantly by
+        tree species, vehicle type, and driving conditions.
+    """
+    co2_kg = projected_self_consumed * grid_emission_factor
+    return {
+        "grid_emission_factor": grid_emission_factor,
+        "annual_co2_avoided_kg": round(co2_kg, 0),
+        "annual_co2_avoided_tonnes": round(co2_kg / 1000, 1),
+        "equiv_trees": round(co2_kg / 22, 0),  # ASSUMPTION: 22 kg CO₂/tree/year
+        "equiv_km_driving": round(co2_kg / 0.21, 0),  # ASSUMPTION: 0.21 kg CO₂/km
+    }
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    # Load config
+    if len(sys.argv) > 1:
+        with open(sys.argv[1]) as f:
+            config = json.load(f)
+    else:
+        config = json.load(sys.stdin)
+
+    pv_kwp = config["pv_kwp"]
+    inverter_kw = config.get("inverter_kw", pv_kwp / 1.3)
+    nominal_kwh = config["battery_nominal_kwh"]
+    has_ev = config.get("has_ev", False)
+    feedin_ratio = config.get("feedin_ratio", 0.0)
+    feedin_rate = config.get("feedin_rate")  # absolute currency/kWh; overrides ratio when set
+    additional_kwp = config.get("additional_kwp", 0)
+    seasonal_factors = config.get("seasonal_factors", {str(m): 1.0 for m in range(1, 13)})
+    grid_emission_factor = config.get("grid_emission_factor", 0.5)
+    tariff = config.get("tariff", {"type": "flat", "import_rate": 0})
+    tariff_history = config.get("tariff_history", [])
+    roi_config = config.get("roi")
+    currency = config.get("currency", "$")
+    system_age = roi_config.get("system_age_years", 0) if roi_config else 0
+
+    data_dir = resolve_data_dir()
+    rows, filenames = load_csv_files(data_dir)
+    for r in rows:
+        enrich(r)
+
+    # 3a
+    monthly_totals = compute_monthly_totals(rows)
+
+    # 3b
+    if has_ev:
+        ev_days, non_ev_days, ev_info = detect_ev_days(rows)
+    else:
+        by_day = group_by(rows, row_day)
+        all_days = set(d for d, drows in by_day.items() if len(drows) > 20)
+        ev_days, non_ev_days, ev_info = set(), all_days, {"ev_day_count": 0, "non_ev_day_count": len(all_days), "total_full_days": len(all_days)}
+
+    # 3c
+    hourly = compute_hourly_patterns(rows, ev_days, non_ev_days)
+
+    # 3c2
+    weekday_weekend = compute_weekday_weekend(rows, non_ev_days)
+
+    # 3d
+    sizing = compute_system_sizing(rows, pv_kwp, inverter_kw, non_ev_days, ev_days)
+
+    # 3e
+    battery = compute_battery_analysis(rows, nominal_kwh, ev_days, non_ev_days)
+
+    # 3f
+    panels = compute_additional_panels(
+        rows, pv_kwp, additional_kwp, feedin_ratio, tariff.get("import_rate", 0), feedin_rate
+    )
+
+    # 3g
+    peak_demand = compute_peak_demand(rows, ev_days, non_ev_days, sizing["inverter_ac_w"])
+
+    # 3h
+    anomalies = compute_anomalies(rows, ev_days, non_ev_days)
+
+    # 3i
+    bill_impact = compute_bill_impact(
+        rows, tariff, feedin_ratio, monthly_totals, tariff_history, feedin_rate)
+
+    # 3j
+    roi = compute_roi(bill_impact, roi_config)
+
+    # 3k
+    trends = compute_trends(monthly_totals, battery["monthly_efficiency"])
+
+    # 3l
+    battery_health = compute_battery_health(battery, system_age)
+
+    # Self-consumption rate for projection
+    total_sc = sum(m["self_consumed"] for m in monthly_totals.values())
+    total_pv = sum(m["total_pv"] for m in monthly_totals.values())
+    sc_rate = (total_sc / total_pv * 100) if total_pv > 0 else 0
+
+    # 3m
+    projection = compute_annual_projection(
+        monthly_totals, seasonal_factors, battery["monthly_efficiency"], sc_rate
+    )
+
+    # 3n
+    best_worst = compute_best_worst_days(rows, ev_days)
+
+    # 3o
+    carbon = compute_carbon_offset(
+        projection["projected_annual_self_consumed"], grid_emission_factor
+    )
+
+    # EV day detail metrics
+    ev_detail = {}
+    if has_ev and ev_days:
+        by_day = group_by(rows, row_day)
+        for label, day_set in [("ev", ev_days), ("non_ev", non_ev_days)]:
+            ds = [d for d in day_set if d in by_day]
+            if ds:
+                ev_detail[label] = {
+                    "avg_pv": round(mean([sum(r["PV_Energy_kWh"] for r in by_day[d]) for d in ds]), 1),
+                    "avg_load": round(mean([sum(r["Load_kWh"] for r in by_day[d]) for d in ds]), 1),
+                    "avg_import": round(mean([sum(r["Grid_Import_kWh"] for r in by_day[d]) for d in ds]), 1),
+                    "avg_export": round(mean([sum(r["Grid_Export_kWh"] for r in by_day[d]) for d in ds]), 1),
+                }
+        # Evening SOC by type
+        for label, day_set in [("non_ev", non_ev_days), ("ev", ev_days)]:
+            subset = [r for r in rows if row_day(r) in day_set and r["Hour"] in ("18:00", "19:00", "20:00")]
+            if subset:
+                ev_detail.setdefault(label, {})["evening_soc"] = round(mean([r["Avg_SOC_Pct"] for r in subset]), 0)
+
+    # Assemble output
+    output = {
+        "files": filenames,
+        "total_rows": len(rows),
+        "date_range": [min(r["Date"] for r in rows), max(r["Date"] for r in rows)],
+        "unique_days": len(set(row_day(r) for r in rows)),
+        "monthly_totals": monthly_totals,
+        "ev_detection": ev_info,
+        "hourly_patterns": hourly,
+        "weekday_weekend": weekday_weekend,
+        "system_sizing": sizing,
+        "battery_analysis": battery,
+        "additional_panels": panels,
+        "peak_demand": peak_demand,
+        "anomalies": anomalies,
+        "bill_impact": bill_impact,
+        "roi": roi,
+        "trends": trends,
+        "battery_health": battery_health,
+        "annual_projection": projection,
+        "best_worst_days": best_worst,
+        "carbon_offset": carbon,
+        "ev_detail": ev_detail,
+        "self_consumption_rate": round(sc_rate, 1),
+    }
+
+    json.dump(output, sys.stdout, indent=2, default=str)
+    print()
+
+
+if __name__ == "__main__":
+    main()
