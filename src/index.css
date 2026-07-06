@@ -929,7 +929,10 @@ textarea.input { resize: vertical; }
 .appliance-row-consumption { display: flex; gap: 16px; margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); }
 .appliance-row-consumption span { display: inline-flex; align-items: center; gap: 4px; }
 
-.consumption-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: var(--bg); border-radius: 10px; padding: 14px; }
+/* Une seule ligne quel que soit le nombre de statistiques (3 ou 4 avec le pic). */
+.consumption-summary { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; background: var(--bg); border-radius: 10px; padding: 14px 12px; }
+.consumption-summary .consumption-stat { min-width: 0; }
+.consumption-summary svg { flex-shrink: 0; }
 .consumption-stat { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
 .consumption-stat.day { color: var(--accent-dark); }
 .consumption-stat.night { color: var(--primary-light); }
