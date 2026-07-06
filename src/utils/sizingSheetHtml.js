@@ -63,7 +63,9 @@ export function buildSizingSheetHtml(d) {
   // --- Récapitulatif matériel : désignations TECHNIQUES uniquement (type,
   // tension, capacité, puissance) + quantité. Les marques et références du
   // catalogue servent au calcul mais n'apparaissent jamais sur le document.
-  const panelWc = (String(d.panelName || '').match(/(\d{3,4})\s*W/i) || [])[1] || PANEL_SPEC.power;
+  const panelWc = Number((String(d.panelName || '').match(/(\d{3,4})\s*W/i) || [])[1]) || PANEL_SPEC.power;
+  // Puissance installée : nombre de panneaux × puissance du panneau retenu.
+  const kwcInstalle = (d.sizing.numberOfPanels * panelWc) / 1000;
   // Batteries regroupées par capacité (les marques disparaissent → fusion des identiques).
   const batParCapacite = new Map();
   d.batteries.forEach((b) => batParCapacite.set(b.capacity, (batParCapacite.get(b.capacity) || 0) + b.qty));
@@ -233,7 +235,7 @@ export function buildSizingSheetHtml(d) {
         <div class="calc-head">Puissance panneaux nécessaire</div>
         <div class="calc-formula">P = E ÷ HSP</div>
         <div class="calc-apply">P = ${nf(energieNecessaire, 2)} kWh ÷ ${nf(d.sunHours, 1)} h = <strong>${nf(Math.round(puissanceRequise))} Wc</strong></div>
-        <div class="calc-result">→ ${nf(d.sizing.numberOfPanels)} panneau(x) de ${nf(PANEL_SPEC.power)} Wc = <strong>${nf(d.sizing.panelCapacity, 2)} kWc installés</strong></div>
+        <div class="calc-result">→ ${nf(d.sizing.numberOfPanels)} panneau(x) de ${nf(panelWc)} Wc = <strong>${nf(kwcInstalle, 2)} kWc installés</strong></div>
       </div>
 
       ${batterieFormule}

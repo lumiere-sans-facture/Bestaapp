@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
@@ -120,6 +120,35 @@ export default function SolarWizard({ onDone }) {
   const effectiveKitId = selectedKitId || suggestedKitId || SOLAR_KITS[0].id;
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0];
   const displayQuotation = kitQuotations[effectiveKitId];
+
+  // Fiche de dimensionnement — récapitulatif technique complet (HTML imprimable),
+  // basé sur le kit retenu et la piste sélectionnée.
+  const openSheet = async () => {
+    if (!sizing) return;
+    const { openSizingSheet } = await import('../../utils/sizingSheetHtml');
+    const lead = availableLeads.find((l) => l.id === selectedLeadId);
+    const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
+    openSizingSheet({
+      client: { name: lead?.contact || lead?.name || '', phone: lead?.phone || '', ville: lead?.address || '' },
+      appliances: rows,
+      manualMode,
+      consumption,
+      systemType,
+      sunHours: psh,
+      cityName: location?.name || lead?.address || null,
+      solarSource: solar?.source || null,
+      // Résultats alignés sur le kit retenu (panneaux 620 Wc, production associée) ;
+      // besoins (puissance requise, capacité batterie) issus du moteur de calcul.
+      sizing: {
+        ...sizing,
+        numberOfPanels: selectedKit.panels,
+        estimatedProduction: (selectedKit.panels * 620 * psh * 365) / 1000,
+      },
+      inverter: { capacity: selectedKit.inverter, maxPower: selectedKit.inverter * 800 },
+      batteries: selectedKit.battery > 0 ? [{ capacity: selectedKit.battery, qty: 1 }] : [],
+      panelName: 'Panneau photovoltaïque 620W',
+    });
+  };
 
   const handleSubmit = (statut = 'finalise') => {
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
@@ -416,6 +445,10 @@ export default function SolarWizard({ onDone }) {
                 <Zap size={14} /> Retour sur investissement estimé : <strong>{displayQuotation.roi.toFixed(1)} mois</strong>
               </div>
             )}
+
+            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
+              <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
+            </button>
           </div>
         )}
 
