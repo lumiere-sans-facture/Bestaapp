@@ -137,16 +137,17 @@ export default function SolarWizard({ onDone }) {
       sunHours: psh,
       cityName: location?.name || lead?.address || null,
       solarSource: solar?.source || null,
-      // Résultats alignés sur le kit retenu (panneaux 620 Wc, production associée) ;
+      // Résultats alignés sur le kit retenu (panneaux du kit, production associée) ;
       // besoins (puissance requise, capacité batterie) issus du moteur de calcul.
       sizing: {
         ...sizing,
         numberOfPanels: selectedKit.panels,
-        estimatedProduction: (selectedKit.panels * 620 * psh * 365) / 1000,
+        estimatedProduction: (selectedKit.panels * selectedKit.panelW * psh * 365) / 1000,
       },
       inverter: { capacity: selectedKit.inverter, maxPower: selectedKit.inverter * 800 },
-      batteries: selectedKit.battery > 0 ? [{ capacity: selectedKit.battery, qty: 1 }] : [],
-      panelName: 'Panneau photovoltaïque 620W',
+      batteries: selectedKit.batteryModules
+        || (selectedKit.battery > 0 ? [{ capacity: selectedKit.battery, qty: 1 }] : []),
+      panelName: `Panneau photovoltaïque ${selectedKit.panelW}W`,
     });
   };
 
@@ -154,11 +155,11 @@ export default function SolarWizard({ onDone }) {
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const submitSizing = {
       numberOfPanels: selectedKit.panels,
-      panelCapacity: (selectedKit.panels * 620) / 1000,
-      inverter: { brand: 'Growatt', model: `${selectedKit.inverter} kVA`, capacity: selectedKit.inverter },
+      panelCapacity: (selectedKit.panels * selectedKit.panelW) / 1000,
+      inverter: { model: `Onduleur hybride ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter },
       batteries: [],
       batteryCapacity: selectedKit.battery,
-      estimatedProduction: Math.round((selectedKit.panels * 620 * psh * 365) / 1000),
+      estimatedProduction: Math.round((selectedKit.panels * selectedKit.panelW * psh * 365) / 1000),
       systemType,
       peakSunHours: psh,
       city: location?.name || null,
@@ -413,7 +414,7 @@ export default function SolarWizard({ onDone }) {
 
             <div className="kit-summary">
               <Package size={16} />
-              <span>{selectedKit.name} — {selectedKit.panels} panneaux 620Wc · batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA</span>
+              <span>{selectedKit.name} — {selectedKit.panels} panneaux {selectedKit.panelW}Wc · batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA</span>
             </div>
 
             <div className="bom">
