@@ -31,7 +31,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const { user } = useAuth();
   const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, addPaiement, addRelance, markDevisPro, updateDevis, deleteDevis } = useData();
 
-  const [tab, setTab] = useState('factures'); // devis | factures
+  const [tab, setTab] = useState('devis'); // devis | factures — ouvre sur les devis
   const [view, setView] = useState('list'); // list | create
   const [createMode, setCreateMode] = useState('choose'); // choose | solar | manual
   const [factureOpen, setFactureOpen] = useState(false);
