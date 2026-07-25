@@ -1,49 +1,36 @@
-import { useState } from 'react';
-import { UserCheck, Pencil } from 'lucide-react';
+import { UserCheck, UserX } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import Field from '../../components/Field';
 
 /**
- * Attribution du partenaire apporteur sur un devis.
- * Automatique par défaut (parrain de la piste, ou lien d'affiliation actif),
- * avec possibilité de modifier manuellement pour les cas particuliers.
+ * Partenaire apporteur d'un devis — lecture seule : c'est toujours celui
+ * rattaché à la piste (parrain enregistré ou lien d'affiliation actif).
+ * Aucun choix manuel : la commission suit le profil de l'apporteur réel.
  */
-export default function PartnerField({ value, onChange }) {
-  const { partners, getPartnerById } = useData();
-  const [manual, setManual] = useState(false);
-
+export default function PartnerField({ value }) {
+  const { getPartnerById } = useData();
   const partner = value ? getPartnerById(value) : null;
 
-  if (!manual && partner) {
+  if (!partner) {
     return (
-      <div className="partner-auto-box">
-        <div className="partner-auto-icon"><UserCheck size={18} /></div>
+      <div className="partner-auto-box none">
+        <div className="partner-auto-icon"><UserX size={18} /></div>
         <div className="partner-auto-info">
-          <div className="partner-auto-label">Partenaire attribué automatiquement</div>
-          <div className="partner-auto-name">
-            {partner.name} <span className="partner-code-chip">{partner.code}</span>
-          </div>
+          <div className="partner-auto-label">Partenaire apporteur</div>
+          <div className="partner-auto-name">Aucun — cette piste n'a pas d'apporteur enregistré.</div>
         </div>
-        <button type="button" className="btn btn-sm btn-outline" onClick={() => setManual(true)}>
-          <Pencil size={13} /> Modifier
-        </button>
       </div>
     );
   }
 
   return (
-    <Field label="Partenaire apporteur (commission)" className="partner-field">
-      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Aucun partenaire</option>
-        {partners.filter((p) => p.status === 'actif').map((p) => (
-          <option key={p.id} value={p.id}>{p.name} — {p.code}</option>
-        ))}
-      </select>
-      <div className="field-hint">
-        {partner
-          ? 'Le code du partenaire sera imprimé sur le devis.'
-          : "Aucun partenaire détecté pour cette piste — sélectionnez-en un si un apporteur est à créditer."}
+    <div className="partner-auto-box">
+      <div className="partner-auto-icon"><UserCheck size={18} /></div>
+      <div className="partner-auto-info">
+        <div className="partner-auto-label">Partenaire apporteur (commission)</div>
+        <div className="partner-auto-name">
+          {partner.name} <span className="partner-code-chip">{partner.code}</span>
+        </div>
       </div>
-    </Field>
+    </div>
   );
 }
