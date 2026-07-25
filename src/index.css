@@ -72,6 +72,7 @@ img { max-width: 100%; }
   padding: 16px;
 }
 .page-content-narrow { max-width: 760px; margin-inline: auto; }
+.page-content-wide { max-width: 1200px; margin-inline: auto; }
 .page-content-flush { padding-left: 0; padding-right: 0; }
 .page-content-flush > * { padding-left: 16px; padding-right: 16px; }
 
@@ -766,15 +767,28 @@ textarea.input { resize: vertical; }
 .course-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
 @media (min-width: 720px) { .course-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1100px) { .course-grid { grid-template-columns: repeat(3, 1fr); } }
-.course-card { display: flex; flex-direction: column; }
-.course-card .btn { margin-top: auto; }
-.course-card-head { display: flex; align-items: center; justify-content: space-between; }
-.course-card-icon {
-  width: 42px; height: 42px; border-radius: 12px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white;
+.course-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.course-card-cover {
+  position: relative; height: 110px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 100%);
+  color: rgba(255, 255, 255, 0.9);
   display: flex; align-items: center; justify-content: center;
 }
-.course-card-title { font-weight: 700; font-size: 1rem; margin-top: 12px; }
+.course-cover-duration {
+  position: absolute; left: 12px; bottom: 10px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.6875rem; font-weight: 700; color: white;
+  background: rgba(255, 255, 255, 0.16); border-radius: 20px; padding: 3px 9px;
+}
+.course-cover-edit {
+  position: absolute; top: 8px; right: 8px; padding: 6px;
+  color: white; background: rgba(255, 255, 255, 0.14); border-radius: 8px;
+  display: flex; cursor: pointer;
+}
+.course-cover-edit:hover { background: rgba(255, 255, 255, 0.28); }
+.course-card-body { display: flex; flex-direction: column; flex: 1; padding: 14px 16px 16px; }
+.course-card-body .btn { margin-top: auto; }
+.course-card-title { font-weight: 700; font-size: 1rem; }
 .course-card-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.75rem; color: var(--text-secondary); margin: 12px 0; }
 .course-card-meta span { display: inline-flex; align-items: center; gap: 4px; }
 .course-card-progress { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }

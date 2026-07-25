@@ -286,7 +286,8 @@ export default function Plus() {
   return (
     <div className="page">
       <PageHeader title="Plus" />
-      <div className="page-content page-content-narrow">
+      {/* La formation s'étale en large (catalogue + école) ; le reste garde la colonne étroite. */}
+      <div className={`page-content ${activeTab === 'formation' ? 'page-content-wide' : 'page-content-narrow'}`}>
         {activeTab === 'menu' && renderMenu()}
         {activeTab === 'partners' && renderPartners()}
         {activeTab === 'commissions' && renderCommissions()}
