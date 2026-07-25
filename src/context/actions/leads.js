@@ -3,6 +3,7 @@
 // Les techniciens DEMANDENT un changement d'étape (pendingStage) ; le gérant
 // valide ou refuse — les commissions ne naissent qu'à la validation.
 import { COMMISSION_RATES, newReferral, partnerFromActiveRef } from './shared';
+import { missingCommissionsForLead } from '../../utils/commissionSync';
 import { stages, LOST_STAGE } from '../../data/seed';
 
 const STAGE_LABEL = Object.fromEntries([...stages, LOST_STAGE].map((st) => [st.id, st.label]));
@@ -15,29 +16,26 @@ export function createLeadActions(setState) {
     const today = new Date().toISOString().slice(0, 10);
     const lead = s.leads.find((l) => l.id === leadId);
     let commissions = s.commissions;
+    let referrals = s.referrals || [];
     if (stage === 'gagne' && lead) {
-      const alreadyExists = (partnerId, level) =>
-        s.commissions.some((c) => c.leadId === leadId && c.partnerId === partnerId && c.level === level);
-      const generated = [];
-      if (lead.parrainL1 && !alreadyExists(lead.parrainL1, 1)) {
-        generated.push({
-          id: crypto.randomUUID(), partnerId: lead.parrainL1, leadId, level: 1,
-          amount: Math.round(lead.estimatedValue * COMMISSION_RATES[1]),
-          status: 'en_attente', paidAt: null, createdAt: today,
-        });
-      }
-      if (lead.parrainL2 && !alreadyExists(lead.parrainL2, 2)) {
-        generated.push({
-          id: crypto.randomUUID(), partnerId: lead.parrainL2, leadId, level: 2,
-          amount: Math.round(lead.estimatedValue * COMMISSION_RATES[2]),
-          status: 'en_attente', paidAt: null, createdAt: today,
-        });
-      }
+      // Base de calcul : total du dernier devis finalisé (sinon valeur
+      // estimée) ; apporteur : parrain de la piste, sinon celui du devis.
+      const generated = missingCommissionsForLead(
+        { lead, devis: s.devis, partners: s.partners, commissions: s.commissions },
+        COMMISSION_RATES,
+        today
+      );
       if (generated.length) commissions = [...generated, ...s.commissions];
+      // Affaire gagnée : les conversions d'affiliation encore en attente sur
+      // cette piste sont validées d'office (registre cohérent avec la commission).
+      referrals = referrals.map((r) =>
+        r.leadId === leadId && r.status === 'en_attente' ? { ...r, status: 'validé' } : r
+      );
     }
     return {
       ...s,
       commissions,
+      referrals,
       leads: s.leads.map((l) =>
         l.id === leadId
           ? {

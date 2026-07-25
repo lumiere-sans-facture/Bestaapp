@@ -1413,6 +1413,12 @@ textarea.input { resize: vertical; }
 .commission-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); }
 
 .commissions-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.com-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.sync-result-note {
+  background: var(--success-light); border: 1px solid #a7f3d0; color: #047857;
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+  font-size: 0.875rem; font-weight: 500;
+}
 .commission-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
 .commission-total-card { border-radius: var(--radius); padding: 14px 16px; }
 .commission-total-card.pending { background: var(--warning-light); }

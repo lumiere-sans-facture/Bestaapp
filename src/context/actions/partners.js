@@ -1,7 +1,8 @@
 // Domaine programme d'affiliation : réseau de partenaires, validation des
 // conversions et paiement des commissions de parrainage.
 import { generatePartnerCode } from '../../utils/referral';
-import { partnerFromActiveRef } from './shared';
+import { missingCommissionsForLead, reconcileMissingCommissions } from '../../utils/commissionSync';
+import { COMMISSION_RATES, partnerFromActiveRef } from './shared';
 
 export function createPartnerActions(setState) {
   return {
@@ -58,12 +59,42 @@ export function createPartnerActions(setState) {
         };
       }),
 
-    // Validation manuelle des conversions d'affiliation avant paiement
+    // Validation manuelle des conversions d'affiliation. Valider une
+    // conversion « devis » attribue immédiatement la commission de
+    // l'apporteur (même règle et même déduplication que le passage à
+    // « gagné » : aucun doublon possible entre les deux chemins).
     updateReferralStatus: (referralId, status) =>
-      setState((s) => ({
-        ...s,
-        referrals: (s.referrals || []).map((r) => (r.id === referralId ? { ...r, status } : r)),
-      })),
+      setState((s) => {
+        const referral = (s.referrals || []).find((r) => r.id === referralId);
+        let commissions = s.commissions;
+        if (status === 'validé' && referral?.type === 'devis' && referral.leadId) {
+          const lead = s.leads.find((l) => l.id === referral.leadId);
+          const generated = missingCommissionsForLead(
+            { lead, devis: s.devis, partners: s.partners, commissions: s.commissions },
+            COMMISSION_RATES,
+            new Date().toISOString().slice(0, 10)
+          );
+          if (generated.length) commissions = [...generated, ...commissions];
+        }
+        return {
+          ...s,
+          commissions,
+          referrals: (s.referrals || []).map((r) => (r.id === referralId ? { ...r, status } : r)),
+        };
+      }),
+
+    // Rattrapage : recrée toutes les commissions manquantes sur les affaires
+    // déjà validées (pistes gagnées, conversions devis validées). Idempotent —
+    // relancer ne crée jamais de doublon.
+    syncCommissions: () =>
+      setState((s) => {
+        const created = reconcileMissingCommissions(
+          { leads: s.leads, devis: s.devis, partners: s.partners, commissions: s.commissions, referrals: s.referrals },
+          COMMISSION_RATES,
+          new Date().toISOString().slice(0, 10)
+        );
+        return created.length ? { ...s, commissions: [...created, ...s.commissions] } : s;
+      }),
 
     addCommission: (commission) =>
       setState((s) => ({
