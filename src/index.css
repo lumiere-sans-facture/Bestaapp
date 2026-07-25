@@ -1119,6 +1119,37 @@ textarea.input { resize: vertical; }
 
 .plus-grid { display: flex; flex-direction: column; gap: 16px; }
 .plus-card { padding: 0; overflow: hidden; }
+
+/* En-tête du menu « Plus » : profil + carte d'accès Pro côte à côte sur desktop */
+.plus-head { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.pro-cta {
+  display: flex; align-items: center; gap: 16px; text-align: left;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 80%);
+  color: white; padding: 20px; cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.pro-cta:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.pro-cta-icon {
+  width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
+  background: var(--accent); color: var(--primary-dark);
+  display: flex; align-items: center; justify-content: center;
+}
+.pro-cta-info { flex: 1; min-width: 0; }
+.pro-cta-title { font-size: 1.0625rem; font-weight: 700; }
+.pro-cta-subtitle { font-size: 0.8125rem; opacity: 0.85; margin-top: 3px; }
+.pro-cta-arrow { flex-shrink: 0; opacity: 0.7; }
+
+/* Sections thématiques : libellé + carte d'entrées ; 2 colonnes sur desktop */
+.plus-sections { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+.plus-section-label {
+  font-size: 0.6875rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-muted); padding: 0 4px 8px;
+}
+@media (min-width: 900px) {
+  .plus-head { grid-template-columns: 300px 1fr; }
+  .plus-head .profile-card { display: flex; flex-direction: column; justify-content: center; }
+  .plus-sections { grid-template-columns: 1fr 1fr; }
+}
 .back-button { margin-bottom: 14px; }
 .menu-item {
   display: flex; align-items: center; gap: 12px; width: 100%;
