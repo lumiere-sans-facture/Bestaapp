@@ -119,6 +119,9 @@ img { max-width: 100%; }
 .sidebar-link:hover { background: rgba(255, 255, 255, 0.07); color: white; }
 .sidebar-link.active { background: var(--primary-light); color: white; }
 .sidebar-group-label { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.4); padding: 16px 14px 6px; }
+/* « Passer en mode Pro » : entrée mise en avant, juste au-dessus de « Mon profil » */
+.sidebar-pro-link { color: var(--accent-light); font-weight: 600; width: 100%; }
+.sidebar-pro-link:hover { background: rgba(245, 166, 35, 0.12); color: var(--accent-light); }
 .sidebar-footer { padding: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 .sidebar-pro-btn { margin-bottom: 12px; }
 .sidebar-user { display: flex; align-items: center; gap: 10px; }
@@ -1120,8 +1123,7 @@ textarea.input { resize: vertical; }
 .plus-grid { display: flex; flex-direction: column; gap: 16px; }
 .plus-card { padding: 0; overflow: hidden; }
 
-/* En-tête du menu « Plus » : profil + carte d'accès Pro côte à côte sur desktop */
-.plus-head { display: grid; grid-template-columns: 1fr; gap: 16px; }
+/* Carte d'accès Pro du menu « Plus » */
 .pro-cta {
   display: flex; align-items: center; gap: 16px; text-align: left;
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 80%);
@@ -1145,9 +1147,9 @@ textarea.input { resize: vertical; }
   font-size: 0.6875rem; font-weight: 800; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--text-muted); padding: 0 4px 8px;
 }
+/* État de synchronisation, affiché discrètement sous la carte Pro */
+.sync-inline { display: flex; justify-content: center; }
 @media (min-width: 900px) {
-  .plus-head { grid-template-columns: 300px 1fr; }
-  .plus-head .profile-card { display: flex; flex-direction: column; justify-content: center; }
   .plus-sections { grid-template-columns: 1fr 1fr; }
 }
 /* Desktop avec barre latérale : toutes ces entrées y figurent déjà (Formation,

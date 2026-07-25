@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +24,7 @@ const proNavItems = [
 ];
 
 // Sous-sections de « Plus » remontées dans la barre latérale (desktop), par rôle.
+// « Mon profil » est rendu à part, en dernier, après le bouton « Passer en mode Pro ».
 const plusSections = (role) => [
   ...(role === 'gerant' ? [
     { path: '/plus/team', label: 'Équipe', icon: Users },
@@ -35,15 +36,21 @@ const plusSections = (role) => [
   ] : []),
   { path: '/plus/formation', label: 'Formation', icon: GraduationCap },
   { path: '/plus/mypartner', label: 'Mon espace partenaire', icon: Users },
-  { path: '/plus/profile', label: 'Mon profil', icon: User },
 ];
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const { getCompanyForUser } = useData();
-  const { mode, setMode } = useMode();
+  const { mode, setMode, proActive } = useMode();
+  const navigate = useNavigate();
   const isPro = mode === 'pro';
   const navItems = isPro ? proNavItems : publicNavItems;
+  // Barre latérale publique : « Plus » n'y figure pas (toutes ses entrées y
+  // sont détaillées) — il reste dans la barre d'onglets mobile.
+  const sidebarItems = isPro ? proNavItems : publicNavItems.filter((i) => i.path !== '/plus');
+  // Bascule Pro depuis la barre latérale : abonné → espace Pro direct ;
+  // sinon → parcours d'abonnement (le formulaire vit sur l'écran Plus).
+  const goPro = () => (proActive ? setMode('pro') : navigate('/plus/gopro'));
   // En mode Pro, la marque affichée est celle de l'entreprise de l'abonné
   // (logo + nom configurés dans « Mon entreprise ») — repli sur la couronne.
   const company = isPro ? getCompanyForUser(user.id) : null;
@@ -66,11 +73,11 @@ export default function AppLayout() {
           </div>
         </div>
         <nav className="sidebar-nav">
-          {navItems.map((item) => (
+          {sidebarItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/pro' || item.path === '/plus'}
+              end={item.path === '/pro'}
               className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
             >
               <item.icon size={20} strokeWidth={2} />
@@ -79,7 +86,6 @@ export default function AppLayout() {
           ))}
           {!isPro && (
             <>
-              <div className="sidebar-group-label">Plus</div>
               {plusSections(user.role).map((item) => (
                 <NavLink
                   key={item.path}
@@ -90,6 +96,14 @@ export default function AppLayout() {
                   <span>{item.label}</span>
                 </NavLink>
               ))}
+              <button className="sidebar-link sidebar-pro-link" onClick={goPro}>
+                <Crown size={20} strokeWidth={2} />
+                <span>Passer en mode Pro</span>
+              </button>
+              <NavLink to="/plus/profile" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+                <User size={20} strokeWidth={2} />
+                <span>Mon profil</span>
+              </NavLink>
             </>
           )}
         </nav>
