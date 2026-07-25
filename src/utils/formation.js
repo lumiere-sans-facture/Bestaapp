@@ -61,3 +61,35 @@ export const courseCounts = (course) => ({
   modules: (course?.modules || []).length,
   lecons: allLecons(course).length,
 });
+
+// ---- Sommaire minuté des vidéos (« Timer de la vidéo ») ----
+
+/** « mm:ss » ou « h:mm:ss » → secondes (NaN si illisible). */
+export const parseTimecode = (txt) => {
+  const parts = String(txt || '').trim().split(':').map((p) => Number(p));
+  if (parts.some((n) => Number.isNaN(n)) || parts.length < 2 || parts.length > 3) return NaN;
+  return parts.reduce((s, n) => s * 60 + n, 0);
+};
+
+/** Secondes → « mm:ss » (ou « h:mm:ss » au-delà d'une heure). */
+export const formatTimecode = (s) => {
+  const sec = Math.max(0, Math.floor(Number(s) || 0));
+  const two = (n) => String(n).padStart(2, '0');
+  const h = Math.floor(sec / 3600);
+  return h ? `${h}:${two(Math.floor((sec % 3600) / 60))}:${two(sec % 60)}` : `${two(Math.floor(sec / 60))}:${two(sec % 60)}`;
+};
+
+/** Texte du formulaire (« 00:43 Déménagement du site ») → chapitres triés. */
+export const parseChaptersText = (text) =>
+  String(text || '')
+    .split('\n')
+    .map((line) => {
+      const m = line.trim().match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$/);
+      return m ? { t: parseTimecode(m[1]), label: m[2].trim() } : null;
+    })
+    .filter((c) => c && !Number.isNaN(c.t))
+    .sort((a, b) => a.t - b.t);
+
+/** Chapitres → texte éditable (une ligne par chapitre). */
+export const chaptersToText = (chapters = []) =>
+  chapters.map((c) => `${formatTimecode(c.t)} ${c.label}`).join('\n');

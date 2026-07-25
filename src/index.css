@@ -811,6 +811,28 @@ textarea.input { resize: vertical; }
 }
 .school-add-lecon:hover { border-color: var(--primary); color: var(--primary); }
 
+.school-content-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.school-content-top .school-content-kicker { margin-bottom: 0; }
+.lesson-topnav { display: flex; gap: 6px; flex-shrink: 0; }
+.school-module-count { font-size: 0.6875rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+.school-module-chevron { color: var(--text-muted); transition: transform 0.15s ease; flex-shrink: 0; }
+.school-module-chevron.open { transform: rotate(180deg); }
+.school-module-head { cursor: pointer; }
+.school-module.closed .school-module-head { border-bottom: none; margin-bottom: 0; padding-bottom: 4px; }
+
+/* Sommaire minuté de la vidéo (« Timer de la vidéo ») */
+.video-chapters { border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 14px; }
+.video-chapters-title { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--primary); margin-bottom: 6px; }
+.video-chapter { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 6px; border-radius: 8px; font-size: 0.875rem; cursor: pointer; }
+.video-chapter:hover { background: var(--bg); }
+.video-chapter.active { background: rgba(10, 36, 114, 0.08); }
+.video-chapter.active .video-chapter-time { color: white; background: var(--primary); }
+.video-chapter-time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.75rem; color: var(--primary); background: rgba(10, 36, 114, 0.08); border-radius: 6px; padding: 2px 7px; flex-shrink: 0; }
+.video-chapter-label { flex: 1; min-width: 0; text-align: left; }
+.video-chapter-play { color: var(--text-muted); flex-shrink: 0; }
+
+.course-card-author, .course-head-author { font-size: 0.75rem; font-weight: 600; color: var(--primary-light); margin-top: 3px; }
+
 .school-content-kicker { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--accent-dark); margin-bottom: 6px; }
 .school-content-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 14px; }
 .lecon-texte p { font-size: 0.9063rem; line-height: 1.65; color: var(--text-primary); margin: 0 0 12px; }
