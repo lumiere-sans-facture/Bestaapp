@@ -1364,7 +1364,10 @@ textarea.input { resize: vertical; }
 .partner-auto-info { flex: 1; min-width: 0; }
 .partner-auto-label { font-size: 0.6875rem; font-weight: 600; color: #047857; text-transform: uppercase; letter-spacing: 0.4px; }
 .partner-auto-name { font-size: 0.9375rem; font-weight: 600; }
-.partner-auto-box .btn { flex-shrink: 0; background: white; }
+.partner-auto-box.none { background: var(--bg); border-color: var(--border); }
+.partner-auto-box.none .partner-auto-icon { color: var(--text-muted); border: 1px solid var(--border); }
+.partner-auto-box.none .partner-auto-label { color: var(--text-muted); }
+.partner-auto-box.none .partner-auto-name { color: var(--text-secondary); font-weight: 500; }
 
 /* Espace partenaire personnel */
 .my-affiliate-box { margin-bottom: 0; }

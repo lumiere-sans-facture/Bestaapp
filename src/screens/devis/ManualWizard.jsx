@@ -88,7 +88,7 @@ export default function ManualWizard({ onDone, initialItems }) {
               ))}
               {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d’abord une piste dans Suivi clients.</div>}
             </div>
-            {selectedLeadId && <PartnerField value={partnerId} onChange={setPartnerId} />}
+            {selectedLeadId && <PartnerField value={partnerId} />}
           </div>
         )}
         {step === 2 && (

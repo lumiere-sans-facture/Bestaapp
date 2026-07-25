@@ -212,7 +212,7 @@ export default function SolarWizard({ onDone }) {
               ))}
               {availableLeads.length === 0 && <EmptyState>Aucune piste disponible. Créez d’abord une piste dans Suivi clients.</EmptyState>}
             </div>
-            {selectedLeadId && <PartnerField value={partnerId} onChange={setPartnerId} />}
+            {selectedLeadId && <PartnerField value={partnerId} />}
           </div>
         )}
 
