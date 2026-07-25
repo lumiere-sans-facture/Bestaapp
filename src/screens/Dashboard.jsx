@@ -89,6 +89,10 @@ export default function Dashboard() {
     feed.push({ id: 'sub', sev: 'info', label: `Abonnement Devis Pro expire dans ${subDays} j`, entity: 'À renouveler' });
   if (user.role === 'gerant' && pendingComm.length)
     feed.push({ id: 'comm', sev: 'info', label: `${pendingComm.length} commission(s) à payer`, entity: formatCFA(pendingCommTotal) });
+  // Demandes de progression des techniciens : à valider dans Suivi clients.
+  const pendingMoves = user.role === 'gerant' ? myLeads.filter((l) => l.pendingStage) : [];
+  if (pendingMoves.length)
+    feed.push({ id: 'moves', sev: 'alerte', label: `${pendingMoves.length} progression(s) client à valider`, entity: 'Suivi clients' });
   feed.sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev]);
   const feedTop = feed.slice(0, 6);
 

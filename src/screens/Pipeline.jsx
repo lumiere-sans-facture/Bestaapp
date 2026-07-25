@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2 } from 'lucide-react';
+import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
@@ -18,7 +18,7 @@ export default function Pipeline() {
   const {
     stages, lostStage, team, commissions, partners,
     leadsForUser, getPartnerById, getUserById,
-    updateLeadStage, addLead, addLeadNote,
+    updateLeadStage, requestStageChange, approveStageChange, rejectStageChange, addLead, addLeadNote,
   } = useData();
 
   // Commission réelle si l'affaire est gagnée, sinon estimation au taux du niveau
@@ -37,7 +37,18 @@ export default function Pipeline() {
     return <>Commission estimée : {formatCFA(Math.round(lead.estimatedValue * rate))}</>;
   };
 
+  const allMyLeads = leadsForUser(user);
   const openStages = stages.filter((s) => s.id !== 'gagne');
+  const isGerant = user.role === 'gerant';
+  const stageLabel = (id) => [...stages, lostStage].find((st) => st.id === id)?.label || id;
+
+  // Gérant : passage direct. Technicien : demande, validée ensuite par le gérant.
+  const moveLead = (leadId, stageId) => {
+    const lead = allMyLeads.find((l) => l.id === leadId);
+    if (!lead || lead.stage === stageId) return;
+    if (isGerant) updateLeadStage(leadId, stageId);
+    else requestStageChange(leadId, stageId, user.id);
+  };
 
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -47,7 +58,6 @@ export default function Pipeline() {
   const [noteText, setNoteText] = useState('');
   const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', clientType: 'particulier' });
 
-  const allMyLeads = leadsForUser(user);
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
   const selectedLead = allMyLeads.find((l) => l.id === selectedLeadId);
 
@@ -57,7 +67,7 @@ export default function Pipeline() {
   const wonValue = wonLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
 
   const handleDrop = (stageId) => {
-    if (draggedLeadId) updateLeadStage(draggedLeadId, stageId);
+    if (draggedLeadId) moveLead(draggedLeadId, stageId);
     setDraggedLeadId(null);
     setDragOverZone(null);
   };
@@ -107,6 +117,29 @@ export default function Pipeline() {
       </PageHeader>
 
       <div className="page-content page-content-flush">
+        {isGerant && allMyLeads.some((l) => l.pendingStage) && (
+          <div className="validation-bar">
+            <div className="validation-bar-title"><Hourglass size={15} /> Progressions à valider</div>
+            {allMyLeads.filter((l) => l.pendingStage).map((l) => {
+              const demandeur = getUserById(l.pendingStage.requestedBy);
+              return (
+                <div key={l.id} className="validation-row">
+                  <div className="validation-info" role="button" tabIndex={0}
+                    onClick={() => setSelectedLeadId(l.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && setSelectedLeadId(l.id)}>
+                    <span className="validation-lead">{l.name}</span>
+                    <span className="validation-move">{stageLabel(l.stage)} → <strong>{stageLabel(l.pendingStage.stage)}</strong></span>
+                    <span className="validation-by">par {demandeur?.name || '—'} · {formatDate(l.pendingStage.requestedAt)}</span>
+                  </div>
+                  <div className="validation-actions">
+                    <button className="btn btn-sm btn-won" onClick={() => approveStageChange(l.id, user.id)}><Check size={14} /> Valider</button>
+                    <button className="btn btn-sm btn-lost" onClick={() => rejectStageChange(l.id, user.id)}><X size={14} /> Refuser</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div className="kanban-container">
           {openStages.map((stage) => {
             const stageLeads = myLeads.filter((l) => l.stage === stage.id);
@@ -144,6 +177,11 @@ export default function Pipeline() {
                       >
                         <div className="kanban-card-title">{lead.name}</div>
                         <div className="kanban-card-contact">{lead.contact}</div>
+                        {lead.pendingStage && (
+                          <div className="pending-chip" title={`Demande en attente de validation du gérant`}>
+                            <Hourglass size={11} /> → {stageLabel(lead.pendingStage.stage)}
+                          </div>
+                        )}
                         <div className="kanban-card-footer">
                           <span className="kanban-card-value">{formatCFA(lead.estimatedValue)}</span>
                           <span className="kanban-card-icons">
@@ -199,6 +237,19 @@ export default function Pipeline() {
       >
         {selectedLead && (
           <>
+            {selectedLead.pendingStage && (
+              <div className="pending-banner">
+                <span className="pending-banner-text">
+                  <Hourglass size={15} /> Passage à « <strong>{stageLabel(selectedLead.pendingStage.stage)}</strong> » demandé par {getUserById(selectedLead.pendingStage.requestedBy)?.name || '—'} — en attente de validation.
+                </span>
+                {isGerant && (
+                  <span className="pending-banner-actions">
+                    <button className="btn btn-sm btn-won" onClick={() => approveStageChange(selectedLead.id, user.id)}><Check size={14} /> Valider</button>
+                    <button className="btn btn-sm btn-lost" onClick={() => rejectStageChange(selectedLead.id, user.id)}><X size={14} /> Refuser</button>
+                  </span>
+                )}
+              </div>
+            )}
             {isOpen(selectedLead) ? (
               <>
                 <div className="stage-stepper">
@@ -208,7 +259,7 @@ export default function Pipeline() {
                       <button
                         key={stage.id}
                         className={`stage-step ${i <= currentIndex ? 'reached' : ''} ${selectedLead.stage === stage.id ? 'current' : ''}`}
-                        onClick={() => updateLeadStage(selectedLead.id, stage.id)}
+                        onClick={() => moveLead(selectedLead.id, stage.id)}
                         title={stage.label}
                       >
                         {stage.label}
@@ -217,10 +268,10 @@ export default function Pipeline() {
                   })}
                 </div>
                 <div className="outcome-actions">
-                  <button className="btn btn-won" onClick={() => updateLeadStage(selectedLead.id, 'gagne')}>
+                  <button className="btn btn-won" onClick={() => moveLead(selectedLead.id, 'gagne')}>
                     <Trophy size={16} /> Gagné
                   </button>
-                  <button className="btn btn-lost" onClick={() => updateLeadStage(selectedLead.id, 'perdu')}>
+                  <button className="btn btn-lost" onClick={() => moveLead(selectedLead.id, 'perdu')}>
                     <ThumbsDown size={16} /> Perdu
                   </button>
                 </div>
@@ -230,7 +281,7 @@ export default function Pipeline() {
                 <span className="outcome-banner-label">
                   {selectedLead.stage === 'gagne' ? <><Trophy size={16} /> Affaire gagnée le {formatDate(selectedLead.wonAt)}</> : <><ThumbsDown size={16} /> Affaire perdue le {formatDate(selectedLead.lostAt)}</>}
                 </span>
-                <button className="btn btn-sm btn-outline" onClick={() => updateLeadStage(selectedLead.id, 'negociation')}>
+                <button className="btn btn-sm btn-outline" onClick={() => moveLead(selectedLead.id, 'negociation')}>
                   <RotateCcw size={14} /> Rouvrir
                 </button>
               </div>

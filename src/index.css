@@ -416,6 +416,35 @@ textarea.input { resize: vertical; }
 
 /* ============ Pipeline (kanban, inspiré de Pipedrive) ============ */
 
+/* Validation des progressions par le gérant */
+.validation-bar {
+  margin: 0 16px 14px; padding: 12px 14px;
+  background: white; border-radius: var(--radius); box-shadow: var(--shadow);
+  border-left: 4px solid var(--warning);
+}
+.validation-bar-title { display: flex; align-items: center; gap: 7px; font-size: 0.8125rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: #92400e; margin-bottom: 8px; }
+.validation-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.validation-info { flex: 1; min-width: 220px; cursor: pointer; }
+.validation-lead { font-weight: 700; margin-right: 10px; }
+.validation-move { font-size: 0.875rem; color: var(--text-secondary); margin-right: 10px; }
+.validation-move strong { color: var(--primary); }
+.validation-by { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+.validation-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* Demande en attente : pastille sur la carte kanban + bandeau de la fiche */
+.pending-chip {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
+  font-size: 0.6875rem; font-weight: 700;
+  background: var(--warning-light); color: #92400e;
+  border-radius: 20px; padding: 2px 8px;
+}
+.pending-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  background: var(--warning-light); border-radius: 10px; padding: 10px 13px; margin-bottom: 14px;
+}
+.pending-banner-text { display: flex; align-items: center; gap: 7px; font-size: 0.8438rem; color: #92400e; }
+.pending-banner-actions { display: flex; gap: 8px; }
+
 .select-filter {
   width: auto; padding: 9px 12px; font-size: 0.875rem;
   border: none; border-radius: 10px; background: rgba(255, 255, 255, 0.95);
