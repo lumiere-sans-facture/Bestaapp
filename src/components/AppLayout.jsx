@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { SyncDot } from './SyncStatus';
 
@@ -39,19 +40,29 @@ const plusSections = (role) => [
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const { getCompanyForUser } = useData();
   const { mode, setMode } = useMode();
   const isPro = mode === 'pro';
   const navItems = isPro ? proNavItems : publicNavItems;
+  // En mode Pro, la marque affichée est celle de l'entreprise de l'abonné
+  // (logo + nom configurés dans « Mon entreprise ») — repli sur la couronne.
+  const company = isPro ? getCompanyForUser(user.id) : null;
 
   return (
     <div className="app-shell">
       {/* Barre latérale — visible uniquement sur grand écran */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-logo">{isPro ? <Crown size={22} /> : <Sun size={22} />}</div>
+          <div className="sidebar-logo">
+            {isPro
+              ? (company?.logo
+                ? <img src={company.logo} alt={`Logo ${company.nomEntreprise || 'entreprise'}`} />
+                : <Crown size={22} />)
+              : <Sun size={22} />}
+          </div>
           <div>
-            <div className="sidebar-title">{isPro ? 'Espace Pro' : 'BestaSolar Pro'}</div>
-            <div className="sidebar-subtitle">Parakou, Bénin</div>
+            <div className="sidebar-title">{isPro ? (company?.nomEntreprise || 'Espace Pro') : 'BestaSolar Pro'}</div>
+            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Parakou, Bénin'}</div>
           </div>
         </div>
         <nav className="sidebar-nav">
