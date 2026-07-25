@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, Plus, Pencil, Check, PlayCircle, FileText, AlignLeft,
+  ChevronLeft, ChevronRight, ChevronDown, Plus, Pencil, Check, PlayCircle, FileText, AlignLeft,
   Clock, ExternalLink, Trash2, GraduationCap, CheckCircle2, Circle, BookOpen, Layers,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -8,7 +8,7 @@ import { useData } from '../../context/DataContext';
 import { toEmbed } from '../../utils/video';
 import {
   allLecons, isLeconDone, courseProgress, resumeLecon, nextLecon, prevLecon,
-  courseDuration, courseCounts,
+  courseDuration, courseCounts, parseChaptersText, chaptersToText, formatTimecode,
 } from '../../utils/formation';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
@@ -16,8 +16,8 @@ import EmptyState from '../../components/EmptyState';
 
 const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText };
 const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document' };
-const EMPTY_COURSE = { title: '', description: '' };
-const EMPTY_LECON = { title: '', type: 'video', url: '', content: '', duration: '' };
+const EMPTY_COURSE = { title: '', description: '', author: '' };
+const EMPTY_LECON = { title: '', type: 'video', url: '', content: '', duration: '', chaptersText: '' };
 
 /** Contenu d'une leçon texte : paragraphes + listes (« - … »), sans dépendance. */
 function TexteContent({ content }) {
@@ -59,6 +59,8 @@ export default function FormationSection({ onBack }) {
   const [courseId, setCourseId] = useState(null);
   const [leconId, setLeconId] = useState(null);
   const [mobileFocus, setMobileFocus] = useState(false); // mobile : contenu plein écran
+  const [startAt, setStartAt] = useState(0); // démarrage vidéo (sommaire minuté)
+  const [openModules, setOpenModules] = useState(new Set()); // modules dépliés
 
   // Formulaires gérant
   const [courseEdit, setCourseEdit] = useState(null); // null | 'new' | id
@@ -79,9 +81,19 @@ export default function FormationSection({ onBack }) {
     setCourseId(c.id);
     const resume = resumeLecon(c, formationProgress, user.id);
     setLeconId(resume?.id || null);
+    // Seul le module de la leçon en cours est déplié (comme sur systeme.io).
+    setOpenModules(new Set(resume ? [resume.moduleId] : (c.modules[0] ? [c.modules[0].id] : [])));
     setMobileFocus(false);
   };
   const openLecon = (l) => { setLeconId(l.id); setMobileFocus(true); };
+  const toggleModule = (id) =>
+    setOpenModules((prev) => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
+
+  // Changement de leçon : repartir du début de la vidéo et déplier son module.
+  useEffect(() => {
+    setStartAt(0);
+    if (lecon) setOpenModules((prev) => (prev.has(lecon.moduleId) ? prev : new Set([...prev, lecon.moduleId])));
+  }, [leconId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const finishAndNext = () => {
     setLeconDone(user.id, course.id, lecon.id, true);
@@ -92,7 +104,7 @@ export default function FormationSection({ onBack }) {
   // ---------- Gérant : formulaires ----------
   const saveCourse = (e) => {
     e.preventDefault();
-    const data = { title: courseForm.title.trim(), description: courseForm.description.trim() };
+    const data = { title: courseForm.title.trim(), description: courseForm.description.trim(), author: courseForm.author.trim() };
     if (!data.title) return;
     if (courseEdit === 'new') addFormation(data);
     else updateFormation(courseEdit, data);
@@ -128,6 +140,7 @@ export default function FormationSection({ onBack }) {
       duration: leconForm.duration.trim(),
       url: leconForm.type === 'texte' ? '' : leconForm.url.trim(),
       content: leconForm.type === 'texte' ? leconForm.content : '',
+      chapters: leconForm.type === 'video' ? parseChaptersText(leconForm.chaptersText) : [],
     };
     if (!data.title) return;
     if (leconEdit.id === 'new') addLecon(course.id, leconEdit.moduleId, data);
@@ -180,12 +193,13 @@ export default function FormationSection({ onBack }) {
                   <div className="course-card-icon"><BookOpen size={20} /></div>
                   {isManager && (
                     <button className="sheet-close" aria-label="Modifier le cours"
-                      onClick={() => { setCourseForm({ title: c.title, description: c.description || '' }); setCourseEdit(c.id); }}>
+                      onClick={() => { setCourseForm({ title: c.title, description: c.description || '', author: c.author || '' }); setCourseEdit(c.id); }}>
                       <Pencil size={15} />
                     </button>
                   )}
                 </div>
                 <div className="course-card-title">{c.title}</div>
+                {c.author && <div className="course-card-author">Par {c.author}</div>}
                 {c.description && <p className="formation-desc">{c.description}</p>}
                 <div className="course-card-meta">
                   <span><Layers size={13} /> {counts.modules} module{counts.modules > 1 ? 's' : ''}</span>
@@ -214,7 +228,7 @@ export default function FormationSection({ onBack }) {
   }
 
   // ================= Vue cours (programme + lecture) =================
-  const embed = lecon?.type === 'video' && lecon.url ? toEmbed(lecon.url) : null;
+  const embed = lecon?.type === 'video' && lecon.url ? toEmbed(lecon.url, startAt) : null;
   const prev = lecon ? prevLecon(course, lecon.id) : null;
   const next = lecon ? nextLecon(course, lecon.id) : null;
   const courseFini = progress.total > 0 && progress.done === progress.total;
@@ -230,6 +244,7 @@ export default function FormationSection({ onBack }) {
 
       <div className="course-head">
         <div className="course-head-title">{course.title}</div>
+        {course.author && <div className="course-head-author">Par {course.author}</div>}
         <div className="course-head-progress">
           <div className="funnel-track">
             <div className="funnel-bar" style={{ width: `${progress.pct}%`, background: progress.pct === 100 ? 'var(--success)' : 'var(--accent)' }} />
@@ -241,19 +256,26 @@ export default function FormationSection({ onBack }) {
       <div className={`school-layout ${mobileFocus ? 'focus-content' : ''}`}>
         {/* Programme (modules + leçons) */}
         <aside className="school-side">
-          {(course.modules || []).map((m, mi) => (
-            <div key={m.id} className="school-module">
-              <div className="school-module-head">
+          {(course.modules || []).map((m, mi) => {
+            const done_m = (m.lecons || []).filter((l) => done(l.id)).length;
+            const ouvert = openModules.has(m.id);
+            return (
+            <div key={m.id} className={`school-module ${ouvert ? '' : 'closed'}`}>
+              <div className="school-module-head" role="button" tabIndex={0}
+                onClick={() => toggleModule(m.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleModule(m.id); } }}>
                 <span className="school-module-label">Module {mi + 1}</span>
                 <span className="school-module-title">{m.title}</span>
+                <span className="school-module-count">{done_m}/{(m.lecons || []).length}</span>
                 {isManager && (
                   <button className="school-edit-btn" aria-label="Modifier le module"
-                    onClick={() => { setModuleTitle(m.title); setModuleEdit({ id: m.id }); }}>
+                    onClick={(e) => { e.stopPropagation(); setModuleTitle(m.title); setModuleEdit({ id: m.id }); }}>
                     <Pencil size={13} />
                   </button>
                 )}
+                <ChevronDown size={15} className={`school-module-chevron ${ouvert ? 'open' : ''}`} />
               </div>
-              {(m.lecons || []).map((l) => {
+              {ouvert && (m.lecons || []).map((l) => {
                 const Icon = LECON_ICON[l.type] || PlayCircle;
                 const active = l.id === leconId;
                 return (
@@ -267,7 +289,7 @@ export default function FormationSection({ onBack }) {
                       <button className="school-edit-btn" aria-label="Modifier la leçon"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLeconForm({ title: l.title, type: l.type || 'video', url: l.url || '', content: l.content || '', duration: l.duration || '' });
+                          setLeconForm({ title: l.title, type: l.type || 'video', url: l.url || '', content: l.content || '', duration: l.duration || '', chaptersText: chaptersToText(l.chapters || []) });
                           setLeconEdit({ moduleId: m.id, id: l.id });
                         }}>
                         <Pencil size={13} />
@@ -276,13 +298,14 @@ export default function FormationSection({ onBack }) {
                   </div>
                 );
               })}
-              {isManager && (
+              {ouvert && isManager && (
                 <button className="school-add-lecon" onClick={() => { setLeconForm(EMPTY_LECON); setLeconEdit({ moduleId: m.id, id: 'new' }); }}>
                   <Plus size={14} /> Ajouter une leçon
                 </button>
               )}
             </div>
-          ))}
+            );
+          })}
           {isManager && (
             <button className="btn btn-outline btn-sm btn-block" onClick={() => { setModuleTitle(''); setModuleEdit({ id: 'new' }); }}>
               <Plus size={15} /> Ajouter un module
@@ -294,18 +317,37 @@ export default function FormationSection({ onBack }) {
         <div className="school-main">
           {lecon ? (
             <div className="card school-content">
-              <div className="school-content-kicker">{lecon.moduleTitle} · {LECON_TYPE_LABEL[lecon.type] || 'Leçon'}{lecon.duration ? ` · ${lecon.duration}` : ''}</div>
+              <div className="school-content-top">
+                <div className="school-content-kicker">{lecon.moduleTitle} · {LECON_TYPE_LABEL[lecon.type] || 'Leçon'}{lecon.duration ? ` · ${lecon.duration}` : ''}</div>
+                <div className="lesson-topnav">
+                  <button className="btn btn-sm btn-outline" disabled={!prev} onClick={() => prev && setLeconId(prev.id)} aria-label="Leçon précédente"><ChevronLeft size={15} /></button>
+                  <button className="btn btn-sm btn-outline" disabled={!next} onClick={() => next && setLeconId(next.id)} aria-label="Leçon suivante"><ChevronRight size={15} /></button>
+                </div>
+              </div>
               <h2 className="school-content-title">{lecon.title}</h2>
 
               {lecon.type === 'video' && embed && (
                 <div className="video-embed">
                   {embed.kind === 'iframe' ? (
-                    <iframe src={embed.src} title={lecon.title}
+                    <iframe key={`${lecon.id}:${startAt}`} src={embed.src} title={lecon.title}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                       allowFullScreen />
                   ) : (
-                    <video src={embed.src} controls playsInline />
+                    <video key={`${lecon.id}:${startAt}`} src={embed.src} controls playsInline
+                      onLoadedMetadata={(e) => { if (embed.start) e.currentTarget.currentTime = embed.start; }} />
                   )}
+                </div>
+              )}
+              {lecon.type === 'video' && embed && (lecon.chapters || []).length > 0 && (
+                <div className="video-chapters">
+                  <div className="video-chapters-title"><Clock size={14} /> Sommaire de la vidéo</div>
+                  {lecon.chapters.map((c) => (
+                    <button key={c.t} type="button" className={`video-chapter ${startAt === c.t ? 'active' : ''}`} onClick={() => setStartAt(c.t)}>
+                      <span className="video-chapter-time">{formatTimecode(c.t)}</span>
+                      <span className="video-chapter-label">{c.label}</span>
+                      <PlayCircle size={14} className="video-chapter-play" />
+                    </button>
+                  ))}
                 </div>
               )}
               {lecon.type === 'video' && !embed && lecon.url && (
@@ -383,6 +425,14 @@ export default function FormationSection({ onBack }) {
               <input className="input" value={leconForm.duration} onChange={(e) => setLeconForm({ ...leconForm, duration: e.target.value })} placeholder="Ex : 12 min" />
             </Field>
           </div>
+          {leconForm.type === 'video' && (
+            <Field label="Sommaire minuté (facultatif)">
+              <textarea className="input" rows="4" value={leconForm.chaptersText}
+                onChange={(e) => setLeconForm({ ...leconForm, chaptersText: e.target.value })}
+                placeholder={'00:00 Introduction\n01:32 Récupérer ses emails\n02:51 Changer ses DNS'} />
+              <div className="field-hint">Une ligne par chapitre : « mm:ss Titre ». Cliquer un chapitre lance la vidéo à cet instant.</div>
+            </Field>
+          )}
           {leconForm.type === 'texte' ? (
             <Field label="Contenu de la leçon *">
               <textarea className="input" rows="8" required value={leconForm.content}
@@ -417,6 +467,9 @@ function CourseFormSheet({ open, isNew, form, setForm, onClose, onSubmit, onDele
       <form onSubmit={onSubmit}>
         <Field label="Titre du cours *">
           <input className="input" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex : Devenir installateur solaire" />
+        </Field>
+        <Field label="Formateur / auteur">
+          <input className="input" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} placeholder="Ex : Siddo Boubacar" />
         </Field>
         <Field label="Description">
           <textarea className="input" rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   allLecons, isLeconDone, courseProgress, resumeLecon, nextLecon, prevLecon,
   parseMinutes, courseDuration, courseCounts,
+  parseTimecode, formatTimecode, parseChaptersText, chaptersToText,
 } from '../formation';
 
 const course = {
@@ -69,5 +70,31 @@ describe('durées', () => {
   });
   it('compte modules et leçons', () => {
     expect(courseCounts(course)).toEqual({ modules: 2, lecons: 3 });
+  });
+});
+
+describe('sommaire minuté des vidéos', () => {
+  it('parse les timecodes mm:ss et h:mm:ss', () => {
+    expect(parseTimecode('00:43')).toBe(43);
+    expect(parseTimecode('01:32')).toBe(92);
+    expect(parseTimecode('1:02:05')).toBe(3725);
+    expect(parseTimecode('abc')).toBeNaN();
+  });
+  it('formate les secondes en timecode', () => {
+    expect(formatTimecode(43)).toBe('00:43');
+    expect(formatTimecode(92)).toBe('01:32');
+    expect(formatTimecode(3725)).toBe('1:02:05');
+  });
+  it('parse le texte du formulaire en chapitres triés (lignes invalides ignorées)', () => {
+    const txt = '01:32 Récupérer ses emails\nblabla sans timecode\n00:00 Vérifications\n00:43 Déménagement du site ?';
+    expect(parseChaptersText(txt)).toEqual([
+      { t: 0, label: 'Vérifications' },
+      { t: 43, label: 'Déménagement du site ?' },
+      { t: 92, label: 'Récupérer ses emails' },
+    ]);
+  });
+  it('fait l’aller-retour chapitres ⇄ texte', () => {
+    const chapters = [{ t: 0, label: 'Intro' }, { t: 151, label: 'Suite' }];
+    expect(parseChaptersText(chaptersToText(chapters))).toEqual(chapters);
   });
 });

@@ -59,12 +59,21 @@ export const formations = [
   {
     id: 'f1',
     title: 'Bien démarrer avec BestaSolar Pro',
+    author: 'Siddo Boubacar',
     description: 'Maîtrisez l’application de A à Z : suivi clients, devis, boutique et factures.',
     modules: [
       {
         id: 'f1m1', title: 'Découverte de l’application',
         lecons: [
-          { id: 'f1m1l1', title: 'Tour du tableau de bord', type: 'video', url: YT, duration: '8 min' },
+          {
+            id: 'f1m1l1', title: 'Tour du tableau de bord', type: 'video', url: YT, duration: '8 min',
+            chapters: [
+              { t: 0, label: 'Introduction' },
+              { t: 45, label: 'Les indicateurs clés' },
+              { t: 150, label: 'Alertes et relances' },
+              { t: 300, label: 'Navigation entre les écrans' },
+            ],
+          },
           { id: 'f1m1l2', title: 'Suivre ses clients du premier contact à la vente', type: 'video', url: YT, duration: '12 min' },
           { id: 'f1m1l3', title: 'Créer un devis en 5 minutes', type: 'video', url: YT, duration: '10 min' },
         ],
@@ -84,6 +93,7 @@ export const formations = [
   {
     id: 'f2',
     title: 'Devenir installateur solaire',
+    author: 'BestaSolar Academy',
     description: 'Des bases du photovoltaïque au chantier : la méthode BestaSolar complète.',
     modules: [
       {
@@ -101,7 +111,15 @@ export const formations = [
         lecons: [
           { id: 'f2m2l1', title: 'Calculer la consommation du client', type: 'video', url: YT, duration: '12 min' },
           { id: 'f2m2l2', title: 'Choisir l’onduleur et les batteries', type: 'video', url: YT, duration: '14 min' },
-          { id: 'f2m2l3', title: 'Utiliser l’outil de dimensionnement de l’app', type: 'video', url: YT, duration: '8 min' },
+          {
+            id: 'f2m2l3', title: 'Utiliser l’outil de dimensionnement de l’app', type: 'video', url: YT, duration: '8 min',
+            chapters: [
+              { t: 0, label: 'Saisir la consommation du client' },
+              { t: 90, label: 'Géolocalisation et ensoleillement' },
+              { t: 210, label: 'Choisir onduleur et batteries' },
+              { t: 360, label: 'Générer la fiche et le devis' },
+            ],
+          },
         ],
       },
       {
@@ -119,6 +137,7 @@ export const formations = [
   {
     id: 'f3',
     title: 'Gagner avec le programme partenaire',
+    author: 'Siddo Boubacar',
     description: 'Parrainage, commissions niveau 1 et 2, paiement Mobile Money : tout pour développer vos revenus.',
     modules: [
       {
