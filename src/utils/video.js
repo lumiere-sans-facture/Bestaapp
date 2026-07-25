@@ -31,11 +31,20 @@ export const toEmbed = (url = '', start = 0) => {
       }
     }
 
-    // Vimeo
+    // Vimeo — gère aussi les vidéos non répertoriées : leur lien contient un
+    // code de confidentialité (vimeo.com/ID/code ou ?h=code) que le lecteur
+    // DOIT recevoir (paramètre h), sinon Vimeo refuse la lecture.
     if (host === 'vimeo.com' || host === 'player.vimeo.com') {
       const m = u.pathname.match(/(\d{6,})/);
       if (m) {
-        return { kind: 'iframe', src: `https://player.vimeo.com/video/${m[1]}?autoplay=1&playsinline=1${s ? `#t=${s}s` : ''}` };
+        const id = m[1];
+        const hash = u.searchParams.get('h')
+          || (u.pathname.match(new RegExp(`${id}/([a-zA-Z0-9]{6,})`)) || [])[1]
+          || '';
+        return {
+          kind: 'iframe',
+          src: `https://player.vimeo.com/video/${id}?autoplay=1&playsinline=1${hash ? `&h=${hash}` : ''}${s ? `#t=${s}s` : ''}`,
+        };
       }
     }
 
