@@ -50,6 +50,17 @@ export async function geocodeCity(query) {
   return { name: r.name, country: r.country || '', lat: r.latitude, lon: r.longitude };
 }
 
+/** Ville la plus proche pour des coordonnées (géocodage inverse BigDataCloud,
+ *  gratuit, sans clé, CORS). Renvoie '' si aucune localité identifiable —
+ *  l'appelant garde alors son libellé de repli (« Ma position »). */
+export async function reverseGeocode(lat, lon) {
+  const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=fr`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Géocodage inverse indisponible.');
+  const d = await res.json();
+  return d.city || d.locality || d.principalSubdivision || '';
+}
+
 async function fromPVGIS(lat, lon) {
   const url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${lat}&lon=${lon}&peakpower=1&loss=14&optimalangles=1&outputformat=json`;
   const res = await fetch(url);
