@@ -12,7 +12,9 @@ export function createDevisActions(setState) {
         const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
         const counter = (s.devisCounter || 0) + 1;
         const devisNumber = `BS-${dateStr}-${String(counter).padStart(4, '0')}`;
-        // Attribution automatique : partenaire choisi > parrain de la piste > lien d'affiliation
+        // Attribution automatique : partenaire choisi > parrain de la piste
+        // > lien d'affiliation > profil partenaire du créateur du devis
+        // (chaque devis a impérativement un apporteur).
         const lead = s.leads.find((l) => l.id === devis.leadId);
         let partnerId = devis.partnerId || lead?.parrainL1 || null;
         let referrals = s.referrals || [];
@@ -25,6 +27,9 @@ export function createDevisActions(setState) {
               ...referrals,
             ];
           }
+        }
+        if (!partnerId && devis.createdBy) {
+          partnerId = s.partners.find((p) => p.userId === devis.createdBy)?.id || null;
         }
         // Le code partenaire est figé sur le devis : il identifie l'apporteur
         // même si le partenaire est renommé plus tard.

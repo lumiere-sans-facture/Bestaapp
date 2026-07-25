@@ -80,15 +80,21 @@ export const consumeRefClick = () => {
 /**
  * Attribution automatique du partenaire pour une affaire :
  * 1) le parrain niveau 1 de la piste s'il existe,
- * 2) sinon le partenaire du lien d'affiliation actif (?ref=…).
+ * 2) sinon le partenaire du lien d'affiliation actif (?ref=…),
+ * 3) sinon le profil partenaire du créateur du devis — chaque affaire a
+ *    impérativement un apporteur.
  */
-export const resolveAutoPartner = (lead, partners) => {
+export const resolveAutoPartner = (lead, partners, creatorUserId = null) => {
   if (lead?.parrainL1) {
     return partners.find((p) => p.id === lead.parrainL1) || null;
   }
   const ref = getActiveRef();
   if (ref) {
-    return partners.find((p) => p.code === ref.code && p.status === 'actif') || null;
+    const refPartner = partners.find((p) => p.code === ref.code && p.status === 'actif');
+    if (refPartner) return refPartner;
+  }
+  if (creatorUserId) {
+    return partners.find((p) => p.userId === creatorUserId) || null;
   }
   return null;
 };

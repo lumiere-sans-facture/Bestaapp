@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -16,10 +16,16 @@ let rowSeq = 0;
 
 export default function SolarWizard({ onDone }) {
   const { user } = useAuth();
-  const { addDevis, leadsForUser, partners } = useData();
+  const { addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
   const [step, setStep] = useState(1);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [partnerId, setPartnerId] = useState('');
+
+  // Chaque devis a impérativement un apporteur : le profil partenaire du
+  // créateur sert de repli quand la piste n'en a pas — on le crée d'office.
+  useEffect(() => {
+    ensurePartnerForUser(user);
+  }, [user, ensurePartnerForUser]);
   const [rows, setRows] = useState([]); // appareils sélectionnés
   const [pickerId, setPickerId] = useState('');
   const [manualMode, setManualMode] = useState(false);
@@ -204,7 +210,7 @@ export default function SolarWizard({ onDone }) {
                 <button
                   key={lead.id}
                   className={`lead-select-item ${selectedLeadId === lead.id ? 'selected' : ''}`}
-                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(resolveAutoPartner(lead, partners)?.id || ''); }}
+                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(resolveAutoPartner(lead, partners, user.id)?.id || ''); }}
                 >
                   <div className="lead-select-name">{lead.name}</div>
                   <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>

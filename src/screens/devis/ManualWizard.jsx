@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -8,10 +8,16 @@ import PartnerField from './PartnerField';
 
 export default function ManualWizard({ onDone, initialItems }) {
   const { user } = useAuth();
-  const { products, addDevis, leadsForUser, partners } = useData();
+  const { products, addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
   const [step, setStep] = useState(1);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [partnerId, setPartnerId] = useState('');
+
+  // Chaque devis a impérativement un apporteur : le profil partenaire du
+  // créateur sert de repli quand la piste n'en a pas — on le crée d'office.
+  useEffect(() => {
+    ensurePartnerForUser(user);
+  }, [user, ensurePartnerForUser]);
   // Pré-rempli depuis le panier de la boutique le cas échéant
   const [items, setItems] = useState(() => ({ ...(initialItems || {}) }));
 
@@ -80,7 +86,7 @@ export default function ManualWizard({ onDone, initialItems }) {
                 <button
                   key={lead.id}
                   className={`lead-select-item ${selectedLeadId === lead.id ? 'selected' : ''}`}
-                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(resolveAutoPartner(lead, partners)?.id || ''); }}
+                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(resolveAutoPartner(lead, partners, user.id)?.id || ''); }}
                 >
                   <div className="lead-select-name">{lead.name}</div>
                   <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
