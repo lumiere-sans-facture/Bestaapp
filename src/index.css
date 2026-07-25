@@ -1535,6 +1535,12 @@ textarea.input { resize: vertical; }
 .client-history-title { font-weight: 600; color: var(--text-primary); }
 .client-history-amount { margin-left: auto; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
 
+/* Commissions : outils de filtre partenaire + actions des lignes payées */
+.com-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.com-toolbar .categories-scroll { flex: 1; min-width: 220px; margin-bottom: 0; }
+.com-partner-tools { display: flex; align-items: center; gap: 8px; }
+.com-paid-actions { display: inline-flex; align-items: center; gap: 8px; }
+
 /* Encaissements (PaiementSheet) */
 .pay-quick { display: flex; gap: 8px; margin: -4px 0 12px; flex-wrap: wrap; }
 .pay-history { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }

@@ -19,6 +19,7 @@ import TeamSection from './plus/TeamSection';
 import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import { SyncStatusRow } from '../components/SyncStatus';
+import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
 
 export default function Plus() {
   const { user, logout } = useAuth();
@@ -42,6 +43,9 @@ export default function Plus() {
   const activeTab = KNOWN_TABS.includes(section) ? section : 'menu';
   const setActiveTab = (x) => navigate(x === 'menu' ? '/plus' : `/plus/${x}`);
   const [comFilter, setComFilter] = useState('all');
+  const [comPartner, setComPartner] = useState('all');
+  const [payCom, setPayCom] = useState(null); // commission en cours de paiement
+  const [payForm, setPayForm] = useState({ mode: 'momo', reference: '', note: '' });
   const [showAddCommission, setShowAddCommission] = useState(false);
   const [newCommission, setNewCommission] = useState({ partnerId: '', leadId: '', level: 1, amount: '' });
   const [subSheetOpen, setSubSheetOpen] = useState(false);
@@ -102,10 +106,38 @@ export default function Plus() {
   const paidTotal = commissions.filter((c) => c.status === 'payée').reduce((sum, c) => sum + c.amount, 0);
 
   const handlePay = (commission) => {
-    const partner = getPartnerById(commission.partnerId);
-    if (window.confirm(`Confirmer le paiement de ${formatCFA(commission.amount)} à ${partner?.name} ?`)) {
-      payCommission(commission.id);
-    }
+    setPayForm({ mode: 'momo', reference: '', note: '' });
+    setPayCom(commission);
+  };
+
+  const submitPayCom = (e) => {
+    e.preventDefault();
+    payCommission(payCom.id, { ...payForm, paidBy: user.id });
+    setPayCom(null);
+  };
+
+  // Reçu de paiement imprimable (commission payée).
+  const openRecu = (commission) => {
+    openHtmlDoc(buildRecuCommissionHtml({
+      commission,
+      partner: getPartnerById(commission.partnerId),
+      lead: commission.leadId ? getLeadById(commission.leadId) : null,
+      payeur: commission.paidBy ? { name: (data.team || []).find((u) => u.id === commission.paidBy)?.name || user.name } : { name: user.name },
+      rates: COMMISSION_RATES,
+    }));
+  };
+
+  // Relevé imprimable de toutes les commissions d'un partenaire.
+  const openReleve = (partnerId) => {
+    const partner = getPartnerById(partnerId);
+    if (!partner) return;
+    openHtmlDoc(buildReleveCommissionsHtml({
+      partner,
+      commissions: commissions.filter((c) => c.partnerId === partnerId)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+      getLeadName: (leadId) => getLeadById(leadId)?.name,
+      rates: COMMISSION_RATES,
+    }));
   };
 
   const handleAddCommission = (e) => {
@@ -136,6 +168,7 @@ export default function Plus() {
 
   const filteredCommissions = commissions
     .filter((c) => comFilter === 'all' || c.status === comFilter)
+    .filter((c) => comPartner === 'all' || c.partnerId === comPartner)
     .sort((a, b) => (a.status === 'en_attente' ? -1 : 1) - (b.status === 'en_attente' ? -1 : 1) || new Date(b.createdAt) - new Date(a.createdAt));
 
   const renderCommissions = () => (
@@ -156,10 +189,22 @@ export default function Plus() {
           <div className="commission-total-label">Total payé</div>
         </div>
       </div>
-      <div className="categories-scroll">
-        {[['all', 'Toutes'], ['en_attente', 'En attente'], ['payée', 'Payées']].map(([id, label]) => (
-          <button key={id} className={`category-chip ${comFilter === id ? 'active' : ''}`} onClick={() => setComFilter(id)}>{label}</button>
-        ))}
+      <div className="com-toolbar">
+        <div className="categories-scroll">
+          {[['all', 'Toutes'], ['en_attente', 'En attente'], ['payée', 'Payées']].map(([id, label]) => (
+            <button key={id} className={`category-chip ${comFilter === id ? 'active' : ''}`} onClick={() => setComFilter(id)}>{label}</button>
+          ))}
+        </div>
+        <div className="com-partner-tools">
+          <select className="input sort-select" value={comPartner} onChange={(e) => setComPartner(e.target.value)} aria-label="Filtrer par partenaire">
+            <option value="all">Tous les partenaires</option>
+            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <button className="btn btn-sm btn-outline" disabled={comPartner === 'all'} onClick={() => openReleve(comPartner)}
+            title={comPartner === 'all' ? 'Choisissez un partenaire pour générer son relevé' : 'Relevé de commissions imprimable'}>
+            <Download size={15} /> Relevé
+          </button>
+        </div>
       </div>
       <div className="commissions-list">
         {filteredCommissions.map((commission) => (
@@ -174,12 +219,19 @@ export default function Plus() {
               <div className="commission-amount">{formatCFA(commission.amount)}</div>
             </div>
             <div className="commission-meta">
-              <span>{commission.status === 'payée' ? `Payée le ${formatDate(commission.paidAt)}` : `Créée le ${formatDate(commission.createdAt)}`}</span>
+              <span>
+                {commission.status === 'payée'
+                  ? `Payée le ${formatDate(commission.paidAt)} · ${PAY_MODE_LABEL[commission.payMode] || 'Mobile Money'}${commission.payRef ? ` · réf. ${commission.payRef}` : ''}`
+                  : `Créée le ${formatDate(commission.createdAt)}`}
+              </span>
               {commission.status === 'payée' ? (
-                <span className="badge badge-success">Payée</span>
+                <span className="com-paid-actions">
+                  <button className="btn btn-sm btn-outline" onClick={() => openRecu(commission)}><Download size={14} /> Reçu</button>
+                  <span className="badge badge-success">Payée</span>
+                </span>
               ) : (
                 <button className="btn btn-won btn-sm" onClick={() => handlePay(commission)}>
-                  <CheckCircle size={15} /> Marquer payée
+                  <CheckCircle size={15} /> Payer…
                 </button>
               )}
             </div>
@@ -349,6 +401,35 @@ export default function Plus() {
       </Sheet>
 
       {/* Abonnement Devis Pro */}
+      {/* Paiement tracé d'une commission (mode + référence, pour le reçu) */}
+      <Sheet open={!!payCom} onClose={() => setPayCom(null)} title="Payer la commission">
+        {payCom && (
+          <form onSubmit={submitPayCom}>
+            <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{getPartnerById(payCom.partnerId)?.name}</span></div>
+            {getPartnerById(payCom.partnerId)?.momoNumber && (
+              <div className="sheet-row"><span className="sheet-label">N° Mobile Money</span><span className="sheet-value">{getPartnerById(payCom.partnerId).momoNumber}</span></div>
+            )}
+            <div className="sheet-row"><span className="sheet-label">Montant</span><span className="sheet-value amount">{formatCFA(payCom.amount)}</span></div>
+            <Field label="Mode de règlement">
+              <select className="input" value={payForm.mode} onChange={(e) => setPayForm({ ...payForm, mode: e.target.value })}>
+                <option value="momo">Mobile Money</option>
+                <option value="especes">Espèces</option>
+                <option value="virement">Virement bancaire</option>
+                <option value="cheque">Chèque</option>
+              </select>
+            </Field>
+            <Field label="Référence de la transaction">
+              <input className="input" value={payForm.reference} onChange={(e) => setPayForm({ ...payForm, reference: e.target.value })} placeholder="N° de transaction MoMo, réf. virement…" />
+            </Field>
+            <Field label="Note (facultatif)">
+              <input className="input" value={payForm.note} onChange={(e) => setPayForm({ ...payForm, note: e.target.value })} />
+            </Field>
+            <button type="submit" className="btn btn-won btn-block"><CheckCircle size={17} /> Confirmer le paiement</button>
+            <p className="field-hint">Le reçu imprimable reprendra le mode et la référence saisis.</p>
+          </form>
+        )}
+      </Sheet>
+
       <Sheet open={subSheetOpen} onClose={closeSubSheet} title="Passer en mode Pro">
         <div className="pro-paywall-icon" style={{ textAlign: 'center', marginBottom: 8 }}><Crown size={28} /></div>
         <p className="pro-paywall-price" style={{ textAlign: 'center', marginBottom: 16 }}>

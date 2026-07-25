@@ -80,22 +80,40 @@ export function createPartnerActions(setState) {
         ],
       })),
 
-    payCommission: (commissionId) =>
+    // Paiement tracé (norme comptable) : mode de règlement, référence de la
+    // transaction (n° Mobile Money…), payeur et note sont archivés sur la commission.
+    payCommission: (commissionId, paiement = {}) =>
       setState((s) => ({
         ...s,
         commissions: s.commissions.map((c) =>
           c.id === commissionId
-            ? { ...c, status: 'payée', paidAt: new Date().toISOString().slice(0, 10) }
+            ? {
+                ...c,
+                status: 'payée',
+                paidAt: new Date().toISOString().slice(0, 10),
+                payMode: paiement.mode || 'momo',
+                payRef: (paiement.reference || '').trim(),
+                payNote: (paiement.note || '').trim(),
+                paidBy: paiement.paidBy || null,
+              }
             : c
         ),
       })),
 
-    payAllCommissionsForPartner: (partnerId) =>
+    payAllCommissionsForPartner: (partnerId, paiement = {}) =>
       setState((s) => ({
         ...s,
         commissions: s.commissions.map((c) =>
           c.partnerId === partnerId && c.status === 'en_attente'
-            ? { ...c, status: 'payée', paidAt: new Date().toISOString().slice(0, 10) }
+            ? {
+                ...c,
+                status: 'payée',
+                paidAt: new Date().toISOString().slice(0, 10),
+                payMode: paiement.mode || 'momo',
+                payRef: (paiement.reference || '').trim(),
+                payNote: (paiement.note || '').trim(),
+                paidBy: paiement.paidBy || null,
+              }
             : c
         ),
       })),
