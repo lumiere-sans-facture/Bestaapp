@@ -8,7 +8,7 @@ import {
   calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, recommendInverterOption, suggestBatteryCombo,
 } from '../../../utils/solarSizing';
-import { geocodeCity, fetchSolarData } from '../../../lib/solarData';
+import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
 
@@ -50,8 +50,8 @@ export default function ProSolarWizard({ onDone }) {
   const [manualMode, setManualMode] = useState(false);
   const [manual, setManual] = useState({ day: '', night: '' });
 
-  // --- Système ---
-  const [systemType, setSystemType] = useState('hybrid');
+  // --- Système --- (off-grid par défaut : cas majoritaire sur le terrain)
+  const [systemType, setSystemType] = useState('off-grid');
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
 
   // --- Localisation / ensoleillement (PVGIS / NASA) ---
@@ -83,7 +83,11 @@ export default function ProSolarWizard({ onDone }) {
     setGeoLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        try { await loadSolar({ name: 'Ma position', lat: pos.coords.latitude, lon: pos.coords.longitude }); }
+        const { latitude: lat, longitude: lon } = pos.coords;
+        // Ville identifiée par géocodage inverse — repli « Ma position » hors-ligne.
+        let name = 'Ma position';
+        try { name = (await reverseGeocode(lat, lon)) || name; } catch { /* repli */ }
+        try { await loadSolar({ name, lat, lon }); }
         catch (err) { setGeoError(err.message || 'Données solaires indisponibles.'); }
         finally { setGeoLoading(false); }
       },

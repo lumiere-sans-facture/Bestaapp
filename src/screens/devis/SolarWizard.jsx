@@ -6,7 +6,7 @@ import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById } from '../../data/appliances';
 import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
 import { SOLAR_KITS } from '../../data/kits';
-import { geocodeCity, fetchSolarData } from '../../lib/solarData';
+import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
 import Field from '../../components/Field';
@@ -24,7 +24,8 @@ export default function SolarWizard({ onDone }) {
   const [pickerId, setPickerId] = useState('');
   const [manualMode, setManualMode] = useState(false);
   const [manual, setManual] = useState({ day: '', night: '' });
-  const [systemType, setSystemType] = useState('hybrid');
+  // Off-grid par défaut : cas majoritaire sur le terrain.
+  const [systemType, setSystemType] = useState('off-grid');
   // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
   // ou recherche de ville ; repli en saisie manuelle des heures de pic.
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
@@ -62,7 +63,11 @@ export default function SolarWizard({ onDone }) {
     setGeoLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        try { await loadSolar({ name: 'Ma position', lat: pos.coords.latitude, lon: pos.coords.longitude }); }
+        const { latitude: lat, longitude: lon } = pos.coords;
+        // Ville identifiée par géocodage inverse — repli « Ma position » hors-ligne.
+        let name = 'Ma position';
+        try { name = (await reverseGeocode(lat, lon)) || name; } catch { /* repli */ }
+        try { await loadSolar({ name, lat, lon }); }
         catch (err) { setGeoError(err.message || 'Données solaires indisponibles.'); }
         finally { setGeoLoading(false); }
       },
