@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -20,15 +20,16 @@ import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import { SyncStatusRow } from '../components/SyncStatus';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
+import { reconcileMissingCommissions } from '../utils/commissionSync';
 
 export default function Plus() {
   const { user, logout } = useAuth();
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
-    partners, commissions, leads, orders,
+    partners, commissions, leads, orders, devis, referrals,
     getPartnerById, getLeadById,
-    payCommission, addCommission,
+    payCommission, addCommission, syncCommissions,
     getSubscriptionForUser, requestSubscription, importData,
   } = data;
 
@@ -47,6 +48,7 @@ export default function Plus() {
   const [payCom, setPayCom] = useState(null); // commission en cours de paiement
   const [payForm, setPayForm] = useState({ mode: 'momo', reference: '', note: '' });
   const [showAddCommission, setShowAddCommission] = useState(false);
+  const [syncMsg, setSyncMsg] = useState(null);
   const [newCommission, setNewCommission] = useState({ partnerId: '', leadId: '', level: 1, amount: '' });
   const [subSheetOpen, setSubSheetOpen] = useState(false);
   const [subForm, setSubForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
@@ -140,6 +142,22 @@ export default function Plus() {
     }));
   };
 
+  // Rattrapage des commissions : recense les affaires validées (pistes
+  // gagnées, conversions devis validées) sans commission, puis les crée.
+  const handleSyncCommissions = () => {
+    const missing = reconcileMissingCommissions(
+      { leads, devis, partners, commissions, referrals },
+      COMMISSION_RATES,
+      new Date().toISOString().slice(0, 10)
+    );
+    syncCommissions();
+    setSyncMsg(
+      missing.length
+        ? `${missing.length} commission(s) manquante(s) retrouvée(s) et ajoutée(s) en attente de paiement.`
+        : 'Tout est à jour : aucune commission manquante sur les affaires validées.'
+    );
+  };
+
   const handleAddCommission = (e) => {
     e.preventDefault();
     addCommission({
@@ -175,10 +193,16 @@ export default function Plus() {
     <>
       <div className="commissions-toolbar">
         <BackButton />
-        <button className="btn btn-accent btn-sm" onClick={() => setShowAddCommission(true)}>
-          <PlusIcon size={16} /> Commission manuelle
-        </button>
+        <div className="com-toolbar-actions">
+          <button className="btn btn-outline btn-sm" onClick={handleSyncCommissions} title="Recrée les commissions manquantes sur les affaires déjà validées">
+            <RefreshCw size={15} /> Synchroniser
+          </button>
+          <button className="btn btn-accent btn-sm" onClick={() => setShowAddCommission(true)}>
+            <PlusIcon size={16} /> Commission manuelle
+          </button>
+        </div>
       </div>
+      {syncMsg && <div className="sync-result-note">{syncMsg}</div>}
       <div className="commission-totals">
         <div className="commission-total-card pending">
           <div className="commission-total-value">{formatCFA(pendingTotal)}</div>
