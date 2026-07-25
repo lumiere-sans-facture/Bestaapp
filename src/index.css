@@ -27,6 +27,7 @@
   --shadow-lg: 0 8px 30px rgba(10, 36, 114, 0.16);
   --radius: 12px;
   --sidebar-width: 264px;
+  --topbar-height: 56px;
   --tab-bar-height: 64px;
 }
 
@@ -89,57 +90,65 @@ img { max-width: 100%; }
 .pipeline-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 0.8125rem; opacity: 0.9; }
 .pipeline-stat strong { font-weight: 600; }
 
-/* ============ Barre latérale (desktop) ============ */
+/* ============ Barre de navigation horizontale (desktop, style Zervant) ============ */
 
-.sidebar {
+.topbar {
   display: none;
-  position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
-  width: var(--sidebar-width);
-  flex-direction: column;
-  background: var(--primary-dark);
-  color: white;
+  position: sticky; top: 0; z-index: 50;
+  height: var(--topbar-height);
+  align-items: center; gap: 18px;
+  background: var(--primary-dark); color: white;
+  padding: 0 20px;
 }
-.sidebar-brand { display: flex; align-items: center; gap: 12px; padding: 22px 20px; }
-.sidebar-logo {
-  width: 42px; height: 42px; flex-shrink: 0;
+.topbar-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.topbar-logo {
+  width: 32px; height: 32px; border-radius: 9px; overflow: hidden; flex-shrink: 0;
   background: var(--accent); color: var(--primary-dark);
-  border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
 }
-/* Logo de l'entreprise de l'abonné (mode Pro) : remplit la vignette. */
-.sidebar-logo img { width: 100%; height: 100%; object-fit: cover; background: white; }
-.sidebar-title { font-weight: 700; font-size: 1rem; }
-.sidebar-subtitle { font-size: 0.75rem; opacity: 0.6; }
-.sidebar-nav { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
-.sidebar-link {
-  display: flex; align-items: center; gap: 12px;
-  padding: 11px 14px; border-radius: 10px;
-  color: rgba(255, 255, 255, 0.65); font-size: 0.9375rem; font-weight: 500;
-  transition: background 0.15s ease, color 0.15s ease;
+.topbar-logo img { width: 100%; height: 100%; object-fit: cover; background: white; }
+.topbar-title { font-weight: 700; font-size: 0.9375rem; white-space: nowrap; }
+.topbar-nav { flex: 1; display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.topbar-nav::-webkit-scrollbar { display: none; }
+.topbar-link {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  height: var(--topbar-height); padding: 0 13px;
+  color: rgba(255, 255, 255, 0.68); font-size: 0.875rem; font-weight: 500;
+  white-space: nowrap; transition: color 0.15s ease;
 }
-.sidebar-link:hover { background: rgba(255, 255, 255, 0.07); color: white; }
-.sidebar-link.active { background: var(--primary-light); color: white; }
-.sidebar-group-label { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.4); padding: 16px 14px 6px; }
-/* « Passer en mode Pro » : entrée mise en avant, juste au-dessus de « Mon profil » */
-.sidebar-pro-link { color: var(--accent-light); font-weight: 600; width: 100%; }
-.sidebar-pro-link:hover { background: rgba(245, 166, 35, 0.12); color: var(--accent-light); }
-.sidebar-footer { padding: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
-.sidebar-pro-btn { margin-bottom: 12px; }
-.sidebar-user { display: flex; align-items: center; gap: 10px; }
-.sidebar-user-avatar {
-  width: 38px; height: 38px; flex-shrink: 0;
+.topbar-link:hover { color: white; }
+.topbar-link.active { color: white; }
+.topbar-link.active::after {
+  content: ''; position: absolute; left: 10px; right: 10px; bottom: 0;
+  height: 3px; border-radius: 3px 3px 0 0; background: var(--accent);
+}
+.topbar-pro { color: var(--accent-light); font-weight: 600; }
+.topbar-pro:hover { color: var(--accent-light); background: rgba(245, 166, 35, 0.12); }
+.topbar-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.topbar-user { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+.topbar-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
   background: var(--accent); color: var(--primary-dark);
-  border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-weight: 600; font-size: 0.875rem;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.75rem;
 }
-.sidebar-user-info { flex: 1; min-width: 0; }
-.sidebar-user-name { font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-user-role { font-size: 0.75rem; opacity: 0.6; }
-.sidebar-logout {
-  color: rgba(255, 255, 255, 0.6); padding: 8px; border-radius: 8px;
-  display: flex; transition: background 0.15s ease, color 0.15s ease;
+.topbar-logout { color: rgba(255, 255, 255, 0.6); padding: 8px; border-radius: 8px; display: flex; }
+.topbar-logout:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+
+/* Menu déroulant « Gestion » (gérant) */
+.topbar-menu { position: relative; }
+.topbar-menu-btn.open { color: white; }
+.topbar-dropdown {
+  position: absolute; top: var(--topbar-height); left: 0; z-index: 60;
+  min-width: 230px; padding: 6px;
+  background: white; border-radius: 0 0 12px 12px; box-shadow: var(--shadow-lg);
 }
-.sidebar-logout:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+.topbar-dropdown-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px;
+  color: var(--text-primary); font-size: 0.875rem; font-weight: 500;
+}
+.topbar-dropdown-item:hover { background: var(--bg); color: var(--primary); }
 
 /* ============ Barre d'onglets (mobile) ============ */
 
@@ -1419,15 +1428,15 @@ textarea.input { resize: vertical; }
    ============================================================ */
 
 @media (min-width: 1024px) {
-  .sidebar { display: flex; }
+  .topbar { display: flex; }
   .tab-bar { display: none; }
-  .app-main { margin-left: var(--sidebar-width); padding-bottom: 0; }
+  .app-main { padding-bottom: 0; }
 
   /* L'en-tête devient une barre claire intégrée au contenu */
   .page-header {
     background: white; color: var(--text-primary);
     border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 30;
+    position: sticky; top: var(--topbar-height); z-index: 30;
   }
   .page-header-inner { padding: 18px 32px; }
   .page-title { font-size: 1.375rem; }
@@ -1445,7 +1454,7 @@ textarea.input { resize: vertical; }
   /* Le kanban occupe toute la largeur disponible */
   .kanban-container { scroll-snap-type: none; }
   .kanban-column { flex: 1 1 0; min-width: 200px; }
-  .drag-zones { left: var(--sidebar-width); padding: 16px 32px; }
+  .drag-zones { left: 0; padding: 16px 32px; }
 
   .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; align-items: start; }
   .products-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
