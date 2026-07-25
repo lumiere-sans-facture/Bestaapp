@@ -1,7 +1,7 @@
-import { Suspense, useState } from 'react';
+import { Suspense } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -23,20 +23,19 @@ const proNavItems = [
   { path: '/pro/abonnement', label: 'Mon abonnement', shortLabel: 'Abo', icon: CreditCard },
 ];
 
-// Entrées d'apprentissage, à plat dans la barre (mode public).
-const learnItems = [
+// Sous-sections de « Plus » remontées dans la barre latérale (desktop), par rôle.
+// « Mon profil » est rendu à part, en dernier, après le bouton « Passer en mode Pro ».
+const plusSections = (role) => [
+  ...(role === 'gerant' ? [
+    { path: '/plus/team', label: 'Équipe', icon: Users },
+    { path: '/plus/partners', label: 'Partenaires', icon: Share2 },
+    { path: '/plus/orders', label: 'Commandes en ligne', icon: ShoppingCart },
+    { path: '/plus/commissions', label: 'Commissions', icon: DollarSign },
+    { path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown },
+    { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },
+  ] : []),
   { path: '/plus/formation', label: 'Formation', icon: GraduationCap },
-  { path: '/plus/mypartner', label: 'Espace partenaire', icon: Share2 },
-];
-
-// Gestion du gérant : regroupée dans un menu déroulant « Gestion » (façon Zervant).
-const gerantMenu = [
-  { path: '/plus/team', label: 'Équipe', icon: Users },
-  { path: '/plus/partners', label: 'Partenaires', icon: Share2 },
-  { path: '/plus/orders', label: 'Commandes en ligne', icon: ShoppingCart },
-  { path: '/plus/commissions', label: 'Commissions', icon: DollarSign },
-  { path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown },
-  { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },
+  { path: '/plus/mypartner', label: 'Mon espace partenaire', icon: Users },
 ];
 
 export default function AppLayout() {
@@ -46,81 +45,86 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const isPro = mode === 'pro';
   const navItems = isPro ? proNavItems : publicNavItems;
-  const [menuOpen, setMenuOpen] = useState(false);
-  // En mode Pro, la marque affichée est celle de l'entreprise de l'abonné.
-  const company = isPro ? getCompanyForUser(user.id) : null;
-
-  // Bascule Pro : abonné → espace Pro direct ; sinon → parcours d'abonnement.
+  // Barre latérale publique : « Plus » n'y figure pas (toutes ses entrées y
+  // sont détaillées) — il reste dans la barre d'onglets mobile.
+  const sidebarItems = isPro ? proNavItems : publicNavItems.filter((i) => i.path !== '/plus');
+  // Bascule Pro depuis la barre latérale : abonné → espace Pro direct ;
+  // sinon → parcours d'abonnement (le formulaire vit sur l'écran Plus).
   const goPro = () => (proActive ? setMode('pro') : navigate('/plus/gopro'));
-
-  const TopLink = ({ path, label, end = false }) => (
-    <NavLink to={path} end={end} className={({ isActive }) => `topbar-link ${isActive ? 'active' : ''}`}>
-      {label}
-    </NavLink>
-  );
+  // En mode Pro, la marque affichée est celle de l'entreprise de l'abonné
+  // (logo + nom configurés dans « Mon entreprise ») — repli sur la couronne.
+  const company = isPro ? getCompanyForUser(user.id) : null;
 
   return (
     <div className="app-shell">
-      {/* Barre de navigation horizontale — grand écran (style Zervant) */}
-      <header className="topbar">
-        <div className="topbar-brand">
-          <div className="topbar-logo">
+      {/* Barre latérale — visible uniquement sur grand écran */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-logo">
             {isPro
               ? (company?.logo
                 ? <img src={company.logo} alt={`Logo ${company.nomEntreprise || 'entreprise'}`} />
-                : <Crown size={17} />)
-              : <Sun size={17} />}
+                : <Crown size={22} />)
+              : <Sun size={22} />}
           </div>
-          <span className="topbar-title">{isPro ? (company?.nomEntreprise || 'Espace Pro') : 'BestaSolar Pro'}</span>
+          <div>
+            <div className="sidebar-title">{isPro ? (company?.nomEntreprise || 'Espace Pro') : 'BestaSolar Pro'}</div>
+            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Parakou, Bénin'}</div>
+          </div>
         </div>
-
-        <nav className="topbar-nav">
-          {(isPro ? proNavItems : publicNavItems.filter((i) => i.path !== '/plus')).map((item) => (
-            <TopLink key={item.path} path={item.path} label={item.label} end={item.path === '/pro'} />
+        <nav className="sidebar-nav">
+          {sidebarItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === '/pro'}
+              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+            >
+              <item.icon size={20} strokeWidth={2} />
+              <span>{item.label}</span>
+            </NavLink>
           ))}
-          {!isPro && learnItems.map((item) => <TopLink key={item.path} path={item.path} label={item.label} />)}
-          {!isPro && user.role === 'gerant' && (
-            <div className="topbar-menu" onMouseLeave={() => setMenuOpen(false)}>
-              <button className={`topbar-link topbar-menu-btn ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen((o) => !o)}>
-                Gestion <ChevronDown size={14} />
+          {!isPro && (
+            <>
+              {plusSections(user.role).map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                >
+                  <item.icon size={20} strokeWidth={2} />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+              <button className="sidebar-link sidebar-pro-link" onClick={goPro}>
+                <Crown size={20} strokeWidth={2} />
+                <span>Passer en mode Pro</span>
               </button>
-              {menuOpen && (
-                <div className="topbar-dropdown">
-                  {gerantMenu.map((item) => (
-                    <NavLink key={item.path} to={item.path} className="topbar-dropdown-item" onClick={() => setMenuOpen(false)}>
-                      <item.icon size={16} /> {item.label}
-                    </NavLink>
-                  ))}
-                </div>
-              )}
-            </div>
+              <NavLink to="/plus/profile" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+                <User size={20} strokeWidth={2} />
+                <span>Mon profil</span>
+              </NavLink>
+            </>
           )}
         </nav>
-
-        <div className="topbar-right">
-          {isPro ? (
-            <button className="topbar-link topbar-pro" onClick={() => setMode('public')}>
-              <ArrowLeft size={15} /> Mode public
-            </button>
-          ) : (
-            <button className="topbar-link topbar-pro" onClick={goPro}>
-              <Crown size={15} /> Passer en mode Pro
+        <div className="sidebar-footer">
+          {isPro && (
+            <button className="btn btn-accent btn-block sidebar-pro-btn" onClick={() => setMode('public')}>
+              <ArrowLeft size={16} /> Revenir au mode public
             </button>
           )}
-          {!isPro && (
-            <NavLink to="/plus/profile" className={({ isActive }) => `topbar-link ${isActive ? 'active' : ''}`}>
-              <User size={15} /> Mon profil
-            </NavLink>
-          )}
-          <div className="topbar-user" title={user.role === 'gerant' ? 'Gérant' : 'Technicien'}>
-            <div className="topbar-avatar">{user.avatar}</div>
-            <SyncDot />
+          <div className="sidebar-user">
+            <div className="sidebar-user-avatar">{user.avatar}</div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{user.name} <SyncDot /></div>
+              <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
+            </div>
+            <button className="sidebar-logout" onClick={logout} title="Déconnexion" aria-label="Déconnexion">
+              <LogOut size={18} />
+            </button>
           </div>
-          <button className="topbar-logout" onClick={logout} title="Déconnexion" aria-label="Déconnexion">
-            <LogOut size={17} />
-          </button>
         </div>
-      </header>
+      </aside>
 
       <main className="app-main">
         <ChunkErrorBoundary>
