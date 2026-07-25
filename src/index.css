@@ -1150,6 +1150,12 @@ textarea.input { resize: vertical; }
   .plus-head .profile-card { display: flex; flex-direction: column; justify-content: center; }
   .plus-sections { grid-template-columns: 1fr 1fr; }
 }
+/* Desktop avec barre latérale : toutes ces entrées y figurent déjà (Formation,
+   Mon profil, gestion, déconnexion…). On ne les double pas — la page « Plus »
+   devient le hub compte : profil + accès Pro. */
+@media (min-width: 1024px) {
+  .plus-sections { display: none; }
+}
 .back-button { margin-bottom: 14px; }
 .menu-item {
   display: flex; align-items: center; gap: 12px; width: 100%;
