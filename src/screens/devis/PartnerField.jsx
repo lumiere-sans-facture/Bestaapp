@@ -1,12 +1,14 @@
 import { UserCheck, UserX } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 
 /**
- * Partenaire apporteur d'un devis — lecture seule : c'est toujours celui
- * rattaché à la piste (parrain enregistré ou lien d'affiliation actif).
- * Aucun choix manuel : la commission suit le profil de l'apporteur réel.
+ * Partenaire apporteur d'un devis — lecture seule : parrain de la piste,
+ * sinon lien d'affiliation actif, sinon le profil partenaire du créateur
+ * du devis. Aucun choix manuel : la commission suit l'apporteur réel.
  */
 export default function PartnerField({ value }) {
+  const { user } = useAuth();
   const { getPartnerById } = useData();
   const partner = value ? getPartnerById(value) : null;
 
@@ -22,13 +24,14 @@ export default function PartnerField({ value }) {
     );
   }
 
+  const isSelf = partner.userId === user?.id;
   return (
     <div className="partner-auto-box">
       <div className="partner-auto-icon"><UserCheck size={18} /></div>
       <div className="partner-auto-info">
         <div className="partner-auto-label">Partenaire apporteur (commission)</div>
         <div className="partner-auto-name">
-          {partner.name} <span className="partner-code-chip">{partner.code}</span>
+          {partner.name}{isSelf ? ' (vous)' : ''} <span className="partner-code-chip">{partner.code}</span>
         </div>
       </div>
     </div>
