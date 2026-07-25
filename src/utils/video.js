@@ -21,13 +21,13 @@ export const toEmbed = (url = '', start = 0) => {
         if (m) id = m[1];
       }
       if (id) {
-        return { kind: 'iframe', src: `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=1&autoplay=1${s ? `&start=${s}` : ''}` };
+        return { kind: 'iframe', src: `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=1&autoplay=1&modestbranding=1&iv_load_policy=3${s ? `&start=${s}` : ''}` };
       }
     }
     if (host === 'youtu.be') {
       const id = u.pathname.slice(1).split('/')[0];
       if (id) {
-        return { kind: 'iframe', src: `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=1&autoplay=1${s ? `&start=${s}` : ''}` };
+        return { kind: 'iframe', src: `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=1&autoplay=1&modestbranding=1&iv_load_policy=3${s ? `&start=${s}` : ''}` };
       }
     }
 
@@ -41,9 +41,13 @@ export const toEmbed = (url = '', start = 0) => {
         const hash = u.searchParams.get('h')
           || (u.pathname.match(new RegExp(`${id}/([a-zA-Z0-9]{6,})`)) || [])[1]
           || '';
+        // Lecteur « nu » façon plateforme de cours : ni titre, ni auteur, ni
+        // avatar, ni badge — impossible de deviner l'hébergeur. (Le petit logo
+        // Vimeo se retire dans les réglages du compte, plan payant requis.)
+        const clean = 'title=0&byline=0&portrait=0&badge=0&pip=0&dnt=1';
         return {
           kind: 'iframe',
-          src: `https://player.vimeo.com/video/${id}?autoplay=1&playsinline=1${hash ? `&h=${hash}` : ''}${s ? `#t=${s}s` : ''}`,
+          src: `https://player.vimeo.com/video/${id}?autoplay=1&playsinline=1&${clean}${hash ? `&h=${hash}` : ''}${s ? `#t=${s}s` : ''}`,
         };
       }
     }

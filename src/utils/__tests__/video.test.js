@@ -21,9 +21,10 @@ describe('toEmbed — YouTube', () => {
 });
 
 describe('toEmbed — Vimeo', () => {
-  it('vidéo publique', () => {
-    expect(toEmbed('https://vimeo.com/76979871').src)
-      .toBe('https://player.vimeo.com/video/76979871?autoplay=1&playsinline=1');
+  it('vidéo publique — lecteur nu (ni titre, ni auteur, ni badge)', () => {
+    const src = toEmbed('https://vimeo.com/76979871').src;
+    expect(src).toContain('player.vimeo.com/video/76979871?autoplay=1&playsinline=1');
+    for (const p of ['title=0', 'byline=0', 'portrait=0', 'badge=0', 'dnt=1']) expect(src).toContain(p);
   });
   it('vidéo non répertoriée : transmet le code de confidentialité (h=)', () => {
     expect(toEmbed('https://vimeo.com/76979871/9abc8def01').src).toContain('&h=9abc8def01');
