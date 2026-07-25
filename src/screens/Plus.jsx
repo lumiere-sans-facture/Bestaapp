@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -70,6 +70,23 @@ export default function Plus() {
     } else {
       setSubSheetOpen(true);
     }
+  };
+
+  // /plus/gopro (bouton « Passer en mode Pro » de la barre latérale) :
+  // abonné → bascule directe, sinon → ouverture du formulaire d'abonnement.
+  // L'URL reste /plus/gopro tant que la fiche est ouverte (une redirection
+  // immédiate remonterait l'écran et refermerait la fiche) ; le retour à
+  // /plus se fait à la fermeture.
+  useEffect(() => {
+    if (section !== 'gopro') return;
+    if (proActive) setMode('pro');
+    else setSubSheetOpen(true);
+  }, [section]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const closeSubSheet = () => {
+    setSubSheetOpen(false);
+    setSubSent(false);
+    if (section === 'gopro') navigate('/plus', { replace: true });
   };
 
   const handleSubSubmit = (e) => {
@@ -214,15 +231,8 @@ export default function Plus() {
 
   const renderMenu = () => (
     <div className="plus-grid">
-      {/* En-tête : profil + accès Pro mis en avant */}
-      <div className="plus-head">
-        <div className="profile-card card">
-          <div className="profile-avatar">{user.avatar}</div>
-          <div className="profile-name">{user.name}</div>
-          <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
-          <SyncStatusRow />
-        </div>
-        <button className="pro-cta card" onClick={handleProClick}>
+      {/* Accès Pro mis en avant (le profil vit dans « Mon profil ») */}
+      <button className="pro-cta card" onClick={handleProClick}>
           <div className="pro-cta-icon"><Crown size={24} /></div>
           <div className="pro-cta-info">
             <div className="pro-cta-title">Passer en mode Pro</div>
@@ -234,7 +244,7 @@ export default function Plus() {
           </div>
           <ChevronRight size={20} className="pro-cta-arrow" />
         </button>
-      </div>
+      <div className="sync-inline"><SyncStatusRow /></div>
 
       {/* Sections thématiques */}
       <div className="plus-sections">
@@ -338,7 +348,7 @@ export default function Plus() {
       </Sheet>
 
       {/* Abonnement Devis Pro */}
-      <Sheet open={subSheetOpen} onClose={() => { setSubSheetOpen(false); setSubSent(false); }} title="Passer en mode Pro">
+      <Sheet open={subSheetOpen} onClose={closeSubSheet} title="Passer en mode Pro">
         <div className="pro-paywall-icon" style={{ textAlign: 'center', marginBottom: 8 }}><Crown size={28} /></div>
         <p className="pro-paywall-price" style={{ textAlign: 'center', marginBottom: 16 }}>
           <strong>{formatCFA(SUBSCRIPTION_PRICE)}</strong> / mois
