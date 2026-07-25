@@ -200,111 +200,75 @@ export default function Plus() {
     </>
   );
 
+  // Entrée de menu générique (icône, titre, sous-titre, action).
+  const MenuItem = ({ icon: Icon, tone = '', title, subtitle, onClick }) => (
+    <button className="menu-item" onClick={onClick}>
+      <div className={`menu-item-icon ${tone}`}><Icon size={18} /></div>
+      <div className="menu-item-info">
+        <div className="menu-item-title">{title}</div>
+        <div className="menu-item-subtitle">{subtitle}</div>
+      </div>
+      <ChevronRight size={18} className="menu-item-arrow" />
+    </button>
+  );
+
   const renderMenu = () => (
     <div className="plus-grid">
-      <div className="profile-card card">
-        <div className="profile-avatar">{user.avatar}</div>
-        <div className="profile-name">{user.name}</div>
-        <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
-        <SyncStatusRow />
-      </div>
-      <div className="plus-card card">
-        <button className="menu-item menu-item-pro" onClick={handleProClick}>
-          <div className="menu-item-icon warning"><Crown size={18} /></div>
-          <div className="menu-item-info">
-            <div className="menu-item-title">Passer en mode Pro</div>
-            <div className="menu-item-subtitle">
-              {proActive ? 'Ouvrir mon espace entreprise (devis & factures)' : `Devis & factures pro — ${formatCFA(SUBSCRIPTION_PRICE)}/mois`}
+      {/* En-tête : profil + accès Pro mis en avant */}
+      <div className="plus-head">
+        <div className="profile-card card">
+          <div className="profile-avatar">{user.avatar}</div>
+          <div className="profile-name">{user.name}</div>
+          <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
+          <SyncStatusRow />
+        </div>
+        <button className="pro-cta card" onClick={handleProClick}>
+          <div className="pro-cta-icon"><Crown size={24} /></div>
+          <div className="pro-cta-info">
+            <div className="pro-cta-title">Passer en mode Pro</div>
+            <div className="pro-cta-subtitle">
+              {proActive
+                ? 'Ouvrir mon espace entreprise : devis, factures, encaissements et clients.'
+                : `Devis & factures à votre identité, suivi des paiements — ${formatCFA(SUBSCRIPTION_PRICE)}/mois.`}
             </div>
           </div>
-          <ChevronRight size={18} className="menu-item-arrow" />
+          <ChevronRight size={20} className="pro-cta-arrow" />
         </button>
+      </div>
+
+      {/* Sections thématiques */}
+      <div className="plus-sections">
         {user.role === 'gerant' && (
-          <>
-            <button className="menu-item" onClick={() => setActiveTab('team')}>
-              <div className="menu-item-icon"><Users size={18} /></div>
-              <div className="menu-item-info">
-                <div className="menu-item-title">Équipe</div>
-                <div className="menu-item-subtitle">Profils des techniciens et performances</div>
-              </div>
-              <ChevronRight size={18} className="menu-item-arrow" />
-            </button>
-            <button className="menu-item" onClick={() => setActiveTab('partners')}>
-              <div className="menu-item-icon success"><Users size={18} /></div>
-              <div className="menu-item-info">
-                <div className="menu-item-title">Partenaires</div>
-                <div className="menu-item-subtitle">{partners.length} partenaires · réseau 2 niveaux</div>
-              </div>
-              <ChevronRight size={18} className="menu-item-arrow" />
-            </button>
-            <button className="menu-item" onClick={() => setActiveTab('orders')}>
-              <div className="menu-item-icon"><DollarSign size={18} /></div>
-              <div className="menu-item-info">
-                <div className="menu-item-title">Commandes en ligne</div>
-                <div className="menu-item-subtitle">{(orders || []).filter((o) => o.status === 'initie').length} à confirmer</div>
-              </div>
-              <ChevronRight size={18} className="menu-item-arrow" />
-            </button>
-            <button className="menu-item" onClick={() => setActiveTab('commissions')}>
-              <div className="menu-item-icon warning"><DollarSign size={18} /></div>
-              <div className="menu-item-info">
-                <div className="menu-item-title">Commissions</div>
-                <div className="menu-item-subtitle">
-                  {pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'}
-                </div>
-              </div>
-              <ChevronRight size={18} className="menu-item-arrow" />
-            </button>
-            <button className="menu-item" onClick={() => setActiveTab('subsadmin')}>
-              <div className="menu-item-icon warning"><Crown size={18} /></div>
-              <div className="menu-item-info">
-                <div className="menu-item-title">Abonnements Devis Pro</div>
-                <div className="menu-item-subtitle">Abonnés, paiements à valider, MRR</div>
-              </div>
-              <ChevronRight size={18} className="menu-item-arrow" />
-            </button>
-            <button className="menu-item" onClick={() => setActiveTab('backup')}>
-              <div className="menu-item-icon"><DatabaseBackup size={18} /></div>
-              <div className="menu-item-info">
-                <div className="menu-item-title">Sauvegarde des données</div>
-                <div className="menu-item-subtitle">Exporter / restaurer toutes les données</div>
-              </div>
-              <ChevronRight size={18} className="menu-item-arrow" />
-            </button>
-          </>
+          <div className="plus-section">
+            <div className="plus-section-label">Gestion</div>
+            <div className="plus-card card">
+              <MenuItem icon={Users} title="Équipe" subtitle="Profils des techniciens et performances" onClick={() => setActiveTab('team')} />
+              <MenuItem icon={Users} tone="success" title="Partenaires" subtitle={`${partners.length} partenaires · réseau 2 niveaux`} onClick={() => setActiveTab('partners')} />
+              <MenuItem icon={DollarSign} title="Commandes en ligne" subtitle={`${(orders || []).filter((o) => o.status === 'initie').length} à confirmer`} onClick={() => setActiveTab('orders')} />
+              <MenuItem icon={DollarSign} tone="warning" title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
+              <MenuItem icon={Crown} tone="warning" title="Abonnements Devis Pro" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
+            </div>
+          </div>
         )}
-        <button className="menu-item" onClick={() => setActiveTab('formation')}>
-          <div className="menu-item-icon success"><GraduationCap size={18} /></div>
-          <div className="menu-item-info">
-            <div className="menu-item-title">Formation</div>
-            <div className="menu-item-subtitle">Cours en ligne : modules, leçons et suivi de progression</div>
+
+        <div className="plus-section">
+          <div className="plus-section-label">Apprendre & gagner</div>
+          <div className="plus-card card">
+            <MenuItem icon={GraduationCap} tone="success" title="Formation" subtitle="Cours en ligne : modules, leçons et progression" onClick={() => setActiveTab('formation')} />
+            <MenuItem icon={Share2} title="Mon espace partenaire" subtitle="Mon code, mon lien, mes commissions" onClick={() => setActiveTab('mypartner')} />
           </div>
-          <ChevronRight size={18} className="menu-item-arrow" />
-        </button>
-        <button className="menu-item" onClick={() => setActiveTab('mypartner')}>
-          <div className="menu-item-icon"><Share2 size={18} /></div>
-          <div className="menu-item-info">
-            <div className="menu-item-title">Mon espace partenaire</div>
-            <div className="menu-item-subtitle">Mon code, mon lien, mes commissions</div>
+        </div>
+
+        <div className="plus-section">
+          <div className="plus-section-label">Compte</div>
+          <div className="plus-card card">
+            <MenuItem icon={User} title="Mon profil" subtitle="Voir vos informations" onClick={() => setActiveTab('profile')} />
+            {user.role === 'gerant' && (
+              <MenuItem icon={DatabaseBackup} title="Sauvegarde des données" subtitle="Exporter / restaurer toutes les données" onClick={() => setActiveTab('backup')} />
+            )}
+            <MenuItem icon={LogOut} tone="danger" title="Déconnexion" subtitle="Quitter l'application" onClick={logout} />
           </div>
-          <ChevronRight size={18} className="menu-item-arrow" />
-        </button>
-        <button className="menu-item" onClick={() => setActiveTab('profile')}>
-          <div className="menu-item-icon"><User size={18} /></div>
-          <div className="menu-item-info">
-            <div className="menu-item-title">Mon profil</div>
-            <div className="menu-item-subtitle">Voir vos informations</div>
-          </div>
-          <ChevronRight size={18} className="menu-item-arrow" />
-        </button>
-        <button className="menu-item" onClick={logout}>
-          <div className="menu-item-icon danger"><LogOut size={18} /></div>
-          <div className="menu-item-info">
-            <div className="menu-item-title">Déconnexion</div>
-            <div className="menu-item-subtitle">Quitter l'application</div>
-          </div>
-          <ChevronRight size={18} className="menu-item-arrow" />
-        </button>
+        </div>
       </div>
     </div>
   );
