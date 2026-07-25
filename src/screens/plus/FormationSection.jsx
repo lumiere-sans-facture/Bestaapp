@@ -189,32 +189,34 @@ export default function FormationSection({ onBack }) {
             const duration = courseDuration(c);
             return (
               <div key={c.id} className="card course-card">
-                <div className="course-card-head">
-                  <div className="course-card-icon"><BookOpen size={20} /></div>
+                <div className="course-card-cover">
+                  <BookOpen size={36} strokeWidth={1.6} />
+                  {duration && <span className="course-cover-duration"><Clock size={12} /> {duration}</span>}
                   {isManager && (
-                    <button className="sheet-close" aria-label="Modifier le cours"
+                    <button className="course-cover-edit" aria-label="Modifier le cours"
                       onClick={() => { setCourseForm({ title: c.title, description: c.description || '', author: c.author || '' }); setCourseEdit(c.id); }}>
-                      <Pencil size={15} />
+                      <Pencil size={14} />
                     </button>
                   )}
                 </div>
-                <div className="course-card-title">{c.title}</div>
-                {c.author && <div className="course-card-author">Par {c.author}</div>}
-                {c.description && <p className="formation-desc">{c.description}</p>}
-                <div className="course-card-meta">
-                  <span><Layers size={13} /> {counts.modules} module{counts.modules > 1 ? 's' : ''}</span>
-                  <span><PlayCircle size={13} /> {counts.lecons} leçon{counts.lecons > 1 ? 's' : ''}</span>
-                  {duration && <span><Clock size={13} /> {duration}</span>}
-                </div>
-                <div className="course-card-progress">
-                  <div className="funnel-track">
-                    <div className="funnel-bar" style={{ width: `${p.pct}%`, background: p.pct === 100 ? 'var(--success)' : 'var(--accent)' }} />
+                <div className="course-card-body">
+                  <div className="course-card-title">{c.title}</div>
+                  {c.author && <div className="course-card-author">Par {c.author}</div>}
+                  {c.description && <p className="formation-desc">{c.description}</p>}
+                  <div className="course-card-meta">
+                    <span><Layers size={13} /> {counts.modules} module{counts.modules > 1 ? 's' : ''}</span>
+                    <span><PlayCircle size={13} /> {counts.lecons} leçon{counts.lecons > 1 ? 's' : ''}</span>
                   </div>
-                  <span className="course-card-pct">{p.pct}%</span>
+                  <div className="course-card-progress">
+                    <div className="funnel-track">
+                      <div className="funnel-bar" style={{ width: `${p.pct}%`, background: p.pct === 100 ? 'var(--success)' : 'var(--accent)' }} />
+                    </div>
+                    <span className="course-card-pct">{p.pct}%</span>
+                  </div>
+                  <button className="btn btn-primary btn-block" onClick={() => openCourse(c)} disabled={!counts.lecons}>
+                    {p.pct === 100 ? 'Revoir le cours' : p.done > 0 ? 'Continuer' : 'Commencer'}
+                  </button>
                 </div>
-                <button className="btn btn-primary btn-block" onClick={() => openCourse(c)} disabled={!counts.lecons}>
-                  {p.pct === 100 ? 'Revoir le cours' : p.done > 0 ? 'Continuer' : 'Commencer'}
-                </button>
               </div>
             );
           })}
