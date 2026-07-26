@@ -9,11 +9,15 @@ import { SyncDot } from './SyncStatus';
 
 const publicNavItems = [
   { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
-  { path: '/pipeline', label: 'Suivi clients', shortLabel: 'Clients', icon: FolderKanban },
+  { path: '/pipeline', label: 'Suivi clients', shortLabel: 'Suivi', icon: FolderKanban },
   { path: '/boutique', label: 'Boutique', shortLabel: 'Boutique', icon: ShoppingCart },
   { path: '/devis', label: 'Devis', shortLabel: 'Devis', icon: FileText },
   { path: '/plus', label: 'Plus', shortLabel: 'Plus', icon: MoreHorizontal },
 ];
+
+// Répertoire clients (ajout + carnet d'adresses) : dans la barre latérale
+// après le suivi ; sur mobile, accessible depuis le menu « Plus ».
+const clientsItem = { path: '/clients', label: 'Clients', icon: Users };
 
 const proNavItems = [
   { path: '/pro', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
@@ -47,7 +51,11 @@ export default function AppLayout() {
   const navItems = isPro ? proNavItems : publicNavItems;
   // Barre latérale publique : « Plus » n'y figure pas (toutes ses entrées y
   // sont détaillées) — il reste dans la barre d'onglets mobile.
-  const sidebarItems = isPro ? proNavItems : publicNavItems.filter((i) => i.path !== '/plus');
+  const sidebarItems = isPro
+    ? proNavItems
+    : publicNavItems
+        .filter((i) => i.path !== '/plus')
+        .flatMap((i) => (i.path === '/pipeline' ? [i, clientsItem] : [i]));
   // Bascule Pro depuis la barre latérale : abonné → espace Pro direct ;
   // sinon → parcours d'abonnement (le formulaire vit sur l'écran Plus).
   const goPro = () => (proActive ? setMode('pro') : navigate('/plus/gopro'));

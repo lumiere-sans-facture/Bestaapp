@@ -1,0 +1,201 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Phone, MapPin, User, Building2, MessageCircle, FolderKanban, FileText, ChevronRight, UserCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
+import { formatCFA, formatDate } from '../utils/format';
+import PageHeader from '../components/PageHeader';
+import Sheet from '../components/Sheet';
+import Field from '../components/Field';
+import EmptyState from '../components/EmptyState';
+
+const EMPTY_FORM = { name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', clientType: 'particulier' };
+
+/**
+ * Répertoire clients : liste alphabétique de tous les clients (pistes) avec
+ * recherche et ajout direct. Le suivi commercial détaillé (étapes, kanban)
+ * reste dans « Suivi clients » — ici, c'est le carnet d'adresses.
+ */
+export default function Clients() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { leadsForUser, stages, lostStage, addLead, getPartnerById } = useData();
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const allClients = leadsForUser(user);
+  const q = query.trim().toLowerCase();
+  const clients = allClients
+    .filter((l) => !q || [l.name, l.contact, l.phone, l.address].some((v) => (v || '').toLowerCase().includes(q)))
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+
+  const stageInfo = (lead) => (lead.stage === 'perdu' ? lostStage : stages.find((s) => s.id === lead.stage));
+  const selectedClient = selected ? allClients.find((l) => l.id === selected) : null;
+  const apporteur = selectedClient?.parrainL1 ? getPartnerById(selectedClient.parrainL1) : null;
+
+  const handleAdd = (e) => {
+    e.preventDefault();
+    addLead({
+      ...form,
+      estimatedValue: Number(form.estimatedValue) || 0,
+      assignedTo: user.id,
+      parrainL1: null, // attribution automatique (lien d'affiliation) gérée par le store
+    });
+    setForm(EMPTY_FORM);
+    setShowAdd(false);
+  };
+
+  return (
+    <div className="page">
+      <PageHeader
+        title="Clients"
+        subtitle={`${allClients.length} client${allClients.length > 1 ? 's' : ''} dans votre carnet`}
+        actions={
+          <button className="btn btn-accent" onClick={() => setShowAdd(true)}>
+            <Plus size={18} /> Nouveau client
+          </button>
+        }
+      />
+      <div className="page-content">
+        <div className="search-box clients-search">
+          <Search size={18} className="search-icon" />
+          <input
+            className="input search-input"
+            placeholder="Rechercher un client, un contact, un téléphone…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+
+        <div className="clients-list">
+          {clients.map((client) => {
+            const st = stageInfo(client);
+            return (
+              <button key={client.id} className="card client-list-row" onClick={() => setSelected(client.id)}>
+                <div className={`client-list-avatar ${client.clientType === 'entreprise' ? 'ent' : ''}`}>
+                  {client.clientType === 'entreprise' ? <Building2 size={18} /> : <User size={18} />}
+                </div>
+                <div className="client-list-info">
+                  <div className="client-list-name">{client.name}</div>
+                  <div className="client-list-sub">
+                    {client.contact}{client.phone ? ` · ${client.phone}` : ''}
+                  </div>
+                </div>
+                <div className="client-list-side">
+                  {st && <span className="badge" style={{ background: `${st.color}22`, color: st.color }}>{st.label}</span>}
+                  <ChevronRight size={18} className="client-list-arrow" />
+                </div>
+              </button>
+            );
+          })}
+          {clients.length === 0 && (
+            <EmptyState card>
+              {q ? 'Aucun client ne correspond à cette recherche.' : 'Aucun client pour le moment — ajoutez votre premier client.'}
+            </EmptyState>
+          )}
+        </div>
+      </div>
+
+      {/* Fiche client */}
+      <Sheet open={!!selectedClient} onClose={() => setSelected(null)} title={selectedClient?.name || ''}>
+        {selectedClient && (
+          <>
+            <div className="sheet-row"><span className="sheet-label"><User size={14} /> Contact</span><span className="sheet-value">{selectedClient.contact}</span></div>
+            {selectedClient.phone && (
+              <div className="sheet-row">
+                <span className="sheet-label"><Phone size={14} /> Téléphone</span>
+                <span className="sheet-value"><a href={`tel:${selectedClient.phone}`}>{selectedClient.phone}</a></span>
+              </div>
+            )}
+            {selectedClient.address && (
+              <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Adresse</span><span className="sheet-value">{selectedClient.address}</span></div>
+            )}
+            <div className="sheet-row">
+              <span className="sheet-label">{selectedClient.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type</span>
+              <span className="sheet-value">{selectedClient.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
+            </div>
+            <div className="sheet-row">
+              <span className="sheet-label"><FolderKanban size={14} /> Étape</span>
+              <span className="sheet-value">
+                {(() => { const st = stageInfo(selectedClient); return st ? <span className="badge" style={{ background: `${st.color}22`, color: st.color }}>{st.label}</span> : '—'; })()}
+              </span>
+            </div>
+            {selectedClient.estimatedValue > 0 && (
+              <div className="sheet-row"><span className="sheet-label">Valeur estimée</span><span className="sheet-value amount">{formatCFA(selectedClient.estimatedValue)}</span></div>
+            )}
+            {apporteur && (
+              <div className="sheet-row">
+                <span className="sheet-label"><UserCheck size={14} /> Apporteur</span>
+                <span className="sheet-value">{apporteur.name} <span className="partner-code-chip">{apporteur.code}</span></span>
+              </div>
+            )}
+            <div className="sheet-row"><span className="sheet-label">Ajouté le</span><span className="sheet-value">{formatDate(selectedClient.createdAt)}</span></div>
+            {selectedClient.notes && <p className="text-sm text-secondary client-sheet-notes">{selectedClient.notes}</p>}
+
+            <div className="client-sheet-actions">
+              {selectedClient.phone && (
+                <a className="btn btn-whatsapp" href={`https://wa.me/${selectedClient.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                  <MessageCircle size={16} /> WhatsApp
+                </a>
+              )}
+              <button className="btn btn-outline" onClick={() => navigate('/pipeline')}>
+                <FolderKanban size={16} /> Suivi commercial
+              </button>
+              <button className="btn btn-primary" onClick={() => navigate('/devis')}>
+                <FileText size={16} /> Créer un devis
+              </button>
+            </div>
+          </>
+        )}
+      </Sheet>
+
+      {/* Formulaire nouveau client */}
+      <Sheet open={showAdd} onClose={() => setShowAdd(false)} title="Nouveau client">
+        <form onSubmit={handleAdd} className="form-grid">
+          <Field label="Entreprise / Client *">
+            <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Hôtel du Parc" />
+          </Field>
+          <Field label="Personne de contact *">
+            <input className="input" required value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Ex : M. Kossi Agboka" />
+          </Field>
+          <Field label="Téléphone">
+            <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+          </Field>
+          <Field label="Adresse">
+            <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Quartier, ville" />
+          </Field>
+          <Field label="Valeur estimée (F CFA)">
+            <input className="input" type="number" min="0" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} placeholder="0" />
+          </Field>
+          <div className="input-group">
+            <span className="input-label" id="clients-clienttype-label">Type de client</span>
+            <div className="client-type-toggle" role="group" aria-labelledby="clients-clienttype-label">
+              <button
+                type="button"
+                className={`client-type-btn ${form.clientType === 'particulier' ? 'active' : ''}`}
+                aria-pressed={form.clientType === 'particulier'}
+                onClick={() => setForm({ ...form, clientType: 'particulier' })}
+              >
+                <User size={16} /> Particulier
+              </button>
+              <button
+                type="button"
+                className={`client-type-btn ${form.clientType === 'entreprise' ? 'active' : ''}`}
+                aria-pressed={form.clientType === 'entreprise'}
+                onClick={() => setForm({ ...form, clientType: 'entreprise' })}
+              >
+                <Building2 size={16} /> Entreprise
+              </button>
+            </div>
+          </div>
+          <Field label="Notes">
+            <textarea className="input" rows="3" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Détails du besoin…" />
+          </Field>
+          <button type="submit" className="btn btn-primary btn-block"><Plus size={18} /> Ajouter le client</button>
+        </form>
+      </Sheet>
+    </div>
+  );
+}
