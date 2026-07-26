@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, Cpu, Battery, MapPin, Search, Package, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
@@ -412,6 +412,32 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
                 </Field>
               </details>
             </div>
+
+            {/* Résumé des besoins calculés — même bloc que l'espace Pro */}
+            {sizing && (
+              <div className="sizing-grid" style={{ marginTop: 16 }}>
+                <div className="sizing-card">
+                  <div className="sizing-icon"><PanelTop size={18} /></div>
+                  <div className="sizing-value">{sizing.numberOfPanels}</div>
+                  <div className="sizing-label">Panneaux · {sizing.panelCapacity.toFixed(1)} kWc</div>
+                </div>
+                <div className="sizing-card">
+                  <div className="sizing-icon"><Cpu size={18} /></div>
+                  <div className="sizing-value">{Math.round(sizing.requiredPanelPower)} W</div>
+                  <div className="sizing-label">Puissance requise</div>
+                </div>
+                <div className="sizing-card">
+                  <div className="sizing-icon"><Battery size={18} /></div>
+                  <div className="sizing-value">{sizing.batteryCapacity > 0 ? `${sizing.batteryCapacity.toFixed(1)} kWh` : '—'}</div>
+                  <div className="sizing-label">Batterie conseillée</div>
+                </div>
+                <div className="sizing-card">
+                  <div className="sizing-icon"><Zap size={18} /></div>
+                  <div className="sizing-value">{Math.round(sizing.estimatedProduction).toLocaleString('fr-FR')}</div>
+                  <div className="sizing-label">kWh / an</div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
