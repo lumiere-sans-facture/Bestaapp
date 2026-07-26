@@ -1,24 +1,26 @@
 // Catalogue d'appareils pour le calculateur de consommation solaire.
 // Puissance en Watts, heures d'utilisation jour (6h-18h) / nuit (18h-6h).
+// `demarrage: true` = moteur/compresseur avec appel au démarrage (dimensionne
+// la puissance de pointe de l'onduleur, pas seulement la puissance continue).
 // Porté depuis l'application besta-solar.
 
 export const applianceCategories = [
   {
     label: 'Climatisation',
     items: [
-      { id: 'ac3cv', name: 'Climatiseur 3 CV', power: 2200, day: 4, night: 4 },
-      { id: 'ac25cv', name: 'Climatiseur 2.5 CV', power: 1850, day: 4, night: 4 },
-      { id: 'ac2cv', name: 'Climatiseur 2 CV', power: 1500, day: 3, night: 4 },
-      { id: 'ac15cv', name: 'Climatiseur 1.5 CV', power: 1100, day: 3, night: 4 },
-      { id: 'ac1cv', name: 'Climatiseur 1 CV', power: 735, day: 3, night: 4 },
+      { id: 'ac3cv', name: 'Climatiseur 3 CV', power: 2200, day: 4, night: 4, demarrage: true },
+      { id: 'ac25cv', name: 'Climatiseur 2.5 CV', power: 1850, day: 4, night: 4, demarrage: true },
+      { id: 'ac2cv', name: 'Climatiseur 2 CV', power: 1500, day: 3, night: 4, demarrage: true },
+      { id: 'ac15cv', name: 'Climatiseur 1.5 CV', power: 1100, day: 3, night: 4, demarrage: true },
+      { id: 'ac1cv', name: 'Climatiseur 1 CV', power: 735, day: 3, night: 4, demarrage: true },
     ],
   },
   {
     label: 'Réfrigération',
     items: [
-      { id: 'fridge', name: 'Réfrigérateur (250-300 L)', power: 250, day: 12, night: 12 },
-      { id: 'freezer', name: 'Congélateur Coffre (425 L)', power: 270, day: 12, night: 12 },
-      { id: 'minifreezer', name: 'Mini Congélateur', power: 120, day: 12, night: 12 },
+      { id: 'fridge', name: 'Réfrigérateur (250-300 L)', power: 250, day: 12, night: 12, demarrage: true },
+      { id: 'freezer', name: 'Congélateur Coffre (425 L)', power: 270, day: 12, night: 12, demarrage: true },
+      { id: 'minifreezer', name: 'Mini Congélateur', power: 120, day: 12, night: 12, demarrage: true },
     ],
   },
   {

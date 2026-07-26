@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { FileText, Plus, Download, Search, Check, Trash2, Pencil } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { FileText, Plus, Download, Search, Check, Trash2, Pencil, History, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import { estAncienneMethodologie } from '../utils/dimensionnementAdapter';
 import DevisCreator from './devis/DevisCreator';
 import DevisEditSheet from './devis/DevisEditSheet';
 
@@ -31,6 +32,7 @@ export default function Devis() {
   // Arrivée depuis le panier de la boutique : assistant manuel pré-rempli.
   // Arrivée depuis une fiche client : création directe, client présélectionné.
   const location = useLocation();
+  const navigate = useNavigate();
   const fromCart = Boolean(location.state?.fromCart);
   const initialLeadId = location.state?.leadId || null;
   const { items: cartItems, clearCart } = useCart();
@@ -145,11 +147,30 @@ export default function Devis() {
             <div className="doc-actions-list">
               <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{getLeadById(actions.leadId)?.name || 'Client'}</span></div>
               <div className="sheet-row"><span className="sheet-label">Total</span><span className="sheet-value amount">{formatCFA(actions.total)}</span></div>
+              {actions.sizing && estAncienneMethodologie(actions.sizing) && (
+                <div className="moteur-v1-banner">
+                  <History size={16} />
+                  <div>
+                    Calculé avec l’ancienne méthodologie — recalculer pour mettre à jour.
+                    Ce dimensionnement reste consultable tel qu’il a été enregistré ; le nouveau
+                    moteur corrige le rendement de chaîne, le calibre de l’onduleur et l’irradiation
+                    de dimensionnement.
+                  </div>
+                </div>
+              )}
               {actions.partnerId && (
                 <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{getPartnerById(actions.partnerId)?.name}{(actions.partnerCode || getPartnerById(actions.partnerId)?.code) ? ` · ${actions.partnerCode || getPartnerById(actions.partnerId)?.code}` : ''}</span></div>
               )}
               <button className="btn btn-primary btn-block" onClick={() => runAction(() => downloadPdf(actions))}><Download size={16} /> Télécharger le PDF</button>
               <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions); setActions(null); }}><Pencil size={16} /> Éditer</button>
+              {actions.sizing && estAncienneMethodologie(actions.sizing) && actions.leadId && (
+                <button
+                  className="btn btn-outline btn-block"
+                  onClick={() => { const id = actions.leadId; setActions(null); navigate('/devis', { state: { leadId: id } }); }}
+                >
+                  <RefreshCw size={16} /> Recalculer avec la nouvelle méthodologie
+                </button>
+              )}
               {actions.statut === 'brouillon' && (
                 <>
                   <button className="btn btn-won btn-block" onClick={() => runAction(() => updateDevis(actions.id, { statut: 'finalise' }))}><Check size={16} /> Finaliser</button>

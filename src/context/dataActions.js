@@ -9,6 +9,7 @@ import { createCatalogueActions } from './actions/catalogue';
 import { createDevisActions } from './actions/devis';
 import { createFormationActions } from './actions/formations';
 import { createProActions } from './actions/pro';
+import { createIrradiationActions } from './actions/irradiation';
 
 // Ré-exports conservés pour les consommateurs existants (Provider, écran Plus).
 export { COMMISSION_RATES, newReferral };
@@ -21,6 +22,7 @@ export function createActions(setState) {
     ...createDevisActions(setState),
     ...createFormationActions(setState),
     ...createProActions(setState),
+    ...createIrradiationActions(setState),
     // Restaure une sauvegarde : remplace les collections connues (la
     // réplication Supabase suit automatiquement si configurée).
     importData: (backup) => setState((s) => ({ ...s, ...extractState(backup) })),

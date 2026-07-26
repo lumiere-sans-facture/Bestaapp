@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 // Chaque entité est une ligne { id, data } ; la logique métier reste
 // dans DataContext, ce module ne fait que répliquer l'état.
 
-export const SYNCED_COLLECTIONS = ['products', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'factures', 'proClients'];
+export const SYNCED_COLLECTIONS = ['products', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'factures', 'proClients', 'irradiationSites'];
 
 /** Récupère toutes les collections + les tombstones. { empty, collections, tombstones } */
 export async function pullAll() {
