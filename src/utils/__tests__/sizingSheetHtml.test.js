@@ -43,6 +43,18 @@ describe('buildSizingSheetHtml', () => {
     expect(html).toContain('<td class="num">12</td><td class="num">12</td><td class="num">3 600</td>'); // 150 × 1 × 24
     expect(html).toContain('5 400 Wh/j'); // total, séparateur espace
     expect(html).toContain('5,40 kWh/j');
+  });
+
+  it('nomme les appareils personnalisés laissés sans nom', () => {
+    const custom = buildSizingSheetHtml({
+      ...data,
+      appliances: [
+        { name: 'Pompe à eau', power: 750, quantity: 1, day: 2, night: 0, custom: true },
+        { name: '  ', power: 300, quantity: 1, day: 1, night: 0, custom: true },
+      ],
+    });
+    expect(custom).toContain('Pompe à eau');
+    expect(custom).toContain('Appareil personnalisé');
     // Pic de charge : 60×2 + 150×1 = 270 W (toutes charges simultanées)
     expect(html).toContain('Pic de charge');
     expect(html).toContain('270 W');

@@ -4,6 +4,7 @@
 // Document TECHNIQUE uniquement : aucun prix, aucun plan de financement.
 import { SIZING_PARAMS, SYSTEM_VOLTAGE, PANEL_SPEC, SYSTEM_TYPES } from './solarSizing';
 import { COMPANY } from '../config/company';
+import { CUSTOM_APPLIANCE_LABEL } from '../data/appliances';
 
 // Milliers avec espaces (« 5 400 ») — espaces insécables normalisées.
 const nf = (v, dec = 0) =>
@@ -57,7 +58,7 @@ export function buildSizingSheetHtml(d) {
        <tr><td>Consommation de nuit (saisie directe)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(conso.night * 1000)}</td></tr>`
     : d.appliances.map((a) => {
         const wh = a.power * a.quantity * ((a.day || 0) + (a.night || 0));
-        return `<tr><td>${esc(a.name)}</td><td class="num">${nf(a.power)}</td><td class="num">${nf(a.quantity)}</td><td class="num">${h(a.day)}</td><td class="num">${h(a.night)}</td><td class="num">${nf(wh)}</td></tr>`;
+        return `<tr><td>${esc((a.name || '').trim() || CUSTOM_APPLIANCE_LABEL)}</td><td class="num">${nf(a.power)}</td><td class="num">${nf(a.quantity)}</td><td class="num">${h(a.day)}</td><td class="num">${h(a.night)}</td><td class="num">${nf(wh)}</td></tr>`;
       }).join('');
 
   // --- Récapitulatif matériel : désignations TECHNIQUES uniquement (type,
