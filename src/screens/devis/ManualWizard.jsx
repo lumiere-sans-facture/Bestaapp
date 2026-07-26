@@ -10,7 +10,8 @@ import LeadPicker from './LeadPicker';
 export default function ManualWizard({ onDone, initialItems, initialLeadId = null }) {
   const { user } = useAuth();
   const { products, addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
-  const [step, setStep] = useState(1);
+  // Client déjà choisi (fiche client) : l'étape de sélection est sautée.
+  const [step, setStep] = useState(initialLeadId ? 2 : 1);
   const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);
   const [partnerId, setPartnerId] = useState('');
 

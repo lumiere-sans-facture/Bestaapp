@@ -18,7 +18,8 @@ let rowSeq = 0;
 export default function SolarWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
   const { addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
-  const [step, setStep] = useState(1);
+  // Client déjà choisi (fiche client) : l'étape de sélection est sautée.
+  const [step, setStep] = useState(initialLeadId ? 2 : 1);
   const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);
   const [partnerId, setPartnerId] = useState('');
 
