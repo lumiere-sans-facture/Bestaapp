@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Phone, MapPin, User, Building2, MessageCircle, FolderKanban, FileText, ChevronRight, UserCheck } from 'lucide-react';
+import { Plus, Search, Phone, MapPin, User, Building2, MessageCircle, FolderKanban, FileText, ChevronRight, UserCheck, Pencil, Save } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
@@ -11,18 +11,67 @@ import EmptyState from '../components/EmptyState';
 
 const EMPTY_FORM = { name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', clientType: 'particulier' };
 
+// Formulaire client partagé entre l'ajout et la modification.
+function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIcon }) {
+  return (
+    <form onSubmit={onSubmit} className="form-grid">
+      <Field label="Entreprise / Client *">
+        <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Hôtel du Parc" />
+      </Field>
+      <Field label="Personne de contact *">
+        <input className="input" required value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Ex : M. Kossi Agboka" />
+      </Field>
+      <Field label="Téléphone">
+        <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+      </Field>
+      <Field label="Adresse">
+        <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Quartier, ville" />
+      </Field>
+      <Field label="Valeur estimée (F CFA)">
+        <input className="input" type="number" min="0" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} placeholder="0" />
+      </Field>
+      <div className="input-group">
+        <span className="input-label" id="clients-clienttype-label">Type de client</span>
+        <div className="client-type-toggle" role="group" aria-labelledby="clients-clienttype-label">
+          <button
+            type="button"
+            className={`client-type-btn ${form.clientType === 'particulier' ? 'active' : ''}`}
+            aria-pressed={form.clientType === 'particulier'}
+            onClick={() => setForm({ ...form, clientType: 'particulier' })}
+          >
+            <User size={16} /> Particulier
+          </button>
+          <button
+            type="button"
+            className={`client-type-btn ${form.clientType === 'entreprise' ? 'active' : ''}`}
+            aria-pressed={form.clientType === 'entreprise'}
+            onClick={() => setForm({ ...form, clientType: 'entreprise' })}
+          >
+            <Building2 size={16} /> Entreprise
+          </button>
+        </div>
+      </div>
+      <Field label="Notes">
+        <textarea className="input" rows="3" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Détails du besoin…" />
+      </Field>
+      <button type="submit" className="btn btn-primary btn-block"><SubmitIcon size={18} /> {submitLabel}</button>
+    </form>
+  );
+}
+
 /**
  * Répertoire clients : liste alphabétique de tous les clients (pistes) avec
- * recherche et ajout direct. Le suivi commercial détaillé (étapes, kanban)
- * reste dans « Suivi clients » — ici, c'est le carnet d'adresses.
+ * recherche, ajout et modification. Le suivi commercial détaillé (étapes,
+ * kanban) reste dans « Suivi clients » — ici, c'est le carnet d'adresses.
  */
 export default function Clients() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { leadsForUser, stages, lostStage, addLead, getPartnerById } = useData();
+  const { leadsForUser, stages, lostStage, addLead, updateLead, getPartnerById } = useData();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
   const allClients = leadsForUser(user);
@@ -47,13 +96,33 @@ export default function Clients() {
     setShowAdd(false);
   };
 
+  const openEdit = (client) => {
+    setForm({
+      name: client.name || '',
+      contact: client.contact || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      estimatedValue: client.estimatedValue ? String(client.estimatedValue) : '',
+      notes: client.notes || '',
+      clientType: client.clientType || 'particulier',
+    });
+    setEditId(client.id);
+  };
+
+  const handleEdit = (e) => {
+    e.preventDefault();
+    updateLead(editId, { ...form, estimatedValue: Number(form.estimatedValue) || 0 });
+    setEditId(null);
+    setForm(EMPTY_FORM);
+  };
+
   return (
     <div className="page">
       <PageHeader
         title="Clients"
         subtitle={`${allClients.length} client${allClients.length > 1 ? 's' : ''} dans votre carnet`}
         actions={
-          <button className="btn btn-accent" onClick={() => setShowAdd(true)}>
+          <button className="btn btn-accent" onClick={() => { setForm(EMPTY_FORM); setShowAdd(true); }}>
             <Plus size={18} /> Nouveau client
           </button>
         }
@@ -135,6 +204,12 @@ export default function Clients() {
             {selectedClient.notes && <p className="text-sm text-secondary client-sheet-notes">{selectedClient.notes}</p>}
 
             <div className="client-sheet-actions">
+              <button className="btn btn-primary" onClick={() => navigate('/devis', { state: { leadId: selectedClient.id } })}>
+                <FileText size={16} /> Créer un devis
+              </button>
+              <button className="btn btn-outline" onClick={() => { openEdit(selectedClient); setSelected(null); }}>
+                <Pencil size={16} /> Modifier
+              </button>
               {selectedClient.phone && (
                 <a className="btn btn-whatsapp" href={`https://wa.me/${selectedClient.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
                   <MessageCircle size={16} /> WhatsApp
@@ -143,9 +218,6 @@ export default function Clients() {
               <button className="btn btn-outline" onClick={() => navigate('/pipeline')}>
                 <FolderKanban size={16} /> Suivi commercial
               </button>
-              <button className="btn btn-primary" onClick={() => navigate('/devis')}>
-                <FileText size={16} /> Créer un devis
-              </button>
             </div>
           </>
         )}
@@ -153,48 +225,12 @@ export default function Clients() {
 
       {/* Formulaire nouveau client */}
       <Sheet open={showAdd} onClose={() => setShowAdd(false)} title="Nouveau client">
-        <form onSubmit={handleAdd} className="form-grid">
-          <Field label="Entreprise / Client *">
-            <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Hôtel du Parc" />
-          </Field>
-          <Field label="Personne de contact *">
-            <input className="input" required value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Ex : M. Kossi Agboka" />
-          </Field>
-          <Field label="Téléphone">
-            <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
-          </Field>
-          <Field label="Adresse">
-            <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Quartier, ville" />
-          </Field>
-          <Field label="Valeur estimée (F CFA)">
-            <input className="input" type="number" min="0" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} placeholder="0" />
-          </Field>
-          <div className="input-group">
-            <span className="input-label" id="clients-clienttype-label">Type de client</span>
-            <div className="client-type-toggle" role="group" aria-labelledby="clients-clienttype-label">
-              <button
-                type="button"
-                className={`client-type-btn ${form.clientType === 'particulier' ? 'active' : ''}`}
-                aria-pressed={form.clientType === 'particulier'}
-                onClick={() => setForm({ ...form, clientType: 'particulier' })}
-              >
-                <User size={16} /> Particulier
-              </button>
-              <button
-                type="button"
-                className={`client-type-btn ${form.clientType === 'entreprise' ? 'active' : ''}`}
-                aria-pressed={form.clientType === 'entreprise'}
-                onClick={() => setForm({ ...form, clientType: 'entreprise' })}
-              >
-                <Building2 size={16} /> Entreprise
-              </button>
-            </div>
-          </div>
-          <Field label="Notes">
-            <textarea className="input" rows="3" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Détails du besoin…" />
-          </Field>
-          <button type="submit" className="btn btn-primary btn-block"><Plus size={18} /> Ajouter le client</button>
-        </form>
+        <ClientForm form={form} setForm={setForm} onSubmit={handleAdd} submitLabel="Ajouter le client" submitIcon={Plus} />
+      </Sheet>
+
+      {/* Formulaire modification client */}
+      <Sheet open={!!editId} onClose={() => setEditId(null)} title="Modifier le client">
+        <ClientForm form={form} setForm={setForm} onSubmit={handleEdit} submitLabel="Enregistrer les modifications" submitIcon={Save} />
       </Sheet>
     </div>
   );

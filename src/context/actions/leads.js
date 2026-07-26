@@ -88,6 +88,18 @@ export function createLeadActions(setState) {
         };
       }),
 
+    // Mise à jour des informations d'un client (fiche : coordonnées, type,
+    // valeur, notes). L'étape et le parrainage ne passent pas par ici.
+    updateLead: (leadId, patch) =>
+      setState((s) => ({
+        ...s,
+        leads: s.leads.map((l) =>
+          l.id === leadId
+            ? { ...l, ...patch, lastActivity: new Date().toISOString().slice(0, 10) }
+            : l
+        ),
+      })),
+
     // Passage direct (gérant) : applique l'étape immédiatement — le « gagné »
     // génère les commissions de parrainage (3 % N1, 1,5 % N2) si absentes.
     updateLeadStage: (leadId, stage) => setState((s) => stageState(s, leadId, stage)),

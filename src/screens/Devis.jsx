@@ -28,13 +28,15 @@ export default function Devis() {
     const { generateDevisPdf } = await import('../utils/devisPdf');
     generateDevisPdf(d, getLeadById(d.leadId), d.partnerId ? getPartnerById(d.partnerId) : null, products);
   };
-  // Arrivée depuis le panier de la boutique : assistant manuel pré-rempli
+  // Arrivée depuis le panier de la boutique : assistant manuel pré-rempli.
+  // Arrivée depuis une fiche client : création directe, client présélectionné.
   const location = useLocation();
   const fromCart = Boolean(location.state?.fromCart);
+  const initialLeadId = location.state?.leadId || null;
   const { items: cartItems, clearCart } = useCart();
 
   // 'list' | 'create'  (le choix du type + les assistants vivent dans DevisCreator)
-  const [view, setView] = useState(fromCart ? 'create' : 'list');
+  const [view, setView] = useState(fromCart || initialLeadId ? 'create' : 'list');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all'); // all | brouillon | solar | manual
   const [sortBy, setSortBy] = useState('recent');
@@ -172,6 +174,7 @@ export default function Devis() {
         <DevisCreator
           startManual={fromCart}
           initialManualItems={fromCart ? cartItems : undefined}
+          initialLeadId={initialLeadId}
           onDone={() => { if (fromCart) clearCart(); backToList(); }}
         />
       </div>
