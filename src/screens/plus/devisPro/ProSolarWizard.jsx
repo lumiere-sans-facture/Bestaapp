@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, User, Building2, MapPin, Search, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, User, Building2, MapPin, Search, FileText } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
-import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
+import { bilanConsommation } from '../../../utils/dimensionnementV2';
+import { DEFAULT_SITE_ID } from '../../../data/irradiation';
+import ChargesTable from '../../../components/dimensionnement/ChargesTable';
+import ParametresProjet, { PARAMETRES_DEFAUT } from '../../../components/dimensionnement/ParametresProjet';
 import {
   calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, recommendInverterOption, suggestBatteryCombo,
@@ -12,7 +15,6 @@ import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarD
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
 
-let rowSeq = 0;
 const EMPTY_CLIENT = { name: '', phone: '', ville: '', type: 'particulier' };
 
 // Accessoires standards ajoutés à tout dimensionnement.
@@ -45,10 +47,12 @@ export default function ProSolarWizard({ onDone }) {
   const [step, setStep] = useState(1);
 
   // --- Consommation ---
+  // Charges : heures JOUR et NUIT séparées + drapeau démarrage moteur.
   const [rows, setRows] = useState([]);
-  const [pickerId, setPickerId] = useState('');
   const [manualMode, setManualMode] = useState(false);
-  const [manual, setManual] = useState({ day: '', night: '' });
+  const [manual, setManual] = useState({ day: '', night: '', peak: '' });
+  // Paramètres de projet du moteur v2 (site, stratégie, autonomie, câblage).
+  const [params, setParams] = useState({ ...PARAMETRES_DEFAUT, siteId: DEFAULT_SITE_ID });
 
   // --- Système --- (off-grid par défaut : cas majoritaire sur le terrain)
   const [systemType, setSystemType] = useState('off-grid');
@@ -109,25 +113,19 @@ export default function ProSolarWizard({ onDone }) {
   const [newClient, setNewClient] = useState(EMPTY_CLIENT);
   const [tvaActive, setTvaActive] = useState(company?.assujettieVAT || false);
 
-  // Appareil du catalogue, ou appareil personnalisé (tout est saisi à la main).
-  const addAppliance = () => {
-    const tpl = pickerId === CUSTOM_APPLIANCE_ID ? newCustomAppliance() : getApplianceById(pickerId);
-    if (!tpl) return;
-    setRows((prev) => [...prev, { rowId: ++rowSeq, ...tpl, quantity: 1 }]);
-    setPickerId('');
-  };
-  const updateRow = (rowId, field, value) => setRows((p) => p.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r)));
-  const removeRow = (rowId) => setRows((p) => p.filter((r) => r.rowId !== rowId));
-
-  const consumption = useMemo(() => {
-    if (manualMode) return { day: Number(manual.day) || 0, night: Number(manual.night) || 0 };
-    const day = rows.reduce((s, r) => s + r.power * r.quantity * r.day, 0) / 1000;
-    const night = rows.reduce((s, r) => s + r.power * r.quantity * r.night, 0) / 1000;
-    return { day: Number(day.toFixed(2)), night: Number(night.toFixed(2)) };
-  }, [rows, manualMode, manual]);
+  // Bilan de consommation (moteur v2) : jour / nuit, pointe simultanée, appel démarrage.
+  const bilan = useMemo(
+    () => bilanConsommation(rows, { coefficientSimultaneite: params.coefficientSimultaneite }),
+    [rows, params.coefficientSimultaneite]
+  );
+  const consumption = useMemo(() => (
+    manualMode
+      ? { day: Number(manual.day) || 0, night: Number(manual.night) || 0 }
+      : { day: bilan.jourKwh, night: bilan.nuitKwh }
+  ), [manualMode, manual, bilan]);
   const totalConsumption = consumption.day + consumption.night;
-  // Pic de charge : toutes les charges branchées en même temps (dimensionne l'onduleur).
-  const peakLoad = useMemo(() => rows.reduce((s, r) => s + r.power * r.quantity, 0), [rows]);
+  // Puissance de pointe simultanée des charges — dimensionne l'onduleur.
+  const puissanceSimultanee = manualMode ? Number(manual.peak) || 0 : bilan.puissanceSimultanee;
 
   const sizing = useMemo(
     () => (totalConsumption > 0 ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS) : null),
@@ -197,7 +195,9 @@ export default function ProSolarWizard({ onDone }) {
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
     openSizingSheet({
       client: { name: client.name || '', phone: client.phone || '', ville: client.ville || '' },
-      appliances: rows,
+      appliances: bilan.parEquipement.map((e) => ({
+        name: e.nom, power: e.puissanceW, quantite: e.quantite, quantity: e.quantite, day: e.heuresJour, night: e.heuresNuit,
+      })),
       manualMode,
       consumption,
       systemType,
@@ -282,59 +282,24 @@ export default function ProSolarWizard({ onDone }) {
                 <Field label={<><Moon size={14} /> Nuit (kWh)</>}>
                   <input className="input" type="number" min="0" step="0.1" value={manual.night} onChange={(e) => setManual({ ...manual, night: e.target.value })} placeholder="0" />
                 </Field>
+                <Field label={<><Gauge size={14} /> Pointe simultanée (W)</>}>
+                  <input className="input" type="number" min="0" step="100" value={manual.peak} onChange={(e) => setManual({ ...manual, peak: e.target.value })} placeholder="0" />
+                </Field>
               </div>
             ) : (
-              <>
-                <div className="appliance-picker">
-                  <select className="input" value={pickerId} onChange={(e) => setPickerId(e.target.value)}>
-                    <option value="">Ajouter un appareil…</option>
-                    <option value={CUSTOM_APPLIANCE_ID}>➕ Autre appareil (non listé)…</option>
-                    {applianceCategories.map((cat) => (
-                      <optgroup key={cat.label} label={cat.label}>
-                        {cat.items.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.power} W)</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <button className="btn btn-primary" onClick={addAppliance} disabled={!pickerId}><Plus size={16} /> Ajouter</button>
-                </div>
-                {rows.length ? (
-                  <div className="appliance-list">
-                    {rows.map((r) => (
-                      <div key={r.rowId} className="appliance-row">
-                        <div className="appliance-row-main">
-                          {r.custom ? (
-                            <input
-                              className="input appliance-name-input"
-                              value={r.name}
-                              onChange={(e) => updateRow(r.rowId, 'name', e.target.value)}
-                              placeholder="Nom de l'appareil (ex : Pompe à eau)"
-                              aria-label="Nom de l'appareil"
-                            />
-                          ) : (
-                            <div className="appliance-name">{r.name}</div>
-                          )}
-                          <button className="appliance-delete" onClick={() => removeRow(r.rowId)} aria-label="Supprimer"><Trash2 size={15} /></button>
-                        </div>
-                        <div className="appliance-fields">
-                          <label className="appliance-field"><span>Qté</span><input type="number" min="1" value={r.quantity} onChange={(e) => updateRow(r.rowId, 'quantity', Math.max(1, Number(e.target.value)))} /></label>
-                          <label className="appliance-field"><span>Puiss. (W)</span><input type="number" min="0" value={r.power} onChange={(e) => updateRow(r.rowId, 'power', Number(e.target.value))} /></label>
-                          <label className="appliance-field"><span><Sun size={12} /> h jour</span><input type="number" min="0" step="0.5" value={r.day} onChange={(e) => updateRow(r.rowId, 'day', Number(e.target.value))} /></label>
-                          <label className="appliance-field"><span><Moon size={12} /> h nuit</span><input type="number" min="0" step="0.5" value={r.night} onChange={(e) => updateRow(r.rowId, 'night', Number(e.target.value))} /></label>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <div className="empty-state">Ajoutez les appareils du client pour estimer ses besoins.</div>}
-              </>
+              <ChargesTable lignes={rows} onChange={setRows} coefficientSimultaneite={params.coefficientSimultaneite} />
             )}
-            <div className="consumption-summary">
-              <div className="consumption-stat day"><Sun size={16} /><div><div className="consumption-value">{consumption.day.toFixed(2)}</div><div className="consumption-label">Jour kWh</div></div></div>
-              <div className="consumption-stat night"><Moon size={16} /><div><div className="consumption-value">{consumption.night.toFixed(2)}</div><div className="consumption-label">Nuit kWh</div></div></div>
-              {!manualMode && (
-                <div className="consumption-stat peak"><Gauge size={16} /><div><div className="consumption-value">{peakLoad.toLocaleString('fr-FR')}</div><div className="consumption-label">Pic de charge (W)</div></div></div>
-              )}
-              <div className="consumption-stat total"><Zap size={16} /><div><div className="consumption-value">{totalConsumption.toFixed(2)}</div><div className="consumption-label">Total / jour</div></div></div>
-            </div>
+            {manualMode && (
+              <div className="consumption-summary">
+                <div className="consumption-stat day"><Sun size={16} /><div><div className="consumption-value">{consumption.day.toFixed(2)}</div><div className="consumption-label">Jour kWh</div></div></div>
+                <div className="consumption-stat night"><Moon size={16} /><div><div className="consumption-value">{consumption.night.toFixed(2)}</div><div className="consumption-label">Nuit kWh</div></div></div>
+                <div className="consumption-stat peak"><Gauge size={16} /><div><div className="consumption-value">{puissanceSimultanee.toLocaleString('fr-FR')}</div><div className="consumption-label">Pointe (W)</div></div></div>
+                <div className="consumption-stat total"><Zap size={16} /><div><div className="consumption-value">{totalConsumption.toFixed(2)}</div><div className="consumption-label">Total / jour</div></div></div>
+              </div>
+            )}
+
+            {/* Paramètres du dimensionnement (moteur v2) */}
+            <ParametresProjet valeurs={params} onChange={setParams} consommation={consumption} />
           </div>
         )}
 

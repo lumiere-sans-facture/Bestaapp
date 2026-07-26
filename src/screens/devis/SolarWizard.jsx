@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
-import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
 import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
+import { bilanConsommation } from '../../utils/dimensionnementV2';
 import { SOLAR_KITS } from '../../data/kits';
+import { DEFAULT_SITE_ID } from '../../data/irradiation';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
 import LeadPicker from './LeadPicker';
 import Field from '../../components/Field';
-import EmptyState from '../../components/EmptyState';
-
-let rowSeq = 0;
+import ChargesTable from '../../components/dimensionnement/ChargesTable';
+import ParametresProjet, { PARAMETRES_DEFAUT } from '../../components/dimensionnement/ParametresProjet';
 
 export default function SolarWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
@@ -37,10 +37,15 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id)?.id || '' : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, partners]);
-  const [rows, setRows] = useState([]); // appareils sélectionnés
-  const [pickerId, setPickerId] = useState('');
+  // Charges : puissance unitaire, quantité, heures JOUR et NUIT séparées,
+  // et drapeau « démarrage moteur / compresseur » (appel au démarrage).
+  const [rows, setRows] = useState([]);
   const [manualMode, setManualMode] = useState(false);
-  const [manual, setManual] = useState({ day: '', night: '' });
+  // En saisie directe, la puissance de pointe doit être saisie : c'est elle qui
+  // dimensionne l'onduleur (jamais la puissance crête du champ PV).
+  const [manual, setManual] = useState({ day: '', night: '', peak: '' });
+  // Paramètres de projet du moteur v2 (site, stratégie, autonomie, câblage).
+  const [params, setParams] = useState({ ...PARAMETRES_DEFAUT, siteId: DEFAULT_SITE_ID });
   // Off-grid par défaut : cas majoritaire sur le terrain.
   const [systemType, setSystemType] = useState('off-grid');
   // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
@@ -97,32 +102,22 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const myLeads = leadsForUser(user);
   const selectedLead = myLeads.find((l) => l.id === selectedLeadId);
 
-  // Appareil du catalogue, ou appareil personnalisé (tout est saisi à la main).
-  const addAppliance = () => {
-    const tpl = pickerId === CUSTOM_APPLIANCE_ID ? newCustomAppliance() : getApplianceById(pickerId);
-    if (!tpl) return;
-    setRows((prev) => [...prev, { rowId: ++rowSeq, ...tpl, quantity: 1 }]);
-    setPickerId('');
-  };
+  // Bilan de consommation (moteur v2) : énergies jour / nuit, pointe simultanée
+  // et appel au démarrage.
+  const bilan = useMemo(
+    () => bilanConsommation(rows, { coefficientSimultaneite: params.coefficientSimultaneite }),
+    [rows, params.coefficientSimultaneite]
+  );
 
-  const updateRow = (rowId, field, value) =>
-    setRows((prev) => prev.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r)));
-
-  const removeRow = (rowId) => setRows((prev) => prev.filter((r) => r.rowId !== rowId));
-
-  // Consommation jour/nuit en kWh
-  const consumption = useMemo(() => {
-    if (manualMode) {
-      return { day: Number(manual.day) || 0, night: Number(manual.night) || 0 };
-    }
-    const day = rows.reduce((sum, r) => sum + r.power * r.quantity * r.day, 0) / 1000;
-    const night = rows.reduce((sum, r) => sum + r.power * r.quantity * r.night, 0) / 1000;
-    return { day: Number(day.toFixed(2)), night: Number(night.toFixed(2)) };
-  }, [rows, manualMode, manual]);
+  const consumption = useMemo(() => (
+    manualMode
+      ? { day: Number(manual.day) || 0, night: Number(manual.night) || 0 }
+      : { day: bilan.jourKwh, night: bilan.nuitKwh }
+  ), [manualMode, manual, bilan]);
 
   const totalConsumption = consumption.day + consumption.night;
-  // Pic de charge : toutes les charges branchées en même temps (dimensionne l'onduleur).
-  const peakLoad = useMemo(() => rows.reduce((s, r) => s + r.power * r.quantity, 0), [rows]);
+  // Puissance de pointe simultanée des charges — dimensionne l'onduleur.
+  const puissanceSimultanee = manualMode ? Number(manual.peak) || 0 : bilan.puissanceSimultanee;
 
   const sizing = useMemo(
     () => (totalConsumption > 0 ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS) : null),
@@ -155,7 +150,9 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     openSizingSheet({
       client: { name: lead?.contact || lead?.name || '', phone: lead?.phone || '', ville: lead?.address || '' },
       apporteur: apporteur ? { name: apporteur.name, code: apporteur.code } : null,
-      appliances: rows,
+      appliances: bilan.parEquipement.map((e) => ({
+        name: e.nom, power: e.puissanceW, quantity: e.quantite, day: e.heuresJour, night: e.heuresNuit,
+      })),
       manualMode,
       consumption,
       systemType,
@@ -242,102 +239,45 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
                 <Field label={<><Moon size={14} /> Consommation nuit (kWh)</>}>
                   <input className="input" type="number" min="0" step="0.1" value={manual.night} onChange={(e) => setManual({ ...manual, night: e.target.value })} placeholder="0" />
                 </Field>
+                <Field label={<><Gauge size={14} /> Puissance de pointe simultanée (W)</>}>
+                  <input className="input" type="number" min="0" step="100" value={manual.peak} onChange={(e) => setManual({ ...manual, peak: e.target.value })} placeholder="0" />
+                </Field>
+                <div className="param-hint">
+                  La puissance de pointe des charges dimensionne l’onduleur : sans elle, le calibre
+                  ne peut pas être vérifié.
+                </div>
               </div>
             ) : (
-              <>
-                <div className="appliance-picker">
-                  <select className="input" value={pickerId} onChange={(e) => setPickerId(e.target.value)}>
-                    <option value="">Ajouter un appareil…</option>
-                    <option value={CUSTOM_APPLIANCE_ID}>➕ Autre appareil (non listé)…</option>
-                    {applianceCategories.map((cat) => (
-                      <optgroup key={cat.label} label={cat.label}>
-                        {cat.items.map((a) => (
-                          <option key={a.id} value={a.id}>{a.name} ({a.power} W)</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <button className="btn btn-primary" onClick={addAppliance} disabled={!pickerId}>
-                    <Plus size={16} /> Ajouter
-                  </button>
-                </div>
-
-                {rows.length > 0 ? (
-                  <div className="appliance-list">
-                    {rows.map((r) => {
-                      const dayWh = r.power * r.quantity * r.day;
-                      const nightWh = r.power * r.quantity * r.night;
-                      return (
-                        <div key={r.rowId} className="appliance-row">
-                          <div className="appliance-row-main">
-                            {r.custom ? (
-                              <input
-                                className="input appliance-name-input"
-                                value={r.name}
-                                onChange={(e) => updateRow(r.rowId, 'name', e.target.value)}
-                                placeholder="Nom de l'appareil (ex : Pompe à eau)"
-                                aria-label="Nom de l'appareil"
-                              />
-                            ) : (
-                              <div className="appliance-name">{r.name}</div>
-                            )}
-                            <button className="appliance-delete" onClick={() => removeRow(r.rowId)} aria-label="Supprimer"><Trash2 size={15} /></button>
-                          </div>
-                          <div className="appliance-fields">
-                            <label className="appliance-field">
-                              <span>Qté</span>
-                              <input type="number" min="1" value={r.quantity} onChange={(e) => updateRow(r.rowId, 'quantity', Math.max(1, Number(e.target.value)))} />
-                            </label>
-                            <label className="appliance-field">
-                              <span>Puiss. (W)</span>
-                              <input type="number" min="0" value={r.power} onChange={(e) => updateRow(r.rowId, 'power', Number(e.target.value))} />
-                            </label>
-                            <label className="appliance-field">
-                              <span><Sun size={12} /> h jour</span>
-                              <input type="number" min="0" step="0.5" value={r.day} onChange={(e) => updateRow(r.rowId, 'day', Number(e.target.value))} />
-                            </label>
-                            <label className="appliance-field">
-                              <span><Moon size={12} /> h nuit</span>
-                              <input type="number" min="0" step="0.5" value={r.night} onChange={(e) => updateRow(r.rowId, 'night', Number(e.target.value))} />
-                            </label>
-                          </div>
-                          <div className="appliance-row-consumption">
-                            <span><Sun size={12} /> {dayWh} Wh</span>
-                            <span><Moon size={12} /> {nightWh} Wh</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <EmptyState>Ajoutez les appareils du client pour estimer ses besoins.</EmptyState>
-                )}
-              </>
+              <ChargesTable
+                lignes={rows}
+                onChange={setRows}
+                coefficientSimultaneite={params.coefficientSimultaneite}
+              />
             )}
 
-            <div className="consumption-summary">
-              <div className="consumption-stat day">
-                <Sun size={16} /><div><div className="consumption-value">{consumption.day.toFixed(2)} kWh</div><div className="consumption-label">Jour</div></div>
-              </div>
-              <div className="consumption-stat night">
-                <Moon size={16} /><div><div className="consumption-value">{consumption.night.toFixed(2)} kWh</div><div className="consumption-label">Nuit</div></div>
-              </div>
-              {!manualMode && (
-                <div className="consumption-stat peak">
-                  <Gauge size={16} /><div><div className="consumption-value">{peakLoad.toLocaleString('fr-FR')} W</div><div className="consumption-label">Pic de charge</div></div>
+            {manualMode && (
+              <div className="consumption-summary">
+                <div className="consumption-stat day">
+                  <Sun size={16} /><div><div className="consumption-value">{consumption.day.toFixed(2)}</div><div className="consumption-label">Jour kWh</div></div>
                 </div>
-              )}
-              <div className="consumption-stat total">
-                <Zap size={16} /><div><div className="consumption-value">{totalConsumption.toFixed(2)} kWh</div><div className="consumption-label">Total / jour</div></div>
+                <div className="consumption-stat night">
+                  <Moon size={16} /><div><div className="consumption-value">{consumption.night.toFixed(2)}</div><div className="consumption-label">Nuit kWh</div></div>
+                </div>
+                <div className="consumption-stat peak">
+                  <Gauge size={16} /><div><div className="consumption-value">{puissanceSimultanee.toLocaleString('fr-FR')}</div><div className="consumption-label">Pointe (W)</div></div>
+                </div>
+                <div className="consumption-stat total">
+                  <Zap size={16} /><div><div className="consumption-value">{totalConsumption.toFixed(2)}</div><div className="consumption-label">Total / jour</div></div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* Étape 3 : type de système */}
         {step === 3 && (
           <div>
-            <div className="wizard-step-title">3. Type de système</div>
+            <div className="wizard-step-title">3. Site, système et paramètres</div>
             <div className="payment-options">
               {SYSTEM_TYPES.map((t) => (
                 <button key={t.id} className={`payment-option ${systemType === t.id ? 'selected' : ''}`} onClick={() => setSystemType(t.id)}>
@@ -412,6 +352,9 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
                 </Field>
               </details>
             </div>
+
+            {/* Paramètres du dimensionnement (moteur v2) */}
+            <ParametresProjet valeurs={params} onChange={setParams} consommation={consumption} />
           </div>
         )}
 
