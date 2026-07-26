@@ -1016,6 +1016,10 @@ textarea.input { resize: vertical; }
 .appliance-row { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
 .appliance-row-main { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .appliance-name { font-size: 0.875rem; font-weight: 600; }
+.appliance-name-input {
+  font-size: 0.875rem; font-weight: 600; padding: 7px 10px;
+  flex: 1; min-width: 0; margin-right: 10px;
+}
 .appliance-delete { color: var(--error); padding: 4px; display: flex; border-radius: 6px; }
 .appliance-delete:hover { background: var(--error-light); }
 .appliance-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }

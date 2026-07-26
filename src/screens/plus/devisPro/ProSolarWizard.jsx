@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, 
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
-import { applianceCategories, getApplianceById } from '../../../data/appliances';
+import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
   calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, recommendInverterOption, suggestBatteryCombo,
@@ -109,8 +109,9 @@ export default function ProSolarWizard({ onDone }) {
   const [newClient, setNewClient] = useState(EMPTY_CLIENT);
   const [tvaActive, setTvaActive] = useState(company?.assujettieVAT || false);
 
+  // Appareil du catalogue, ou appareil personnalisé (tout est saisi à la main).
   const addAppliance = () => {
-    const tpl = getApplianceById(pickerId);
+    const tpl = pickerId === CUSTOM_APPLIANCE_ID ? newCustomAppliance() : getApplianceById(pickerId);
     if (!tpl) return;
     setRows((prev) => [...prev, { rowId: ++rowSeq, ...tpl, quantity: 1 }]);
     setPickerId('');
@@ -287,6 +288,7 @@ export default function ProSolarWizard({ onDone }) {
                 <div className="appliance-picker">
                   <select className="input" value={pickerId} onChange={(e) => setPickerId(e.target.value)}>
                     <option value="">Ajouter un appareil…</option>
+                    <option value={CUSTOM_APPLIANCE_ID}>➕ Autre appareil (non listé)…</option>
                     {applianceCategories.map((cat) => (
                       <optgroup key={cat.label} label={cat.label}>
                         {cat.items.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.power} W)</option>)}
@@ -300,7 +302,17 @@ export default function ProSolarWizard({ onDone }) {
                     {rows.map((r) => (
                       <div key={r.rowId} className="appliance-row">
                         <div className="appliance-row-main">
-                          <div className="appliance-name">{r.name}</div>
+                          {r.custom ? (
+                            <input
+                              className="input appliance-name-input"
+                              value={r.name}
+                              onChange={(e) => updateRow(r.rowId, 'name', e.target.value)}
+                              placeholder="Nom de l'appareil (ex : Pompe à eau)"
+                              aria-label="Nom de l'appareil"
+                            />
+                          ) : (
+                            <div className="appliance-name">{r.name}</div>
+                          )}
                           <button className="appliance-delete" onClick={() => removeRow(r.rowId)} aria-label="Supprimer"><Trash2 size={15} /></button>
                         </div>
                         <div className="appliance-fields">

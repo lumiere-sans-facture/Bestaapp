@@ -67,3 +67,17 @@ export const applianceCategories = [
 export const appliances = applianceCategories.flatMap((c) => c.items);
 
 export const getApplianceById = (id) => appliances.find((a) => a.id === id);
+
+// Appareil hors catalogue : l'utilisateur saisit lui-même le nom, la
+// puissance et les heures d'utilisation (jour / nuit).
+export const CUSTOM_APPLIANCE_ID = '__custom';
+export const CUSTOM_APPLIANCE_LABEL = 'Appareil personnalisé';
+
+export const newCustomAppliance = () => ({
+  id: CUSTOM_APPLIANCE_ID,
+  name: '',
+  power: 0,
+  day: 0,
+  night: 0,
+  custom: true,
+});
