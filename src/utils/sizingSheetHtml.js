@@ -19,6 +19,7 @@ const SYSTEM_LABEL = Object.fromEntries(SYSTEM_TYPES.map((t) => [t.id, t.label])
  * Construit le document HTML de la fiche (chaîne complète, autonome).
  * @param {object} d
  * @param {{name:string, phone?:string, ville?:string}} d.client
+ * @param {{name:string, code?:string}|null} d.apporteur  partenaire apporteur (commission)
  * @param {Array<{name:string, power:number, quantity:number, day:number, night:number}>} d.appliances
  * @param {boolean} d.manualMode        saisie directe (pas de détail d'appareils)
  * @param {{day:number, night:number}} d.consumption   kWh/jour
@@ -195,6 +196,9 @@ export function buildSizingSheetHtml(d) {
         <div class="client-item"><strong>Contact</strong>${esc(d.client?.phone || '—')}</div>
         <div class="client-item"><strong>Localisation</strong>${esc(d.cityName || d.client?.ville || '—')}</div>
         <div class="client-item"><strong>Type de système</strong>${esc(SYSTEM_LABEL[d.systemType] || d.systemType)}</div>
+        ${d.apporteur?.name
+          ? `<div class="client-item"><strong>Apporteur d’affaires</strong>${esc(d.apporteur.name)}${d.apporteur.code ? ` <span class="muted">(${esc(d.apporteur.code)})</span>` : ''}</div>`
+          : ''}
       </div>
     </section>
 

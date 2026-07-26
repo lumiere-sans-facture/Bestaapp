@@ -151,8 +151,10 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     const { openSizingSheet } = await import('../../utils/sizingSheetHtml');
     const lead = myLeads.find((l) => l.id === selectedLeadId);
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
+    const apporteur = partnerId ? partners.find((p) => p.id === partnerId) : null;
     openSizingSheet({
       client: { name: lead?.contact || lead?.name || '', phone: lead?.phone || '', ville: lead?.address || '' },
+      apporteur: apporteur ? { name: apporteur.name, code: apporteur.code } : null,
       appliances: rows,
       manualMode,
       consumption,

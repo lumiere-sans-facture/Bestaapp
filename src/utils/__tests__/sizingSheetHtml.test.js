@@ -45,6 +45,15 @@ describe('buildSizingSheetHtml', () => {
     expect(html).toContain('5,40 kWh/j');
   });
 
+  it("mentionne l'apporteur d'affaires quand il est fourni", () => {
+    const avec = buildSizingSheetHtml({ ...data, apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' } });
+    expect(avec).toContain('Apporteur d’affaires');
+    expect(avec).toContain('Aminata Kesso');
+    expect(avec).toContain('BESTA-AMINATA');
+    // Sans apporteur, aucune ligne vide ne s'affiche
+    expect(html).not.toContain('Apporteur');
+  });
+
   it('nomme les appareils personnalisés laissés sans nom', () => {
     const custom = buildSizingSheetHtml({
       ...data,
