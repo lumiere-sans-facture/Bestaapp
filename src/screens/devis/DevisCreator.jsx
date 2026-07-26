@@ -11,12 +11,13 @@ import SolarWizard from './SolarWizard';
  * @param {() => void} onDone            appelé à la création du devis
  * @param {boolean}    startManual       démarre directement sur l'assistant manuel
  * @param {object}     initialManualItems pré-remplissage (ex. panier boutique)
+ * @param {string}     initialLeadId     client présélectionné (ex. fiche client)
  */
-export default function DevisCreator({ onDone, startManual = false, initialManualItems }) {
+export default function DevisCreator({ onDone, startManual = false, initialManualItems, initialLeadId = null }) {
   const [mode, setMode] = useState(startManual ? 'manual' : 'choose'); // choose | solar | manual
 
-  if (mode === 'solar') return <SolarWizard onDone={onDone} />;
-  if (mode === 'manual') return <ManualWizard onDone={onDone} initialItems={initialManualItems} />;
+  if (mode === 'solar') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} />;
+  if (mode === 'manual') return <ManualWizard onDone={onDone} initialItems={initialManualItems} initialLeadId={initialLeadId} />;
 
   return (
     <div className="devis-mode-grid">

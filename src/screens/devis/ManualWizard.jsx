@@ -5,12 +5,13 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
+import LeadPicker from './LeadPicker';
 
-export default function ManualWizard({ onDone, initialItems }) {
+export default function ManualWizard({ onDone, initialItems, initialLeadId = null }) {
   const { user } = useAuth();
   const { products, addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
   const [step, setStep] = useState(1);
-  const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);
   const [partnerId, setPartnerId] = useState('');
 
   // Chaque devis a impérativement un apporteur : le profil partenaire du
@@ -18,11 +19,20 @@ export default function ManualWizard({ onDone, initialItems }) {
   useEffect(() => {
     ensurePartnerForUser(user);
   }, [user, ensurePartnerForUser]);
+
+  // L'apporteur suit le client sélectionné : parrain de la piste, sinon
+  // lien d'affiliation actif, sinon profil partenaire du créateur.
+  useEffect(() => {
+    if (!selectedLeadId) return;
+    const lead = leadsForUser(user).find((l) => l.id === selectedLeadId);
+    setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id)?.id || '' : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLeadId, partners]);
   // Pré-rempli depuis le panier de la boutique le cas échéant
   const [items, setItems] = useState(() => ({ ...(initialItems || {}) }));
 
+  // Toute la liste des clients est proposée (un client gagné peut recommander).
   const myLeads = leadsForUser(user);
-  const availableLeads = myLeads.filter((l) => l.stage !== 'gagne' && l.stage !== 'perdu');
   const selectedLead = myLeads.find((l) => l.id === selectedLeadId);
 
   const getPrice = (basePrice) => (user.role === 'gerant' ? Math.round(basePrice * 1.15) : basePrice);
@@ -81,19 +91,7 @@ export default function ManualWizard({ onDone, initialItems }) {
         {step === 1 && (
           <div>
             <div className="wizard-step-title">1. Sélectionnez un client</div>
-            <div className="lead-select">
-              {availableLeads.map((lead) => (
-                <button
-                  key={lead.id}
-                  className={`lead-select-item ${selectedLeadId === lead.id ? 'selected' : ''}`}
-                  onClick={() => { setSelectedLeadId(lead.id); setPartnerId(resolveAutoPartner(lead, partners, user.id)?.id || ''); }}
-                >
-                  <div className="lead-select-name">{lead.name}</div>
-                  <div className="lead-select-value">{lead.contact} — {formatCFA(lead.estimatedValue)}</div>
-                </button>
-              ))}
-              {availableLeads.length === 0 && <div className="empty-state">Aucune piste disponible. Créez d’abord une piste dans Suivi clients.</div>}
-            </div>
+            <LeadPicker leads={myLeads} selectedLeadId={selectedLeadId} onSelect={setSelectedLeadId} />
             {selectedLeadId && <PartnerField value={partnerId} />}
           </div>
         )}

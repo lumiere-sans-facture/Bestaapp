@@ -1155,6 +1155,10 @@ textarea.input { resize: vertical; }
   max-height: 320px; overflow-y: auto;
   border: 1px solid var(--border); border-radius: 10px;
 }
+.lead-picker-search { max-width: none; margin-bottom: 10px; }
+.lead-picker-search .search-input { border: 1px solid var(--border); }
+.lead-picker-empty { padding: 18px 14px; font-size: 0.875rem; color: var(--text-secondary); text-align: center; }
+.lead-select-name .badge { font-size: 0.6875rem; margin-left: 4px; }
 .lead-select-item {
   display: block; width: 100%; padding: 12px 14px;
   border-bottom: 1px solid var(--border); transition: background 0.15s ease;
