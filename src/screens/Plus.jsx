@@ -338,6 +338,13 @@ export default function Plus() {
         )}
 
         <div className="plus-section">
+          <div className="plus-section-label">Clients</div>
+          <div className="plus-card card">
+            <MenuItem icon={Users} title="Clients" subtitle="Carnet d'adresses : ajouter et retrouver vos clients" onClick={() => navigate('/clients')} />
+          </div>
+        </div>
+
+        <div className="plus-section">
           <div className="plus-section-label">Apprendre & gagner</div>
           <div className="plus-card card">
             <MenuItem icon={GraduationCap} tone="success" title="Formation" subtitle="Cours en ligne : modules, leçons et progression" onClick={() => setActiveTab('formation')} />

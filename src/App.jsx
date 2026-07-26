@@ -23,6 +23,7 @@ const lazyWithPreload = (factory) => {
 
 const Dashboard = lazyWithPreload(() => import('./screens/Dashboard'));
 const Pipeline = lazyWithPreload(() => import('./screens/Pipeline'));
+const Clients = lazyWithPreload(() => import('./screens/Clients'));
 const Boutique = lazyWithPreload(() => import('./screens/Boutique'));
 const Devis = lazyWithPreload(() => import('./screens/Devis'));
 const Plus = lazyWithPreload(() => import('./screens/Plus'));
@@ -32,7 +33,7 @@ const ProClients = lazyWithPreload(() => import('./screens/pro/ProClients'));
 const ProCompany = lazyWithPreload(() => import('./screens/pro/ProCompany'));
 const ProSubscription = lazyWithPreload(() => import('./screens/pro/ProSubscription'));
 
-const ALL_SCREENS = [Dashboard, Pipeline, Boutique, Devis, Plus, ProDashboard, ProDocuments, ProClients, ProCompany, ProSubscription];
+const ALL_SCREENS = [Dashboard, Pipeline, Clients, Boutique, Devis, Plus, ProDashboard, ProDocuments, ProClients, ProCompany, ProSubscription];
 
 // Précharge tous les chunks dès que le navigateur est inactif : la navigation
 // reste instantanée ET fonctionne hors-ligne pendant la session (invariant
@@ -96,6 +97,7 @@ function ModeSwitch() {
       <Route element={<AppLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/pipeline" element={<Pipeline />} />
+        <Route path="/clients" element={<Clients />} />
         <Route path="/boutique" element={<Boutique />} />
         <Route path="/devis" element={<Devis />} />
         <Route path="/plus" element={<Plus />} />

@@ -647,6 +647,32 @@ textarea.input { resize: vertical; }
 .referral-connector { width: 28px; display: flex; justify-content: center; }
 .referral-connector::before { content: ''; width: 2px; height: 12px; background: var(--border); border-radius: 1px; }
 
+/* ============ Répertoire clients ============ */
+
+.clients-search { max-width: 460px; margin-bottom: 16px; }
+.clients-list { display: flex; flex-direction: column; gap: 10px; }
+.client-list-row {
+  display: flex; align-items: center; gap: 12px;
+  text-align: left; cursor: pointer; width: 100%;
+  border: 1px solid var(--border); background: var(--surface);
+  padding: 12px 14px;
+}
+.client-list-row:hover { border-color: var(--primary); }
+.client-list-avatar {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #e8edf8; color: var(--primary);
+}
+.client-list-avatar.ent { background: #fdf1dc; color: #b45309; }
+.client-list-info { flex: 1; min-width: 0; }
+.client-list-name { font-weight: 600; font-size: 0.9375rem; }
+.client-list-sub { font-size: 0.8125rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.client-list-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.client-list-arrow { color: var(--text-muted); }
+.client-sheet-notes { margin-top: 10px; }
+.client-sheet-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.client-sheet-actions .btn { flex: 1; min-width: 140px; }
+
 /* ============ Boutique ============ */
 
 .search-box { position: relative; width: 100%; max-width: 320px; }
