@@ -68,7 +68,9 @@ export function buildFicheTechniqueHtml({
         <tfoot>
           <tr class="sous"><td colspan="5">${LIBELLES.consommationJour}</td><td class="num">${fmt.num(consommation.jourKwh * 1000)} Wh</td></tr>
           <tr class="sous"><td colspan="5">${LIBELLES.consommationNuit}</td><td class="num">${fmt.num(consommation.nuitKwh * 1000)} Wh</td></tr>
-          <tr class="sous"><td colspan="5">${LIBELLES.puissanceSimultanee} <span class="muted">(coefficient de simultanéité ${fmt.pct(consommation.coefficientSimultaneite, 0)} sur ${fmt.w(consommation.puissanceCrete)} installés)</span></td><td class="num">${fmt.w(consommation.puissanceSimultanee)}</td></tr>
+          <tr class="sous"><td colspan="5">${LIBELLES.puissanceSimultanee} <span class="muted">${consommation.simultaneiteImposee
+            ? '(pointe saisie directement)'
+            : `(coefficient de simultanéité ${fmt.pct(consommation.coefficientSimultaneite, 0)} sur ${fmt.w(consommation.puissanceCrete)} installés)`}</span></td><td class="num">${fmt.w(consommation.puissanceSimultanee)}</td></tr>
           <tr class="sous"><td colspan="5">${LIBELLES.puissanceAppel} <span class="muted">${consommation.nbMoteurs ? `(appel × ${fmt.num(consommation.facteurDemarrage)} du plus gros moteur, ${fmt.w(consommation.plusGrosMoteur)})` : '(aucun moteur déclaré)'}</span></td><td class="num">${fmt.w(consommation.puissanceAppelDemarrage)}</td></tr>
           <tr><td colspan="5">${LIBELLES.consommationTotale}</td><td class="num">${fmt.kwhJour(consommation.totalKwh)}</td></tr>
         </tfoot>
@@ -129,7 +131,7 @@ export function buildFicheTechniqueHtml({
         <div class="calc-formula">P = énergie à produire ÷ productible du mois défavorable</div>
         <div class="calc-apply">
           P = ${fmt.kwhJour(energie.totalAProduire)} ÷ ${fmt.productible(irradiation.productible)}
-          = <strong>${fmt.kwc(pv.puissanceMinW)}</strong> (${LIBELLES.pvMin.toLowerCase()})
+          = <strong>${fmt.kwc(pv.puissanceMinW)}</strong> — ${LIBELLES.pvMin}
         </div>
         <div class="calc-result">${LIBELLES.pvInstalle} : <strong>${fmt.kwc(pv.puissanceInstalleeW)}</strong> — ${fmt.num(pv.nbPanneaux)} panneaux de ${fmt.num(pv.panneauWc)} Wc</div>
       </div>

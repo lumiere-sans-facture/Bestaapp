@@ -219,10 +219,15 @@ export const normaliserEquipements = (liste = []) => liste.map(normaliserEquipem
  * Hypothèse de démarrage (pratique professionnelle) : un seul moteur démarre à
  * la fois — l'appel est donc la pointe simultanée augmentée du surcroît d'appel
  * du plus gros moteur, et non de tous les moteurs cumulés.
+ *
+ * `puissanceSimultaneeImposee` : en saisie directe, l'utilisateur fournit
+ * lui-même la pointe des charges ; elle fait alors foi et le coefficient de
+ * simultanéité n'est pas appliqué.
  */
 export function bilanConsommation(equipements, {
   coefficientSimultaneite = DEFAUTS.coefficientSimultaneite,
   facteurDemarrage = DEFAUTS.facteurDemarrage,
+  puissanceSimultaneeImposee = null,
 } = {}) {
   const items = normaliserEquipements(equipements).map((e) => {
     const puissanceTotale = e.puissanceW * e.quantite;
@@ -237,7 +242,8 @@ export function bilanConsommation(equipements, {
   const jourKwh = items.reduce((s, e) => s + e.whJour, 0) / 1000;
   const nuitKwh = items.reduce((s, e) => s + e.whNuit, 0) / 1000;
   const puissanceCrete = items.reduce((s, e) => s + e.puissanceTotaleW, 0);
-  const puissanceSimultanee = Math.round(puissanceCrete * coefficientSimultaneite);
+  const imposee = Number(puissanceSimultaneeImposee) > 0 ? Math.round(Number(puissanceSimultaneeImposee)) : null;
+  const puissanceSimultanee = imposee ?? Math.round(puissanceCrete * coefficientSimultaneite);
 
   const moteurs = items.filter((e) => e.demarrage);
   const plusGrosMoteur = moteurs.reduce((max, e) => Math.max(max, e.puissanceW), 0);
@@ -254,6 +260,7 @@ export function bilanConsommation(equipements, {
     puissanceSimultanee,
     puissanceAppelDemarrage,
     coefficientSimultaneite,
+    simultaneiteImposee: imposee != null,
     facteurDemarrage,
     plusGrosMoteur,
     nbMoteurs: moteurs.length,
@@ -568,6 +575,7 @@ const alerte = (niveau, code, message) => ({ niveau, code, message });
  * @param {'mois-defavorable'|'moyenne-annuelle'} [entrees.strategieIrradiation]
  * @param {'nuit'|'journee-complete'} [entrees.baseAutonomie]
  * @param {number} [entrees.coefficientSimultaneite]
+ * @param {number} [entrees.puissanceSimultaneeImposee] pointe des charges saisie directement
  * @param {number} [entrees.tensionSysteme]
  * @param {number} [entrees.joursAutonomie]
  * @param {number} [entrees.hsp]         repli si aucun productible mensuel
@@ -591,10 +599,11 @@ export function dimensionner(entrees = {}) {
     materiel = {},
     pertes = {},
     dod: dodEntree,
+    puissanceSimultaneeImposee = null,
   } = entrees;
 
   // --- 1. Consommation ---
-  const consommation = bilanConsommation(equipements, { coefficientSimultaneite });
+  const consommation = bilanConsommation(equipements, { coefficientSimultaneite, puissanceSimultaneeImposee });
   if (consommation.repartitionAVerifier) {
     alertes.push(alerte('important', 'repartition-jour-nuit',
       'Des charges ont été reprises d’un dimensionnement antérieur sans répartition jour / nuit : leurs heures ont été affectées à la journée. Vérifiez la répartition avant de valider.'));

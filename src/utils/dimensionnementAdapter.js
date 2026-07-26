@@ -51,6 +51,7 @@ export function construireEntrees({
   // la valeur saisie EST la pointe).
   let equipements = charges;
   let coefficientSimultaneite = params.coefficientSimultaneite;
+  let puissanceSimultaneeImposee = null;
   if (consommationDirecte) {
     const pointe = Number(consommationDirecte.puissanceSimultanee) || 0;
     const jour = Number(consommationDirecte.jourKwh) || 0;
@@ -67,6 +68,8 @@ export function construireEntrees({
         heuresJour: 0, heuresNuit: pointe ? (nuit * 1000) / pointe : 1,
       }] : []),
     ];
+    // La pointe saisie fait foi : le coefficient de simultanéité ne s'applique pas.
+    puissanceSimultaneeImposee = pointe || null;
     coefficientSimultaneite = 1;
   }
 
@@ -90,6 +93,7 @@ export function construireEntrees({
     strategieIrradiation: params.strategieIrradiation,
     baseAutonomie: params.baseAutonomie,
     coefficientSimultaneite,
+    puissanceSimultaneeImposee,
     joursAutonomie: params.joursAutonomie,
     tensionSysteme,
     hsp,
