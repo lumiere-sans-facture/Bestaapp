@@ -4,6 +4,8 @@ import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { bilanConsommation } from '../../../utils/dimensionnementV2';
+import { dimensionnerDepuisWizard } from '../../../utils/dimensionnementAdapter';
+import AlertesDimensionnement from '../../../components/dimensionnement/AlertesDimensionnement';
 import { DEFAULT_SITE_ID } from '../../../data/irradiation';
 import ChargesTable from '../../../components/dimensionnement/ChargesTable';
 import ParametresProjet, { PARAMETRES_DEFAUT } from '../../../components/dimensionnement/ParametresProjet';
@@ -31,7 +33,7 @@ const accessoryLines = (numberOfPanels) => [
  */
 export default function ProSolarWizard({ onDone }) {
   const { user } = useAuth();
-  const { products, proClientsForUser, addProClient, addDevis, getCompanyForUser } = useData();
+  const { products, proClientsForUser, addProClient, addDevis, getCompanyForUser, getIrradiationSiteById } = useData();
 
   const myClients = proClientsForUser(user.id);
   const company = getCompanyForUser(user.id);
@@ -135,6 +137,26 @@ export default function ProSolarWizard({ onDone }) {
   // Nouveau dimensionnement → on repart des sélections conseillées.
   useEffect(() => { setSelectedInverterId(null); setBatteryQty(null); }, [sizing]);
 
+  // --- Dimensionnement v2 : méthodologie corrigée -------------------------
+  const site = params.siteId ? getIrradiationSiteById(params.siteId) : null;
+  const dim = useMemo(() => {
+    if (totalConsumption <= 0) return null;
+    return dimensionnerDepuisWizard({
+      charges: rows,
+      params,
+      site,
+      products,
+      hsp: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+      consommationDirecte: manualMode
+        ? { jourKwh: consumption.day, nuitKwh: consumption.night, puissanceSimultanee }
+        : null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, params, site, products, sunHours, manualMode, consumption.day, consumption.night, puissanceSimultanee, totalConsumption]);
+
+  const alertes = dim?.alertes || [];
+  const devisBloque = Boolean(dim?.bloquant);
+
   const brand = inverterBrand || brands[0] || '';
   const brandInverters = useMemo(() => inverterOptions.filter((o) => o.brand === brand), [inverterOptions, brand]);
 
@@ -208,6 +230,7 @@ export default function ProSolarWizard({ onDone }) {
       inverter,
       batteries: batteryList,
       panelName,
+      dim,
     });
   };
 
@@ -246,6 +269,13 @@ export default function ProSolarWizard({ onDone }) {
         peakSunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
         estimatedProduction: sizing.estimatedProduction,
         city: location?.name || null,
+        // Traçabilité du moteur (les anciens enregistrements restent en 'v1').
+        moteurVersion: dim ? 'v2' : 'v1',
+        entrees: dim ? {
+          charges: rows, params, siteId: params.siteId, manualMode,
+          consommation: consumption, puissanceSimultanee,
+        } : null,
+        resultats: dim || null,
       },
     });
     onDone();
@@ -300,6 +330,7 @@ export default function ProSolarWizard({ onDone }) {
 
             {/* Paramètres du dimensionnement (moteur v2) */}
             <ParametresProjet valeurs={params} onChange={setParams} consommation={consumption} />
+            <AlertesDimensionnement alertes={alertes} compact />
           </div>
         )}
 
@@ -505,7 +536,14 @@ export default function ProSolarWizard({ onDone }) {
           ) : (
             <>
               <button className="btn btn-outline btn-block" onClick={() => submit('brouillon')} disabled={!clientReady || !lignes.length}>Brouillon</button>
-              <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!clientReady || !lignes.length}><Check size={18} /> Créer le devis</button>
+              <button
+                className="btn btn-accent btn-block"
+                onClick={() => submit('finalise')}
+                disabled={!clientReady || !lignes.length || devisBloque}
+                title={devisBloque ? 'Corrigez les alertes bloquantes avant de générer le devis.' : undefined}
+              >
+                <Check size={18} /> Créer le devis
+              </button>
             </>
           )}
         </div>

@@ -5,6 +5,8 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
 import { bilanConsommation } from '../../utils/dimensionnementV2';
+import { dimensionnerDepuisWizard } from '../../utils/dimensionnementAdapter';
+import AlertesDimensionnement from '../../components/dimensionnement/AlertesDimensionnement';
 import { SOLAR_KITS } from '../../data/kits';
 import { DEFAULT_SITE_ID } from '../../data/irradiation';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
@@ -17,7 +19,7 @@ import ParametresProjet, { PARAMETRES_DEFAUT } from '../../components/dimensionn
 
 export default function SolarWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
-  const { addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
+  const { addDevis, leadsForUser, partners, ensurePartnerForUser, products, getIrradiationSiteById } = useData();
   // Client déjà choisi (fiche client) : l'étape de sélection est sautée.
   const [step, setStep] = useState(initialLeadId ? 2 : 1);
   const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);
@@ -119,6 +121,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   // Puissance de pointe simultanée des charges — dimensionne l'onduleur.
   const puissanceSimultanee = manualMode ? Number(manual.peak) || 0 : bilan.puissanceSimultanee;
 
+  // v1 conservé pour la suggestion de kit (capacité batterie ↔ besoin) : le
+  // chiffrage kit et les prix restent strictement inchangés.
   const sizing = useMemo(
     () => (totalConsumption > 0 ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS) : null),
     [consumption, systemType, sunHours, totalConsumption]
@@ -138,6 +142,30 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const effectiveKitId = selectedKitId || suggestedKitId || SOLAR_KITS[0].id;
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0];
   const displayQuotation = kitQuotations[effectiveKitId];
+
+  // --- Dimensionnement v2 : méthodologie corrigée -------------------------
+  // Piloté par les charges (onduleur), calé sur le mois le plus défavorable
+  // (irradiation) et justifiant l'écart puissance minimale → installée (kit).
+  const site = params.siteId ? getIrradiationSiteById(params.siteId) : null;
+  const dim = useMemo(() => {
+    if (totalConsumption <= 0) return null;
+    return dimensionnerDepuisWizard({
+      charges: rows,
+      params,
+      site,
+      products,
+      hsp: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+      kit: selectedKit,
+      consommationDirecte: manualMode
+        ? { jourKwh: consumption.day, nuitKwh: consumption.night, puissanceSimultanee }
+        : null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, params, site, products, sunHours, selectedKit, manualMode, consumption.day, consumption.night, puissanceSimultanee, totalConsumption]);
+
+  const alertes = dim?.alertes || [];
+  // Une alerte bloquante interdit la génération du devis.
+  const devisBloque = Boolean(dim?.bloquant);
 
   // Fiche de dimensionnement — récapitulatif technique complet (HTML imprimable),
   // basé sur le kit retenu et la piste sélectionnée.
@@ -170,6 +198,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
       batteries: selectedKit.batteryModules
         || (selectedKit.battery > 0 ? [{ capacity: selectedKit.battery, qty: 1 }] : []),
       panelName: `Panneau photovoltaïque ${selectedKit.panelW}W`,
+      // Dimensionnement v2 : la fiche s'appuie dessus (sections, vérifications…).
+      dim,
     });
   };
 
@@ -186,6 +216,13 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
       peakSunHours: psh,
       city: location?.name || null,
       kit: selectedKit.name,
+      // Traçabilité du moteur : les anciens enregistrements restent en 'v1'.
+      moteurVersion: dim ? 'v2' : 'v1',
+      entrees: dim ? {
+        charges: rows, params, siteId: params.siteId, manualMode,
+        consommation: consumption, puissanceSimultanee,
+      } : null,
+      resultats: dim || null,
     };
     addDevis({
       type: 'solar',
@@ -254,6 +291,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
                 coefficientSimultaneite={params.coefficientSimultaneite}
               />
             )}
+
+            <AlertesDimensionnement alertes={alertes.filter((a) => a.code === 'repartition-jour-nuit' || a.code === 'aucune-consommation')} compact />
 
             {manualMode && (
               <div className="consumption-summary">
@@ -355,6 +394,10 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
 
             {/* Paramètres du dimensionnement (moteur v2) */}
             <ParametresProjet valeurs={params} onChange={setParams} consommation={consumption} />
+            <AlertesDimensionnement
+              alertes={alertes.filter((a) => ['irradiation-absente', 'irradiation-annuelle', 'strategie-moyenne', 'autonomie-journee'].includes(a.code))}
+              compact
+            />
           </div>
         )}
 
@@ -414,6 +457,9 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
               </div>
             )}
 
+            {/* Alertes du moteur : bloquant (rouge) / important (orange) / info (gris) */}
+            <AlertesDimensionnement alertes={alertes} />
+
             <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
               <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
             </button>
@@ -435,7 +481,12 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
               <button className="btn btn-outline btn-block" onClick={() => handleSubmit('brouillon')}>
                 Brouillon
               </button>
-              <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')}>
+              <button
+                className="btn btn-accent btn-block"
+                onClick={() => handleSubmit('finalise')}
+                disabled={devisBloque}
+                title={devisBloque ? 'Corrigez les alertes bloquantes avant de générer le devis.' : undefined}
+              >
                 <Check size={18} /> Créer le devis{selectedLead ? ` pour ${selectedLead.name}` : ''}
               </button>
             </>
