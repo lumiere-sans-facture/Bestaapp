@@ -9,7 +9,9 @@ import Sheet from '../components/Sheet';
 import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
 
-const EMPTY_FORM = { name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', clientType: 'particulier' };
+// Pas de « valeur estimée » à saisir : la valeur de l'affaire se déduit
+// automatiquement des devis créés pour le client.
+const EMPTY_FORM = { name: '', contact: '', phone: '', address: '', notes: '', clientType: 'particulier' };
 
 // Formulaire client partagé entre l'ajout et la modification.
 function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIcon }) {
@@ -26,9 +28,6 @@ function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIc
       </Field>
       <Field label="Adresse">
         <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Quartier, ville" />
-      </Field>
-      <Field label="Valeur estimée (F CFA)">
-        <input className="input" type="number" min="0" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} placeholder="0" />
       </Field>
       <div className="input-group">
         <span className="input-label" id="clients-clienttype-label">Type de client</span>
@@ -88,7 +87,7 @@ export default function Clients() {
     e.preventDefault();
     addLead({
       ...form,
-      estimatedValue: Number(form.estimatedValue) || 0,
+      estimatedValue: 0, // déduite automatiquement des devis du client
       assignedTo: user.id,
       parrainL1: null, // attribution automatique (lien d'affiliation) gérée par le store
     });
@@ -102,7 +101,6 @@ export default function Clients() {
       contact: client.contact || '',
       phone: client.phone || '',
       address: client.address || '',
-      estimatedValue: client.estimatedValue ? String(client.estimatedValue) : '',
       notes: client.notes || '',
       clientType: client.clientType || 'particulier',
     });
@@ -111,7 +109,7 @@ export default function Clients() {
 
   const handleEdit = (e) => {
     e.preventDefault();
-    updateLead(editId, { ...form, estimatedValue: Number(form.estimatedValue) || 0 });
+    updateLead(editId, form);
     setEditId(null);
     setForm(EMPTY_FORM);
   };
@@ -192,7 +190,7 @@ export default function Clients() {
               </span>
             </div>
             {selectedClient.estimatedValue > 0 && (
-              <div className="sheet-row"><span className="sheet-label">Valeur estimée</span><span className="sheet-value amount">{formatCFA(selectedClient.estimatedValue)}</span></div>
+              <div className="sheet-row"><span className="sheet-label">Valeur de l'affaire</span><span className="sheet-value amount">{formatCFA(selectedClient.estimatedValue)}</span></div>
             )}
             {apporteur && (
               <div className="sheet-row">

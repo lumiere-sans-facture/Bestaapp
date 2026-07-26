@@ -34,6 +34,7 @@ export default function Pipeline() {
         </>
       );
     }
+    if (!lead.estimatedValue) return <>Commission : calculée sur le devis du client</>;
     return <>Commission estimée : {formatCFA(Math.round(lead.estimatedValue * rate))}</>;
   };
 
@@ -56,7 +57,8 @@ export default function Pipeline() {
   const [draggedLeadId, setDraggedLeadId] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [noteText, setNoteText] = useState('');
-  const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', clientType: 'particulier' });
+  // Pas de « valeur estimée » à saisir : elle se déduit des devis du client.
+  const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', notes: '', clientType: 'particulier' });
 
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
   const selectedLead = allMyLeads.find((l) => l.id === selectedLeadId);
@@ -76,11 +78,11 @@ export default function Pipeline() {
     e.preventDefault();
     addLead({
       ...newLead,
-      estimatedValue: Number(newLead.estimatedValue) || 0,
+      estimatedValue: 0, // déduite automatiquement des devis du client
       assignedTo: user.id,
       parrainL1: null, // attribution automatique (lien d'affiliation) gérée par le store
     });
-    setNewLead({ name: '', contact: '', phone: '', address: '', estimatedValue: '', notes: '', clientType: 'particulier' });
+    setNewLead({ name: '', contact: '', phone: '', address: '', notes: '', clientType: 'particulier' });
     setShowAddForm(false);
   };
 
@@ -183,7 +185,7 @@ export default function Pipeline() {
                           </div>
                         )}
                         <div className="kanban-card-footer">
-                          <span className="kanban-card-value">{formatCFA(lead.estimatedValue)}</span>
+                          <span className="kanban-card-value">{lead.estimatedValue > 0 ? formatCFA(lead.estimatedValue) : 'Pas encore de devis'}</span>
                           <span className="kanban-card-icons">
                             {stale && (
                               <span className="stale-indicator" title={`Inactive depuis ${daysSince(lead.lastActivity)} jours`}>
@@ -233,7 +235,7 @@ export default function Pipeline() {
         open={!!selectedLead}
         onClose={() => setSelectedLeadId(null)}
         title={selectedLead?.name}
-        subtitle={selectedLead && `${selectedLead.contact} · ${formatCFA(selectedLead.estimatedValue)}`}
+        subtitle={selectedLead && `${selectedLead.contact}${selectedLead.estimatedValue > 0 ? ` · ${formatCFA(selectedLead.estimatedValue)}` : ''}`}
       >
         {selectedLead && (
           <>
@@ -386,9 +388,6 @@ export default function Pipeline() {
           </Field>
           <Field label="Adresse">
             <input className="input" value={newLead.address} onChange={(e) => setNewLead({ ...newLead, address: e.target.value })} placeholder="Quartier, ville" />
-          </Field>
-          <Field label="Valeur estimée (F CFA)">
-            <input className="input" type="number" min="0" value={newLead.estimatedValue} onChange={(e) => setNewLead({ ...newLead, estimatedValue: e.target.value })} placeholder="0" />
           </Field>
           <div className="input-group">
             <span className="input-label" id="pipeline-clienttype-label">Type de client</span>

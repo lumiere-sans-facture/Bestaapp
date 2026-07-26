@@ -42,7 +42,7 @@ export default function LeadPicker({ leads, selectedLeadId, onSelect }) {
                 {st && <span className="badge" style={{ background: `${st.color}22`, color: st.color }}>{st.label}</span>}
               </div>
               <div className="lead-select-value">
-                {lead.contact}{lead.phone ? ` · ${lead.phone}` : ''} — {formatCFA(lead.estimatedValue)}
+                {lead.contact}{lead.phone ? ` · ${lead.phone}` : ''}{lead.estimatedValue > 0 ? ` — ${formatCFA(lead.estimatedValue)}` : ''}
               </div>
             </button>
           );

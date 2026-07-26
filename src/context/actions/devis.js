@@ -43,9 +43,15 @@ export function createDevisActions(setState) {
             ...s.devis,
           ],
           leads: s.leads.map((l) => {
-            if (l.id !== devis.leadId || !partnerId || l.parrainL1) return l;
-            const sponsor = s.partners.find((p) => p.id === partnerId)?.sponsorId || null;
-            return { ...l, parrainL1: partnerId, parrainL2: l.parrainL2 || sponsor };
+            if (l.id !== devis.leadId) return l;
+            // La valeur de l'affaire se déduit du devis (pas de saisie manuelle) ;
+            // le dernier devis créé fait référence.
+            let next = devis.total > 0 ? { ...l, estimatedValue: devis.total } : l;
+            if (partnerId && !l.parrainL1) {
+              const sponsor = s.partners.find((p) => p.id === partnerId)?.sponsorId || null;
+              next = { ...next, parrainL1: partnerId, parrainL2: l.parrainL2 || sponsor };
+            }
+            return next;
           }),
         };
       }),
@@ -58,11 +64,19 @@ export function createDevisActions(setState) {
       })),
 
     // Mise à jour partielle d'un devis (ex. finaliser un brouillon : statut).
+    // Si le total change, la valeur de l'affaire du client suit.
     updateDevis: (devisId, patch) =>
-      setState((s) => ({
-        ...s,
-        devis: s.devis.map((d) => (d.id === devisId ? { ...d, ...patch } : d)),
-      })),
+      setState((s) => {
+        const devis = s.devis.find((d) => d.id === devisId);
+        const newTotal = patch.total != null && patch.total !== devis?.total ? patch.total : null;
+        return {
+          ...s,
+          devis: s.devis.map((d) => (d.id === devisId ? { ...d, ...patch } : d)),
+          leads: newTotal > 0 && devis?.leadId
+            ? s.leads.map((l) => (l.id === devis.leadId ? { ...l, estimatedValue: newTotal } : l))
+            : s.leads,
+        };
+      }),
 
     // Suppression d'un devis (la réplication gère les tombstones automatiquement).
     deleteDevis: (devisId) =>
