@@ -1,14 +1,20 @@
 // État applicatif : forme initiale, chargement depuis localStorage (avec
 // migrations de seed) et persistance. Aucune dépendance React — logique pure.
 import * as seed from '../data/seed';
+import { IRRADIATION_SITES } from '../data/irradiation';
 import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
+import { withSpecsAll } from '../utils/materielSpecs';
 
 export const STORAGE_KEY = 'bestasolar_data';
 
 export const buildInitialState = () => ({
   version: seed.SEED_VERSION,
   leads: seed.leads,
-  products: seed.products,
+  // Le catalogue porte les caractéristiques électriques (specs) attendues par
+  // le moteur de dimensionnement v2 : squelette + valeurs déductibles de la
+  // désignation. Les données de fiche constructeur restent à null.
+  products: withSpecsAll(seed.products),
+  irradiationSites: IRRADIATION_SITES,
   partners: seed.partners,
   commissions: seed.commissions,
   devis: [],
@@ -75,6 +81,16 @@ export const loadState = () => {
       if (!saved.companies) saved.companies = [];
       if (!saved.factures) saved.factures = [];
       if (!saved.proClients) saved.proClients = [];
+      // Dimensionnement v2 : référentiel d'irradiation + squelette de specs
+      // matériel. Les sites du seed absents localement sont ajoutés, sans
+      // toucher à ceux que le gérant a complétés (productible PVGIS saisi).
+      if (!saved.irradiationSites) saved.irradiationSites = IRRADIATION_SITES;
+      else {
+        const connus = new Set(saved.irradiationSites.map((s) => s.id));
+        const nouveaux = IRRADIATION_SITES.filter((s) => !connus.has(s.id));
+        if (nouveaux.length) saved.irradiationSites = [...saved.irradiationSites, ...nouveaux];
+      }
+      saved.products = withSpecsAll(saved.products || []);
       const isNameBased = (p) => p.code && p.code.startsWith(`BESTA-${codeBaseFromName(p.name)}`);
       // 1re passe : réserver les codes déjà conformes (basés sur le nom)
       const codes = saved.partners.filter(isNameBased).map((p) => p.code);

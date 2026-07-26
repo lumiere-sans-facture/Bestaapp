@@ -70,6 +70,7 @@ export function DataProvider({ children }) {
     getProClientById: (id) => (state.proClients || []).find((c) => c.id === id),
     leadsForUser: (user) =>
       user.role === 'gerant' ? state.leads : state.leads.filter((l) => l.assignedTo === user.id),
+    getIrradiationSiteById: (id) => (state.irradiationSites || []).find((s) => s.id === id),
   }), [state]);
 
   return (
