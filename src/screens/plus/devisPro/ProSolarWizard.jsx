@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, User, Building2, MapPin, Search, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, User, Building2, MapPin, Search, FileText, Lock } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
@@ -211,26 +211,37 @@ export default function ProSolarWizard({ onDone }) {
 
   // Fiche de dimensionnement — récapitulatif technique complet (HTML imprimable),
   // généré à la dernière étape avec le client et le matériel réellement retenus.
-  const openSheet = async () => {
+  // Fiche technique de dimensionnement (client / interne).
+  const openSheet = async (interne = false) => {
     if (!sizing) return;
-    const { openSizingSheet } = await import('../../../utils/sizingSheetHtml');
-    const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
-    openSizingSheet({
-      client: { name: client.name || '', phone: client.phone || '', ville: client.ville || '' },
-      appliances: bilan.parEquipement.map((e) => ({
-        name: e.nom, power: e.puissanceW, quantite: e.quantite, quantity: e.quantite, day: e.heuresJour, night: e.heuresNuit,
-      })),
-      manualMode,
-      consumption,
-      systemType,
-      sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
-      cityName: location?.name || client.ville || null,
-      solarSource: solar?.source || null,
-      sizing,
-      inverter,
-      batteries: batteryList,
-      panelName,
-      dim,
+    const c = clientMode === 'new' ? newClient : (myClients.find((x) => x.id === clientId) || {});
+    const client = { name: c.name || '', phone: c.phone || '', ville: c.ville || '' };
+    if (!dim) {
+      const { openSizingSheet } = await import('../../../utils/sizingSheetHtml');
+      openSizingSheet({
+        client,
+        appliances: bilan.parEquipement.map((e) => ({
+          name: e.nom, power: e.puissanceW, quantity: e.quantite, day: e.heuresJour, night: e.heuresNuit,
+        })),
+        manualMode, consumption, systemType,
+        sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+        cityName: location?.name || c.ville || null,
+        solarSource: solar?.source || null,
+        sizing, inverter, batteries: batteryList, panelName,
+      });
+      return;
+    }
+    const { openFicheTechnique } = await import('../../../utils/ficheTechniqueHtml');
+    openFicheTechnique({
+      dim, client, systemType, interne,
+      // Version interne : matériel réellement sélectionné, marques comprises.
+      materielDetaille: interne
+        ? [
+            { ref: panelName, qty: sizing.numberOfPanels, marque: '' },
+            ...(inverter ? [{ ref: `${inverter.model} (${inverter.capacity} kVA)`, qty: 1, marque: inverter.brand }] : []),
+            ...batteryList.map((b) => ({ ref: `${b.model} (${b.capacity} kWh)`, qty: b.qty, marque: b.brand })),
+          ]
+        : null,
     });
   };
 
@@ -513,8 +524,11 @@ export default function ProSolarWizard({ onDone }) {
               ))}
             </div>
 
-            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
-              <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
+            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={() => openSheet(false)}>
+              <FileText size={16} /> Fiche de dimensionnement (client)
+            </button>
+            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 8 }} onClick={() => openSheet(true)}>
+              <Lock size={16} /> Version interne (marques et références)
             </button>
 
             <label className="pro-tva-toggle">

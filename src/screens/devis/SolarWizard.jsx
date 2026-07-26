@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Sun, Moon, Zap, Gauge, Calculator, PanelTop, MapPin, Search, Package, FileText, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
@@ -167,39 +167,48 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   // Une alerte bloquante interdit la génération du devis.
   const devisBloque = Boolean(dim?.bloquant);
 
-  // Fiche de dimensionnement — récapitulatif technique complet (HTML imprimable),
-  // basé sur le kit retenu et la piste sélectionnée.
-  const openSheet = async () => {
-    if (!sizing) return;
-    const { openSizingSheet } = await import('../../utils/sizingSheetHtml');
+  // Fiche technique de dimensionnement (HTML imprimable / PDF).
+  // Version client : désignations techniques et quantités, sans aucune marque.
+  // Version interne : la même fiche augmentée des marques et références.
+  const openSheet = async (interne = false) => {
     const lead = myLeads.find((l) => l.id === selectedLeadId);
-    const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const apporteur = partnerId ? partners.find((p) => p.id === partnerId) : null;
-    openSizingSheet({
-      client: { name: lead?.contact || lead?.name || '', phone: lead?.phone || '', ville: lead?.address || '' },
-      apporteur: apporteur ? { name: apporteur.name, code: apporteur.code } : null,
-      appliances: bilan.parEquipement.map((e) => ({
-        name: e.nom, power: e.puissanceW, quantity: e.quantite, day: e.heuresJour, night: e.heuresNuit,
-      })),
-      manualMode,
-      consumption,
-      systemType,
-      sunHours: psh,
-      cityName: location?.name || lead?.address || null,
-      solarSource: solar?.source || null,
-      // Résultats alignés sur le kit retenu (panneaux du kit, production associée) ;
-      // besoins (puissance requise, capacité batterie) issus du moteur de calcul.
-      sizing: {
-        ...sizing,
-        numberOfPanels: selectedKit.panels,
-        estimatedProduction: (selectedKit.panels * selectedKit.panelW * psh * 365) / 1000,
-      },
-      inverter: { capacity: selectedKit.inverter, maxPower: selectedKit.inverter * 800 },
-      batteries: selectedKit.batteryModules
-        || (selectedKit.battery > 0 ? [{ capacity: selectedKit.battery, qty: 1 }] : []),
-      panelName: `Panneau photovoltaïque ${selectedKit.panelW}W`,
-      // Dimensionnement v2 : la fiche s'appuie dessus (sections, vérifications…).
+    const client = { name: lead?.contact || lead?.name || '', phone: lead?.phone || '', ville: lead?.address || '' };
+    if (!dim) {
+      // Repli : dimensionnement v2 indisponible → ancien document (v1).
+      const { openSizingSheet } = await import('../../utils/sizingSheetHtml');
+      const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
+      openSizingSheet({
+        client,
+        apporteur: apporteur ? { name: apporteur.name, code: apporteur.code } : null,
+        appliances: bilan.parEquipement.map((e) => ({
+          name: e.nom, power: e.puissanceW, quantity: e.quantite, day: e.heuresJour, night: e.heuresNuit,
+        })),
+        manualMode, consumption, systemType, sunHours: psh,
+        cityName: location?.name || lead?.address || null,
+        solarSource: solar?.source || null,
+        sizing: { ...sizing, numberOfPanels: selectedKit.panels },
+        inverter: { capacity: selectedKit.inverter },
+        batteries: selectedKit.batteryModules || (selectedKit.battery > 0 ? [{ capacity: selectedKit.battery, qty: 1 }] : []),
+        panelName: `Panneau photovoltaïque ${selectedKit.panelW}W`,
+      });
+      return;
+    }
+    const { openFicheTechnique } = await import('../../utils/ficheTechniqueHtml');
+    const { detectBrand } = await import('../../utils/solarSizing');
+    openFicheTechnique({
       dim,
+      client,
+      apporteur: apporteur ? { name: apporteur.name, code: apporteur.code } : null,
+      systemType,
+      interne,
+      // Version interne : le matériel réel du kit, marques comprises.
+      materielDetaille: interne
+        ? selectedKit.lines.filter((l) => !l.labor).map((l) => {
+            const marque = detectBrand(l.designation);
+            return { ref: l.designation, qty: l.qty, unite: l.unit, marque: marque === 'Autre' ? '' : marque };
+          })
+        : null,
     });
   };
 
@@ -460,8 +469,11 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
             {/* Alertes du moteur : bloquant (rouge) / important (orange) / info (gris) */}
             <AlertesDimensionnement alertes={alertes} />
 
-            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
-              <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
+            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={() => openSheet(false)}>
+              <FileText size={16} /> Fiche de dimensionnement (client)
+            </button>
+            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 8 }} onClick={() => openSheet(true)}>
+              <Lock size={16} /> Version interne (marques et références)
             </button>
           </div>
         )}
