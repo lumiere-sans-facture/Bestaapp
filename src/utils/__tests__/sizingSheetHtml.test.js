@@ -84,10 +84,10 @@ describe('buildSizingSheetHtml', () => {
     // P = 7,20 ÷ 5,2 → même valeur que le moteur de calcul (séparateur : espace simple)
     const wc = Math.round(sizing.requiredPanelPower).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ');
     expect(html).toContain(`${wc} Wc`);
-    // Batterie lithium : 3,2 ÷ 0,95 ÷ 0,90 = 3,74 kWh → Ah sous 48 V
+    // Batterie : 3,2 ÷ 0,95 ÷ 0,80 = 4,21 kWh → Ah sous 48 V
     const kwh = sizing.batteryCapacity.toFixed(2).replace('.', ',');
     expect(html).toContain(`${kwh} kWh`);
-    expect(html).toContain('3,74 kWh');
+    expect(html).toContain('4,21 kWh');
     const ah = Math.round((sizing.batteryCapacity * 1000) / SYSTEM_VOLTAGE);
     expect(html).toContain(`${ah} Ah`);
   });

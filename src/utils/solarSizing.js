@@ -112,18 +112,17 @@ export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PV
 
 // Hypothèses de dimensionnement — exportées pour être affichées telles quelles
 // sur la fiche de dimensionnement (ne pas dupliquer ces valeurs ailleurs).
-// ⚠️ Les batteries du catalogue sont TOUTES au lithium (LiFePO4, cellules
-// prismatiques EVE, 6 000 cycles, « DOD ≥ 95 % », « efficacité de charge
-// 95-99 % » selon les fiches constructeur). Les valeurs de dimensionnement
-// doivent donc être celles du lithium — 80 % de DoD et 85 % de rendement sont
-// des valeurs de batteries PLOMB : les réintroduire surdimensionnerait le parc
-// de ~20 %.
+// Les batteries du catalogue sont toutes au lithium (LiFePO4, cellules
+// prismatiques EVE, 6 000 cycles, « efficacité de charge 95-99 % » selon les
+// fiches constructeur) : le rendement aller-retour est donc celui du lithium,
+// 95 % — 85 % est une valeur de batteries PLOMB, à ne pas réintroduire.
+// La profondeur de décharge reste volontairement fixée à 80 %, bien en deçà
+// des ≥ 95 % annoncés : c'est une marge de sécurité maison qui préserve la
+// durée de vie du parc.
 export const SIZING_PARAMS = {
   panelEfficiency: 0.75,    // rendement des panneaux appliqué au calcul
   batteryEfficiency: 0.95,  // rendement charge/décharge aller-retour (LiFePO4)
-  depthOfDischarge: 0.9,    // profondeur de décharge retenue (lithium ; marge
-                            // volontaire sur les ≥ 95 % annoncés, pour préserver
-                            // la durée de vie du parc)
+  depthOfDischarge: 0.8,    // profondeur de décharge retenue (marge de sécurité)
   hybridBatteryRatio: 0.8,  // part de la consommation nocturne stockée en hybride
   inverterMargin: 1.2,      // marge de sécurité sur la puissance onduleur (+20 %)
 };

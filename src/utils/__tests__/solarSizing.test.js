@@ -36,15 +36,16 @@ describe('calculateSystemSize', () => {
     expect(parsePanelWc('Onduleur hybride 5kVA')).toBeNull();
   });
 
-  it('dimensionne les batteries sur des valeurs LITHIUM, pas plomb', () => {
-    // Le catalogue ne vend que du LiFePO4 : DoD 90 %, rendement aller-retour 95 %.
-    // 80 % / 85 % sont des valeurs plomb et surdimensionneraient le parc de ~20 %.
-    expect(SIZING_PARAMS.depthOfDischarge).toBe(0.9);
+  it('dimensionne les batteries avec le rendement LITHIUM et un DoD de 80 %', () => {
+    // Le catalogue ne vend que du LiFePO4 : rendement aller-retour 95 %
+    // (85 % est une valeur plomb). La profondeur de décharge reste à 80 %,
+    // marge de sécurité maison sur les ≥ 95 % annoncés par les constructeurs.
     expect(SIZING_PARAMS.batteryEfficiency).toBe(0.95);
+    expect(SIZING_PARAMS.depthOfDischarge).toBe(0.8);
     // Capacité = conso nocturne ÷ rendement ÷ DoD
-    expect(sizing.batteryCapacity).toBeCloseTo(5 / 0.95 / 0.9, 5);
-    // Un dimensionnement plomb aurait donné ~20 % de capacité en plus.
-    expect(5 / 0.85 / 0.8).toBeGreaterThan(sizing.batteryCapacity * 1.15);
+    expect(sizing.batteryCapacity).toBeCloseTo(5 / 0.95 / 0.8, 5);
+    // Le rendement plomb (85 %) gonflerait le parc d'environ 12 %.
+    expect(5 / 0.85 / 0.8).toBeGreaterThan(sizing.batteryCapacity * 1.1);
   });
 
   it('choisit un onduleur avec 20 % de marge', () => {
