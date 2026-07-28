@@ -1,12 +1,39 @@
 import { describe, it, expect } from 'vitest';
-import { calculateSystemSize, buildQuotation, PANEL_SPEC } from '../solarSizing';
+import { calculateSystemSize, buildQuotation, PANEL_SPEC, PANEL_REFERENCE_WC, parsePanelWc } from '../solarSizing';
 
 describe('calculateSystemSize', () => {
   const sizing = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5);
 
   it('dimensionne le nombre de panneaux (arrondi au supérieur, min 1)', () => {
-    expect(sizing.numberOfPanels).toBe(5);
-    expect(sizing.panelCapacity).toBeCloseTo(2.75, 5);
+    // Besoin ~2 424 Wc, exprimé sur le panneau de référence (620 Wc) → 4 panneaux.
+    const attendu = Math.ceil(sizing.requiredPanelPower / PANEL_REFERENCE_WC);
+    expect(sizing.numberOfPanels).toBe(attendu);
+    expect(sizing.numberOfPanels).toBe(4);
+    expect(sizing.panelWc).toBe(PANEL_REFERENCE_WC);
+    expect(sizing.panelCapacity).toBeCloseTo((attendu * PANEL_REFERENCE_WC) / 1000, 5);
+  });
+
+  it('exprime le besoin sur un autre panneau de référence si on le précise', () => {
+    // L'espace Pro passe la puissance du panneau réellement vendu.
+    const sur580 = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, 580);
+    expect(sur580.panelWc).toBe(580);
+    expect(sur580.numberOfPanels).toBe(Math.ceil(sur580.requiredPanelPower / 580));
+    // La puissance requise, elle, ne dépend pas du panneau retenu.
+    expect(sur580.requiredPanelPower).toBeCloseTo(sizing.requiredPanelPower, 5);
+    // La puissance installée couvre toujours le besoin.
+    expect(sur580.panelCapacity * 1000).toBeGreaterThanOrEqual(sur580.requiredPanelPower);
+    expect(sizing.panelCapacity * 1000).toBeGreaterThanOrEqual(sizing.requiredPanelPower);
+  });
+
+  it('retombe sur la référence si la puissance fournie est invalide', () => {
+    expect(calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, 0).panelWc).toBe(PANEL_REFERENCE_WC);
+    expect(calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, null).panelWc).toBe(PANEL_REFERENCE_WC);
+  });
+
+  it('lit la puissance crête d’un panneau depuis sa désignation', () => {
+    expect(parsePanelWc('Panneaux Photovoltaïque 580W Jinko')).toBe(580);
+    expect(parsePanelWc('Panneau solaire monocristallin 620 Wc')).toBe(620);
+    expect(parsePanelWc('Onduleur hybride 5kVA')).toBeNull();
   });
 
   it('choisit un onduleur avec 20 % de marge', () => {

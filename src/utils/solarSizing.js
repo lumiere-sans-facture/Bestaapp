@@ -4,8 +4,14 @@
 
 // ---- Catalogue matériel ----
 
+// Panneau de référence du dimensionnement : c'est sur cette puissance crête
+// qu'est exprimé le BESOIN (nombre de panneaux nécessaires, puissance
+// installée, production estimée) — indépendamment du kit qui sera proposé au
+// devis. 620 Wc = format standard BestaSolar.
+export const PANEL_REFERENCE_WC = 620;
+
 export const PANEL_SPEC = {
-  power: 550, // Watts
+  power: PANEL_REFERENCE_WC, // Watts crête — référence de dimensionnement
   brand: 'Jinko Solar',
   model: 'Tiger Neo N-type',
   type: 'Bifacial',
@@ -45,6 +51,8 @@ export const detectBrand = (name = '') => {
 };
 export const parseKva = (name = '') => { const m = name.match(/(\d+(?:[.,]\d+)?)\s*kva/i); return m ? parseNum(m[1]) : null; };
 export const parseKwh = (name = '') => { const m = name.match(/(\d+(?:[.,]\d+)?)\s*kwh/i); return m ? parseNum(m[1]) : null; };
+/** Puissance crête d'un panneau depuis sa désignation : « … 580W » → 580. */
+export const parsePanelWc = (name = '') => { const m = String(name).match(/(\d{3,4})\s*w(?:c|atts?)?\b/i); return m ? Number(m[1]) : null; };
 
 /** Onduleurs boutique → { id, brand, model, capacity (kVA), maxPower (W), price }. */
 export const inverterOptionsFromCatalog = (products = []) =>
@@ -156,14 +164,23 @@ const groupBatteries = (batteries) => {
  * @param {{ day:number, night:number }} consumption  consommation en kWh/jour
  * @param {'off-grid'|'hybrid'|'on-grid'} systemType
  * @param {number} peakSunHours
+ * @param {number} panelWc  puissance crête du panneau de référence (défaut :
+ *   PANEL_REFERENCE_WC). L'espace Pro passe la puissance du panneau réellement
+ *   vendu, pour que le devis livre bien la puissance calculée.
  */
-export const calculateSystemSize = (consumption, systemType, peakSunHours = DEFAULT_PEAK_SUN_HOURS) => {
+export const calculateSystemSize = (
+  consumption,
+  systemType,
+  peakSunHours = DEFAULT_PEAK_SUN_HOURS,
+  panelWc = PANEL_REFERENCE_WC,
+) => {
   const { panelEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio } = SIZING_PARAMS;
+  const panelPower = Number(panelWc) > 0 ? Number(panelWc) : PANEL_REFERENCE_WC;
 
   const totalDaily = consumption.day + consumption.night; // kWh
   const requiredDailyEnergy = totalDaily / panelEfficiency; // kWh
   const requiredPanelPower = (requiredDailyEnergy / peakSunHours) * 1000; // W
-  const numberOfPanels = Math.max(1, Math.ceil(requiredPanelPower / PANEL_SPEC.power));
+  const numberOfPanels = Math.max(1, Math.ceil(requiredPanelPower / panelPower));
 
   const selectedInverter = findInverterForPower(requiredPanelPower);
 
@@ -179,12 +196,13 @@ export const calculateSystemSize = (consumption, systemType, peakSunHours = DEFA
 
   return {
     numberOfPanels,
+    panelWc: panelPower, // puissance crête du panneau de référence retenu
     requiredPanelPower, // W — utile pour filtrer les onduleurs par marque
-    panelCapacity: (numberOfPanels * PANEL_SPEC.power) / 1000, // kWc
+    panelCapacity: (numberOfPanels * panelPower) / 1000, // kWc
     inverter: selectedInverter,
     batteryCapacity,
     batteries: groupBatteries(batteries),
-    estimatedProduction: (numberOfPanels * PANEL_SPEC.power * peakSunHours * 365) / 1000, // kWh/an
+    estimatedProduction: (numberOfPanels * panelPower * peakSunHours * 365) / 1000, // kWh/an
     systemType,
     peakSunHours,
   };
