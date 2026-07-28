@@ -144,8 +144,10 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0];
   const displayQuotation = kitQuotations[effectiveKitId];
 
-  // Fiche de dimensionnement — récapitulatif technique complet (HTML imprimable),
-  // basé sur le kit retenu et la piste sélectionnée.
+  // Fiche de dimensionnement — étude technique du BESOIN du client.
+  // Elle ne reprend rien du kit proposé au devis : nombre de panneaux, calibre
+  // d'onduleur, capacité batterie et production sont ceux du calcul, exprimés
+  // sur le panneau de référence (PANEL_REFERENCE_WC).
   const openSheet = async () => {
     if (!sizing) return;
     const { openSizingSheet } = await import('../../utils/sizingSheetHtml');
@@ -162,17 +164,12 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
       sunHours: psh,
       cityName: location?.name || lead?.address || null,
       solarSource: solar?.source || null,
-      // Résultats alignés sur le kit retenu (panneaux du kit, production associée) ;
-      // besoins (puissance requise, capacité batterie) issus du moteur de calcul.
-      sizing: {
-        ...sizing,
-        numberOfPanels: selectedKit.panels,
-        estimatedProduction: (selectedKit.panels * selectedKit.panelW * psh * 365) / 1000,
-      },
-      inverter: { capacity: selectedKit.inverter, maxPower: selectedKit.inverter * 800 },
-      batteries: selectedKit.batteryModules
-        || (selectedKit.battery > 0 ? [{ capacity: selectedKit.battery, qty: 1 }] : []),
-      panelName: `Panneau photovoltaïque ${selectedKit.panelW}W`,
+      sizing,
+      // Seules les grandeurs techniques sont transmises : les marques du
+      // catalogue interne (onduleur, batteries) n'apparaissent jamais.
+      inverter: { capacity: sizing.inverter.capacity },
+      batteries: sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
+      panelName: `Panneau photovoltaïque ${sizing.panelWc}W`,
     });
   };
 

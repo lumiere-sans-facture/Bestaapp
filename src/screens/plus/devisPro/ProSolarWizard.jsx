@@ -5,7 +5,7 @@ import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
-  calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
+  calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, recommendInverterOption, suggestBatteryCombo,
 } from '../../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
@@ -129,9 +129,15 @@ export default function ProSolarWizard({ onDone }) {
   // Pic de charge : toutes les charges branchées en même temps (dimensionne l'onduleur).
   const peakLoad = useMemo(() => rows.reduce((s, r) => s + r.power * r.quantity, 0), [rows]);
 
+  // Le devis Pro livre le panneau du catalogue : le nombre de panneaux est
+  // calculé sur SA puissance crête réelle, pour que la puissance installée
+  // corresponde bien au besoin (la référence 620 Wc ne sert qu'à l'étude).
+  const panelWcCatalogue = useMemo(() => parsePanelWc(panelName) || PANEL_SPEC.power, [panelName]);
   const sizing = useMemo(
-    () => (totalConsumption > 0 ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS) : null),
-    [consumption, systemType, sunHours, totalConsumption]
+    () => (totalConsumption > 0
+      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, panelWcCatalogue)
+      : null),
+    [consumption, systemType, sunHours, totalConsumption, panelWcCatalogue]
   );
 
   // Nouveau dimensionnement → on repart des sélections conseillées.
