@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateSystemSize, buildQuotation, PANEL_SPEC, PANEL_REFERENCE_WC, parsePanelWc } from '../solarSizing';
+import { calculateSystemSize, buildQuotation, PANEL_SPEC, PANEL_REFERENCE_WC, parsePanelWc, SIZING_PARAMS } from '../solarSizing';
 
 describe('calculateSystemSize', () => {
   const sizing = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5);
@@ -34,6 +34,17 @@ describe('calculateSystemSize', () => {
     expect(parsePanelWc('Panneaux Photovoltaïque 580W Jinko')).toBe(580);
     expect(parsePanelWc('Panneau solaire monocristallin 620 Wc')).toBe(620);
     expect(parsePanelWc('Onduleur hybride 5kVA')).toBeNull();
+  });
+
+  it('dimensionne les batteries sur des valeurs LITHIUM, pas plomb', () => {
+    // Le catalogue ne vend que du LiFePO4 : DoD 90 %, rendement aller-retour 95 %.
+    // 80 % / 85 % sont des valeurs plomb et surdimensionneraient le parc de ~20 %.
+    expect(SIZING_PARAMS.depthOfDischarge).toBe(0.9);
+    expect(SIZING_PARAMS.batteryEfficiency).toBe(0.95);
+    // Capacité = conso nocturne ÷ rendement ÷ DoD
+    expect(sizing.batteryCapacity).toBeCloseTo(5 / 0.95 / 0.9, 5);
+    // Un dimensionnement plomb aurait donné ~20 % de capacité en plus.
+    expect(5 / 0.85 / 0.8).toBeGreaterThan(sizing.batteryCapacity * 1.15);
   });
 
   it('choisit un onduleur avec 20 % de marge', () => {
