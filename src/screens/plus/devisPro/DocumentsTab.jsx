@@ -10,6 +10,7 @@ import {
   relanceMessage, whatsappLink,
 } from '../../../utils/paiement';
 import { exportDevisProPdf, exportFacturePdf } from './proPdf';
+import { MODELES } from './constants';
 import FactureSheet from './FactureSheet';
 import PaiementSheet from './PaiementSheet';
 import ProDevisBuilder from './ProDevisBuilder';
@@ -39,6 +40,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
   const [actions, setActions] = useState(null); // { kind:'facture'|'devis', doc }
+  // Modèle retenu pour le document qu'on s'apprête à ouvrir (défaut : réglage entreprise).
+  const [modeleChoisi, setModeleChoisi] = useState(null);
+  const modeleActif = modeleChoisi || modeleDefaut;
   const [editDevis, setEditDevis] = useState(null);
   const [factureEdit, setFactureEdit] = useState(null);
   const [payFacture, setPayFacture] = useState(null); // facture en cours d'encaissement
@@ -56,6 +60,25 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const montantRetard = enRetardList.reduce((s, f) => s + resteAPayer(f), 0);
 
   const clientOf = (d) => d.clientName || getLeadById(d.leadId)?.name || 'Client';
+
+  // Choix du modèle de document, propre à l'espace Pro (le public n'a que Studio).
+  const SelecteurModele = () => (
+    <div className="input-group">
+      <span className="input-label" id="doc-modele-label">Modèle de document</span>
+      <div className="client-type-toggle" role="group" aria-labelledby="doc-modele-label">
+        {MODELES.map((m) => (
+          <button
+            key={m.id} type="button"
+            className={`client-type-btn ${modeleActif === m.id ? 'active' : ''}`}
+            aria-pressed={modeleActif === m.id}
+            onClick={() => setModeleChoisi(m.id)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
   const switchTab = (t) => { setTab(t); setStatusFilter('all'); setSearch(''); };
   const closeCreate = () => { setView('list'); setCreateMode('choose'); };
 
@@ -101,7 +124,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     setActions(null);
   };
 
-  const runAction = (fn) => { fn(); setActions(null); };
+  const runAction = (fn) => { fn(); setActions(null); setModeleChoisi(null); };
 
   // --- Filtre + tri ---
   const q = search.trim().toLowerCase();
@@ -333,8 +356,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             {actionFacture.derniereRelance && (
               <div className="sheet-row"><span className="sheet-label">Dernière relance</span><span className="sheet-value">{formatDate(actionFacture.derniereRelance)}</span></div>
             )}
-            <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actionFacture, undefined, { company, modeleDefaut }))}>
-              <Download size={16} /> Télécharger le PDF
+            <SelecteurModele />
+            <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actionFacture, modeleActif, { company, modeleDefaut }))}>
+              <Download size={16} /> Facture imprimable (PDF)
             </button>
             {actionFacture.statut !== 'payee' && reste > 0 && (
               <button className="btn btn-won btn-block" onClick={() => { setPayFacture(actionFacture); setActions(null); }}>
@@ -369,8 +393,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             {factureByDevis.get(actions.doc.id) && (
               <div className="sheet-row"><span className="sheet-label">Facturé</span><span className="sheet-value">{factureByDevis.get(actions.doc.id).numero}</span></div>
             )}
-            <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise} onClick={() => runAction(() => exportDevisProPdf(actions.doc, modeleDefaut, { company, lead: getLeadById(actions.doc.leadId), products, markDevisPro }))}>
-              <Download size={16} /> Télécharger le PDF Pro
+            <SelecteurModele />
+            <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise} onClick={() => runAction(() => exportDevisProPdf(actions.doc, modeleActif, { company, lead: getLeadById(actions.doc.leadId), products, markDevisPro }))}>
+              <Download size={16} /> Devis imprimable (PDF)
             </button>
             <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions.doc); setActions(null); }}>
               <Pencil size={16} /> Modifier le devis

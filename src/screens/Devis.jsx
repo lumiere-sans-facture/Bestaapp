@@ -23,10 +23,25 @@ export default function Devis() {
   const { user } = useAuth();
   const { devis, getLeadById, getPartnerById, products, updateDevis, deleteDevis } = useData();
 
-  // jsPDF est chargé à la demande pour ne pas alourdir le chargement initial
-  const downloadPdf = async (d) => {
-    const { generateDevisPdf } = await import('../utils/devisPdf');
-    generateDevisPdf(d, getLeadById(d.leadId), d.partnerId ? getPartnerById(d.partnerId) : null, products);
+  // Document imprimable (HTML autonome, export PDF par Ctrl+P). L'espace
+  // public n'utilise qu'un seul modèle : Studio.
+  const ouvrirDocument = async (d) => {
+    const [{ openDoc }, { donneesDeDevis }] = await Promise.all([
+      import('../utils/docTemplates'),
+      import('../utils/docTemplates/shared'),
+    ]);
+    const { COMPANY } = await import('../config/company');
+    openDoc({
+      kind: 'devis',
+      model: 'studio',
+      data: donneesDeDevis({
+        devis: d,
+        company: COMPANY,
+        lead: getLeadById(d.leadId),
+        partner: d.partnerId ? getPartnerById(d.partnerId) : null,
+        products,
+      }),
+    });
   };
   // Arrivée depuis le panier de la boutique : assistant manuel pré-rempli.
   // Arrivée depuis une fiche client : création directe, client présélectionné.
@@ -148,7 +163,7 @@ export default function Devis() {
               {actions.partnerId && (
                 <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{getPartnerById(actions.partnerId)?.name}{(actions.partnerCode || getPartnerById(actions.partnerId)?.code) ? ` · ${actions.partnerCode || getPartnerById(actions.partnerId)?.code}` : ''}</span></div>
               )}
-              <button className="btn btn-primary btn-block" onClick={() => runAction(() => downloadPdf(actions))}><Download size={16} /> Télécharger le PDF</button>
+              <button className="btn btn-primary btn-block" onClick={() => runAction(() => ouvrirDocument(actions))}><Download size={16} /> Devis imprimable (PDF)</button>
               <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions); setActions(null); }}><Pencil size={16} /> Éditer</button>
               {actions.statut === 'brouillon' && (
                 <>

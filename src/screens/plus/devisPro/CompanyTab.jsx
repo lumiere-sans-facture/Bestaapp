@@ -5,7 +5,6 @@ import { useData } from '../../../context/DataContext';
 import { fileToResizedDataUrl } from '../../../utils/image';
 import Field from '../../../components/Field';
 import { MODELES, EMPTY_COMPANY, normalizeModele } from './constants';
-import FacturePreview from './FacturePreview';
 
 // Facture d'exemple pour l'aperçu PDF.
 const SAMPLE_LIGNES = [
@@ -43,28 +42,17 @@ export default function CompanyTab({ company }) {
     setCompanyForm(null);
   };
 
+  // Aperçu : le vrai document imprimable, dans le modèle sélectionné.
   const previewPdf = async () => {
-    const { generateProPdf } = await import('../../../utils/proDocPdf');
-    generateProPdf({
-      kind: 'facture',
-      company: f,
-      modele,
-      doc: {
-        numero: 'FAC-APERCU',
-        date: new Date().toISOString(),
-        client: { name: 'Client exemple', ville: 'Cotonou' },
-        lignes: SAMPLE_LIGNES,
-        totalHT: SAMPLE_HT, tvaActive: false, tva: 0, totalTTC: SAMPLE_HT,
-        statut: 'emise',
-      },
-    });
+    const { previewDocument } = await import('./proPdf');
+    previewDocument(f, modele, SAMPLE_LIGNES, 'facture');
   };
 
   return (
     <form onSubmit={saveCompanyForm}>
       {/* Aperçu + modèle */}
       <div className="card my-partner-section">
-        <div className="card-title"><Eye size={15} /> Aperçu de la facture</div>
+        <div className="card-title"><Eye size={15} /> Modèle de document</div>
         <div className="client-type-toggle" role="group" aria-label="Modèle de document" style={{ marginBottom: 14 }}>
           {MODELES.map((m) => (
             <button key={m.id} type="button" className={`client-type-btn ${modele === m.id ? 'active' : ''}`} onClick={() => set({ modeleDefaut: m.id })}>
@@ -72,9 +60,8 @@ export default function CompanyTab({ company }) {
             </button>
           ))}
         </div>
-        <FacturePreview company={f} modele={modele} />
         <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={previewPdf}>
-          <Download size={16} /> Télécharger un aperçu PDF
+          <Download size={16} /> Ouvrir un aperçu imprimable
         </button>
         <div className="field-hint">{MODELES.find((m) => m.id === modele)?.desc}</div>
       </div>
