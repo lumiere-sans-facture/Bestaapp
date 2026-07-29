@@ -31,7 +31,16 @@ export default function CompanyTab({ company }) {
     if (!file) return;
     try {
       const dataUrl = await fileToResizedDataUrl(file, 360, 0.85);
-      set({ logo: dataUrl });
+      // Détecte les couleurs de marque du logo et les applique aux documents
+      // (l'utilisateur peut toujours les ajuster dans la section Couleurs).
+      const patch = { logo: dataUrl };
+      const { couleursDuLogo } = await import('../../../utils/logoColors');
+      const couleurs = await couleursDuLogo(dataUrl);
+      if (couleurs) {
+        patch.couleurPrimaire = couleurs.primaire;
+        patch.couleurSecondaire = couleurs.secondaire;
+      }
+      set(patch);
     } catch { alert('Impossible de lire cette image.'); }
     e.target.value = '';
   };
@@ -109,7 +118,7 @@ export default function CompanyTab({ company }) {
 
       {/* Apparence */}
       <div className="card my-partner-section">
-        <div className="card-title"><Palette size={15} /> Couleurs (modèle Couleur)</div>
+        <div className="card-title"><Palette size={15} /> Couleurs des documents</div>
         <div className="form-row-2">
           <Field label="Couleur principale">
             <input className="input pro-color-input" type="color" value={f.couleurPrimaire} onChange={(e) => set({ couleurPrimaire: e.target.value })} />
@@ -118,7 +127,7 @@ export default function CompanyTab({ company }) {
             <input className="input pro-color-input" type="color" value={f.couleurSecondaire} onChange={(e) => set({ couleurSecondaire: e.target.value })} />
           </Field>
         </div>
-        <div className="field-hint">Utilisées par le modèle « Couleur ». Le modèle « Noir & blanc » les ignore.</div>
+        <div className="field-hint">Détectées automatiquement à l'import de votre logo, ajustables ici. Appliquées aux modèles Studio et Vague ; le modèle Classique reste noir et blanc.</div>
       </div>
 
       {/* Facturation */}
