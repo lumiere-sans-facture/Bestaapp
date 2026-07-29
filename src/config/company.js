@@ -15,8 +15,14 @@ export const COMPANY = {
     account: 'BJ66 BJ01 1000 0000 0123 4567 890',
     swift: 'AFRIBJBJ',
   },
-  terms:
+  // Conditions générales : la clause de validité ne vaut que pour un devis.
+  termsDevis:
     "Ce devis est valable 30 jours. Tout acompte versé est non remboursable. BestaSolar se réserve le droit de réviser les prix en cas de variation significative des cours. La livraison est effectuée après réception de l'acompte convenu.",
+  termsFacture:
+    "Tout acompte versé est non remboursable. BestaSolar se réserve le droit de réviser les prix en cas de variation significative des cours. La livraison est effectuée après réception de l'acompte convenu. Tout retard de paiement pourra donner lieu à des pénalités.",
 };
+
+// Alias historique : les documents existants lisent encore COMPANY.terms.
+COMPANY.terms = COMPANY.termsDevis;
 
 export const TVA_RATE = 0.18;

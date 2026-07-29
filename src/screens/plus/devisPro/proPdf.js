@@ -1,57 +1,55 @@
-// Export PDF des documents Pro (devis / facture) à l'identité du technicien.
-// jsPDF est chargé à la demande pour ne pas alourdir le bundle initial.
+// Ouverture des documents Pro (devis / facture) à l'identité de l'abonné.
+// Les documents sont des pages HTML autonomes imprimables (export PDF par
+// Ctrl+P) construites par src/utils/docTemplates ; le modèle est celui choisi
+// pour le document, à défaut celui réglé sur l'entreprise.
 
-/** Devis à l'identité Pro. La TVA n'est affichée que si elle est réellement due
- *  (les devis kit solaires ont une TVA à 0 → ne pas imprimer « TVA 18 % · 0 F »). */
+/** Devis à l'identité Pro. */
 export async function exportDevisProPdf(d, modele, { company, lead, products, markDevisPro }) {
-  const { generateProPdf, devisToLignes } = await import('../../../utils/proDocPdf');
-  markDevisPro(d.id, { modele, companySnapshot: company });
-
-  // TVA effective : devis Pro → selon le devis ; devis solaire → celle du chiffrage.
-  const tva = d.type === 'pro' ? (d.tva || 0) : (d.type === 'solar' ? (d.quotation?.tva || 0) : 0);
-  const totalHT = d.type === 'solar' ? d.quotation?.subtotalHT : d.subtotal;
-  // Client : devis Pro → figé sur le devis ; sinon → piste liée.
-  const client = d.type === 'pro'
-    ? { name: d.clientName || 'Client', phone: d.clientPhone, ville: d.clientVille }
-    : { name: lead?.contact || lead?.name || 'Client', phone: lead?.phone, ville: lead?.address };
-
-  generateProPdf({
+  const [{ openDoc, normaliserModel }, { donneesDeDevis }] = await Promise.all([
+    import('../../../utils/docTemplates'),
+    import('../../../utils/docTemplates/shared'),
+  ]);
+  const model = normaliserModel(modele);
+  markDevisPro(d.id, { modele: model, companySnapshot: company });
+  openDoc({
     kind: 'devis',
-    company,
-    modele,
-    doc: {
-      numero: d.devisNumber,
-      date: d.createdAt,
-      client,
-      lignes: devisToLignes(d, products),
-      totalHT,
-      tvaActive: tva > 0,
-      tva,
-      totalTTC: d.total,
-      validiteJours: 30,
-    },
+    model,
+    data: donneesDeDevis({ devis: d, company, lead, products }),
   });
 }
 
-/** Facture à l'identité Pro (utilise le snapshot d'entreprise figé à la création). */
+/** Facture à l'identité Pro (snapshot d'entreprise figé à la création). */
 export async function exportFacturePdf(f, modele, { company, modeleDefaut }) {
-  const { generateProPdf } = await import('../../../utils/proDocPdf');
-  generateProPdf({
+  const [{ openDoc, normaliserModel }, { donneesDeFacture }] = await Promise.all([
+    import('../../../utils/docTemplates'),
+    import('../../../utils/docTemplates/shared'),
+  ]);
+  openDoc({
     kind: 'facture',
-    company: f.companySnapshot || company,
-    modele: modele || f.modele || modeleDefaut,
-    doc: {
-      numero: f.numero,
-      date: f.createdAt,
-      client: { name: f.clientName, phone: f.clientPhone, ville: f.clientVille },
-      lignes: f.lignes,
-      totalHT: f.totalHT,
-      tvaActive: f.tvaActive,
-      tva: f.tva,
-      totalTTC: f.totalTTC,
-      statut: f.statut,
-      echeance: f.echeance,
-      montantPaye: f.montantPaye || 0,
+    model: normaliserModel(modele || f.modele || modeleDefaut),
+    data: donneesDeFacture({ facture: f, company }),
+  });
+}
+
+/** Aperçu d'un modèle avec un jeu d'exemple (réglages de l'entreprise). */
+export async function previewDocument(company, modele, lignes, kind = 'facture') {
+  const [{ openDoc, normaliserModel }, { emetteurDe, totauxDe }] = await Promise.all([
+    import('../../../utils/docTemplates'),
+    import('../../../utils/docTemplates/shared'),
+  ]);
+  const maintenant = new Date();
+  openDoc({
+    kind,
+    model: normaliserModel(modele),
+    data: {
+      numero: kind === 'facture' ? 'FAC-APERCU' : 'BS-APERCU',
+      date: maintenant.toISOString(),
+      dateSecondaire: new Date(maintenant.getTime() + 30 * 86400000).toISOString(),
+      emetteur: emetteurDe(company || {}),
+      client: { name: 'Client exemple', societe: '', phone: '+229 00 00 00 00', adresse: 'Cotonou' },
+      lignes,
+      totaux: totauxDe(lignes, { tva: 0, tvaActive: false }),
+      apporteur: null,
     },
   });
 }
