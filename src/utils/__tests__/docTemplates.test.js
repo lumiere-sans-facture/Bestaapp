@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildDocHtml, MODELS, modelsPour, normaliserModel } from '../docTemplates';
-import { donneesDeDevis, donneesDeFacture, lignesDeDevis, totauxDe, nf } from '../docTemplates/shared';
+import { donneesDeDevis, donneesDeFacture, lignesDeDevis, totauxDe, nf, emetteurDe, eclaircir } from '../docTemplates/shared';
 import { COMPANY } from '../../config/company';
 
 const LEAD = { name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+229 94 22 33 44', address: 'Parakou' };
@@ -157,6 +157,52 @@ describe('unités et lisibilité', () => {
       expect(html).not.toContain('gradient');
       expect(html).not.toMatch(/[\u{1F300}-\u{1FAFF}☀-➿]/u);
     }
+  });
+});
+
+describe('couleurs de marque de l’émetteur', () => {
+  // Entreprise Pro avec sa propre identité visuelle (vert / rouge).
+  const companyPro = {
+    nomEntreprise: 'Soleil du Borgou', telephone: '+229 97 00 00 00', email: 'contact@borgou.bj',
+    adresse: 'Parakou', couleurPrimaire: '#1b7a43', couleurSecondaire: '#d43518',
+  };
+  const facturePro = donneesDeFacture({
+    facture: { numero: 'FAC-2026-020', createdAt: '2026-03-25T09:00:00.000Z', clientName: 'Client', lignes: [{ designation: 'Kit', qty: 1, pu: 500000 }] },
+    company: companyPro,
+  });
+
+  it('les documents Pro portent les couleurs de l’abonné, pas celles par défaut', () => {
+    for (const model of ['studio', 'vague']) {
+      const html = buildDocHtml({ kind: 'facture', model, data: facturePro });
+      expect(html).toContain('#1b7a43');
+      expect(html).toContain('#d43518');
+      expect(html).not.toContain('#0a2472');
+      expect(html).not.toContain('#f5a623');
+    }
+  });
+
+  it('l’espace public garde la palette BestaSolar', () => {
+    for (const model of ['studio', 'vague']) {
+      const html = buildDocHtml({ kind: 'devis', model, data: dataDevis });
+      expect(html).toContain('#0a2472');
+    }
+  });
+
+  it('le modèle Classique reste noir et blanc quelles que soient les couleurs', () => {
+    const html = buildDocHtml({ kind: 'facture', model: 'classique', data: facturePro });
+    expect(html).not.toContain('#1b7a43');
+    expect(html).not.toContain('#d43518');
+  });
+
+  it('rejette une couleur invalide et retombe sur la palette par défaut', () => {
+    const e = emetteurDe({ nomEntreprise: 'X', couleurPrimaire: 'red;} body{display:none', couleurSecondaire: '#12345' });
+    expect(e.couleurPrimaire).toBe('#0a2472');
+    expect(e.couleurSecondaire).toBe('#f5a623');
+  });
+
+  it('éclaircit une couleur en restant un hexadécimal valide', () => {
+    expect(eclaircir('#0a2472', 0.24)).toMatch(/^#[0-9a-f]{6}$/);
+    expect(eclaircir('#000000', 1)).toBe('#ffffff');
   });
 });
 

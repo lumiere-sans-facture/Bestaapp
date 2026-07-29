@@ -1,18 +1,20 @@
 // Modèle B — Vague. Bandeaux décoratifs SVG à fond plat (jamais de dégradé),
-// en-tête de tableau gris clair (c'est ce qui le distingue de Studio), orange
-// réservé aux traits de titre, au filet du total et au montant du total.
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml } from './shared';
+// en-tête de tableau gris clair (c'est ce qui le distingue de Studio),
+// couleur secondaire réservée aux traits de titre, au filet du total et au
+// montant du total. En Pro, les couleurs de l'abonné remplacent navy/orange ;
+// la vague claire est une teinte éclaircie de la primaire.
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, eclaircir } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 10, suite: 14, derniere: 8 };
 
-const CSS = `
+const cssPour = (p, s) => `
   .page { color: #3a3a3a; }
   .corps { padding: 0 56px; position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1; }
   .micro { font-size: 11px; color: #6b6b6b; }
-  .navy { color: #0a2472; }
-  .titre-bloc { font-size: 18px; font-weight: 600; color: #0a2472; }
-  .trait { width: 40px; height: 3px; background: #f5a623; margin: 8px 0; }
+  .navy { color: ${p}; }
+  .titre-bloc { font-size: 18px; font-weight: 600; color: ${p}; }
+  .trait { width: 40px; height: 3px; background: ${s}; margin: 8px 0; }
 
   .vague-haute { position: relative; height: 112px; flex-shrink: 0; }
   .vague-basse { height: 72px; flex-shrink: 0; }
@@ -25,10 +27,10 @@ const CSS = `
   .client-rang { display: grid; grid-template-columns: 1fr 288px; gap: 32px; margin-top: 16px; }
   .meta-ligne { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
   .meta-ligne + .meta-ligne { margin-top: 8px; }
-  .meta-ligne .libelle { font-weight: 600; color: #0a2472; }
+  .meta-ligne .libelle { font-weight: 600; color: ${p}; }
 
   table.lignes { margin-top: 16px; }
-  table.lignes th { background: #f2f3f7; color: #0a2472; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  table.lignes th { background: #f2f3f7; color: ${p}; font-size: 11px; font-weight: 600; text-transform: uppercase;
                     letter-spacing: 0.5px; text-align: left; padding: 10px 12px; }
   table.lignes th.num { text-align: right; }
   table.lignes td { padding: 8px 12px; border-bottom: 1px solid #e5e5e5; font-size: 13px; }
@@ -39,31 +41,31 @@ const CSS = `
   .totaux-ligne { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
   .totaux-ligne + .totaux-ligne { margin-top: 8px; }
   .total-final { display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
-                 border-top: 2px solid #f5a623; margin-top: 8px; padding-top: 8px; }
-  .total-final .libelle { font-size: 13px; font-weight: 600; color: #0a2472; }
-  .total-final .montant { font-size: 18px; font-weight: 600; color: #f5a623; }
+                 border-top: 2px solid ${s}; margin-top: 8px; padding-top: 8px; }
+  .total-final .libelle { font-size: 13px; font-weight: 600; color: ${p}; }
+  .total-final .montant { font-size: 18px; font-weight: 600; color: ${s}; }
 
   .conditions { font-size: 11px; color: #6b6b6b; }
   .legal { display: flex; justify-content: space-between; gap: 24px; font-size: 11px; color: #6b6b6b; margin-top: 16px; }
   .filigrane { position: absolute; inset: 0; z-index: 0; opacity: 0.07; background-size: cover; background-position: center; }
 `;
 
-/** Ruban supérieur : deux tracés pleins, clair puis foncé par-dessus. */
-const vagueHaute = (titre) => `
+/** Ruban supérieur : deux tracés pleins, teinte claire puis primaire par-dessus. */
+const vagueHaute = (titre, p, clair) => `
   <div class="vague-haute">
     <svg viewBox="0 0 794 136" preserveAspectRatio="none" aria-hidden="true">
-      <path d="M0,0 H794 V72 C620,120 420,40 250,96 C160,126 70,120 0,104 Z" fill="#2a49a0"></path>
-      <path d="M0,0 H794 V44 C640,92 430,16 250,68 C160,94 70,88 0,72 Z" fill="#0a2472"></path>
+      <path d="M0,0 H794 V72 C620,120 420,40 250,96 C160,126 70,120 0,104 Z" fill="${clair}"></path>
+      <path d="M0,0 H794 V44 C640,92 430,16 250,68 C160,94 70,88 0,72 Z" fill="${p}"></path>
     </svg>
     <div class="vague-titre">${titre}</div>
   </div>`;
 
 /** Ruban inférieur : miroir du supérieur, masse à droite. */
-const vagueBasse = () => `
+const vagueBasse = (p, clair) => `
   <div class="vague-basse">
     <svg viewBox="0 0 794 96" preserveAspectRatio="none" aria-hidden="true">
-      <path d="M0,96 H794 V16 C650,-8 500,64 320,40 C200,24 90,56 0,40 Z" fill="#2a49a0"></path>
-      <path d="M0,96 H794 V48 C660,24 520,88 340,64 C210,46 100,78 0,64 Z" fill="#0a2472"></path>
+      <path d="M0,96 H794 V16 C650,-8 500,64 320,40 C200,24 90,56 0,40 Z" fill="${clair}"></path>
+      <path d="M0,96 H794 V48 C660,24 520,88 340,64 C210,46 100,78 0,64 Z" fill="${p}"></path>
     </svg>
   </div>`;
 
@@ -84,6 +86,8 @@ export function renderVague({ kind, data }) {
   const t = data.totaux;
   const pages = paginer(data.lignes, CAPACITES);
   const total = pages.length;
+  // Vague claire : la primaire de l'émetteur éclaircie (le second tracé du ruban).
+  const clair = eclaircir(e.couleurPrimaire, 0.24);
   let rang = 0;
 
   const corps = pages.map((lignes, i) => {
@@ -104,7 +108,7 @@ export function renderVague({ kind, data }) {
     return `
 <section class="page">
   ${data.filigrane ? `<div class="filigrane" style="background-image:url('${data.filigrane}')"></div>` : ''}
-  ${vagueHaute(premiere ? L.titre : `${L.titre} · ${esc(data.numero || '')}`)}
+  ${vagueHaute(premiere ? L.titre : `${L.titre} · ${esc(data.numero || '')}`, e.couleurPrimaire, clair)}
   <div class="corps">
     ${premiere ? `
     <div class="identite">
@@ -171,13 +175,13 @@ export function renderVague({ kind, data }) {
       <span>${e.rccm ? `RCCM ${esc(e.rccm)}` : ''}${e.rccm && e.ifu ? ' · ' : ''}${e.ifu ? `IFU ${esc(e.ifu)}` : ''}${total > 1 ? ` · Page ${i + 1} / ${total}` : ''}</span>
     </div>
   </div>
-  ${vagueBasse()}
+  ${vagueBasse(e.couleurPrimaire, clair)}
 </section>`;
   });
 
   return documentHtml({
     titre: `${L.titre} ${data.numero} — ${data.client.name}`,
-    css: CSS,
+    css: cssPour(e.couleurPrimaire, e.couleurSecondaire),
     pages: corps,
   });
 }

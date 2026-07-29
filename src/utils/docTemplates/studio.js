@@ -1,45 +1,47 @@
 // Modèle A — Studio. Modèle par défaut, seul disponible côté public.
-// Navy structurant, orange strictement réservé aux trois pastilles, montant
-// focal en navy. Marges 40 px, angles 8 px (blocs) / 6 px (pastilles, totaux).
+// Couleur primaire structurante (navy par défaut), secondaire strictement
+// réservée aux trois pastilles, montant focal en primaire. En Pro, ce sont les
+// couleurs de l'abonné (couleurPrimaire / couleurSecondaire) qui s'appliquent.
+// Marges 40 px, angles 8 px (blocs) / 6 px (pastilles, totaux).
 import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 11, suite: 16, derniere: 8 };
 
-const CSS = `
+const cssPour = (p, s) => `
   .page { padding: 40px; color: #3a3a3a; }
   .micro { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: #6b6b6b; }
   .val { font-size: 13px; }
-  .navy { color: #0a2472; font-weight: 600; }
+  .navy { color: ${p}; font-weight: 600; }
 
   .bandeau { display: flex; align-items: flex-end; gap: 32px; padding-bottom: 16px; border-bottom: 1px solid #e5e5e5; }
   .bandeau img { height: 32px; width: auto; display: block; }
   .bandeau-col { min-width: 160px; }
 
   .titre-rang { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-top: 16px; }
-  .pave { background: #0a2472; border-radius: 8px; padding: 16px 32px; }
+  .pave { background: ${p}; border-radius: 8px; padding: 16px 32px; }
   .pave-texte { font-size: 28px; font-weight: 600; color: #fff; letter-spacing: 4px; }
   .titre-meta { text-align: right; }
   .titre-meta > div + div { margin-top: 8px; }
 
   .triptyque { display: grid; grid-template-columns: 1fr 1fr 240px; gap: 32px; margin-top: 16px; }
   .triptyque .val + .val { margin-top: 4px; }
-  .pastille { display: inline-block; background: #f5a623; color: #0a2472; border-radius: 6px; padding: 4px 12px;
+  .pastille { display: inline-block; background: ${s}; color: ${p}; border-radius: 6px; padding: 4px 12px;
               font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; }
   .focal { text-align: right; }
-  .focal-montant { font-size: 28px; font-weight: 600; color: #0a2472; line-height: 1.2; margin-top: 8px; }
+  .focal-montant { font-size: 28px; font-weight: 600; color: ${p}; line-height: 1.2; margin-top: 8px; }
   .focal-unite { font-size: 11px; color: #6b6b6b; }
   .focal-date { margin-top: 8px; }
 
   table.lignes { margin-top: 16px; }
-  table.lignes th { background: #0a2472; color: #fff; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  table.lignes th { background: ${p}; color: #fff; font-size: 11px; font-weight: 600; text-transform: uppercase;
                     letter-spacing: 0.5px; text-align: left; padding: 10px 12px; }
   table.lignes th.num { text-align: right; }
   table.lignes th:first-child { border-radius: 8px 0 0 8px; }
   table.lignes th:last-child { border-radius: 0 8px 8px 0; }
   table.lignes td { padding: 8px 12px; border-bottom: 1px solid #e5e5e5; font-size: 13px; }
   table.lignes td:first-child { height: 32px; box-sizing: border-box; }
-  table.lignes td.montant { font-weight: 600; color: #0a2472; }
+  table.lignes td.montant { font-weight: 600; color: ${p}; }
 
   .bas { display: grid; grid-template-columns: 1fr 328px; gap: 32px; margin-top: 16px; }
   .banque-ligne { margin-top: 8px; }
@@ -48,12 +50,12 @@ const CSS = `
   .totaux-ligne { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
   .totaux-ligne + .totaux-ligne { margin-top: 8px; }
   .total-barre { display: flex; justify-content: space-between; align-items: center; gap: 16px;
-                 background: #0a2472; border-radius: 8px; padding: 12px 16px; margin-top: 8px; }
+                 background: ${p}; border-radius: 8px; padding: 12px 16px; margin-top: 8px; }
   .total-barre .libelle { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: #fff; }
   .total-barre .montant { font-size: 18px; font-weight: 600; color: #fff; }
 
   .merci { display: grid; grid-template-columns: 1fr 328px; gap: 32px; margin-top: 16px; }
-  .merci-titre { font-size: 18px; font-weight: 600; color: #0a2472; }
+  .merci-titre { font-size: 18px; font-weight: 600; color: ${p}; }
   .conditions { font-size: 11px; color: #6b6b6b; margin-top: 8px; }
 
   .pied { padding-top: 8px; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-between;
@@ -178,7 +180,7 @@ export function renderStudio({ kind, data }) {
 
   return documentHtml({
     titre: `${L.titre} ${data.numero} — ${data.client.name}`,
-    css: CSS,
+    css: cssPour(e.couleurPrimaire, e.couleurSecondaire),
     pages: corps,
   });
 }

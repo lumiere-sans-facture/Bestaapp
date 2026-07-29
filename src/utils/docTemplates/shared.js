@@ -44,6 +44,25 @@ export const conditionsPour = (kind, emetteur = {}) =>
   || (kind === 'facture' ? COMPANY.termsFacture : COMPANY.termsDevis);
 
 // ---------------------------------------------------------------------------
+// Couleurs de marque
+// ---------------------------------------------------------------------------
+
+/** Palette par défaut (identité BestaSolar, espace public). */
+export const COULEURS_DEFAUT = { primaire: '#0a2472', secondaire: '#f5a623' };
+
+/** N'accepte qu'un hexadécimal valide — les couleurs sont injectées dans le CSS. */
+const hexOu = (valeur, defaut) =>
+  (/^#[0-9a-fA-F]{6}$/.test(valeur || '') ? valeur.toLowerCase() : defaut);
+
+/** Teinte éclaircie d'une couleur (mélange vers le blanc), pour les aplats décoratifs. */
+export function eclaircir(hex, ratio = 0.22) {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c) => Math.round(c + (255 - c) * ratio);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(mix);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
+// ---------------------------------------------------------------------------
 // Normalisation des données d'entrée
 // ---------------------------------------------------------------------------
 
@@ -67,6 +86,9 @@ export function emetteurDe(source = {}) {
         logo: source.logo || '',
         bank: source.momo ? { name: 'Mobile Money', account: source.momo, swift: source.momoNom || '' } : null,
         conditions: source.conditions || '',
+        // Couleurs de l'abonné : les documents Pro portent sa marque, pas la nôtre.
+        couleurPrimaire: hexOu(source.couleurPrimaire, COULEURS_DEFAUT.primaire),
+        couleurSecondaire: hexOu(source.couleurSecondaire, COULEURS_DEFAUT.secondaire),
       }
     : {
         name: source.name || COMPANY.name,
@@ -81,6 +103,8 @@ export function emetteurDe(source = {}) {
         logo: source.logo || LOGO_BESTASOLAR,
         bank: source.bank ?? COMPANY.bank,
         conditions: source.conditions || '',
+        couleurPrimaire: COULEURS_DEFAUT.primaire,
+        couleurSecondaire: COULEURS_DEFAUT.secondaire,
       };
 }
 
