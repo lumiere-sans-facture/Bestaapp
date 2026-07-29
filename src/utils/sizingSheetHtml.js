@@ -1,19 +1,48 @@
-// Fiche de dimensionnement — document HTML imprimable (export PDF via Ctrl+P).
+// Fiche de dimensionnement — document HTML autonome, imprimable (Ctrl+P).
 // Récapitulatif technique complet : charges saisies, hypothèses de calcul
 // (lues depuis solarSizing.js), résultats avec formules, matériel retenu.
 // Document TECHNIQUE uniquement : aucun prix, aucun plan de financement.
+//
+// Mise en page : exactement DEUX pages A4 (794 × 1123 px), marges 40 px,
+// espacements multiples de 8. Système typographique unique (IBM Plex Sans,
+// graisses 400/500/600 ; échelle 28 / 18 / 13 / 11 px). Couleur 60/30/10 :
+// blanc dominant, navy #0a2472 pour la structure, orange #f5a623 réservé à un
+// SEUL élément du document — le chiffre focal de puissance à installer.
 import { SIZING_PARAMS, SYSTEM_VOLTAGE, PANEL_SPEC, SYSTEM_TYPES } from './solarSizing';
 import { COMPANY } from '../config/company';
 import { CUSTOM_APPLIANCE_LABEL } from '../data/appliances';
+import { LOGO_BESTASOLAR } from '../assets/logoBestaSolar';
 
 // Milliers avec espaces (« 5 400 ») — espaces insécables normalisées.
 const nf = (v, dec = 0) =>
   Number(v || 0).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
-    .replace(/[  ]/g, ' ');
+    .replace(/[\u202f\u00a0]/g, ' ');
 const pct = (v) => `${nf(v * 100)} %`;
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const SYSTEM_LABEL = Object.fromEntries(SYSTEM_TYPES.map((t) => [t.id, t.label]));
+
+/** Bloc statistique : micro-libellé, valeur navy, précision grise. */
+const stat = (label, valeur, precision = '') => `
+  <div class="stat">
+    <div class="stat-label">${label}</div>
+    <div class="stat-value">${valeur}</div>
+    ${precision ? `<div class="stat-note">${precision}</div>` : ''}
+  </div>`;
+
+/** Ligne de résultat : valeur mise en avant à gauche, formules à droite. */
+const resultat = (label, valeur, precision, formule, application) => `
+  <div class="result">
+    <div class="result-main">
+      <div class="result-label">${label}</div>
+      <div class="result-value">${valeur}</div>
+      ${precision ? `<div class="result-note">${precision}</div>` : ''}
+    </div>
+    <div class="result-calc">
+      <div>${formule}</div>
+      <div>${application}</div>
+    </div>
+  </div>`;
 
 /**
  * Construit le document HTML de la fiche (chaîne complète, autonome).
@@ -28,8 +57,8 @@ const SYSTEM_LABEL = Object.fromEntries(SYSTEM_TYPES.map((t) => [t.id, t.label])
  * @param {string|null} d.cityName      ville / localisation retenue
  * @param {string|null} d.solarSource   source des données solaires (PVGIS, NASA…)
  * @param {object} d.sizing             résultat de calculateSystemSize()
- * @param {{brand:string, model:string, capacity:number, maxPower:number}|null} d.inverter
- * @param {Array<{brand:string, model:string, capacity:number, qty:number}>} d.batteries
+ * @param {{capacity:number, maxPower?:number}|null} d.inverter
+ * @param {Array<{capacity:number, qty:number}>} d.batteries
  * @param {string} d.panelName          désignation du panneau (catalogue)
  */
 export function buildSizingSheetHtml(d) {
@@ -37,7 +66,11 @@ export function buildSizingSheetHtml(d) {
   const conso = d.consumption;
   const totalKwh = conso.day + conso.night;
   const totalWh = Math.round(totalKwh * 1000);
-  const date = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const maintenant = new Date();
+  const date = maintenant.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  // Référence de fiche : date + initiales du client, stable et lisible.
+  const initiales = String(d.client?.name || 'CLI').replace(/[^A-Za-zÀ-ÿ]/g, '').slice(0, 3).toUpperCase() || 'CLI';
+  const reference = `FD-${maintenant.getFullYear()}${String(maintenant.getMonth() + 1).padStart(2, '0')}${String(maintenant.getDate()).padStart(2, '0')}-${initiales}`;
 
   // --- Détail des calculs (mêmes formules que calculateSystemSize) ---
   const energieNecessaire = totalKwh / panelEfficiency; // kWh/j à produire
@@ -52,15 +85,39 @@ export function buildSizingSheetHtml(d) {
       ? `${pct(hybridBatteryRatio)} de la consommation nocturne (appoint réseau)`
       : 'Sans batterie (injection réseau)';
 
-  // --- Tableau des charges — heures jour / nuit séparées, comme dans le wizard ---
+  // --- Charges ---
   const h = (v) => (v ? nf(v, v % 1 ? 1 : 0) : '—');
-  const chargesRows = d.manualMode
-    ? `<tr><td>Consommation de jour (saisie directe)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(conso.day * 1000)}</td></tr>
-       <tr><td>Consommation de nuit (saisie directe)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(conso.night * 1000)}</td></tr>`
-    : d.appliances.map((a) => {
-        const wh = a.power * a.quantity * ((a.day || 0) + (a.night || 0));
-        return `<tr><td>${esc((a.name || '').trim() || CUSTOM_APPLIANCE_LABEL)}</td><td class="num">${nf(a.power)}</td><td class="num">${nf(a.quantity)}</td><td class="num">${h(a.day)}</td><td class="num">${h(a.night)}</td><td class="num">${nf(wh)}</td></tr>`;
-      }).join('');
+  const lignes = d.manualMode
+    ? [
+        ['Consommation de jour (saisie directe)', '—', '—', '—', '—', nf(conso.day * 1000)],
+        ['Consommation de nuit (saisie directe)', '—', '—', '—', '—', nf(conso.night * 1000)],
+      ]
+    : d.appliances.map((a) => [
+        esc((a.name || '').trim() || CUSTOM_APPLIANCE_LABEL),
+        nf(a.power), nf(a.quantity), h(a.day), h(a.night),
+        nf(a.power * a.quantity * ((a.day || 0) + (a.night || 0))),
+      ]);
+  // La page 1 a une hauteur fixe (A4) : le tableau des charges s'y adapte en
+  // deux temps. D'abord la densité — les lignes se resserrent quand elles sont
+  // nombreuses (40 px jusqu'à 4 lignes, 32 px à 5 lignes, 24 px au-delà).
+  // Ensuite le plafond : au-delà de LIGNES_MAX, les appareils excédentaires
+  // sont regroupés sur une dernière ligne « + N autres appareils », dont la
+  // consommation reste comptée dans les totaux. Le détail complet des charges
+  // reste consultable dans l'assistant de dimensionnement.
+  const LIGNES_MAX = 6;
+  const densite = lignes.length <= 4 ? '' : lignes.length === 5 ? ' dense' : ' tres-dense';
+  const visibles = lignes.length > LIGNES_MAX ? lignes.slice(0, LIGNES_MAX - 1) : lignes;
+  const reste = lignes.slice(visibles.length);
+  const ligneHtml = ([nom, p, q, j, n, wh]) =>
+    `<tr><td>${nom}</td><td class="num">${p}</td><td class="num">${q}</td><td class="num">${j}</td><td class="num">${n}</td><td class="num">${wh}</td></tr>`;
+  const resteWh = d.manualMode ? 0 : d.appliances
+    .slice(visibles.length)
+    .reduce((sum, a) => sum + a.power * a.quantity * ((a.day || 0) + (a.night || 0)), 0);
+  const chargesRows = visibles.map(ligneHtml).join('')
+    + (reste.length
+      ? `<tr><td class="muted">+ ${nf(reste.length)} autre${reste.length > 1 ? 's' : ''} appareil${reste.length > 1 ? 's' : ''} regroupé${reste.length > 1 ? 's' : ''}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(resteWh)}</td></tr>`
+      : '');
+  const picDeCharge = d.manualMode ? null : d.appliances.reduce((s, a) => s + a.power * a.quantity, 0);
 
   // --- Récapitulatif matériel : désignations TECHNIQUES uniquement (type,
   // tension, capacité, puissance) + quantité. Les marques et références du
@@ -94,202 +151,285 @@ export function buildSizingSheetHtml(d) {
     ['Marge de sécurité onduleur', `+${nf((inverterMargin - 1) * 100)} %`],
   ];
 
-  const batterieFormule = d.systemType === 'on-grid'
-    ? ''
-    : `<div class="calc">
-        <div class="calc-head">Capacité batterie nécessaire</div>
-        <div class="calc-formula">C = Conso. nocturne ÷ rendement batterie ÷ DoD${d.systemType === 'hybrid' ? ' × ratio hybride' : ''}</div>
-        <div class="calc-apply">C = ${nf(conso.night, 2)} kWh ÷ ${nf(batteryEfficiency, 2)} ÷ ${nf(depthOfDischarge, 2)}${d.systemType === 'hybrid' ? ` × ${nf(hybridBatteryRatio, 2)}` : ''} = <strong>${nf(batterieKwh, 2)} kWh</strong></div>
-        <div class="calc-result">soit ${nf(batterieWh)} Wh ≈ <strong>${nf(batterieAh)} Ah</strong> sous ${SYSTEM_VOLTAGE} V</div>
-      </div>`;
+  const clientNom = esc(d.client?.name || 'À compléter');
+  const ville = esc(d.cityName || d.client?.ville || '—');
+
+  // --- Résultats (page 2) : cinq blocs, dans l'ordre, mêmes formules ---
+  const blocsResultats = [
+    resultat(
+      'Énergie journalière à produire',
+      `${nf(energieNecessaire, 2)} kWh/jour`,
+      '',
+      'E = Consommation totale ÷ rendement des panneaux',
+      `E = ${nf(totalKwh, 2)} kWh ÷ ${nf(panelEfficiency, 2)}`,
+    ),
+    resultat(
+      'Puissance panneaux nécessaire',
+      `${nf(Math.round(puissanceRequise))} Wc`,
+      `→ ${nf(d.sizing.numberOfPanels)} panneau${d.sizing.numberOfPanels > 1 ? 'x' : ''} de ${nf(panelWc)} Wc = ${nf(kwcInstalle, 2)} kWc installés`,
+      'P = E ÷ HSP',
+      `P = ${nf(energieNecessaire, 2)} kWh ÷ ${nf(d.sunHours, 1)} h`,
+    ),
+    ...(d.systemType === 'on-grid' ? [] : [resultat(
+      'Capacité batterie nécessaire',
+      `${nf(batterieKwh, 2)} kWh`,
+      `soit ${nf(batterieWh)} Wh ≈ ${nf(batterieAh)} Ah sous ${SYSTEM_VOLTAGE} V`,
+      `C = Conso. nocturne ÷ rendement batterie ÷ DoD${d.systemType === 'hybrid' ? ' × ratio hybride' : ''}`,
+      `C = ${nf(conso.night, 2)} kWh ÷ ${nf(batteryEfficiency, 2)} ÷ ${nf(depthOfDischarge, 2)}${d.systemType === 'hybrid' ? ` × ${nf(hybridBatteryRatio, 2)}` : ''}`,
+    )]),
+    ...(d.inverter ? [resultat(
+      'Onduleur hybride recommandé',
+      `${nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0)} kVA`,
+      `MPPT intégré · tension système ${SYSTEM_VOLTAGE} V${d.inverter.maxPower ? ` · ${nf(d.inverter.maxPower)} W` : ''}`,
+      `Puissance onduleur ≥ puissance requise × ${nf(inverterMargin, 1)}`,
+      `≥ ${nf(Math.round(puissanceRequise))} W × ${nf(inverterMargin, 1)} = ${nf(Math.round(puissanceRequise * inverterMargin))} W`,
+    )] : []),
+    resultat(
+      'Production annuelle estimée',
+      `${nf(Math.round(d.sizing.estimatedProduction))} kWh/an`,
+      '',
+      'Production = puissance installée × HSP × 365',
+      `= ${nf(kwcInstalle, 2)} kWc × ${nf(d.sunHours, 1)} h × 365`,
+    ),
+  ].join('');
 
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fiche de dimensionnement — ${esc(d.client?.name || 'Client')}</title>
+<title>Fiche de dimensionnement — ${clientNom}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --bleu: #0a2472; --bleu-fonce: #061540; --orange: #f5a623; --gris: #6b7280; --ligne: #e5e7eb; }
+  :root { --navy: #0a2472; --orange: #f5a623; --texte: #3a3a3a; --gris: #6b6b6b; --filet: #e5e5e5; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a2e; font-size: 13px; line-height: 1.5; background: #f4f6fb; }
-  .sheet { max-width: 800px; margin: 0 auto; background: white; }
-  @media screen { .sheet { margin: 24px auto; box-shadow: 0 8px 30px rgba(10,36,114,.16); border-radius: 8px; overflow: hidden; } }
+  body {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 13px; line-height: 1.5; color: var(--texte);
+    background: #eceef2; padding: 32px 0;
+  }
 
-  header { background: var(--bleu); color: white; padding: 22px 28px; display: flex; align-items: center; gap: 16px; }
-  .logo { width: 46px; height: 46px; border-radius: 12px; background: var(--orange); color: var(--bleu-fonce); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 26px; }
-  .brand-name { font-size: 18px; font-weight: 800; letter-spacing: .3px; }
-  .brand-slogan { font-size: 11px; opacity: .85; font-style: italic; }
-  .doc-meta { margin-left: auto; text-align: right; }
-  .doc-title { font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
-  .doc-date { font-size: 11px; opacity: .8; }
-  .band { height: 5px; background: var(--orange); }
+  /* ---- Pages A4 ---- */
+  .page {
+    width: 794px; height: 1123px; padding: 40px; box-sizing: border-box;
+    display: flex; flex-direction: column;
+    background: #fff; margin: 0 auto 32px; overflow: hidden;
+    font-variant-numeric: tabular-nums;
+  }
+  .page:last-of-type { margin-bottom: 0; }
 
-  main { padding: 22px 28px 28px; }
-  section { margin-bottom: 20px; }
-  h2 { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--bleu); border-bottom: 2px solid var(--orange); padding-bottom: 4px; margin-bottom: 10px; }
-  .muted { color: var(--gris); font-weight: 400; font-size: 11px; }
+  /* ---- Typographie ---- */
+  .micro { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
+  .muted { color: var(--gris); font-weight: 400; }
+  h2 {
+    font-size: 18px; font-weight: 600; color: var(--navy);
+    padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--filet);
+  }
 
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  th { background: var(--bleu); color: white; text-align: left; padding: 7px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
-  td { padding: 7px 10px; border-bottom: 1px solid var(--ligne); vertical-align: top; }
-  tr:nth-child(even) td { background: #f8f9fc; }
-  .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* ---- En-tête page 1 ---- */
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+          padding-bottom: 16px; border-bottom: 2px solid var(--navy); margin-bottom: 32px; }
+  .head img { height: 32px; width: auto; display: block; }
+  .head-right { text-align: right; }
+  .head-title { font-size: 18px; font-weight: 600; color: var(--navy); text-transform: uppercase; letter-spacing: 1.6px; }
+  .head-sub { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); margin-top: 8px; }
+
+  /* ---- Bandeau de continuité page 2 ---- */
+  .runner { display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
+            padding-bottom: 8px; border-bottom: 2px solid var(--navy); margin-bottom: 32px;
+            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; }
+  .runner .marque { color: var(--navy); }
+  .runner .contexte { color: var(--gris); }
+
+  /* ---- Bloc focal (unique point orange du document) ---- */
+  .focal { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px;
+           padding-bottom: 16px; border-bottom: 1px solid var(--filet); margin-bottom: 32px; }
+  .focal-value { font-size: 28px; font-weight: 600; color: var(--orange); line-height: 1.2; margin: 8px 0; }
+  .focal-note { font-size: 11px; color: var(--gris); }
+  .focal-stats { display: grid; grid-template-columns: repeat(3, auto); gap: 32px; text-align: right; }
+
+  /* ---- Statistiques ---- */
+  .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
+  .stat-value { font-size: 18px; font-weight: 600; color: var(--navy); line-height: 1.4; margin-top: 4px; }
+  .stat-note { font-size: 11px; color: var(--gris); }
+  .synthese { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 8px; }
+  .synthese .stat-value { line-height: 1.3; }
+
+  /* ---- Client ---- */
+  .client { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+  .client-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
+  .client-value { font-size: 13px; margin-top: 4px; }
+  .client-value.fort { font-weight: 600; color: var(--navy); }
+
+  /* ---- Tableaux ---- */
+  table { width: 100%; border-collapse: collapse; }
+  th { background: var(--navy); color: #fff; font-size: 11px; font-weight: 600;
+       text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 10px 12px; }
   th.num { text-align: right; }
-  tfoot td { font-weight: 800; background: #fef3e0 !important; border-top: 2px solid var(--orange); border-bottom: none; }
+  td { padding: 0 12px; border-bottom: 1px solid var(--filet); font-size: 13px; }
+  td:first-child { height: 40px; box-sizing: border-box; }
+  .dense td:first-child { height: 32px; }
+  .tres-dense td:first-child { height: 24px; }
+  .tres-dense td { font-size: 12px; }
+  .num { text-align: right; white-space: nowrap; }
 
-  .kv { display: grid; grid-template-columns: 1fr; gap: 0; }
-  .kv-row { display: flex; justify-content: space-between; gap: 16px; padding: 6px 2px; border-bottom: 1px dashed var(--ligne); }
-  .kv-row:last-child { border-bottom: none; }
-  .kv-label { color: #374151; }
-  .kv-value { font-weight: 700; text-align: right; white-space: nowrap; }
-  .kv-value .muted { white-space: normal; }
+  /* ---- Paramètres (deux colonnes : libellé / valeur) ---- */
+  .params td { border-bottom: 1px solid var(--filet); }
+  .params td:first-child { height: 28px; }
+  .params .valeur { text-align: right; font-weight: 600; color: var(--navy); }
 
-  .calc { border: 1.5px solid var(--ligne); border-left: 4px solid var(--orange); border-radius: 6px; padding: 10px 14px; margin-bottom: 10px; page-break-inside: avoid; }
-  .calc-head { font-weight: 800; color: var(--bleu); margin-bottom: 3px; }
-  .calc-formula { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 11.5px; color: var(--gris); margin-bottom: 3px; }
-  .calc-apply { font-size: 12.5px; }
-  .calc-result { font-size: 12.5px; color: var(--bleu); margin-top: 2px; }
+  /* ---- Résultats (page 2) ---- */
+  .result { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px;
+            padding: 8px 0; border-bottom: 1px solid var(--filet); }
+  .result:last-child { border-bottom: none; }
+  .result-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
+  .result-value { font-size: 18px; font-weight: 600; color: var(--navy); line-height: 1.4; margin-top: 4px; }
+  .result-note { font-size: 11px; color: var(--gris); margin-top: 4px; }
+  .result-calc { font-size: 11px; color: var(--gris); text-align: right; white-space: nowrap; line-height: 1.6; }
 
-  .client-grid { display: flex; flex-wrap: wrap; gap: 6px 28px; }
-  .client-item strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--gris); font-weight: 700; }
+  /* ---- Pieds de page ---- */
+  .foot { margin-top: auto; padding-top: 8px; border-top: 2px solid var(--navy);
+          display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .foot-line { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gris); }
+  .foot-line.navy { color: var(--navy); }
+  .foot-legal { font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--gris); margin-top: 4px; }
+  .foot-right { text-align: right; }
 
-  footer { padding: 14px 28px; border-top: 1px solid var(--ligne); display: flex; justify-content: space-between; gap: 12px; font-size: 10.5px; color: var(--gris); }
-  .footer-band { height: 8px; background: var(--bleu); }
+  /* ---- Barre d'impression (hors pages) ---- */
+  .print-bar { width: 794px; margin: 32px auto 0; display: flex; justify-content: flex-end; }
+  .print-btn { font-family: inherit; font-size: 13px; font-weight: 600; color: #fff;
+               background: var(--navy); border: none; border-radius: 4px; padding: 12px 24px; cursor: pointer; }
 
-  .print-bar { max-width: 800px; margin: 16px auto 40px; display: flex; justify-content: center; }
-  .print-btn { background: var(--bleu); color: white; border: none; border-radius: 10px; padding: 12px 26px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .print-btn:hover { background: #1a3a8c; }
-
-  @page { size: A4; margin: 10mm; }
+  @page { size: A4; margin: 0; }
   @media print {
-    body { background: white; font-size: 12px; }
-    .sheet { max-width: none; box-shadow: none; border-radius: 0; }
+    body { background: #fff; padding: 0; }
+    .page { margin: 0; }
+    .page:first-of-type { page-break-after: always; }
     .print-bar { display: none; }
-    header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    section { page-break-inside: avoid; }
   }
 </style>
 </head>
 <body>
-<div class="sheet">
-  <header>
-    <div class="logo">☀</div>
+
+<!-- ================= PAGE 1 ================= -->
+<section class="page">
+  <div class="head">
+    <img src="${LOGO_BESTASOLAR}" alt="${esc(COMPANY.name)}">
+    <div class="head-right">
+      <div class="head-title">Fiche de dimensionnement</div>
+      <div class="head-sub">Étude technique · ${date} · Réf. ${reference}</div>
+    </div>
+  </div>
+
+  <div class="focal">
     <div>
-      <div class="brand-name">${esc(COMPANY.name)}</div>
-      <div class="brand-slogan">${esc(COMPANY.slogan)}</div>
+      <div class="micro">Puissance photovoltaïque à installer</div>
+      <div class="focal-value">${nf(kwcInstalle, 2)} kWc</div>
+      <div class="focal-note">${nf(d.sizing.numberOfPanels)} panneau${d.sizing.numberOfPanels > 1 ? 'x' : ''} de ${nf(panelWc)} Wc · ${nf(Math.round(d.sizing.estimatedProduction))} kWh/an estimés</div>
     </div>
-    <div class="doc-meta">
-      <div class="doc-title">Fiche de dimensionnement</div>
-      <div class="doc-date">${date}</div>
+    <div class="focal-stats">
+      ${stat('Stockage', batterieKwh > 0 ? `${nf(batterieKwh, 1)} kWh` : '—', batterieKwh > 0 ? `${nf(batterieAh)} Ah · ${SYSTEM_VOLTAGE} V` : 'Sans batterie')}
+      ${stat('Onduleur', d.inverter ? `${nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0)} kVA` : '—', d.inverter ? 'Hybride' : 'Non retenu')}
+      ${stat('Consommation', `${nf(totalKwh, 1)} kWh/j`, `${nf(totalWh)} Wh/jour`)}
     </div>
-  </header>
-  <div class="band"></div>
+  </div>
 
-  <main>
-    <!-- 1. Client -->
-    <section>
-      <h2>1 · Client</h2>
-      <div class="client-grid">
-        <div class="client-item"><strong>Nom</strong>${esc(d.client?.name || 'À compléter')}</div>
-        <div class="client-item"><strong>Contact</strong>${esc(d.client?.phone || '—')}</div>
-        <div class="client-item"><strong>Localisation</strong>${esc(d.cityName || d.client?.ville || '—')}</div>
-        <div class="client-item"><strong>Type de système</strong>${esc(SYSTEM_LABEL[d.systemType] || d.systemType)}</div>
-        ${d.apporteur?.name
-          ? `<div class="client-item"><strong>Apporteur d’affaires</strong>${esc(d.apporteur.name)}${d.apporteur.code ? ` <span class="muted">(${esc(d.apporteur.code)})</span>` : ''}</div>`
-          : ''}
-      </div>
-    </section>
+  <section style="margin-bottom:32px">
+    <h2>1 · Client</h2>
+    <div class="client">
+      <div><div class="client-label">Nom</div><div class="client-value fort">${clientNom}</div></div>
+      <div><div class="client-label">Contact</div><div class="client-value">${esc(d.client?.phone || '—')}</div></div>
+      <div><div class="client-label">Localisation</div><div class="client-value">${ville}</div></div>
+      <div><div class="client-label">Type de système</div><div class="client-value">${esc(SYSTEM_LABEL[d.systemType] || d.systemType)}</div></div>
+    </div>
+  </section>
 
-    <!-- 2. Charges -->
-    <section>
-      <h2>2 · Charges saisies</h2>
-      <table>
-        <thead>
-          <tr><th>Désignation</th><th class="num">Puissance (W)</th><th class="num">Qté</th><th class="num">☀ Jour (h)</th><th class="num">☾ Nuit (h)</th><th class="num">Conso. (Wh/j)</th></tr>
-        </thead>
-        <tbody>${chargesRows}</tbody>
-        <tfoot>
-          ${d.manualMode ? '' : `<tr><td colspan="5">Pic de charge <span class="muted">(toutes charges simultanées)</span></td><td class="num">${nf(d.appliances.reduce((s, a) => s + a.power * a.quantity, 0))} W</td></tr>`}
-          <tr><td colspan="5">Total consommation journalière</td><td class="num">${nf(totalWh)} Wh/j — ${nf(totalKwh, 2)} kWh/j</td></tr>
-        </tfoot>
-      </table>
-      <div class="muted" style="margin-top:4px">Dont jour : ${nf(conso.day, 2)} kWh — nuit : ${nf(conso.night, 2)} kWh.</div>
-    </section>
+  <section style="margin-bottom:32px">
+    <h2>2 · Charges saisies</h2>
+    <table class="charges${densite}">
+      <thead>
+        <tr><th>Désignation</th><th class="num">Puissance (W)</th><th class="num">Qté</th><th class="num">Jour (h)</th><th class="num">Nuit (h)</th><th class="num">Conso. (Wh/j)</th></tr>
+      </thead>
+      <tbody>${chargesRows}</tbody>
+    </table>
+    <div class="synthese">
+      ${stat('Pic de charge', picDeCharge != null ? `${nf(picDeCharge)} W` : '—', picDeCharge != null ? 'Toutes charges simultanées' : 'Saisie directe')}
+      ${stat('Consommation journalière', `${nf(totalKwh, 2)} kWh`, `${nf(totalWh)} Wh par jour`)}
+      ${stat('Répartition', `${nf(conso.day, 2)} / ${nf(conso.night, 2)} kWh`, 'Jour / nuit')}
+    </div>
+  </section>
 
-    <!-- 3. Paramètres -->
-    <section>
-      <h2>3 · Paramètres de calcul utilisés</h2>
-      <div class="kv">
-        ${paramRows.map(([k, v]) => `<div class="kv-row"><span class="kv-label">${k}</span><span class="kv-value">${v}</span></div>`).join('')}
-      </div>
-    </section>
+  <section>
+    <h2>3 · Paramètres de calcul utilisés</h2>
+    <table class="params">
+      <tbody>
+        ${paramRows.map(([k, v]) => `<tr><td>${k}</td><td class="valeur">${v}</td></tr>`).join('')}
+      </tbody>
+    </table>
+  </section>
 
-    <!-- 4. Résultats + formules -->
-    <section>
-      <h2>4 · Résultats du dimensionnement</h2>
+  <div class="foot">
+    <div class="foot-line">${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)}</div>
+    <div class="foot-line foot-right">Fiche de dimensionnement — ${clientNom} · Page 1 / 2</div>
+  </div>
+</section>
 
-      <div class="calc">
-        <div class="calc-head">Énergie journalière à produire</div>
-        <div class="calc-formula">E = Consommation totale ÷ rendement des panneaux</div>
-        <div class="calc-apply">E = ${nf(totalKwh, 2)} kWh ÷ ${nf(panelEfficiency, 2)} = <strong>${nf(energieNecessaire, 2)} kWh/jour</strong></div>
-      </div>
+<!-- ================= PAGE 2 ================= -->
+<section class="page">
+  <div class="runner">
+    <div class="marque">${esc(COMPANY.name)}</div>
+    <div class="contexte">${clientNom} · ${ville} · Page 2 / 2</div>
+  </div>
 
-      <div class="calc">
-        <div class="calc-head">Puissance panneaux nécessaire</div>
-        <div class="calc-formula">P = E ÷ HSP</div>
-        <div class="calc-apply">P = ${nf(energieNecessaire, 2)} kWh ÷ ${nf(d.sunHours, 1)} h = <strong>${nf(Math.round(puissanceRequise))} Wc</strong></div>
-        <div class="calc-result">→ ${nf(d.sizing.numberOfPanels)} panneau(x) de ${nf(panelWc)} Wc = <strong>${nf(kwcInstalle, 2)} kWc installés</strong></div>
-      </div>
+  <section style="margin-bottom:32px">
+    <h2>4 · Résultats du dimensionnement</h2>
+    ${blocsResultats}
+  </section>
 
-      ${batterieFormule}
+  <section>
+    <h2>5 · Récapitulatif matériel</h2>
+    <table>
+      <thead><tr><th>Désignation technique</th><th class="num">Quantité</th></tr></thead>
+      <tbody>
+        ${materiel.map((m) => `<tr><td>${esc(m.ref)}</td><td class="num">${nf(m.qty)}</td></tr>`).join('')}
+      </tbody>
+    </table>
+  </section>
 
-      ${d.inverter ? `<div class="calc">
-        <div class="calc-head">Onduleur hybride recommandé</div>
-        <div class="calc-formula">Puissance onduleur ≥ puissance requise × ${nf(inverterMargin, 1)}</div>
-        <div class="calc-apply">≥ ${nf(Math.round(puissanceRequise))} W × ${nf(inverterMargin, 1)} = ${nf(Math.round(puissanceRequise * inverterMargin))} W
-          → <strong>Onduleur hybride ${nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0)} kVA</strong> (${nf(d.inverter.maxPower)} W)</div>
-        <div class="calc-result">Régulateur MPPT intégré à l’onduleur hybride · tension système ${SYSTEM_VOLTAGE} V</div>
-      </div>` : ''}
-
-      <div class="calc">
-        <div class="calc-head">Production annuelle estimée</div>
-        <div class="calc-formula">Production = puissance installée × HSP × 365</div>
-        <div class="calc-apply">= <strong>${nf(Math.round(d.sizing.estimatedProduction))} kWh/an</strong></div>
-      </div>
-    </section>
-
-    <!-- 5. Matériel -->
-    <section>
-      <h2>5 · Récapitulatif matériel</h2>
-      <table>
-        <thead><tr><th>Désignation technique</th><th class="num">Quantité</th></tr></thead>
-        <tbody>
-          ${materiel.map((m) => `<tr><td>${esc(m.ref)}</td><td class="num">${nf(m.qty)}</td></tr>`).join('')}
-        </tbody>
-      </table>
-    </section>
-  </main>
-
-  <footer>
-    <span>${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)} · ${esc(COMPANY.phone)}</span>
-    <span>Document technique — ne constitue ni un devis ni une offre de prix.</span>
-  </footer>
-  <div class="footer-band"></div>
-</div>
+  <div class="foot">
+    <div>
+      <div class="foot-line navy">${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)} · ${esc(COMPANY.phone)}</div>
+      <div class="foot-legal">RCCM ${esc(COMPANY.rccm)} · IFU ${esc(COMPANY.ifu)}${d.apporteur?.name ? ` · Apporteur d’affaires : ${esc(d.apporteur.name)}${d.apporteur.code ? ` · ${esc(d.apporteur.code)}` : ''}` : ''}</div>
+    </div>
+    <div class="foot-line foot-right">Document technique — ne constitue ni un devis ni une offre de prix.</div>
+  </div>
+</section>
 
 <div class="print-bar">
-  <button class="print-btn" onclick="window.print()">🖨 Imprimer / Exporter en PDF</button>
+  <button class="print-btn" onclick="window.print()">Imprimer / Exporter en PDF</button>
 </div>
+
 </body>
 </html>`;
 }
 
-/** Ouvre la fiche dans un nouvel onglet, prête à imprimer (Ctrl+P). */
+/** Ouvre la fiche dans un nouvel onglet (repli : téléchargement du fichier). */
 export function openSizingSheet(data) {
-  const w = window.open('about:blank', '_blank');
-  if (!w) return; // bloqueur de popups
-  w.document.write(buildSizingSheetHtml(data));
-  w.document.close();
+  const html = buildSizingSheetHtml(data);
+  const fenetre = window.open('', '_blank');
+  if (fenetre) {
+    fenetre.document.write(html);
+    fenetre.document.close();
+    return;
+  }
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'fiche-dimensionnement.html';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
