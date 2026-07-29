@@ -7,6 +7,9 @@ export const COMPANY = {
   website: 'www.bestasolar.com',
   address: 'Cotonou Saint Rita, République du Bénin',
   addressShort: 'Cotonou Saint Rita, Bénin',
+  // Mentions légales portées en pied des documents techniques
+  rccm: 'RB/PKO/23 A 19308',
+  ifu: '0202274882317',
   bank: {
     name: 'Bank of Africa Bénin',
     account: 'BJ66 BJ01 1000 0000 0123 4567 890',

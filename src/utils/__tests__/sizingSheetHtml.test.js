@@ -34,15 +34,18 @@ describe('buildSizingSheetHtml', () => {
   });
 
   it('détaille chaque charge avec heures jour/nuit séparées et conso journalière', () => {
-    expect(html).toContain('☀ Jour (h)');
-    expect(html).toContain('☾ Nuit (h)');
+    expect(html).toContain('Jour (h)');
+    expect(html).toContain('Nuit (h)');
+    // Refonte : plus aucun emoji dans le document
+    expect(html).not.toContain('☀');
+    expect(html).not.toContain('☾');
     // Téléviseur : 3 h jour et 2 h nuit dans des colonnes distinctes
     expect(html).toContain('<td class="num">3</td><td class="num">2</td><td class="num">600</td>'); // 60 W × 2 × 5 h
     expect(html).toContain('Téléviseur LED 32&quot;');
     expect(html).toContain('Réfrigérateur 200 L');
     expect(html).toContain('<td class="num">12</td><td class="num">12</td><td class="num">3 600</td>'); // 150 × 1 × 24
-    expect(html).toContain('5 400 Wh/j'); // total, séparateur espace
-    expect(html).toContain('5,40 kWh/j');
+    expect(html).toContain('5 400 Wh par jour'); // total, séparateur espace
+    expect(html).toContain('5,40 kWh');
   });
 
   it("mentionne l'apporteur d'affaires quand il est fourni", () => {
@@ -111,7 +114,41 @@ describe('buildSizingSheetHtml', () => {
   it('porte la charte BestaSolar', () => {
     expect(html).toContain('#0a2472');
     expect(html).toContain('#f5a623');
-    expect(html.toLowerCase()).toContain('énergie lumineuse sans facture');
+    // Le logo officiel est inliné (data-URI) : aucune URL relative ne se
+    // résoudrait dans le document ouvert via document.write.
+    expect(html).toContain('data:image/svg+xml;base64,');
+    expect(html).toContain('BESTA SOLAR');
+  });
+
+  it('tient sur exactement deux pages A4, orange réservé au chiffre focal', () => {
+    const pages = html.match(/<section class="page">/g) || [];
+    expect(pages).toHaveLength(2);
+    expect(html).toContain('width: 794px; height: 1123px');
+    expect(html).toContain('Page 1 / 2');
+    expect(html).toContain('Page 2 / 2');
+    // Un seul élément coloré en orange dans tout le document.
+    const regles = (html.match(/color: var\(--orange\)/g) || []);
+    expect(regles).toHaveLength(1);
+    expect(html).toContain('.focal-value');
+  });
+
+  it('porte les mentions légales et l’apporteur au pied de la page 2', () => {
+    const avec = buildSizingSheetHtml({ ...data, apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' } });
+    expect(avec).toContain('RCCM RB/PKO/23 A 19308');
+    expect(avec).toContain('IFU 0202274882317');
+    expect(avec).toContain('ne constitue ni un devis ni une offre de prix');
+  });
+
+  it('regroupe les charges excédentaires pour tenir sur la page', () => {
+    const beaucoup = Array.from({ length: 10 }, (_, i) => ({
+      name: `Appareil ${i + 1}`, power: 100 + i * 10, quantity: 1, day: 2, night: 1,
+    }));
+    const dense = buildSizingSheetHtml({ ...data, appliances: beaucoup });
+    expect(dense).toContain('tres-dense');
+    expect(dense).toContain('+ 5 autres appareils regroupés');
+    // Les appareils regroupés restent comptés dans la consommation affichée.
+    const regroupes = beaucoup.slice(5).reduce((s2, a) => s2 + a.power * a.quantity * 3, 0);
+    expect(dense).toContain(String(regroupes).replace(/\B(?=(\d{3})+(?!\d))/g, ' '));
   });
 
   it('gère la saisie directe (mode manuel)', () => {
