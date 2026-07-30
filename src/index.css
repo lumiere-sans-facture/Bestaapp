@@ -654,7 +654,8 @@ textarea.input { resize: vertical; }
 .client-list-row {
   display: flex; align-items: center; gap: 12px;
   text-align: left; cursor: pointer; width: 100%;
-  border: 1px solid var(--border); background: var(--surface);
+  border: 1px solid var(--border); background: var(--bg-card);
+  border-radius: var(--radius);
   padding: 12px 14px;
 }
 .client-list-row:hover { border-color: var(--primary); }
