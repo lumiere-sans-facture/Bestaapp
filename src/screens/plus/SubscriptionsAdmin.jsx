@@ -24,7 +24,7 @@ export default function SubscriptionsAdmin({ onBack }) {
 
   return (
     <>
-      <button className="btn btn-outline btn-sm back-button" onClick={onBack}>
+      <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={onBack}>
         <ChevronLeft size={16} /> Retour
       </button>
       <div className="section-title">Abonnements Devis Pro</div>

@@ -177,7 +177,7 @@ export default function Plus() {
   };
 
   const BackButton = () => (
-    <button className="btn btn-outline btn-sm back-button" onClick={() => setActiveTab('menu')}>
+    <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={() => setActiveTab('menu')}>
       <ChevronLeft size={16} /> Retour
     </button>
   );

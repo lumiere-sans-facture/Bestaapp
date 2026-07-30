@@ -161,7 +161,7 @@ export default function FormationSection({ onBack }) {
     return (
       <>
         <div className="partners-toolbar">
-          <button className="btn btn-outline btn-sm back-button" onClick={onBack}>
+          <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={onBack}>
             <ChevronLeft size={16} /> Retour
           </button>
           {isManager && (
