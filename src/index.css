@@ -425,9 +425,10 @@ textarea.input { resize: vertical; }
 .alert-feed-row .sheet-value.amount { margin-left: auto; white-space: nowrap; flex-shrink: 0; }
 
 @media (min-width: 640px) {
-  .stat-strip { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); max-width: calc(4 * 280px + 3 * 12px); }
+  .stat-strip { grid-template-columns: repeat(3, 1fr); }
 }
 @media (min-width: 1024px) {
+  .stat-strip { grid-template-columns: repeat(6, 1fr); }
   .dash-row { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
   .dash-row.wide-left { grid-template-columns: 1.5fr 1fr; }
   .stage-ring-grid { grid-template-columns: repeat(6, 1fr); }
@@ -637,7 +638,7 @@ textarea.input { resize: vertical; }
 .sheet-close { color: var(--text-muted); padding: 6px; border-radius: 8px; display: flex; flex-shrink: 0; }
 .sheet-close:hover { background: var(--bg); color: var(--text-primary); }
 .sheet-body { padding: 18px 20px; overflow-y: auto; }
-.sheet-footer { padding: 14px 20px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg-card); }
+.sheet-footer { padding: 14px 20px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .sheet-section { margin-bottom: 20px; }
 .sheet-section:last-child { margin-bottom: 0; }
 .sheet-section-title {
@@ -1733,50 +1734,4 @@ textarea.input { resize: vertical; }
   .back-to-plus { display: none; }
   /* Le bouton d'action reste à droite quand le retour est masqué. */
   .partners-toolbar, .commissions-toolbar { justify-content: flex-end; }
-}
-
-/* ============ Complément desktop (audit des 19 blocs) ============ */
-
-/* Blocs 06/12 · panneau d'actions : détail à gauche, actions à droite
-   sur grand écran — plus de pile de 7 boutons au milieu d'un écran vide. */
-@media (min-width: 1024px) {
-  .sheet-two-col { display: grid; grid-template-columns: 1fr 280px; gap: 24px; align-items: start; }
-  .sheet-two-col .doc-actions-list { align-content: start; position: sticky; top: 0; }
-}
-
-/* Bloc 08 · barre d'enregistrement collante du formulaire entreprise. */
-.form-actions-sticky {
-  position: sticky; bottom: calc(var(--tab-bar-height) + 12px); z-index: 5;
-  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 10px 14px; box-shadow: var(--shadow-lg); margin-top: 16px;
-  max-width: var(--form-max);
-}
-@media (min-width: 1024px) { .form-actions-sticky { bottom: 16px; } }
-.form-dirty-flag { font-size: 0.8125rem; font-weight: 600; color: var(--accent-dark); margin-right: auto; }
-
-/* Bloc 05 · vue liste du catalogue (desktop seulement) : le gérant gère
-   des prix, pas des vignettes. */
-.view-toggle { display: none; }
-@media (min-width: 1280px) {
-  .view-toggle { display: flex; max-width: 200px; }
-  .products-grid.as-list { display: block; max-width: var(--content-max); }
-  .products-grid.as-list .product-card {
-    flex-direction: row; align-items: center; gap: 14px;
-    padding: 10px 14px; border-radius: 8px;
-    box-shadow: none; border-bottom: 1px solid var(--border);
-  }
-  .products-grid.as-list .product-image-wrap { order: -1; width: 56px; flex-shrink: 0; display: flex; align-items: center; }
-  .products-grid.as-list .product-image { height: 56px; }
-  .products-grid.as-list .product-top { flex: 1; margin-bottom: 0; text-align: left; }
-  .products-grid.as-list .product-description { display: none; }
-  .products-grid.as-list .product-footer { margin-top: 0; padding-top: 0; width: 300px; justify-content: flex-end; gap: 16px; }
-  .products-grid.as-list .product-edit-btn { position: static; box-shadow: none; margin-left: 6px; }
-  .products-grid.as-list .oos-badge { position: static; margin-left: 6px; }
-}
-
-/* Bloc 07 · barre latérale : tout doit tenir sur un écran de 768 px de haut. */
-@media (max-height: 800px) {
-  .sidebar-link { padding-block: 8px; }
-  .sidebar-group-label { padding-top: 10px; }
 }
