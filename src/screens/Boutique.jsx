@@ -163,6 +163,7 @@ export default function Boutique() {
               <Search size={18} className="search-icon" />
               <input
                 className="input search-input"
+                aria-label="Rechercher un produit"
                 placeholder="Rechercher un produit…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -182,7 +183,7 @@ export default function Boutique() {
           {productCategories.map((cat) => (
             <button
               key={cat.id}
-              className={`category-chip ${selectedCategory === cat.id ? 'active' : ''}`}
+              className={`category-chip ${selectedCategory === cat.id ? 'active' : ''}`} aria-pressed={selectedCategory === cat.id}
               onClick={() => setSelectedCategory(cat.id)}
             >
               {cat.label}

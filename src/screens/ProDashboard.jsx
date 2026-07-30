@@ -63,7 +63,9 @@ export default function ProDashboard() {
 
   // ---- Taux & score ----
   // Taux d'encaissement en montant : F CFA encaissés / F CFA facturés (hors brouillons).
-  const tauxEncaissement = factureTotal ? Math.round((encaisseTotal / factureTotal) * 100) : 0;
+  // Plafonné à 100 : des paiements sur brouillons ou des données anciennes
+  // surpayées feraient sinon afficher « 150 % » dans un anneau plein.
+  const tauxEncaissement = factureTotal ? Math.min(100, Math.round((encaisseTotal / factureTotal) * 100)) : 0;
   const tauxConversion = myFactures.length ? Math.round((convertis / myFactures.length) * 100) : 0;
   const partTVA = myFactures.length
     ? Math.round((myFactures.filter((f) => f.tvaActive).length / myFactures.length) * 100)

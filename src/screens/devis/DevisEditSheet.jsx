@@ -5,6 +5,7 @@ import { formatCFA } from '../../utils/format';
 import { computeFactureTotals } from '../../utils/facture';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
+import { TVA_PCT } from '../../config/company';
 
 /**
  * Édition d'un devis (finalisé ou brouillon), commun au mode public et Pro.
@@ -81,14 +82,14 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
         </>
       )}
 
-      <div className="input-label">Lignes du devis</div>
+      <div className="sheet-section-title">Lignes du devis</div>
       {lignes.map((l, i) => (
         <div key={i} className="facture-ligne">
           <input className="input" placeholder="Désignation" aria-label="Désignation" value={l.designation}
             onChange={(e) => setLigne(i, { designation: e.target.value })} />
           <input className="input facture-qty" type="number" min="1" placeholder="Qté" aria-label="Quantité" value={l.qty}
             onChange={(e) => setLigne(i, { qty: e.target.value })} />
-          <input className="input facture-pu" type="number" min="0" placeholder="P.U." aria-label="Prix unitaire" value={l.pu}
+          <input className="input facture-pu" type="number" min="0" placeholder="P.U. (F CFA)" aria-label="Prix unitaire en F CFA" value={l.pu}
             onChange={(e) => setLigne(i, { pu: e.target.value })} />
           {lignes.length > 1 && (
             <button type="button" className="cart-row-remove" onClick={() => removeLigne(i)} aria-label="Supprimer la ligne"><Trash2 size={14} /></button>
@@ -102,7 +103,7 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
       {withTva && (
         <label className="pro-tva-toggle">
           <input type="checkbox" checked={tvaActive} onChange={(e) => setTvaActive(e.target.checked)} />
-          Appliquer la TVA 18 %
+          Appliquer la TVA {TVA_PCT} % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
         </label>
       )}
 
@@ -114,7 +115,7 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
             <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(preview.totalTTC)}</span></div>
           </>
         ) : (
-          <div className="devis-summary-row total"><span>Total</span><span>{formatCFA(preview.totalTTC)}</span></div>
+          <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(preview.totalTTC)}</span></div>
         )}
       </div>
       <button className="btn btn-primary btn-block" onClick={save} disabled={!clean().length}>

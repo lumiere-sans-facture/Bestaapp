@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
+import StageBadge from '../../components/StageBadge';
 
 const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };
 
@@ -112,7 +113,7 @@ export default function MyPartnerDashboard({ onBack }) {
           <div key={l.id} className="sheet-row">
             <span className="sheet-label">{l.name}</span>
             <span className="sheet-value">
-              <span className="badge" style={{ background: `${stageInfo(l)?.color}22`, color: stageInfo(l)?.color }}>{stageInfo(l)?.label}</span>
+              <StageBadge stage={stageInfo(l)} />
               {' '}{formatCFA(l.estimatedValue)}
             </span>
           </div>
@@ -124,7 +125,7 @@ export default function MyPartnerDashboard({ onBack }) {
               <div key={l.id} className="sheet-row">
                 <span className="sheet-label">{l.name} <span className="text-secondary">via {getPartnerById(l.parrainL1)?.name}</span></span>
                 <span className="sheet-value">
-                  <span className="badge" style={{ background: `${stageInfo(l)?.color}22`, color: stageInfo(l)?.color }}>{stageInfo(l)?.label}</span>
+                  <StageBadge stage={stageInfo(l)} />
                   {' '}{formatCFA(l.estimatedValue)}
                 </span>
               </div>

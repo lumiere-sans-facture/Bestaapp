@@ -1,4 +1,5 @@
 import { DAY_MS } from './date';
+import { formatNombre as nf } from './format';
 
 // Suivi des encaissements & relances — logique métier pure, sans React.
 // Le statut stocké d'une facture reste { brouillon | emise | payee } ; les états
@@ -82,7 +83,6 @@ export const STATUT_EFFECTIF_BADGE = {
   payee: 'success', partiel: 'info', emise: 'warning', retard: 'danger', brouillon: 'muted',
 };
 
-const nf = (v) => Math.round(Number(v) || 0).toLocaleString('fr-FR');
 
 /** Message de relance pré-rempli (WhatsApp / SMS), en français. */
 export const relanceMessage = (f, company) => {

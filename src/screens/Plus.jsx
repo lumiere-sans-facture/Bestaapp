@@ -216,7 +216,7 @@ export default function Plus() {
       <div className="com-toolbar">
         <div className="categories-scroll">
           {[['all', 'Toutes'], ['en_attente', 'En attente'], ['payée', 'Payées']].map(([id, label]) => (
-            <button key={id} className={`category-chip ${comFilter === id ? 'active' : ''}`} onClick={() => setComFilter(id)}>{label}</button>
+            <button key={id} className={`category-chip ${comFilter === id ? 'active' : ''}`} aria-pressed={comFilter === id} onClick={() => setComFilter(id)}>{label}</button>
           ))}
         </div>
         <div className="com-partner-tools">
@@ -366,9 +366,18 @@ export default function Plus() {
     </div>
   );
 
+  // Le titre de page suit la sous-section : arriver sur /plus/commissions
+  // depuis la barre latérale doit afficher « Commissions », pas « Plus ».
+  const TAB_TITLES = {
+    menu: 'Plus', partners: 'Partenaires', commissions: 'Commissions',
+    orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
+    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire',
+    profile: 'Mon profil', backup: 'Sauvegarde',
+  };
+
   return (
     <div className="page">
-      <PageHeader title="Plus" />
+      <PageHeader title={TAB_TITLES[activeTab] || 'Plus'} />
       {/* La formation s'étale en large (catalogue + école) ; le reste garde la colonne étroite. */}
       <div className={`page-content ${activeTab === 'formation' ? 'page-content-wide' : 'page-content-narrow'}`}>
         {activeTab === 'menu' && renderMenu()}

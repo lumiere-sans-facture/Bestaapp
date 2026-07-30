@@ -16,7 +16,11 @@ export default function SubscriptionTab({ sub }) {
   return (
     <div className="card my-partner-section">
       <div className="card-title"><CreditCard size={15} /> Mon abonnement Devis Pro</div>
-      <div className="sheet-row"><span className="sheet-label">Statut</span><span className="sheet-value"><span className="badge badge-success">Actif</span></span></div>
+      <div className="sheet-row"><span className="sheet-label">Statut</span><span className="sheet-value">{
+        status === 'actif' ? <span className="badge badge-success">Actif</span>
+        : status === 'en_attente_paiement' ? <span className="badge badge-warning">En attente de validation</span>
+        : <span className="badge badge-danger">Expiré</span>
+      }</span></div>
       <div className="sheet-row"><span className="sheet-label">Expire le</span><span className="sheet-value">{formatDate(sub.dateFin)} ({daysLeft(sub)} jour(s) restants)</span></div>
       <div className="sheet-row"><span className="sheet-label">Montant</span><span className="sheet-value">{formatCFA(sub.montant)} / mois</span></div>
       {subSent || status === 'en_attente_paiement' ? (

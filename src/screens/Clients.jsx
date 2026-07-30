@@ -8,6 +8,7 @@ import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
+import StageBadge from '../components/StageBadge';
 
 // Pas de « valeur estimée » à saisir : la valeur de l'affaire se déduit
 // automatiquement des devis créés pour le client.
@@ -130,12 +131,18 @@ export default function Clients() {
           <Search size={18} className="search-icon" />
           <input
             className="input search-input"
+            aria-label="Rechercher un client"
             placeholder="Rechercher un client, un contact, un téléphone…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
 
+        {query.trim() !== '' && (
+          <div className="filter-status" role="status">
+            {clients.length} résultat{clients.length > 1 ? 's' : ''} pour « {query.trim()} »
+          </div>
+        )}
         <div className="clients-list">
           {clients.map((client) => {
             const st = stageInfo(client);
@@ -151,7 +158,7 @@ export default function Clients() {
                   </div>
                 </div>
                 <div className="client-list-side">
-                  {st && <span className="badge" style={{ background: `${st.color}22`, color: st.color }}>{st.label}</span>}
+                  {st && <StageBadge stage={st} />}
                   <ChevronRight size={18} className="client-list-arrow" />
                 </div>
               </button>
@@ -186,7 +193,7 @@ export default function Clients() {
             <div className="sheet-row">
               <span className="sheet-label"><FolderKanban size={14} /> Étape</span>
               <span className="sheet-value">
-                {(() => { const st = stageInfo(selectedClient); return st ? <span className="badge" style={{ background: `${st.color}22`, color: st.color }}>{st.label}</span> : '—'; })()}
+                {(() => { const st = stageInfo(selectedClient); return st ? <StageBadge stage={st} /> : '—'; })()}
               </span>
             </div>
             {selectedClient.estimatedValue > 0 && (

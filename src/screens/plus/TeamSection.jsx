@@ -28,6 +28,7 @@ export default function TeamSection({ onBack }) {
         <Search size={18} className="search-icon" />
         <input
           className="input search-input"
+          aria-label="Rechercher un membre de l'équipe"
           placeholder="Nom, téléphone, code, zone…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -35,10 +36,15 @@ export default function TeamSection({ onBack }) {
       </div>
       <div className="categories-scroll">
         {[['all', 'Tous'], ['gerant', 'Gérants'], ['technicien', 'Techniciens']].map(([id, label]) => (
-          <button key={id} className={`category-chip ${roleFilter === id ? 'active' : ''}`} onClick={() => setRoleFilter(id)}>{label}</button>
+          <button key={id} className={`category-chip ${roleFilter === id ? 'active' : ''}`} aria-pressed={roleFilter === id} onClick={() => setRoleFilter(id)}>{label}</button>
         ))}
       </div>
 
+      {(search.trim() !== '' || roleFilter !== 'all') && (
+        <div className="filter-status" role="status">
+          {members.length} membre{members.length > 1 ? 's' : ''} affiché{members.length > 1 ? 's' : ''} sur {team.length}
+        </div>
+      )}
       <div className="partners-list">
         {members.map((u) => {
           const partner = partners.find((p) => p.userId === u.id);

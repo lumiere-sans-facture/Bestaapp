@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { TVA_PCT } from '../config/company';
 
 // Module Devis Pro : documents (devis / factures) à l'identité de l'entreprise
 // du technicien, en 2 modèles : « couleur » (bandeau aux couleurs de
@@ -180,7 +181,7 @@ export function generateProPdf({ kind, company = {}, modele = 'couleur', doc: d,
   // ---------- Totaux ----------
   const totalsX = W - M - 210;
   const rows = [['Total HT', fmt(d.totalHT)]];
-  if (d.tvaActive) rows.push([`TVA (${d.tvaRate || 18} %)`, fmt(d.tva)]);
+  if (d.tvaActive) rows.push([`TVA (${d.tvaRate || TVA_PCT} %)`, fmt(d.tva)]);
   else rows.push(['TVA', 'Exonérée']);
   pdf.setFontSize(9);
   rows.forEach(([label, value]) => {

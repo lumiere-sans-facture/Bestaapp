@@ -4,13 +4,13 @@ import { FileText, Plus, Download, Search, Check, Trash2, Pencil } from 'lucide-
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
-import { formatCFA, formatDate } from '../utils/format';
+import {formatCFA, formatDate, formatNombre as nf } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import DevisCreator from './devis/DevisCreator';
 import DevisEditSheet from './devis/DevisEditSheet';
 
-const nf = (v) => Math.round(v || 0).toLocaleString('fr-FR');
+
 
 const SORT_OPTIONS = [
   { id: 'recent', label: 'Plus récents' },
@@ -99,6 +99,7 @@ export default function Devis() {
                 <Search size={18} className="search-icon" />
                 <input
                   className="input search-input"
+                  aria-label="Rechercher un devis"
                   placeholder="Client, numéro, partenaire…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -124,18 +125,23 @@ export default function Devis() {
             <div className="list-toolbar">
               <div className="categories-scroll">
                 {[['all', 'Tous'], ['brouillon', 'Brouillons'], ['solar', 'Solaires'], ['manual', 'Manuels']].map(([id, label]) => (
-                  <button key={id} className={`category-chip ${typeFilter === id ? 'active' : ''}`} onClick={() => setTypeFilter(id)}>{label}</button>
+                  <button key={id} className={`category-chip ${typeFilter === id ? 'active' : ''}`} aria-pressed={typeFilter === id} onClick={() => setTypeFilter(id)}>{label}</button>
                 ))}
               </div>
               <select className="input sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Trier les devis">
                 {SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
             </div>
+            {(search.trim() !== '' || typeFilter !== 'all') && (
+              <div className="filter-status" role="status">
+                {visibleDevis.length} devis affiché{visibleDevis.length > 1 ? 's' : ''} sur {myDevis.length}
+              </div>
+            )}
             {visibleDevis.length === 0 && <div className="empty-state card">Aucun devis ne correspond à votre recherche.</div>}
             <div className="flat-list">
               {visibleDevis.map((d) => {
                 const lead = getLeadById(d.leadId);
-                const [bcls, blabel] = d.statut === 'brouillon' ? ['muted', 'Brouillon'] : ['', 'Créé'];
+                const [bcls, blabel] = d.statut === 'brouillon' ? ['muted', 'Brouillon'] : ['', 'Finalisé'];
                 return (
                   <div key={d.id} className="flat-row" role="button" tabIndex={0}
                     onClick={() => setActions(d)} onKeyDown={(e) => rowKey(e, () => setActions(d))}>

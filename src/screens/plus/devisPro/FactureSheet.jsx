@@ -7,6 +7,7 @@ import { computeFactureTotals } from '../../../utils/facture';
 import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
 import { MODELES, EMPTY_LIGNE } from './constants';
+import { TVA_PCT } from '../../../config/company';
 
 const emptyForm = (tvaActive, modele) => ({
   clientName: '', clientPhone: '', clientVille: '', echeance: '',
@@ -131,14 +132,14 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
         </Field>
         <div className="field-hint">Laisser vide pour appliquer le délai par défaut (30 jours).</div>
 
-        <div className="input-label">Lignes de la facture *</div>
+        <div className="sheet-section-title">Lignes de la facture *</div>
         {form.lignes.map((l, i) => (
           <div key={i} className="facture-ligne">
             <input className="input" placeholder="Désignation" aria-label="Désignation" value={l.designation}
               onChange={(e) => setLigne(i, { designation: e.target.value })} />
             <input className="input facture-qty" type="number" min="1" placeholder="Qté" aria-label="Quantité" value={l.qty}
               onChange={(e) => setLigne(i, { qty: e.target.value })} />
-            <input className="input facture-pu" type="number" min="0" placeholder="P.U." aria-label="Prix unitaire" value={l.pu}
+            <input className="input facture-pu" type="number" min="0" placeholder="P.U. (F CFA)" aria-label="Prix unitaire en F CFA" value={l.pu}
               onChange={(e) => setLigne(i, { pu: e.target.value })} />
             {form.lignes.length > 1 && (
               <button type="button" className="cart-row-remove"
@@ -156,7 +157,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
         <label className="pro-tva-toggle">
           <input type="checkbox" checked={form.tvaActive}
             onChange={(e) => setForm({ ...form, tvaActive: e.target.checked })} />
-          Appliquer la TVA 18 % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
+          Appliquer la TVA {TVA_PCT} % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
         </label>
 
         <Field label="Modèle de document">

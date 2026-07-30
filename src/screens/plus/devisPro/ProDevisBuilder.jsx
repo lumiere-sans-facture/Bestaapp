@@ -5,6 +5,7 @@ import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
+import { TVA_PCT } from '../../../config/company';
 
 const EMPTY_CLIENT = { name: '', phone: '', ville: '', type: 'particulier' };
 
@@ -179,7 +180,7 @@ export default function ProDevisBuilder({ onDone }) {
 
       <label className="pro-tva-toggle">
         <input type="checkbox" checked={tvaActive} onChange={(e) => setTvaActive(e.target.checked)} />
-        Appliquer la TVA 18 % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
+        Appliquer la TVA {TVA_PCT} % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
       </label>
 
       <div className="devis-summary">

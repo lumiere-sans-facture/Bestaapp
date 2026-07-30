@@ -80,7 +80,7 @@ export default function AppLayout() {
             <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Parakou, Bénin'}</div>
           </div>
         </div>
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Navigation principale">
           {sidebarItems.map((item) => (
             <NavLink
               key={item.path}
@@ -143,12 +143,14 @@ export default function AppLayout() {
       </main>
 
       {/* Barre d'onglets — visible uniquement sur mobile */}
-      <nav className="tab-bar">
+      <nav className="tab-bar" aria-label="Navigation par onglets">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
-            end={item.path === '/pro' || item.path === '/plus'}
+            // `end` seulement sur la racine Pro : « Plus » doit rester allumé
+            // sur toutes ses sous-pages /plus/:section (sinon aucun onglet actif).
+            end={item.path === '/pro'}
             className={({ isActive }) => `tab-item ${isActive ? 'active' : ''}`}
           >
             <item.icon size={22} strokeWidth={2} />
@@ -156,7 +158,7 @@ export default function AppLayout() {
           </NavLink>
         ))}
         {isPro && (
-          <button className="tab-item" onClick={() => setMode('public')}>
+          <button className="tab-item" onClick={() => setMode('public')} aria-label="Revenir au mode public">
             <ArrowLeft size={22} strokeWidth={2} />
             <span>Retour</span>
           </button>

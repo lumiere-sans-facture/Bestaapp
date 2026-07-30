@@ -11,6 +11,7 @@ import {
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
+import { TVA_PCT } from '../../../config/company';
 
 let rowSeq = 0;
 const EMPTY_CLIENT = { name: '', phone: '', ville: '', type: 'particulier' };
@@ -419,7 +420,7 @@ export default function ProSolarWizard({ onDone }) {
               <>
                 <div className="categories-scroll">
                   {brands.map((b) => (
-                    <button key={b} className={`category-chip ${brand === b ? 'active' : ''}`} onClick={() => { setInverterBrand(b); setSelectedInverterId(null); }}>{b}</button>
+                    <button key={b} className={`category-chip ${brand === b ? 'active' : ''}`} aria-pressed={brand === b} onClick={() => { setInverterBrand(b); setSelectedInverterId(null); }}>{b}</button>
                   ))}
                 </div>
                 <div className="kit-options" style={{ marginTop: 12 }}>
@@ -453,7 +454,7 @@ export default function ProSolarWizard({ onDone }) {
               <>
                 <div className="categories-scroll">
                   {batteryBrands.map((b) => (
-                    <button key={b} className={`category-chip ${bBrand === b ? 'active' : ''}`}
+                    <button key={b} className={`category-chip ${bBrand === b ? 'active' : ''}`} aria-pressed={bBrand === b}
                       onClick={() => { setBatteryBrand(b); setBatteryQty(suggestBatteryCombo(batteryOptions.filter((o) => o.brand === b), sizing.batteryCapacity)); }}>{b}</button>
                   ))}
                 </div>
@@ -529,7 +530,7 @@ export default function ProSolarWizard({ onDone }) {
 
             <label className="pro-tva-toggle">
               <input type="checkbox" checked={tvaActive} onChange={(e) => setTvaActive(e.target.checked)} />
-              Appliquer la TVA 18 % <span className="text-secondary">(exonérée par défaut sur le solaire)</span>
+              Appliquer la TVA {TVA_PCT} % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
             </label>
             <div className="devis-summary">
               <div className="devis-summary-row"><span>Total HT</span><span>{formatCFA(totals.totalHT)}</span></div>

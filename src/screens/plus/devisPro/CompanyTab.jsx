@@ -5,6 +5,7 @@ import { useData } from '../../../context/DataContext';
 import { fileToResizedDataUrl } from '../../../utils/image';
 import Field from '../../../components/Field';
 import { MODELES, EMPTY_COMPANY, normalizeModele } from './constants';
+import { TVA_PCT } from '../../../config/company';
 
 // Facture d'exemple pour l'aperçu PDF.
 const SAMPLE_LIGNES = [
@@ -149,7 +150,7 @@ export default function CompanyTab({ company }) {
         </Field>
         <label className="pro-tva-toggle">
           <input type="checkbox" checked={!!f.assujettieVAT} onChange={(e) => set({ assujettieVAT: e.target.checked })} />
-          Entreprise assujettie à la TVA <span className="text-secondary">(active la TVA 18 % par défaut sur les nouvelles factures)</span>
+          Entreprise assujettie à la TVA <span className="text-secondary">(active la TVA {TVA_PCT} % par défaut sur les nouvelles factures)</span>
         </label>
       </div>
 
