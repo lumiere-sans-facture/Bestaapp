@@ -154,11 +154,7 @@ export default function CompanyTab({ company }) {
         </label>
       </div>
 
-      <div className="form-actions-sticky">
-        {companyForm && <span className="form-dirty-flag">Modifications non enregistrées</span>}
-        {companyForm && <button type="button" className="btn btn-outline" onClick={() => setCompanyForm(null)}>Annuler</button>}
-        <button type="submit" className="btn btn-primary"><Check size={17} /> Enregistrer</button>
-      </div>
+      <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer mon entreprise</button>
     </form>
   );
 }
