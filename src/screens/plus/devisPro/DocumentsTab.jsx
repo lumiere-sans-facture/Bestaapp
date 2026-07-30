@@ -333,14 +333,24 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       )}
 
       {/* Menu d'actions (facture ou devis) */}
-      <Sheet open={!!actions} onClose={() => setActions(null)} title={actions ? (actions.kind === 'facture' ? actions.doc.numero : actions.doc.devisNumber) : ''}>
+      <Sheet open={!!actions} onClose={() => setActions(null)} title={actions ? (actions.kind === 'facture' ? actions.doc.numero : actions.doc.devisNumber) : ''}
+        footer={actionFacture ? (
+          <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actionFacture, modeleActif, { company, modeleDefaut }))}>
+            <Download size={16} /> Facture imprimable (PDF)
+          </button>
+        ) : actions?.kind === 'devis' ? (
+          <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise} onClick={() => runAction(() => exportDevisProPdf(actions.doc, modeleActif, { company, lead: getLeadById(actions.doc.leadId), products, markDevisPro }))}>
+            <Download size={16} /> Devis imprimable (PDF)
+          </button>
+        ) : null}>
         {actionFacture && (() => {
           const eff = statutEffectif(actionFacture);
           const reste = resteAPayer(actionFacture);
           const paye = montantPaye(actionFacture);
           const jae = joursAvantEcheance(actionFacture);
           return (
-          <div className="doc-actions-list">
+          <div className="sheet-two-col">
+          <div>
             <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{actionFacture.clientName}</span></div>
             <div className="sheet-row"><span className="sheet-label">Statut</span><span className="sheet-value"><span className={`badge badge-${STATUT_EFFECTIF_BADGE[eff]}`}>{STATUT_EFFECTIF_LABEL[eff]}</span></span></div>
             <div className="sheet-row"><span className="sheet-label">Total TTC</span><span className="sheet-value amount">{formatCFA(actionFacture.totalTTC)}</span></div>
@@ -362,10 +372,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             {actionFacture.derniereRelance && (
               <div className="sheet-row"><span className="sheet-label">Dernière relance</span><span className="sheet-value">{formatDate(actionFacture.derniereRelance)}</span></div>
             )}
+          </div>
+          <div className="doc-actions-list">
             <SelecteurModele />
-            <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actionFacture, modeleActif, { company, modeleDefaut }))}>
-              <Download size={16} /> Facture imprimable (PDF)
-            </button>
             {actionFacture.statut !== 'payee' && reste > 0 && (
               <button className="btn btn-won btn-block" onClick={() => { setPayFacture(actionFacture); setActions(null); }}>
                 <Wallet size={16} /> Enregistrer un encaissement
@@ -390,19 +399,20 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               </button>
             )}
           </div>
+          </div>
           );
         })()}
         {actions?.kind === 'devis' && (
-          <div className="doc-actions-list">
+          <div className="sheet-two-col">
+          <div>
             <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{clientOf(actions.doc)}</span></div>
             <div className="sheet-row"><span className="sheet-label">Total TTC</span><span className="sheet-value amount">{formatCFA(actions.doc.total)}</span></div>
             {factureByDevis.get(actions.doc.id) && (
               <div className="sheet-row"><span className="sheet-label">Facturé</span><span className="sheet-value">{factureByDevis.get(actions.doc.id).numero}</span></div>
             )}
+          </div>
+          <div className="doc-actions-list">
             <SelecteurModele />
-            <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise} onClick={() => runAction(() => exportDevisProPdf(actions.doc, modeleActif, { company, lead: getLeadById(actions.doc.leadId), products, markDevisPro }))}>
-              <Download size={16} /> Devis imprimable (PDF)
-            </button>
             <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions.doc); setActions(null); }}>
               <Pencil size={16} /> Modifier le devis
             </button>
@@ -419,6 +429,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                 </button>
               </>
             )}
+          </div>
           </div>
         )}
       </Sheet>

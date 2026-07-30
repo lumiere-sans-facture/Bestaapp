@@ -21,6 +21,8 @@ export default function Boutique() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [search, setSearch] = useState('');
+  // Vue liste sur grand écran (le gérant gère des prix, pas des vignettes).
+  const [view, setView] = useState(() => (typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'list' : 'grid'));
   const [priceRange, setPriceRange] = useState('all');
   const [powerRange, setPowerRange] = useState('all');
   // null = fermé, 'new' = création, sinon id du produit en édition
@@ -197,8 +199,12 @@ export default function Boutique() {
           <select className="input sort-select" value={powerRange} onChange={(e) => setPowerRange(e.target.value)} aria-label="Filtrer par puissance">
             {POWER_RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
           </select>
+          <div className="client-type-toggle view-toggle" role="group" aria-label="Affichage du catalogue">
+            <button type="button" className={`client-type-btn ${view === 'grid' ? 'active' : ''}`} aria-pressed={view === 'grid'} onClick={() => setView('grid')}>Grille</button>
+            <button type="button" className={`client-type-btn ${view === 'list' ? 'active' : ''}`} aria-pressed={view === 'list'} onClick={() => setView('list')}>Liste</button>
+          </div>
         </div>
-        <div className="products-grid">
+        <div className={`products-grid ${view === 'list' ? 'as-list' : ''}`}>
           {filtered.map((product) => {
             const outOfStock = product.stock === 0;
             return (
