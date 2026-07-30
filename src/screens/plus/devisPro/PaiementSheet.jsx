@@ -24,7 +24,9 @@ export default function PaiementSheet({ open, onClose, facture, onSubmit }) {
 
   const submit = (e) => {
     e.preventDefault();
-    const m = Math.max(0, Number(montant) || 0);
+    // Borné au reste à payer : un encaissement ne peut pas dépasser le solde
+    // (sinon « Encaissé » et le taux d'encaissement du tableau de bord dérivent).
+    const m = Math.min(reste, Math.max(0, Number(montant) || 0));
     if (m <= 0) return;
     onSubmit({ montant: m, mode, note });
   };
@@ -39,7 +41,7 @@ export default function PaiementSheet({ open, onClose, facture, onSubmit }) {
 
       <form onSubmit={submit}>
         <Field label="Montant encaissé *">
-          <input className="input" type="number" min="1" required value={montant}
+          <input className="input" type="number" min="1" max={reste} required value={montant}
             onChange={(e) => setMontant(e.target.value)} />
         </Field>
         <div className="pay-quick">
@@ -59,7 +61,7 @@ export default function PaiementSheet({ open, onClose, facture, onSubmit }) {
 
       {(facture.paiements || []).length > 0 && (
         <div className="pay-history">
-          <div className="input-label">Historique des encaissements</div>
+          <div className="sheet-section-title">Historique des encaissements</div>
           {facture.paiements.map((p) => (
             <div key={p.id} className="pay-history-row">
               <Wallet size={15} />

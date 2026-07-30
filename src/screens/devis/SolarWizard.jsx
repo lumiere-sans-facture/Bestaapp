@@ -12,6 +12,7 @@ import PartnerField from './PartnerField';
 import LeadPicker from './LeadPicker';
 import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
+import { TVA_PCT } from '../../config/company';
 
 let rowSeq = 0;
 
@@ -484,7 +485,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
             <div className="devis-summary">
               <div className="devis-summary-row"><span>Sous-total HT</span><span>{formatCFA(displayQuotation.subtotalHT)}</span></div>
               {displayQuotation.tva > 0 && (
-                <div className="devis-summary-row credit"><span>TVA (18 %)</span><span>{formatCFA(displayQuotation.tva)}</span></div>
+                <div className="devis-summary-row credit"><span>TVA ({TVA_PCT} %)</span><span>{formatCFA(displayQuotation.tva)}</span></div>
               )}
               <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(displayQuotation.total)}</span></div>
             </div>

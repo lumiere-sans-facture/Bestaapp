@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, Search, CheckCircle, Pencil, Wallet, Send } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
-import { formatCFA, formatDate } from '../../../utils/format';
+import { formatCFA, formatDate, formatNombre as nf } from '../../../utils/format';
 import { computeFactureTotals } from '../../../utils/facture';
 import {
   statutEffectif, STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE,
@@ -18,7 +18,7 @@ import ProSolarWizard from './ProSolarWizard';
 import Sheet from '../../../components/Sheet';
 import DevisEditSheet from '../../devis/DevisEditSheet';
 
-const nf = (v) => Math.round(v || 0).toLocaleString('fr-FR');
+
 const nextStatut = (s) => (s === 'brouillon' ? 'emise' : 'payee');
 const nextStatutLabel = (s) => (s === 'brouillon' ? 'Marquer émise' : 'Marquer payée');
 
@@ -225,10 +225,10 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
 
       {/* Bascule Devis / Factures */}
       <div className="client-type-toggle" role="group" aria-label="Type de document">
-        <button type="button" className={`client-type-btn ${tab === 'devis' ? 'active' : ''}`} onClick={() => switchTab('devis')}>
+        <button type="button" aria-pressed={tab === 'devis'} className={`client-type-btn ${tab === 'devis' ? 'active' : ''}`} onClick={() => switchTab('devis')}>
           <FileText size={16} /> Devis ({myDevis.length})
         </button>
-        <button type="button" className={`client-type-btn ${tab === 'factures' ? 'active' : ''}`} onClick={() => switchTab('factures')}>
+        <button type="button" aria-pressed={tab === 'factures'} className={`client-type-btn ${tab === 'factures' ? 'active' : ''}`} onClick={() => switchTab('factures')}>
           <Receipt size={16} /> Factures ({myFactures.length})
         </button>
       </div>
@@ -238,7 +238,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         <div className="list-toolbar">
           <div className="search-box">
             <Search size={18} className="search-icon" />
-            <input className="input search-input" placeholder="Client, numéro…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="input search-input" aria-label="Rechercher un document" placeholder="Client, numéro…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <button className="btn btn-accent" onClick={onNew} disabled={tab === 'factures' && !company?.nomEntreprise}>
             <Plus size={16} /> {newLabel}
@@ -247,7 +247,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         <div className="list-toolbar">
           <div className="categories-scroll">
             {filters.map(([id, label]) => (
-              <button key={id} className={`category-chip ${statusFilter === id ? 'active' : ''}`} onClick={() => setStatusFilter(id)}>{label}</button>
+              <button key={id} className={`category-chip ${statusFilter === id ? 'active' : ''}`} aria-pressed={statusFilter === id} onClick={() => setStatusFilter(id)}>{label}</button>
             ))}
           </div>
           <select className="input sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Trier">
@@ -257,6 +257,12 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       </div>
 
       {/* Liste des factures */}
+      {(search.trim() !== '' || statusFilter !== 'all') && (
+        <div className="filter-status" role="status">
+          {(tab === 'factures' ? visibleFactures : visibleDevis).length} document{(tab === 'factures' ? visibleFactures : visibleDevis).length > 1 ? 's' : ''} affiché{(tab === 'factures' ? visibleFactures : visibleDevis).length > 1 ? 's' : ''} sur {(tab === 'factures' ? myFactures : myDevis).length}
+        </div>
+      )}
+
       {tab === 'factures' && (
         visibleFactures.length ? (
           <div className="flat-list">
@@ -300,7 +306,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               const facture = factureByDevis.get(d.id);
               const [bcls, blabel] = d.statut === 'brouillon'
                 ? ['muted', 'Brouillon']
-                : facture ? ['success', 'Facturé'] : ['', 'Créé'];
+                : facture ? ['success', 'Facturé'] : ['', 'Finalisé'];
               return (
                 <div key={d.id} className="flat-row" role="button" tabIndex={0}
                   onClick={() => setActions({ kind: 'devis', doc: d })}
@@ -389,7 +395,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         {actions?.kind === 'devis' && (
           <div className="doc-actions-list">
             <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{clientOf(actions.doc)}</span></div>
-            <div className="sheet-row"><span className="sheet-label">Total</span><span className="sheet-value amount">{formatCFA(actions.doc.total)}</span></div>
+            <div className="sheet-row"><span className="sheet-label">Total TTC</span><span className="sheet-value amount">{formatCFA(actions.doc.total)}</span></div>
             {factureByDevis.get(actions.doc.id) && (
               <div className="sheet-row"><span className="sheet-label">Facturé</span><span className="sheet-value">{factureByDevis.get(actions.doc.id).numero}</span></div>
             )}

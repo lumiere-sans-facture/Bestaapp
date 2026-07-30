@@ -26,3 +26,5 @@ export const COMPANY = {
 COMPANY.terms = COMPANY.termsDevis;
 
 export const TVA_RATE = 0.18;
+// Libellé du taux pour l'UI (« 18 ») — toujours dérivé, jamais recopié.
+export const TVA_PCT = Math.round(TVA_RATE * 100);

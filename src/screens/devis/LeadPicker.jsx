@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
+import StageBadge from '../../components/StageBadge';
 
 /**
  * Sélecteur de client des assistants de devis : toute la liste des clients
@@ -39,7 +40,7 @@ export default function LeadPicker({ leads, selectedLeadId, onSelect }) {
             >
               <div className="lead-select-name">
                 {lead.name}{' '}
-                {st && <span className="badge" style={{ background: `${st.color}22`, color: st.color }}>{st.label}</span>}
+                {st && <StageBadge stage={st} />}
               </div>
               <div className="lead-select-value">
                 {lead.contact}{lead.phone ? ` · ${lead.phone}` : ''}{lead.estimatedValue > 0 ? ` — ${formatCFA(lead.estimatedValue)}` : ''}

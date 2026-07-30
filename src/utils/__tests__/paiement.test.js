@@ -71,7 +71,7 @@ describe('relanceMessage / whatsappLink', () => {
     const f = { numero: 'FAC-2026-001', clientName: 'Kossi', totalTTC: 100000, montantPaye: 30000, echeance: iso(-3) };
     const msg = relanceMessage(f, { nomEntreprise: 'BestaSolar', momo: '01 61 73 29 56', momoNom: 'BestaSolar' });
     expect(msg).toContain('FAC-2026-001');
-    expect(msg).toContain('70 000'); // reste 70 000 formaté fr-FR
+    expect(msg).toContain('70 000'); // reste 70 000, séparateur espace normale (formatNombre)
     expect(msg).toContain('01 61 73 29 56');
     expect(msg).toContain('Kossi');
   });

@@ -12,11 +12,11 @@
   --primary-dark: #061540;
   --accent: #f5a623;
   --accent-light: #f7b84a;
-  --accent-dark: #d48c1a;
+  --accent-dark: #936112; /* texte/icônes orange : AA sur blanc et --warning-light */
   --bg: #f4f6fb;
   --bg-card: #ffffff;
   --text-primary: #1a1a2e;
-  --text-secondary: #6b7280;
+  --text-secondary: #676d7b; /* AA (4.6) sur --bg */
   --text-muted: #9ca3af;
   --success: #10b981;
   --success-light: #d1fae5;
@@ -24,6 +24,8 @@
   --warning-light: #fef3c7;
   --error: #ef4444;
   --error-light: #fee2e2;
+  --error-text: #bb3535;
+  --success-text: #047857;
   --border: #e5e7eb;
   --shadow: 0 2px 8px rgba(10, 36, 114, 0.08);
   --shadow-lg: 0 8px 30px rgba(10, 36, 114, 0.16);

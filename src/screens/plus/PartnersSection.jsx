@@ -5,6 +5,7 @@ import { formatCFA, formatDate, initials } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS, getActiveRef } from '../../utils/referral';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
+import StageBadge from '../../components/StageBadge';
 
 const EMPTY_FORM = { name: '', phone: '', momoNumber: '', sponsorId: '', status: 'actif', tier: 'standard' };
 
@@ -100,6 +101,20 @@ export default function PartnersSection({ onBack }) {
     (p) => p.id !== editing && p.sponsorId !== editing
   );
 
+  const visiblePartners = partners
+    .filter((p) => statusFilter === 'all' || p.status === statusFilter)
+    .filter((p) => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      return [p.name, p.code, p.phone, p.momoNumber].some((v) => v && v.toLowerCase().includes(q));
+    })
+    .sort((a, b) => {
+      if (sortBy === 'attente') return statsFor(b).pending - statsFor(a).pending;
+      if (sortBy === 'affaires') return statsFor(b).l1Leads.length - statsFor(a).l1Leads.length;
+      if (sortBy === 'recent') return new Date(b.registeredAt) - new Date(a.registeredAt);
+      return a.name.localeCompare(b.name, 'fr');
+    });
+
   return (
     <>
       <div className="partners-toolbar">
@@ -116,6 +131,7 @@ export default function PartnersSection({ onBack }) {
         <Search size={18} className="search-icon" />
         <input
           className="input search-input"
+          aria-label="Rechercher un partenaire"
           placeholder="Nom, code, téléphone…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -124,7 +140,7 @@ export default function PartnersSection({ onBack }) {
       <div className="list-toolbar">
         <div className="categories-scroll">
           {[['all', 'Tous'], ['actif', 'Actifs'], ['inactif', 'Inactifs']].map(([id, label]) => (
-            <button key={id} className={`category-chip ${statusFilter === id ? 'active' : ''}`} onClick={() => setStatusFilter(id)}>{label}</button>
+            <button key={id} className={`category-chip ${statusFilter === id ? 'active' : ''}`} aria-pressed={statusFilter === id} onClick={() => setStatusFilter(id)}>{label}</button>
           ))}
         </div>
         <select className="input sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Trier les partenaires">
@@ -135,21 +151,18 @@ export default function PartnersSection({ onBack }) {
         </select>
       </div>
 
+      {(search.trim() !== '' || statusFilter !== 'all') && (
+        <div className="filter-status" role="status">
+          {visiblePartners.length} partenaire{visiblePartners.length > 1 ? 's' : ''} affiché{visiblePartners.length > 1 ? 's' : ''} sur {partners.length}
+        </div>
+      )}
+      {visiblePartners.length === 0 && (
+        <div className="empty-state card">
+          {partners.length ? 'Aucun partenaire ne correspond à ce filtre.' : 'Aucun partenaire pour le moment.'}
+        </div>
+      )}
       <div className="partners-list">
-        {partners
-          .filter((p) => statusFilter === 'all' || p.status === statusFilter)
-          .filter((p) => {
-            if (!search.trim()) return true;
-            const q = search.trim().toLowerCase();
-            return [p.name, p.code, p.phone, p.momoNumber].some((v) => v && v.toLowerCase().includes(q));
-          })
-          .sort((a, b) => {
-            if (sortBy === 'attente') return statsFor(b).pending - statsFor(a).pending;
-            if (sortBy === 'affaires') return statsFor(b).l1Leads.length - statsFor(a).l1Leads.length;
-            if (sortBy === 'recent') return new Date(b.registeredAt) - new Date(a.registeredAt);
-            return a.name.localeCompare(b.name, 'fr');
-          })
-          .map((partner) => {
+        {visiblePartners.map((partner) => {
           const st = statsFor(partner);
           const sponsor = partner.sponsorId ? getPartnerById(partner.sponsorId) : null;
           return (
@@ -302,7 +315,7 @@ export default function PartnersSection({ onBack }) {
                   <div key={l.id} className="sheet-row">
                     <span className="sheet-label">{l.name}</span>
                     <span className="sheet-value">
-                      <span className="badge" style={{ background: `${stageInfo(l)?.color}22`, color: stageInfo(l)?.color }}>{stageInfo(l)?.label}</span>
+                      <StageBadge stage={stageInfo(l)} />
                       {' '}{formatCFA(l.estimatedValue)}
                     </span>
                   </div>
@@ -315,7 +328,7 @@ export default function PartnersSection({ onBack }) {
                   <div key={l.id} className="sheet-row">
                     <span className="sheet-label">{l.name} <span className="text-secondary">via {getPartnerById(l.parrainL1)?.name}</span></span>
                     <span className="sheet-value">
-                      <span className="badge" style={{ background: `${stageInfo(l)?.color}22`, color: stageInfo(l)?.color }}>{stageInfo(l)?.label}</span>
+                      <StageBadge stage={stageInfo(l)} />
                       {' '}{formatCFA(l.estimatedValue)}
                     </span>
                   </div>

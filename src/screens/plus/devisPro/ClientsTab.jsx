@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Plus, Trash2, User, Building2, Phone, MapPin, Check, Pencil, Send, FileText, Receipt } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
-import { formatCFA, formatDate } from '../../../utils/format';
+import {formatCFA, formatDate, formatNombre as nf } from '../../../utils/format';
 import {
   resteAPayer, montantPaye, isEnRetard, statutEffectif,
   STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE, relanceMessage, whatsappLink,
@@ -11,7 +11,7 @@ import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
 
 const EMPTY = { name: '', phone: '', ville: '', type: 'particulier' };
-const nf = (v) => Math.round(v || 0).toLocaleString('fr-FR');
+
 const norm = (s) => (s || '').trim().toLowerCase();
 
 /** Onglet « Clients » : carnet du technicien + fiche client (historique, solde, relance). */
@@ -149,13 +149,13 @@ export default function ClientsTab({ company }) {
               </div>
               <div className={`client-bilan-item ${viewedBilan?.retard ? 'ko' : ''}`}>
                 <div className="client-bilan-value">{formatCFA(viewedBilan?.reste || 0)}</div>
-                <div className="client-bilan-label">Reste dû</div>
+                <div className="client-bilan-label">Reste à payer</div>
               </div>
             </div>
 
             {(viewedDocs.factures.length > 0 || viewedDocs.devis.length > 0) && (
               <>
-                <div className="input-label">Historique ({viewedDocs.devis.length} devis · {viewedDocs.factures.length} facture(s))</div>
+                <div className="sheet-section-title">Historique ({viewedDocs.devis.length} devis · {viewedDocs.factures.length} facture(s))</div>
                 <div className="client-history">
                   {viewedDocs.factures.map((f) => {
                     const eff = statutEffectif(f);
@@ -172,7 +172,7 @@ export default function ClientsTab({ company }) {
                     <div key={d.id} className="client-history-row">
                       <FileText size={15} />
                       <span className="client-history-title">{d.devisNumber}</span>
-                      <span className={`flat-badge ${d.statut === 'brouillon' ? 'muted' : ''}`}>{d.statut === 'brouillon' ? 'Brouillon' : 'Devis'}</span>
+                      <span className={`flat-badge ${d.statut === 'brouillon' ? 'muted' : ''}`}>{d.statut === 'brouillon' ? 'Brouillon' : 'Finalisé'}</span>
                       <span className="client-history-amount">{nf(d.total)} F</span>
                     </div>
                   ))}
