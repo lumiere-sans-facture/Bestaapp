@@ -59,7 +59,7 @@ export default function CompanyTab({ company }) {
   };
 
   return (
-    <form onSubmit={saveCompanyForm}>
+    <form className="pro-company-form" onSubmit={saveCompanyForm}>
       {/* Aperçu + modèle */}
       <div className="card my-partner-section">
         <div className="card-title"><Eye size={15} /> Modèle de document</div>
