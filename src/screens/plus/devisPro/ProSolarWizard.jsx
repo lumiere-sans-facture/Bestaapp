@@ -403,6 +403,9 @@ export default function ProSolarWizard({ onDone }) {
               <div className="sizing-card"><div className="sizing-icon"><Battery size={18} /></div><div className="sizing-value">{sizing.batteryCapacity > 0 ? `${sizing.batteryCapacity.toFixed(1)} kWh` : '—'}</div><div className="sizing-label">Batterie conseillée</div></div>
               <div className="sizing-card"><div className="sizing-icon"><Zap size={18} /></div><div className="sizing-value">{Math.round(sizing.estimatedProduction).toLocaleString('fr-FR')}</div><div className="sizing-label">kWh / an</div></div>
             </div>
+            <div className="field-hint" role="status">
+              Calcul basé sur {Number(sunHours) || DEFAULT_PEAK_SUN_HOURS} h de pic solaire / jour{solar ? ` (${solar.source})` : ' (valeur par défaut — géolocalisez ou saisissez la vôtre ci-dessus)'}.
+            </div>
           </div>
         )}
 
@@ -431,6 +434,11 @@ export default function ProSolarWizard({ onDone }) {
                     </button>
                   ))}
                 </div>
+                {suitableInverters.length > 0 && suitableInverters.length < brandInverters.length && !showAllInverters && (
+                  <div className="filter-status" role="status" style={{ marginTop: 8 }}>
+                    {shownInverters.length} modèle{shownInverters.length > 1 ? 's' : ''} adapté{shownInverters.length > 1 ? 's' : ''} affiché{shownInverters.length > 1 ? 's' : ''} sur {brandInverters.length} — les modèles sous-dimensionnés sont masqués.
+                  </div>
+                )}
                 {suitableInverters.length > 0 && suitableInverters.length < brandInverters.length && (
                   <label className="pro-tva-toggle">
                     <input type="checkbox" checked={showAllInverters} onChange={(e) => setShowAllInverters(e.target.checked)} />

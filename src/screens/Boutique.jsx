@@ -11,6 +11,7 @@ import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
+import { prixPublic, PUBLIC_MARKUP } from '../utils/price';
 
 const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', category: 'kits', image: '' };
 
@@ -37,7 +38,7 @@ export default function Boutique() {
   const detailProduct = products.find((p) => p.id === detailId);
 
   const isManager = user.role === 'gerant';
-  const getPrice = (basePrice) => (isManager ? Math.round(basePrice * 1.15) : basePrice);
+  const getPrice = (basePrice) => (isManager ? prixPublic(basePrice) : basePrice);
   const categoryLabel = (id) => productCategories.find((c) => c.id === id)?.label || '';
 
   const handleAddToCart = (product) => {
@@ -308,7 +309,7 @@ export default function Boutique() {
             </div>
             <div className="sheet-section">
               <div className="sheet-section-title">Prix et disponibilité</div>
-              <div className="sheet-row"><span className="sheet-label">Prix public</span><span className="sheet-value amount">{formatCFA(Math.round(detailProduct.basePrice * 1.15))}</span></div>
+              <div className="sheet-row"><span className="sheet-label">Prix public</span><span className="sheet-value amount">{formatCFA(prixPublic(detailProduct.basePrice))}</span></div>
               <div className="sheet-row"><span className="sheet-label">Prix partenaire</span><span className="sheet-value">{formatCFA(detailProduct.basePrice)}</span></div>
               <div className="sheet-row">
                 <span className="sheet-label">Stock</span>
@@ -422,7 +423,7 @@ export default function Boutique() {
             <Field label="Prix technicien (F CFA) *">
               <input className="input" type="number" min="0" required value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} placeholder="0" />
               {Number(form.basePrice) > 0 && (
-                <div className="field-hint">Prix public (+15 %) : {formatCFA(Math.round(Number(form.basePrice) * 1.15))}</div>
+                <div className="field-hint">Prix public (+{Math.round((PUBLIC_MARKUP - 1) * 100)} %) : {formatCFA(prixPublic(form.basePrice))}</div>
               )}
             </Field>
             <Field label="Stock *">

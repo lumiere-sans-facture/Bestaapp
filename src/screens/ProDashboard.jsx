@@ -1,5 +1,6 @@
-import { Building2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Building2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useMode } from '../context/ModeContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { computeMonthlyRevenue } from '../utils/stats';
@@ -29,6 +30,7 @@ const STATUT_META = [
  */
 export default function ProDashboard() {
   const { user } = useAuth();
+  const { setMode } = useMode();
   const { factures, getCompanyForUser, getSubscriptionForUser } = useData();
 
   const now = new Date();
@@ -98,7 +100,7 @@ export default function ProDashboard() {
   // ---- Feed d'alertes (trié par sévérité) ----
   const feed = [];
   if (!company?.nomEntreprise)
-    feed.push({ id: 'company', sev: 'critique', label: 'Entreprise non configurée', entity: 'Plus → Devis Pro → Mon entreprise' });
+    feed.push({ id: 'company', sev: 'critique', label: 'Entreprise non configurée', entity: 'Onglet Entreprise → Mon entreprise' });
   // Factures en retard d'échéance : priorité maximale, du plus ancien retard au plus récent.
   retards
     .slice()
@@ -120,7 +122,7 @@ export default function ProDashboard() {
   if (sub && subStatus === 'actif' && subDays != null && subDays <= 7)
     feed.push({ id: 'sub', sev: 'info', label: `Abonnement Pro expire dans ${subDays} j`, entity: 'À renouveler' });
   if (brouillons.length)
-    feed.push({ id: 'draft', sev: 'info', label: `${brouillons.length} brouillon(s) à finaliser`, entity: 'Devis Pro' });
+    feed.push({ id: 'draft', sev: 'info', label: `${brouillons.length} brouillon(s) à finaliser`, entity: 'Onglet Devis & Factures' });
   feed.sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev]);
   const feedTop = feed.slice(0, 6);
 
@@ -137,6 +139,11 @@ export default function ProDashboard() {
       <PageHeader
         title={company?.nomEntreprise || 'Mon Entreprise'}
         subtitle="Espace Pro — tableau de bord"
+        actions={
+          <button className="btn btn-outline-light btn-sm" onClick={() => setMode('public')}>
+            <ArrowLeft size={15} /> Mode public
+          </button>
+        }
       />
       <div className="page-content">
         {/* Bandeau de statistiques */}
@@ -293,7 +300,7 @@ export default function ProDashboard() {
           ) : (
             <div className="alert-empty">
               <Building2 size={26} />
-              <span>Aucune facture — créez-en une depuis Plus → Devis Pro</span>
+              <span>Aucune facture — créez-en une depuis l'onglet Devis & Factures</span>
             </div>
           )}
         </div>
