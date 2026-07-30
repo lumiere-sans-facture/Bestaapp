@@ -23,8 +23,8 @@ const proNavItems = [
   { path: '/pro', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
   { path: '/pro/documents', label: 'Devis & Factures', shortLabel: 'Devis', icon: FileText },
   { path: '/pro/clients', label: 'Clients', shortLabel: 'Clients', icon: Users },
-  { path: '/pro/entreprise', label: 'Mon entreprise', shortLabel: 'Société', icon: Building2 },
-  { path: '/pro/abonnement', label: 'Mon abonnement', shortLabel: 'Abo', icon: CreditCard },
+  { path: '/pro/entreprise', label: 'Mon entreprise', shortLabel: 'Entreprise', icon: Building2 },
+  { path: '/pro/abonnement', label: 'Mon abonnement', shortLabel: 'Abonnement', icon: CreditCard },
 ];
 
 // Sous-sections de « Plus » remontées dans la barre latérale (desktop), par rôle.
@@ -157,12 +157,6 @@ export default function AppLayout() {
             <span>{item.shortLabel}</span>
           </NavLink>
         ))}
-        {isPro && (
-          <button className="tab-item" onClick={() => setMode('public')} aria-label="Revenir au mode public">
-            <ArrowLeft size={22} strokeWidth={2} />
-            <span>Retour</span>
-          </button>
-        )}
       </nav>
     </div>
   );
