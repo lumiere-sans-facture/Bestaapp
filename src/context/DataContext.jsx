@@ -1,9 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as seed from '../data/seed';
 import { consumeRefClick } from '../utils/referral';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { fetchTeamProfiles } from '../lib/remoteSync';
 import { loadState, persist } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
+
+// Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
+// (le contexte est lisible depuis tous les écrans).
+const LOCAL_TEAM = seed.users.map(({ password: _pw, ...u }) => u);
 
 // Taux de commission ré-exporté : conservé sur l'API publique du contexte
 // (consommé par l'écran Plus pour estimer les commissions).
@@ -55,6 +61,18 @@ export function DataProvider({ children }) {
   // Réplication Supabase (optionnelle, auto-détectée)
   const syncStatus = useRemoteSync(state, setState, stateRef);
 
+  // Équipe : profils de l'organisation quand le backend est configuré,
+  // utilisateurs du seed sinon (mode local / démo).
+  const [team, setTeam] = useState(LOCAL_TEAM);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let on = true;
+    fetchTeamProfiles()
+      .then((t) => { if (on && t.length) setTeam(t); })
+      .catch(() => {}); // hors-ligne : on garde l'équipe connue
+    return () => { on = false; };
+  }, []);
+
   // Actions métier (stables : créées une fois sur setState)
   const actions = useMemo(() => createActions(setState), []);
 
@@ -65,15 +83,15 @@ export function DataProvider({ children }) {
     getSubscriptionForUser: (userId) => (state.subscriptions || []).find((x) => x.userId === userId),
     getCompanyForUser: (userId) => (state.companies || []).find((c) => c.userId === userId),
     getLeadById: (id) => state.leads.find((l) => l.id === id),
-    getUserById: (id) => seed.users.find((u) => u.id === id),
+    getUserById: (id) => team.find((u) => u.id === id),
     proClientsForUser: (userId) => (state.proClients || []).filter((c) => c.userId === userId),
     getProClientById: (id) => (state.proClients || []).find((c) => c.id === id),
     leadsForUser: (user) =>
       user.role === 'gerant' ? state.leads : state.leads.filter((l) => l.assignedTo === user.id),
-  }), [state]);
+  }), [state, team]);
 
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team: seed.users }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team }}>
       {children}
     </DataContext.Provider>
   );

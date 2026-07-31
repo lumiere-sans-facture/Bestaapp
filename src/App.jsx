@@ -52,11 +52,14 @@ function usePreloadScreens() {
 }
 
 function AppRoutes() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, recovery } = useAuth();
 
   if (isLoading) {
     return <div className="splash-screen">Chargement…</div>;
   }
+
+  // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.
+  if (recovery) return <Login />;
 
   if (!user) return <Login />;
 

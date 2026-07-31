@@ -32,7 +32,7 @@ begin
   foreach t in array array[
     'products','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
-    'companies','factures','tombstones'
+    'companies','factures','proClients','tombstones'
   ] loop
     execute format('drop policy if exists "team full access" on public.%I', t);
     execute format('create policy "team full access" on public.%I for all to authenticated using (public.is_team_member()) with check (public.is_team_member())', t);

@@ -54,7 +54,7 @@ begin
   foreach t in array array[
     'products','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
-    'companies','factures','tombstones'
+    'companies','factures','proClients','tombstones'
   ] loop
     execute format('alter table public.%I add column if not exists org_id text', t);
     execute format('update public.%I set org_id = ''org-bestasolar'' where org_id is null', t);
@@ -69,7 +69,7 @@ begin
   foreach t in array array[
     'products','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
-    'companies','factures'
+    'companies','factures','proClients'
   ] loop
     execute format('create index if not exists idx_%s_org_updated on public.%I (org_id, updated_at)', t, t);
   end loop;
@@ -83,7 +83,7 @@ begin
   foreach t in array array[
     'products','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
-    'companies','factures','tombstones'
+    'companies','factures','proClients','tombstones'
   ] loop
     execute format('drop policy if exists "team full access" on public.%I', t);
     execute format('drop policy if exists "org isolation" on public.%I', t);
@@ -127,5 +127,92 @@ end $$;
 --   await supabase.auth.signUp({ email, password })
 --   await supabase.rpc('signup_create_org', { p_org_name, p_user_name })
 --   -> recharger le profil (AuthContext) ; la nouvelle org démarre VIDE.
--- Inviter des coéquipiers (techniciens) = flux admin séparé (phase ultérieure).
+-- ============================================================
+
+-- ============================================================
+-- ÉQUIPE : code d'invitation par organisation.
+-- Le gérant partage le code (visible dans l'écran Équipe) ; le technicien
+-- s'inscrit avec ce code et rejoint l'org — aucun accès admin requis.
+-- ============================================================
+alter table public.orgs add column if not exists invite_code text unique;
+update public.orgs
+  set invite_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))
+  where invite_code is null;
+alter table public.orgs alter column invite_code set not null;
+
+create or replace function public.signup_join_org(p_invite_code text, p_user_name text)
+  returns text language plpgsql security definer set search_path = public as $$
+declare v_org text; v_email text;
+begin
+  v_email := auth.jwt() ->> 'email';
+  if v_email is null then raise exception 'non authentifié'; end if;
+  if exists (select 1 from public.profiles where lower(email) = lower(v_email)) then
+    raise exception 'profil déjà existant pour cet email';
+  end if;
+  select id into v_org from public.orgs where invite_code = upper(trim(p_invite_code));
+  if v_org is null then raise exception 'code d''invitation invalide'; end if;
+  insert into public.profiles (id, email, name, role, org_id)
+    values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org);
+  return v_org;
+end $$;
+
+-- ============================================================
+-- ABONNEMENTS DEVIS PRO : vérité côté serveur.
+-- Faille corrigée : sans ce bloc, n'importe quel membre peut pousser une ligne
+-- subscriptions { status: 'actif' } et s'activer le mode Pro gratuitement.
+-- Règle : les membres peuvent créer/modifier une DEMANDE (status ≠ 'actif') ;
+-- seul un ADMIN PLATEFORME (toi, l'éditeur de l'app) peut écrire 'actif'.
+-- ============================================================
+alter table public.profiles add column if not exists is_platform_admin boolean not null default false;
+
+-- Admin plateforme = éditeur du SaaS (accès transverse aux abonnements).
+create or replace function public.auth_is_platform_admin()
+  returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select is_platform_admin from public.profiles where lower(email) = lower(auth.jwt() ->> 'email')),
+    false
+  )
+$$;
+
+-- subscriptions : lecture dans son org (+ admin partout) ; écriture 'actif'
+-- réservée à l'admin plateforme.
+drop policy if exists "org isolation" on public.subscriptions;
+drop policy if exists "subs read" on public.subscriptions;
+drop policy if exists "subs write" on public.subscriptions;
+create policy "subs read" on public.subscriptions for select to authenticated
+  using (org_id = public.auth_org_id() or public.auth_is_platform_admin());
+create policy "subs write" on public.subscriptions for all to authenticated
+  using (
+    public.auth_is_platform_admin()
+    or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') <> 'actif')
+  )
+  with check (
+    public.auth_is_platform_admin()
+    or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') <> 'actif')
+  );
+
+-- subscriptionPayments : demande de paiement par les membres ; la validation
+-- (statut confirmé) reste à l'admin plateforme.
+drop policy if exists "org isolation" on public."subscriptionPayments";
+drop policy if exists "subpay read" on public."subscriptionPayments";
+drop policy if exists "subpay write" on public."subscriptionPayments";
+create policy "subpay read" on public."subscriptionPayments" for select to authenticated
+  using (org_id = public.auth_org_id() or public.auth_is_platform_admin());
+create policy "subpay write" on public."subscriptionPayments" for all to authenticated
+  using (
+    public.auth_is_platform_admin()
+    or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') not in ('confirme'))
+  )
+  with check (
+    public.auth_is_platform_admin()
+    or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') not in ('confirme'))
+  );
+
+-- L'admin plateforme lit les profils de toutes les orgs (écran Abonnements).
+drop policy if exists "platform admin read" on public.profiles;
+create policy "platform admin read" on public.profiles for select to authenticated
+  using (public.auth_is_platform_admin());
+
+-- Se déclarer admin plateforme (à exécuter UNE FOIS, avec ton email) :
+--   update public.profiles set is_platform_admin = true where email = 'ton@email';
 -- ============================================================

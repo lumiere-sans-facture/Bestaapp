@@ -1,16 +1,22 @@
 // État applicatif : forme initiale, chargement depuis localStorage (avec
 // migrations de seed) et persistance. Aucune dépendance React — logique pure.
 import * as seed from '../data/seed';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
 
 export const STORAGE_KEY = 'bestasolar_data';
 
 export const buildInitialState = () => ({
   version: seed.SEED_VERSION,
-  leads: seed.leads,
+  // Backend configuré (mode SaaS) : une nouvelle entreprise démarre SANS les
+  // données métier de démonstration — ses pistes/partenaires arrivent de la
+  // synchronisation ou de sa propre saisie. Elle reçoit en dotation le
+  // catalogue de référence et les cours de formation.
+  // Mode local (sans backend) : jeu de démonstration complet, comme avant.
+  leads: isSupabaseConfigured ? [] : seed.leads,
   products: seed.products,
-  partners: seed.partners,
-  commissions: seed.commissions,
+  partners: isSupabaseConfigured ? [] : seed.partners,
+  commissions: isSupabaseConfigured ? [] : seed.commissions,
   devis: [],
   referrals: [],
   orders: [],

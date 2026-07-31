@@ -4,6 +4,7 @@ import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { formatCFA, formatDate } from '../utils/format';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
 import { downloadBackup, readBackupFile } from '../utils/backup';
@@ -344,7 +345,12 @@ export default function Plus() {
               <MenuItem icon={Users} title="Partenaires" subtitle={`${partners.length} partenaires · réseau 2 niveaux`} onClick={() => setActiveTab('partners')} />
               <MenuItem icon={DollarSign} title="Commandes en ligne" subtitle={`${(orders || []).filter((o) => o.status === 'initie').length} à confirmer`} onClick={() => setActiveTab('orders')} />
               <MenuItem icon={DollarSign} title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
-              <MenuItem icon={Crown} title="Abonnements Devis Pro" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
+              {/* Administration du SaaS : en mode backend, réservée à l'admin
+                  plateforme (le serveur refuse de toute façon l'activation
+                  d'un abonnement à quiconque d'autre). */}
+              {(!isSupabaseConfigured || user.is_platform_admin) && (
+                <MenuItem icon={Crown} title="Abonnements Devis Pro" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
+              )}
             </div>
           </div>
         )}
