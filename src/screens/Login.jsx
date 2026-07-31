@@ -85,11 +85,17 @@ export default function Login() {
           <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
             {loading ? 'Connexion…' : 'Se connecter'}
           </button>
-          <div className="login-divider"><span>Accès démo</span></div>
-          <div className="quick-login-buttons">
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => handleQuickLogin('gerant')}>Gérant</button>
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => handleQuickLogin('technicien')}>Technicien</button>
-          </div>
+          <div className="login-help">Mot de passe oublié ? Contactez votre gérant.</div>
+          {/* Accès démo : outil de développement, jamais livré dans l'APK. */}
+          {import.meta.env.DEV && (
+            <>
+              <div className="login-divider"><span>Accès démo</span></div>
+              <div className="quick-login-buttons">
+                <button type="button" className="btn btn-outline" onClick={() => handleQuickLogin('gerant')}>Gérant</button>
+                <button type="button" className="btn btn-outline" onClick={() => handleQuickLogin('technicien')}>Technicien</button>
+              </div>
+            </>
+          )}
         </form>
       </div>
     </div>
