@@ -1196,7 +1196,9 @@ textarea.input { resize: vertical; }
 .roi-note strong { color: var(--accent-dark); }
 
 .wizard { max-width: 920px; margin: 0 auto; width: 100%; }
-.steps-indicator { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
+.steps-indicator { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
+/* Progression nommée sous les pastilles : « Étape 2 sur 4 · Consommation ». */
+.steps-label { text-align: center; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; }
 .step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); transition: all 0.2s ease; }
 .step-dot.active { background: var(--primary); width: 28px; border-radius: 5px; }
 .step-dot.completed { background: var(--success); }
@@ -1347,8 +1349,10 @@ textarea.input { resize: vertical; }
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 0.875rem; color: var(--text-secondary); margin: 10px 0 16px;
 }
-.profile-stats { display: flex; justify-content: center; gap: 32px; padding-top: 16px; border-top: 1px solid var(--border); }
-.profile-stat-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+/* Grille de 3 : les montants ne se cassent plus sur deux lignes (l'unité vit
+   dans le libellé). */
+.profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+.profile-stat-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); overflow-wrap: anywhere; }
 .profile-stat-label { font-size: 0.75rem; color: var(--text-muted); }
 
 .partners-list, .commissions-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
@@ -1522,6 +1526,9 @@ textarea.input { resize: vertical; }
 .commission-lead { font-weight: 600; }
 .commission-amount { font-size: 1.125rem; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
 .commission-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); }
+/* L'action de paiement sort de la ligne de métadonnées : pied de carte dédié. */
+.commission-actions { display: flex; gap: 8px; margin-top: 10px; }
+.commission-actions .btn { flex: 1; justify-content: center; }
 
 .commissions-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .com-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
@@ -1617,6 +1624,11 @@ textarea.input { resize: vertical; }
 .doc-summary-card.late:not(.is-empty) { cursor: pointer; box-shadow: inset 0 0 0 1.5px var(--error-light), var(--shadow); }
 .doc-summary-card.late.is-empty .doc-summary-value { color: var(--text-secondary); }
 .doc-summary-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+/* La carte « En retard » est cliquable : on le dit, on ne le suggère plus. */
+.doc-summary-link {
+  display: inline-flex; align-items: center; gap: 2px; margin-top: 4px;
+  font-size: 0.6875rem; font-weight: 700; color: var(--error-text);
+}
 
 /* Fiche client Pro : bilan (facturé / encaissé / reste dû) + historique */
 .client-bilan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }

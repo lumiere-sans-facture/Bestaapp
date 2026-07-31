@@ -3,9 +3,13 @@ import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
+import { prixPublic } from '../../utils/price';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
 import LeadPicker from './LeadPicker';
+
+// Noms des étapes, affichés sous les pastilles de progression.
+const STEP_NAMES = ['Client', 'Produits'];
 
 export default function ManualWizard({ onDone, initialItems, initialLeadId = null }) {
   const { user } = useAuth();
@@ -36,7 +40,7 @@ export default function ManualWizard({ onDone, initialItems, initialLeadId = nul
   const myLeads = leadsForUser(user);
   const selectedLead = myLeads.find((l) => l.id === selectedLeadId);
 
-  const getPrice = (basePrice) => (user.role === 'gerant' ? Math.round(basePrice * 1.15) : basePrice);
+  const getPrice = (basePrice) => (user.role === 'gerant' ? prixPublic(basePrice) : basePrice);
 
   const toggleProduct = (productId) => {
     setItems((prev) => {
@@ -88,17 +92,18 @@ export default function ManualWizard({ onDone, initialItems, initialLeadId = nul
           <div key={s} className={`step-dot ${step >= s ? 'active' : ''} ${step > s ? 'completed' : ''}`} />
         ))}
       </div>
+      <div className="steps-label">Étape {step} sur 2 · {STEP_NAMES[step - 1]}</div>
       <div className="wizard-form card">
         {step === 1 && (
           <div>
-            <div className="wizard-step-title">1. Sélectionnez un client</div>
+            <div className="wizard-step-title">Sélectionnez un client</div>
             <LeadPicker leads={myLeads} selectedLeadId={selectedLeadId} onSelect={setSelectedLeadId} />
             {selectedLeadId && <PartnerField value={partnerId} />}
           </div>
         )}
         {step === 2 && (
           <div>
-            <div className="wizard-step-title">2. Ajoutez des produits</div>
+            <div className="wizard-step-title">Ajoutez des produits</div>
             <div className="products-select">
               {products.filter((p) => p.stock > 0).map((product) => {
                 const qty = items[product.id];
@@ -129,9 +134,11 @@ export default function ManualWizard({ onDone, initialItems, initialLeadId = nul
           </div>
         )}
         <div className="wizard-actions">
+          {/* Dernière étape : une seule primaire (Créer le devis) ; retour réduit
+              à une flèche et brouillon en action secondaire compacte. */}
           {step > 1 && (
-            <button className="btn btn-outline btn-block" onClick={() => setStep(step - 1)}>
-              <ChevronLeft size={18} /> Précédent
+            <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => setStep(step - 1)} aria-label="Étape précédente">
+              <ChevronLeft size={18} />
             </button>
           )}
           {step < 2 ? (
@@ -140,7 +147,7 @@ export default function ManualWizard({ onDone, initialItems, initialLeadId = nul
             </button>
           ) : (
             <>
-              <button className="btn btn-outline btn-block" onClick={() => handleSubmit('brouillon')} disabled={Object.keys(items).length === 0}>
+              <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => handleSubmit('brouillon')} disabled={Object.keys(items).length === 0}>
                 Brouillon
               </button>
               <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')} disabled={Object.keys(items).length === 0}>

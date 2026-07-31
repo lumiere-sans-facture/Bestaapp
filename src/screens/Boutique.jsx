@@ -9,8 +9,10 @@ import { fileToResizedDataUrl } from '../utils/image';
 import { extractPowerWatts, POWER_RANGES, PRICE_RANGES } from '../utils/power';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import ConfirmSheet from '../components/ConfirmSheet';
 import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
+import { useToast } from '../components/Toast';
 import { prixPublic, PUBLIC_MARKUP } from '../utils/price';
 
 const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', category: 'kits', image: '' };
@@ -33,7 +35,11 @@ export default function Boutique() {
   const [payment, setPayment] = useState(null);
   const [payForm, setPayForm] = useState({ operator: 'MTN MoMo', phone: '' });
   const [justAdded, setJustAdded] = useState(null);
+  // Confirmations (remplacent window.confirm) : vidage du panier, suppression produit.
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const fileInputRef = useRef(null);
+  const toast = useToast();
 
   const detailProduct = products.find((p) => p.id === detailId);
 
@@ -81,7 +87,7 @@ export default function Boutique() {
       const dataUrl = await fileToResizedDataUrl(file);
       setForm((f) => ({ ...f, image: dataUrl }));
     } catch {
-      alert("Impossible de lire cette image. Essayez avec une autre photo.");
+      toast('Impossible de lire cette image. Essayez avec une autre photo.', { type: 'error' });
     }
     e.target.value = '';
   };
@@ -101,13 +107,7 @@ export default function Boutique() {
     setEditing(null);
   };
 
-  const handleDelete = () => {
-    const product = products.find((p) => p.id === editing);
-    if (window.confirm(`Supprimer « ${product?.name} » du catalogue ?`)) {
-      deleteProduct(editing);
-      setEditing(null);
-    }
-  };
+  const handleDelete = () => setConfirmDelete(true);
 
   // Filtre + tri mémoïsés : ne recalcule (et ne relance les regex de puissance)
   // que si une entrée réelle change — pas sur l'ajout au panier ou l'ouverture
@@ -274,16 +274,34 @@ export default function Boutique() {
         <div className="devis-summary">
           <div className="devis-summary-row total"><span>Total</span><span>{formatCFA(cartTotal)}</span></div>
         </div>
+        {/* Une seule action primaire : le devis. Le vidage est un lien discret, confirmé. */}
         <div className="cart-actions">
-          <button className="btn btn-outline" onClick={() => { clearCart(); setCartOpen(false); }}>Vider</button>
-          <button className="btn btn-primary btn-block" onClick={handlePayOnline}>
-            <Smartphone size={17} /> Payer en ligne
-          </button>
           <button className="btn btn-accent btn-block" onClick={goToDevis}>
             <FileText size={17} /> Créer le devis
           </button>
+          <button className="btn btn-outline btn-block" onClick={handlePayOnline}>
+            <Smartphone size={17} /> Payer en ligne
+          </button>
         </div>
+        <button
+          type="button"
+          className="btn btn-block text-danger"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => setConfirmClear(true)}
+        >
+          Vider le panier
+        </button>
       </Sheet>
+
+      <ConfirmSheet
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        onConfirm={() => { clearCart(); setCartOpen(false); }}
+        title="Vider le panier"
+        message="Tous les articles seront retirés du panier."
+        confirmLabel="Vider le panier"
+        danger
+      />
 
       {/* Fiche produit détaillée */}
       <Sheet
@@ -297,9 +315,11 @@ export default function Boutique() {
             <img src={detailProduct.image} alt={detailProduct.name} className="detail-image" />
             <div className="sheet-section">
               <div className="sheet-section-title">Caractéristiques</div>
-              {(detailProduct.description || '').split('·').map((spec, i) => spec.trim() && (
-                <div key={i} className="sheet-row"><span className="sheet-label">{spec.trim()}</span></div>
-              ))}
+              <ul className="spec-list">
+                {(detailProduct.description || '').split('·').map((spec, i) => spec.trim() && (
+                  <li key={i}>{spec.trim()}</li>
+                ))}
+              </ul>
               {extractPowerWatts(detailProduct.name) && (
                 <div className="sheet-row">
                   <span className="sheet-label">Puissance</span>
@@ -446,6 +466,16 @@ export default function Boutique() {
           )}
         </form>
       </Sheet>
+
+      <ConfirmSheet
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => { deleteProduct(editing); setEditing(null); }}
+        title="Supprimer ce produit"
+        message={`« ${products.find((p) => p.id === editing)?.name || 'Ce produit'} » sera retiré du catalogue.`}
+        confirmLabel="Supprimer"
+        danger
+      />
     </div>
   );
 }

@@ -2,17 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { formatCFA, formatDate, initials } from '../../utils/format';
+import { formatCFA, formatNombre, formatDate, initials } from '../../utils/format';
 import { fileToResizedDataUrl } from '../../utils/image';
 import { ENSOLEILLEMENT } from '../../data/ensoleillement';
 import Field from '../../components/Field';
+import { useToast } from '../../components/Toast';
 
 export default function MyProfile({ onBack }) {
   const { user } = useAuth();
   const { partners, leads, commissions, ensurePartnerForUser, updatePartner } = useData();
   const fileRef = useRef(null);
   const [form, setForm] = useState(null); // null = lecture
-  const [saved, setSaved] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     ensurePartnerForUser(user);
@@ -37,7 +38,7 @@ export default function MyProfile({ onBack }) {
       const dataUrl = await fileToResizedDataUrl(file, 240, 0.8);
       updatePartner(me.id, { photo: dataUrl });
     } catch {
-      alert('Impossible de lire cette image.');
+      toast('Impossible de lire cette image.', { type: 'error' });
     }
     e.target.value = '';
   };
@@ -52,9 +53,17 @@ export default function MyProfile({ onBack }) {
       momoNumber: form.momoNumber.trim(),
     });
     setForm(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    toast('Modifications enregistrées.');
   };
+
+  // Historique fusionné (commissions + affaires gagnées), trié du plus récent
+  // au plus ancien AVANT découpe — sinon les affaires passaient toujours après.
+  const history = [
+    ...myComs.map((c) => ({ kind: 'commission', date: c.createdAt, item: c })),
+    ...wonLeads.map((l) => ({ kind: 'won', date: l.wonAt, item: l })),
+  ]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 8);
 
   return (
     <>
@@ -77,10 +86,11 @@ export default function MyProfile({ onBack }) {
           {me.tier === 'or' && <span className="tier-badge"><Star size={12} /> OR</span>}
         </div>
         <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'} · <span className="partner-code-chip">{me.code}</span></div>
+        {/* L'unité (F) vit dans le libellé pour garder des valeurs compactes */}
         <div className="profile-stats">
-          <div><div className="profile-stat-value">{formatCFA(pending)}</div><div className="profile-stat-label">Solde en attente</div></div>
-          <div><div className="profile-stat-value">{formatCFA(paid)}</div><div className="profile-stat-label">Commissions payées</div></div>
-          <div><div className="profile-stat-value">{wonLeads.length}</div><div className="profile-stat-label">Affaires gagnées</div></div>
+          <div><div className="profile-stat-value">{formatNombre(pending)}</div><div className="profile-stat-label">En attente (F)</div></div>
+          <div><div className="profile-stat-value">{formatNombre(paid)}</div><div className="profile-stat-label">Payées (F)</div></div>
+          <div><div className="profile-stat-value">{wonLeads.length}</div><div className="profile-stat-label">Gagnées</div></div>
         </div>
       </div>
 
@@ -88,9 +98,7 @@ export default function MyProfile({ onBack }) {
         <div className="profile-edit-header">
           <div className="card-title">Mes informations</div>
           {!form && (
-            <button className="btn btn-sm btn-outline" onClick={startEdit}>
-              {saved ? <><Check size={14} /> Enregistré</> : 'Modifier'}
-            </button>
+            <button className="btn btn-sm btn-outline" onClick={startEdit}>Modifier</button>
           )}
         </div>
         {form ? (
@@ -116,9 +124,9 @@ export default function MyProfile({ onBack }) {
             <Field label="Numéro Mobile Money (réception des commissions)">
               <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+229 ..." />
             </Field>
-            <div className="cart-actions">
-              <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>Annuler</button>
+            <div className="form-actions">
               <button type="submit" className="btn btn-primary btn-block"><Check size={16} /> Enregistrer</button>
+              <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>Annuler</button>
             </div>
           </form>
         ) : (
@@ -134,20 +142,21 @@ export default function MyProfile({ onBack }) {
 
       <div className="card my-partner-section">
         <div className="card-title">Historique récent</div>
-        {myComs.length === 0 && wonLeads.length === 0 && (
+        {history.length === 0 && (
           <div className="text-sm text-secondary">Aucune activité pour le moment.</div>
         )}
-        {myComs.slice(0, 5).map((c) => (
-          <div key={c.id} className="sheet-row">
-            <span className="sheet-label"><Wallet size={14} /> Commission niveau {c.level} · {formatDate(c.createdAt)}</span>
-            <span className="sheet-value">{formatCFA(c.amount)} <span className={`badge ${c.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>{c.status === 'payée' ? 'Payée' : 'En attente'}</span></span>
-          </div>
-        ))}
-        {wonLeads.slice(0, 3).map((l) => (
-          <div key={l.id} className="sheet-row">
-            <span className="sheet-label"><Trophy size={14} /> {l.name} · {formatDate(l.wonAt)}</span>
-            <span className="sheet-value amount">{formatCFA(l.estimatedValue)}</span>
-          </div>
+        {history.map(({ kind, item }) => (
+          kind === 'commission' ? (
+            <div key={item.id} className="sheet-row">
+              <span className="sheet-label"><Wallet size={14} /> Commission niveau {item.level} · {formatDate(item.createdAt)}</span>
+              <span className="sheet-value">{formatCFA(item.amount)} <span className={`badge ${item.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>{item.status === 'payée' ? 'Payée' : 'En attente'}</span></span>
+            </div>
+          ) : (
+            <div key={item.id} className="sheet-row">
+              <span className="sheet-label"><Trophy size={14} /> {item.name} · {formatDate(item.wonAt)}</span>
+              <span className="sheet-value amount">{formatCFA(item.estimatedValue)}</span>
+            </div>
+          )
         ))}
       </div>
     </>

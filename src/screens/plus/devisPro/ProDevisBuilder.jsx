@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, Check, User, Building2, Package } from 'lucide-react';
+import { Plus, Check, User, Building2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
-import { TVA_PCT } from '../../../config/company';
+import EmptyState from '../../../components/EmptyState';
+import LigneEditor from '../../../components/LigneEditor';
+import TvaToggle from '../../../components/TvaToggle';
 
 const EMPTY_CLIENT = { name: '', phone: '', ville: '', type: 'particulier' };
 
@@ -90,7 +92,7 @@ export default function ProDevisBuilder({ onDone }) {
   return (
     <div className="wizard-form card">
       {/* ---- Client ---- */}
-      <div className="wizard-step-title">1. Client</div>
+      <div className="wizard-step-title">Client</div>
       <div className="client-type-toggle" role="group" aria-label="Source du client" style={{ marginBottom: 14 }}>
         <button type="button" className={`client-type-btn ${clientMode === 'existing' ? 'active' : ''}`} onClick={() => setClientMode('existing')} disabled={!myClients.length}>
           Client existant
@@ -135,7 +137,7 @@ export default function ProDevisBuilder({ onDone }) {
       )}
 
       {/* ---- Produits ---- */}
-      <div className="wizard-step-title" style={{ marginTop: 8 }}>2. Produits</div>
+      <div className="wizard-step-title" style={{ marginTop: 8 }}>Produits</div>
       <div className="appliance-picker">
         <select className="input" value={pickerId} onChange={(e) => setPickerId(e.target.value)}>
           <option value="">Ajouter depuis la boutique…</option>
@@ -147,41 +149,19 @@ export default function ProDevisBuilder({ onDone }) {
           <Plus size={16} /> Ajouter
         </button>
       </div>
-      <button type="button" className="btn btn-sm btn-outline facture-add-ligne" onClick={addCustom}>
-        <Package size={14} /> Ajouter un produit personnalisé
-      </button>
 
-      {lignes.length ? (
-        <div className="appliance-list">
-          {lignes.map((l, i) => (
-            <div key={i} className="appliance-row">
-              <div className="appliance-row-main">
-                <input className="input" placeholder="Désignation" aria-label="Désignation" value={l.designation}
-                  onChange={(e) => setLigne(i, { designation: e.target.value })} />
-                <button type="button" className="appliance-delete" onClick={() => removeLigne(i)} aria-label="Supprimer"><Trash2 size={15} /></button>
-              </div>
-              <div className="form-row-2">
-                <Field label="Quantité">
-                  <input className="input" type="number" min="1" value={l.qty} onChange={(e) => setLigne(i, { qty: e.target.value })} />
-                </Field>
-                <Field label="Prix unitaire (F CFA)">
-                  <input className="input" type="number" min="0" value={l.pu} onChange={(e) => setLigne(i, { pu: e.target.value })} placeholder="0" />
-                </Field>
-              </div>
-              <div className="appliance-row-consumption">
-                <span>Sous-total : {formatCFA((Number(l.pu) || 0) * (Number(l.qty) || 0))}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state">Ajoutez des produits de la boutique ou un produit personnalisé.</div>
+      {!lignes.length && (
+        <EmptyState card>Ajoutez des produits de la boutique ou un produit personnalisé.</EmptyState>
       )}
+      <LigneEditor
+        lignes={lignes}
+        onChange={setLigne}
+        onRemove={removeLigne}
+        onAdd={addCustom}
+        addLabel="Ajouter un produit personnalisé"
+      />
 
-      <label className="pro-tva-toggle">
-        <input type="checkbox" checked={tvaActive} onChange={(e) => setTvaActive(e.target.checked)} />
-        Appliquer la TVA {TVA_PCT} % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
-      </label>
+      <TvaToggle value={tvaActive} onChange={setTvaActive} />
 
       <div className="devis-summary">
         <div className="devis-summary-row"><span>Total HT</span><span>{formatCFA(totals.totalHT)}</span></div>
@@ -189,12 +169,14 @@ export default function ProDevisBuilder({ onDone }) {
         <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(totals.totalTTC)}</span></div>
       </div>
 
-      <div className="wizard-actions">
-        <button className="btn btn-outline btn-block" onClick={() => submit('brouillon')} disabled={!canSubmit}>
-          Enregistrer en brouillon
-        </button>
+      {/* Une seule action primaire ; le brouillon reste accessible sans lui
+          disputer le poids visuel. */}
+      <div className="form-actions">
         <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!canSubmit}>
           <Check size={18} /> Créer le devis
+        </button>
+        <button className="btn btn-outline" onClick={() => submit('brouillon')} disabled={!canSubmit}>
+          Brouillon
         </button>
       </div>
     </div>

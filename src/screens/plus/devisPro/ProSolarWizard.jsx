@@ -11,10 +11,17 @@ import {
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
-import { TVA_PCT } from '../../../config/company';
+import TvaToggle from '../../../components/TvaToggle';
 
 let rowSeq = 0;
 const EMPTY_CLIENT = { name: '', phone: '', ville: '', type: 'particulier' };
+
+// Même ordre d'étapes que l'assistant public (client d'abord) : un technicien
+// qui utilise les deux modes garde le même parcours.
+const STEP_NAMES = ['Client', 'Consommation', 'Système & localisation', 'Matériel & devis'];
+
+// Format fr-FR (virgule décimale), cohérent avec le reste de l'app.
+const nbFr = (n, dec = 2) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: dec });
 
 // Accessoires standards ajoutés à tout dimensionnement.
 const accessoryLines = (numberOfPanels) => [
@@ -172,7 +179,7 @@ export default function ProSolarWizard({ onDone }) {
 
   // Semence de la combinaison de batteries (suggestion, dans la marque) à l'étape Matériel.
   useEffect(() => {
-    if (step === 3 && sizing && batteryQty === null) {
+    if (step === 4 && sizing && batteryQty === null) {
       setBatteryQty(suggestBatteryCombo(brandBatteries, sizing.batteryCapacity));
     }
   }, [step, sizing, batteryQty, brandBatteries]);
@@ -258,11 +265,11 @@ export default function ProSolarWizard({ onDone }) {
     onDone();
   };
 
-  const canNext =
-    (step === 1 && totalConsumption > 0) ||
-    step === 2 ||
-    (step === 3 && !!inverter);
   const clientReady = clientMode === 'new' ? newClient.name.trim() : clientId;
+  const canNext =
+    (step === 1 && !!clientReady) ||
+    (step === 2 && totalConsumption > 0) ||
+    step === 3;
 
   return (
     <div className="wizard">
@@ -271,12 +278,45 @@ export default function ProSolarWizard({ onDone }) {
           <div key={s} className={`step-dot ${step >= s ? 'active' : ''} ${step > s ? 'completed' : ''}`} />
         ))}
       </div>
+      <div className="steps-label">Étape {step} sur 4 · {STEP_NAMES[step - 1]}</div>
       <div className="wizard-form card">
-        {/* Étape 1 : consommation */}
+        {/* Étape 1 : client */}
         {step === 1 && (
           <div>
+            <div className="wizard-step-title">Client</div>
+            <div className="client-type-toggle" role="group" aria-label="Source du client" style={{ marginBottom: 14 }}>
+              <button type="button" className={`client-type-btn ${clientMode === 'existing' ? 'active' : ''}`} onClick={() => setClientMode('existing')} disabled={!myClients.length}>Client existant</button>
+              <button type="button" className={`client-type-btn ${clientMode === 'new' ? 'active' : ''}`} onClick={() => setClientMode('new')}><Plus size={15} /> Nouveau client</button>
+            </div>
+            {clientMode === 'existing' ? (
+              <Field label="Choisir un client">
+                <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                  {!myClients.length && <option value="">Aucun client — créez-en un</option>}
+                  {myClients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.ville ? ` — ${c.ville}` : ''}</option>)}
+                </select>
+              </Field>
+            ) : (
+              <>
+                <Field label="Nom du client *"><input className="input" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Nom / raison sociale" /></Field>
+                <div className="client-type-toggle" role="group" aria-label="Type de client" style={{ marginBottom: 14 }}>
+                  <button type="button" className={`client-type-btn ${newClient.type === 'particulier' ? 'active' : ''}`} onClick={() => setNewClient({ ...newClient, type: 'particulier' })}><User size={16} /> Particulier</button>
+                  <button type="button" className={`client-type-btn ${newClient.type === 'entreprise' ? 'active' : ''}`} onClick={() => setNewClient({ ...newClient, type: 'entreprise' })}><Building2 size={16} /> Entreprise</button>
+                </div>
+                <div className="form-row-2">
+                  <Field label="Téléphone"><input className="input" type="tel" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} placeholder="+229 ..." /></Field>
+                  <Field label="Ville"><input className="input" value={newClient.ville} onChange={(e) => setNewClient({ ...newClient, ville: e.target.value })} /></Field>
+                </div>
+                <div className="field-hint" style={{ marginBottom: 8 }}>Ce client sera ajouté à votre carnet.</div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Étape 2 : consommation */}
+        {step === 2 && (
+          <div>
             <div className="wizard-step-header">
-              <div className="wizard-step-title">1. Consommation</div>
+              <div className="wizard-step-title">Estimez la consommation</div>
               <button className="btn btn-sm btn-outline" onClick={() => setManualMode((m) => !m)}>
                 {manualMode ? 'Calculateur' : 'Saisie directe'}
               </button>
@@ -323,10 +363,10 @@ export default function ProSolarWizard({ onDone }) {
                           <button className="appliance-delete" onClick={() => removeRow(r.rowId)} aria-label="Supprimer"><Trash2 size={15} /></button>
                         </div>
                         <div className="appliance-fields">
-                          <label className="appliance-field"><span>Qté</span><input type="number" min="1" value={r.quantity} onChange={(e) => updateRow(r.rowId, 'quantity', Math.max(1, Number(e.target.value)))} /></label>
-                          <label className="appliance-field"><span>Puiss. (W)</span><input type="number" min="0" value={r.power} onChange={(e) => updateRow(r.rowId, 'power', Number(e.target.value))} /></label>
-                          <label className="appliance-field"><span><Sun size={12} /> h jour</span><input type="number" min="0" step="0.5" value={r.day} onChange={(e) => updateRow(r.rowId, 'day', Number(e.target.value))} /></label>
-                          <label className="appliance-field"><span><Moon size={12} /> h nuit</span><input type="number" min="0" step="0.5" value={r.night} onChange={(e) => updateRow(r.rowId, 'night', Number(e.target.value))} /></label>
+                          <label className="appliance-field"><span>Quantité</span><input type="number" min="1" value={r.quantity} onChange={(e) => updateRow(r.rowId, 'quantity', Math.max(1, Number(e.target.value)))} /></label>
+                          <label className="appliance-field"><span>Puissance (W)</span><input type="number" min="0" value={r.power} onChange={(e) => updateRow(r.rowId, 'power', Number(e.target.value))} /></label>
+                          <label className="appliance-field"><span><Sun size={12} /> Heures de jour</span><input type="number" min="0" step="0.5" value={r.day} onChange={(e) => updateRow(r.rowId, 'day', Number(e.target.value))} /></label>
+                          <label className="appliance-field"><span><Moon size={12} /> Heures de nuit</span><input type="number" min="0" step="0.5" value={r.night} onChange={(e) => updateRow(r.rowId, 'night', Number(e.target.value))} /></label>
                         </div>
                       </div>
                     ))}
@@ -335,20 +375,20 @@ export default function ProSolarWizard({ onDone }) {
               </>
             )}
             <div className="consumption-summary">
-              <div className="consumption-stat day"><Sun size={16} /><div><div className="consumption-value">{consumption.day.toFixed(2)}</div><div className="consumption-label">Jour kWh</div></div></div>
-              <div className="consumption-stat night"><Moon size={16} /><div><div className="consumption-value">{consumption.night.toFixed(2)}</div><div className="consumption-label">Nuit kWh</div></div></div>
+              <div className="consumption-stat day"><Sun size={16} /><div><div className="consumption-value">{nbFr(consumption.day)}</div><div className="consumption-label">Jour (kWh)</div></div></div>
+              <div className="consumption-stat night"><Moon size={16} /><div><div className="consumption-value">{nbFr(consumption.night)}</div><div className="consumption-label">Nuit (kWh)</div></div></div>
               {!manualMode && (
                 <div className="consumption-stat peak"><Gauge size={16} /><div><div className="consumption-value">{peakLoad.toLocaleString('fr-FR')}</div><div className="consumption-label">Pic de charge (W)</div></div></div>
               )}
-              <div className="consumption-stat total"><Zap size={16} /><div><div className="consumption-value">{totalConsumption.toFixed(2)}</div><div className="consumption-label">Total / jour</div></div></div>
+              <div className="consumption-stat total"><Zap size={16} /><div><div className="consumption-value">{nbFr(totalConsumption)}</div><div className="consumption-label">Total / jour (kWh)</div></div></div>
             </div>
           </div>
         )}
 
-        {/* Étape 2 : système + aperçu */}
-        {step === 2 && sizing && (
+        {/* Étape 3 : système + aperçu */}
+        {step === 3 && sizing && (
           <div>
-            <div className="wizard-step-title">2. Système & aperçu</div>
+            <div className="wizard-step-title">Type de système & localisation</div>
             <div className="payment-options">
               {SYSTEM_TYPES.map((t) => (
                 <button key={t.id} className={`payment-option ${systemType === t.id ? 'selected' : ''}`} onClick={() => setSystemType(t.id)}>
@@ -409,10 +449,10 @@ export default function ProSolarWizard({ onDone }) {
           </div>
         )}
 
-        {/* Étape 3 : matériel (onduleur + batteries) */}
-        {step === 3 && sizing && (
+        {/* Étape 4 : matériel (onduleur + batteries) + devis */}
+        {step === 4 && sizing && (
           <div>
-            <div className="wizard-step-title">3. Matériel</div>
+            <div className="wizard-step-title">Matériel & devis</div>
 
             {/* --- Onduleur --- */}
             <div className="mat-section-head">
@@ -436,11 +476,11 @@ export default function ProSolarWizard({ onDone }) {
                 </div>
                 {suitableInverters.length > 0 && suitableInverters.length < brandInverters.length && !showAllInverters && (
                   <div className="filter-status" role="status" style={{ marginTop: 8 }}>
-                    {shownInverters.length} modèle{shownInverters.length > 1 ? 's' : ''} adapté{shownInverters.length > 1 ? 's' : ''} affiché{shownInverters.length > 1 ? 's' : ''} sur {brandInverters.length} — les modèles sous-dimensionnés sont masqués.
+                    {brandInverters.length - suitableInverters.length} modèle{brandInverters.length - suitableInverters.length > 1 ? 's' : ''} masqué{brandInverters.length - suitableInverters.length > 1 ? 's' : ''} (puissance insuffisante).
                   </div>
                 )}
                 {suitableInverters.length > 0 && suitableInverters.length < brandInverters.length && (
-                  <label className="pro-tva-toggle">
+                  <label className="checkbox-row">
                     <input type="checkbox" checked={showAllInverters} onChange={(e) => setShowAllInverters(e.target.checked)} />
                     Voir aussi les modèles plus petits
                   </label>
@@ -453,7 +493,8 @@ export default function ProSolarWizard({ onDone }) {
               <span className="mat-section-title"><Battery size={15} /> Batteries</span>
               {systemType !== 'on-grid' && (
                 <span className={`mat-section-need ${totalBatteryCapacity >= sizing.batteryCapacity ? 'ok' : ''}`}>
-                  {totalBatteryCapacity.toFixed(1)} / {sizing.batteryCapacity.toFixed(1)} kWh{totalBatteryCapacity >= sizing.batteryCapacity ? ' ✓' : ''}
+                  {nbFr(totalBatteryCapacity, 1)} / {nbFr(sizing.batteryCapacity, 1)} kWh
+                  {totalBatteryCapacity >= sizing.batteryCapacity && <Check size={12} style={{ verticalAlign: -2, marginLeft: 3 }} />}
                 </span>
               )}
             </div>
@@ -490,72 +531,49 @@ export default function ProSolarWizard({ onDone }) {
                 </button>
               </>
             ) : <div className="empty-state">Aucune batterie dans la boutique.</div>}
-          </div>
-        )}
 
-        {/* Étape 4 : client + devis */}
-        {step === 4 && sizing && inverter && (
-          <div>
-            <div className="wizard-step-title">4. Client & devis</div>
-            <div className="client-type-toggle" role="group" aria-label="Source du client" style={{ marginBottom: 14 }}>
-              <button type="button" className={`client-type-btn ${clientMode === 'existing' ? 'active' : ''}`} onClick={() => setClientMode('existing')} disabled={!myClients.length}>Client existant</button>
-              <button type="button" className={`client-type-btn ${clientMode === 'new' ? 'active' : ''}`} onClick={() => setClientMode('new')}><Plus size={15} /> Nouveau client</button>
-            </div>
-            {clientMode === 'existing' ? (
-              <Field label="Choisir un client">
-                <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                  {!myClients.length && <option value="">Aucun client — créez-en un</option>}
-                  {myClients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.ville ? ` — ${c.ville}` : ''}</option>)}
-                </select>
-              </Field>
-            ) : (
+            {/* Récapitulatif du devis, dès que l'onduleur est arrêté. */}
+            {inverter && (
               <>
-                <Field label="Nom du client *"><input className="input" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Nom / raison sociale" /></Field>
-                <div className="client-type-toggle" role="group" aria-label="Type de client" style={{ marginBottom: 14 }}>
-                  <button type="button" className={`client-type-btn ${newClient.type === 'particulier' ? 'active' : ''}`} onClick={() => setNewClient({ ...newClient, type: 'particulier' })}><User size={16} /> Particulier</button>
-                  <button type="button" className={`client-type-btn ${newClient.type === 'entreprise' ? 'active' : ''}`} onClick={() => setNewClient({ ...newClient, type: 'entreprise' })}><Building2 size={16} /> Entreprise</button>
+                <div className="bom" style={{ marginTop: 18 }}>
+                  <div className="bom-title">Équipements & prestations</div>
+                  {lignes.map((l, i) => (
+                    <div key={i} className="bom-row">
+                      <div className="bom-name">{l.designation}{l.qty > 1 ? <span className="bom-qty"> × {l.qty}</span> : ''}</div>
+                      <div className="bom-price">{formatCFA(l.qty * l.pu)}</div>
+                    </div>
+                  ))}
                 </div>
-                <div className="form-row-2">
-                  <Field label="Téléphone"><input className="input" type="tel" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} placeholder="+229 ..." /></Field>
-                  <Field label="Ville"><input className="input" value={newClient.ville} onChange={(e) => setNewClient({ ...newClient, ville: e.target.value })} /></Field>
+
+                <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
+                  <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
+                </button>
+
+                <TvaToggle value={tvaActive} onChange={setTvaActive} />
+                <div className="devis-summary">
+                  <div className="devis-summary-row"><span>Total HT</span><span>{formatCFA(totals.totalHT)}</span></div>
+                  <div className="devis-summary-row"><span>TVA</span><span>{tvaActive ? formatCFA(totals.tva) : 'Exonérée'}</span></div>
+                  <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(totals.totalTTC)}</span></div>
                 </div>
               </>
             )}
-
-            <div className="bom" style={{ marginTop: 8 }}>
-              <div className="bom-title">Équipements & prestations</div>
-              {lignes.map((l, i) => (
-                <div key={i} className="bom-row">
-                  <div className="bom-name">{l.designation}{l.qty > 1 ? <span className="bom-qty"> × {l.qty}</span> : ''}</div>
-                  <div className="bom-price">{formatCFA(l.qty * l.pu)}</div>
-                </div>
-              ))}
-            </div>
-
-            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
-              <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
-            </button>
-
-            <label className="pro-tva-toggle">
-              <input type="checkbox" checked={tvaActive} onChange={(e) => setTvaActive(e.target.checked)} />
-              Appliquer la TVA {TVA_PCT} % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
-            </label>
-            <div className="devis-summary">
-              <div className="devis-summary-row"><span>Total HT</span><span>{formatCFA(totals.totalHT)}</span></div>
-              <div className="devis-summary-row"><span>TVA</span><span>{tvaActive ? formatCFA(totals.tva) : 'Exonérée'}</span></div>
-              <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(totals.totalTTC)}</span></div>
-            </div>
           </div>
         )}
 
         <div className="wizard-actions">
-          {step > 1 && <button className="btn btn-outline btn-block" onClick={() => setStep(step - 1)}><ChevronLeft size={18} /> Précédent</button>}
+          {step > 1 && (
+            <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => setStep(step - 1)} aria-label="Étape précédente">
+              <ChevronLeft size={18} />
+            </button>
+          )}
           {step < 4 ? (
-            <button className="btn btn-primary btn-block" onClick={() => setStep(step + 1)} disabled={!canNext}>Suivant <ChevronRight size={18} /></button>
+            <button className="btn btn-primary btn-block" onClick={() => setStep(step + 1)} disabled={!canNext}>
+              {STEP_NAMES[step]} <ChevronRight size={18} />
+            </button>
           ) : (
             <>
-              <button className="btn btn-outline btn-block" onClick={() => submit('brouillon')} disabled={!clientReady || !lignes.length}>Brouillon</button>
-              <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!clientReady || !lignes.length}><Check size={18} /> Créer le devis</button>
+              <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!clientReady || !inverter || !lignes.length}><Check size={18} /> Créer le devis</button>
+              <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => submit('brouillon')} disabled={!clientReady || !inverter || !lignes.length}>Brouillon</button>
             </>
           )}
         </div>

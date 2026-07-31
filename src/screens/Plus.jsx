@@ -9,6 +9,8 @@ import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
 import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import ConfirmSheet from '../components/ConfirmSheet';
+import { useToast } from '../components/Toast';
 import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
 import PartnersSection from './plus/PartnersSection';
@@ -53,7 +55,9 @@ export default function Plus() {
   const [subSheetOpen, setSubSheetOpen] = useState(false);
   const [subForm, setSubForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
   const [subSent, setSubSent] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState(null); // sauvegarde lue, en attente de confirmation
   const fileRef = useRef(null);
+  const toast = useToast();
 
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
@@ -61,12 +65,20 @@ export default function Plus() {
     if (!file) return;
     try {
       const backup = await readBackupFile(file);
-      if (window.confirm('Importer cette sauvegarde remplacera les données actuelles. Continuer ?')) {
-        importData(backup);
-        window.alert('Sauvegarde restaurée avec succès.');
-      }
+      setPendingRestore(backup); // confirmation avant remplacement des données
     } catch (err) {
-      window.alert(err.message || 'Import impossible.');
+      toast(err.message || 'Import impossible.', { type: 'error' });
+    }
+  };
+
+  // Numéro Mobile Money pour le paiement de l'abonnement Pro.
+  const PAY_NUMBER = '+229 016 173 2956';
+  const copyPayNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(PAY_NUMBER);
+      toast('Numéro copié.');
+    } catch {
+      toast(`Copie impossible — composez le ${PAY_NUMBER}.`, { type: 'error' });
     }
   };
 
@@ -248,11 +260,11 @@ export default function Plus() {
                   ? `Payée le ${formatDate(commission.paidAt)} · ${PAY_MODE_LABEL[commission.payMode] || 'Mobile Money'}${commission.payRef ? ` · réf. ${commission.payRef}` : ''}`
                   : `Créée le ${formatDate(commission.createdAt)}`}
               </span>
+              {commission.status === 'payée' && <span className="badge badge-success">Payée</span>}
+            </div>
+            <div className="commission-actions">
               {commission.status === 'payée' ? (
-                <span className="com-paid-actions">
-                  <button className="btn btn-sm btn-outline" onClick={() => openRecu(commission)}><Download size={14} /> Reçu</button>
-                  <span className="badge badge-success">Payée</span>
-                </span>
+                <button className="btn btn-sm btn-outline" onClick={() => openRecu(commission)}><Download size={14} /> Reçu</button>
               ) : (
                 <button className="btn btn-won btn-sm" onClick={() => handlePay(commission)}>
                   <CheckCircle size={15} /> Payer…
@@ -329,10 +341,10 @@ export default function Plus() {
             <div className="plus-section-label">Gestion</div>
             <div className="plus-card card">
               <MenuItem icon={Users} title="Équipe" subtitle="Profils des techniciens et performances" onClick={() => setActiveTab('team')} />
-              <MenuItem icon={Users} tone="success" title="Partenaires" subtitle={`${partners.length} partenaires · réseau 2 niveaux`} onClick={() => setActiveTab('partners')} />
+              <MenuItem icon={Users} title="Partenaires" subtitle={`${partners.length} partenaires · réseau 2 niveaux`} onClick={() => setActiveTab('partners')} />
               <MenuItem icon={DollarSign} title="Commandes en ligne" subtitle={`${(orders || []).filter((o) => o.status === 'initie').length} à confirmer`} onClick={() => setActiveTab('orders')} />
-              <MenuItem icon={DollarSign} tone="warning" title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
-              <MenuItem icon={Crown} tone="warning" title="Abonnements Devis Pro" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
+              <MenuItem icon={DollarSign} title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
+              <MenuItem icon={Crown} title="Abonnements Devis Pro" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
             </div>
           </div>
         )}
@@ -347,7 +359,7 @@ export default function Plus() {
         <div className="plus-section">
           <div className="plus-section-label">Apprendre & gagner</div>
           <div className="plus-card card">
-            <MenuItem icon={GraduationCap} tone="success" title="Formation" subtitle="Cours en ligne : modules, leçons et progression" onClick={() => setActiveTab('formation')} />
+            <MenuItem icon={GraduationCap} title="Formation" subtitle="Cours en ligne : modules, leçons et progression" onClick={() => setActiveTab('formation')} />
             <MenuItem icon={Share2} title="Mon espace partenaire" subtitle="Mon code, mon lien, mes commissions" onClick={() => setActiveTab('mypartner')} />
           </div>
         </div>
@@ -377,7 +389,10 @@ export default function Plus() {
 
   return (
     <div className="page">
-      <PageHeader title={TAB_TITLES[activeTab] || 'Plus'} />
+      <PageHeader
+        title={TAB_TITLES[activeTab] || 'Plus'}
+        onBack={activeTab !== 'menu' ? () => navigate('/plus') : undefined}
+      />
       {/* La formation s'étale en large (catalogue + école) ; le reste garde la colonne étroite. */}
       <div className={`page-content ${activeTab === 'formation' ? 'page-content-wide' : 'page-content-narrow'}`}>
         {activeTab === 'menu' && renderMenu()}
@@ -505,9 +520,13 @@ export default function Plus() {
                 <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+229 ..." />
               </Field>
             </div>
+            <p className="text-sm">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} par Mobile Money à ce numéro, puis validez :</p>
+            <div className="copy-block">
+              <span className="copy-block-value">{PAY_NUMBER}</span>
+              <button type="button" className="btn btn-sm btn-outline" onClick={copyPayNumber}>Copier</button>
+            </div>
             <Field label="Référence de la transaction (optionnel)">
               <input className="input" value={subForm.reference} onChange={(e) => setSubForm({ ...subForm, reference: e.target.value })} placeholder="Ex : ID du transfert MoMo" />
-              <div className="field-hint">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} au +229 016 173 2956, puis validez.</div>
             </Field>
             <button type="submit" className="btn btn-accent btn-block btn-lg">
               <Crown size={18} /> S'abonner — {formatCFA(SUBSCRIPTION_PRICE)}/mois
@@ -515,6 +534,20 @@ export default function Plus() {
           </form>
         )}
       </Sheet>
+
+      {/* Confirmation avant restauration d'une sauvegarde (remplace les données) */}
+      <ConfirmSheet
+        open={!!pendingRestore}
+        onClose={() => setPendingRestore(null)}
+        onConfirm={() => {
+          importData(pendingRestore);
+          toast('Sauvegarde restaurée avec succès.');
+        }}
+        title="Restaurer la sauvegarde"
+        message="Importer cette sauvegarde remplacera toutes les données actuelles de l'application."
+        confirmLabel="Restaurer"
+        danger
+      />
     </div>
   );
 }

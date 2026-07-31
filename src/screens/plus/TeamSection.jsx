@@ -73,13 +73,14 @@ export default function TeamSection({ onBack }) {
                     <Phone size={12} /> {partner?.phone || u.phone}{partner?.zone ? ` · ${partner.zone}` : ''}
                   </div>
                 </div>
-                <span className={`badge ${u.role === 'gerant' ? 'badge-warning' : 'badge-success'}`}>
+                {/* Rôles = information, pas états : info pour gérant, neutre pour technicien */}
+                <span className={`badge ${u.role === 'gerant' ? 'badge-info' : 'badge-muted'}`}>
                   {u.role === 'gerant' ? 'Gérant' : 'Technicien'}
                 </span>
               </div>
               <div className="partner-stats">
                 <div className="partner-stat"><div className="partner-stat-value">{myLeads.length}</div><div className="partner-stat-label">Clients suivis</div></div>
-                <div className="partner-stat"><div className="partner-stat-value">{won.length}</div><div className="partner-stat-label">Gagnés · {formatCFA(wonValue)}</div></div>
+                <div className="partner-stat"><div className="partner-stat-value">{formatCFA(wonValue)}</div><div className="partner-stat-label">Gagnés ({won.length})</div></div>
                 <div className="partner-stat"><div className="partner-stat-value">{myDevis.length}</div><div className="partner-stat-label">Devis créés</div></div>
                 <div className={`partner-stat ${pending > 0 ? 'pending' : ''}`}><div className="partner-stat-value">{formatCFA(pending)}</div><div className="partner-stat-label">Comm. en attente</div></div>
               </div>

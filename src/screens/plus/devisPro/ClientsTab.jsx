@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, User, Building2, Phone, MapPin, Check, Pencil, Send, FileText, Receipt } from 'lucide-react';
+import { Plus, User, Building2, Phone, MapPin, Check, Pencil, Send, FileText, Receipt, UserPlus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
-import {formatCFA, formatDate, formatNombre as nf } from '../../../utils/format';
+import { formatCFA, formatDate } from '../../../utils/format';
 import {
   resteAPayer, montantPaye, isEnRetard, statutEffectif,
   STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE, relanceMessage, whatsappLink,
 } from '../../../utils/paiement';
 import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
+import DangerZone from '../../../components/DangerZone';
+import { useToast } from '../../../components/Toast';
 
 const EMPTY = { name: '', phone: '', ville: '', type: 'particulier' };
 
@@ -17,9 +19,17 @@ const norm = (s) => (s || '').trim().toLowerCase();
 /** Onglet « Clients » : carnet du technicien + fiche client (historique, solde, relance). */
 export default function ClientsTab({ company }) {
   const { user } = useAuth();
-  const { proClientsForUser, devis, factures, addProClient, updateProClient, deleteProClient, addRelance } = useData();
+  const { proClientsForUser, devis, factures, addProClient, updateProClient, deleteProClient, addRelance, leadsForUser } = useData();
+  const toast = useToast();
 
   const myClients = proClientsForUser(user.id);
+  // Passerelle avec le carnet public : les clients du pipeline importables
+  // dans le carnet Pro (pas de ressaisie en changeant de mode).
+  const importables = useMemo(() => {
+    const deja = new Set(myClients.map((c) => norm(c.name)));
+    return leadsForUser(user).filter((l) => !deja.has(norm(l.name)));
+  }, [myClients, leadsForUser, user]);
+  const [importOpen, setImportOpen] = useState(false);
   const myDevis = useMemo(() => (devis || []).filter((d) => d.createdBy === user.id), [devis, user.id]);
   const myFactures = useMemo(() => (factures || []).filter((f) => f.userId === user.id), [factures, user.id]);
 
@@ -73,18 +83,29 @@ export default function ClientsTab({ company }) {
     close();
   };
 
-  const removeClient = () => {
-    if (window.confirm(`Supprimer le client « ${form.name} » ?`)) { deleteProClient(editingId); close(); }
-  };
-
   // Relance : cible la facture impayée la plus ancienne (retards d'abord).
-  const relancer = (client, fs) => {
-    const dues = fs.filter((f) => f.statut !== 'brouillon' && resteAPayer(f) > 0)
-      .sort((a, b) => (isEnRetard(b) - isEnRetard(a)) || (new Date(a.createdAt) - new Date(b.createdAt)));
-    const cible = dues[0];
+  // La cible est calculée en amont pour que le bouton NOMME la facture visée
+  // (le client reçoit un message sur une facture, pas sur tout le solde).
+  const factureARelancer = (fs) => fs
+    .filter((f) => f.statut !== 'brouillon' && resteAPayer(f) > 0)
+    .sort((a, b) => (isEnRetard(b) - isEnRetard(a)) || (new Date(a.createdAt) - new Date(b.createdAt)))[0];
+  const relancer = (client, cible) => {
     if (!cible) return;
     window.open(whatsappLink(client.phone, relanceMessage(cible, company)), '_blank', 'noopener');
     addRelance(cible.id, 'whatsapp');
+    toast(`Relance envoyée pour ${cible.numero} (${formatCFA(resteAPayer(cible))}).`);
+  };
+
+  // Import d'un client du carnet public (pipeline) vers le carnet Pro.
+  const importerLead = (l) => {
+    addProClient({
+      userId: user.id,
+      name: l.name,
+      phone: l.phone || '',
+      ville: l.address || '',
+      type: l.clientType === 'entreprise' ? 'entreprise' : 'particulier',
+    });
+    toast(`${l.name} ajouté à votre carnet Pro.`);
   };
 
   const rowKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
@@ -99,6 +120,11 @@ export default function ClientsTab({ company }) {
         <button className="btn btn-accent" onClick={openNew}>
           <Plus size={16} /> Nouveau client
         </button>
+        {importables.length > 0 && (
+          <button className="btn btn-outline" onClick={() => setImportOpen(true)}>
+            <UserPlus size={16} /> Importer depuis mes clients
+          </button>
+        )}
       </div>
       <div className="section-title">Mes clients ({myClients.length})</div>
 
@@ -112,17 +138,21 @@ export default function ClientsTab({ company }) {
                 <div className="flat-row-main">
                   <div className="flat-row-title">{c.name}</div>
                   <div className="flat-row-sub">
-                    {b?.retard ? (
-                      <span className="flat-badge danger">En retard</span>
-                    ) : b?.reste > 0 ? (
-                      <span className="flat-badge warning">Doit {nf(b.reste)} F</span>
-                    ) : (
-                      <span className={`flat-badge ${c.type === 'entreprise' ? '' : 'muted'}`}>{c.type === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
-                    )}
-                    <span className="flat-row-date">{c.phone || c.ville || formatDate(c.createdAt)}</span>
+                    {/* La nature du client vit dans le sous-titre ; l'état de
+                        recouvrement, à droite — une colonne = une information. */}
+                    {b?.retard && <span className="flat-badge danger">En retard</span>}
+                    <span className="flat-row-date">
+                      {c.type === 'entreprise' ? 'Entreprise' : 'Particulier'}
+                      {c.ville ? ` · ${c.ville}` : ''}
+                      {b?.nbFactures ? ` · ${b.nbFactures} facture${b.nbFactures > 1 ? 's' : ''}` : ` · client depuis le ${formatDate(c.createdAt)}`}
+                    </span>
                   </div>
                 </div>
-                {b?.facture > 0 && <div className="flat-row-amount">{nf(b.facture)}<span className="flat-amount-unit">F CFA</span></div>}
+                {b?.reste > 0 ? (
+                  <div className="flat-row-amount">{formatCFA(b.reste)}<span className="flat-amount-unit">reste dû</span></div>
+                ) : b?.facture > 0 ? (
+                  <div className="flat-row-amount"><span className="flat-badge success">Soldé</span></div>
+                ) : null}
               </div>
             );
           })}
@@ -133,10 +163,18 @@ export default function ClientsTab({ company }) {
       <Sheet open={!!viewed} onClose={() => setViewId(null)} title={viewed?.name || ''}>
         {viewed && (
           <div className="doc-actions-list">
-            <div className="sheet-row"><span className="sheet-label">Type</span><span className="sheet-value">{viewed.type === 'entreprise' ? 'Entreprise' : 'Particulier'}</span></div>
-            {viewed.phone && <div className="sheet-row"><span className="sheet-label">Téléphone</span><span className="sheet-value">{viewed.phone}</span></div>}
-            {viewed.ville && <div className="sheet-row"><span className="sheet-label">Ville</span><span className="sheet-value">{viewed.ville}</span></div>}
-            <div className="sheet-row"><span className="sheet-label">Client depuis</span><span className="sheet-value">{formatDate(viewed.createdAt)}</span></div>
+            <div className="sheet-section">
+              <div className="sheet-section-title">Contact</div>
+              <div className="sheet-row"><span className="sheet-label">Type</span><span className="sheet-value">{viewed.type === 'entreprise' ? 'Entreprise' : 'Particulier'}</span></div>
+              {viewed.phone && (
+                <div className="sheet-row">
+                  <span className="sheet-label"><Phone size={14} /> Téléphone</span>
+                  <a className="sheet-value sheet-link" href={`tel:${viewed.phone.replace(/\s/g, '')}`}>{viewed.phone}</a>
+                </div>
+              )}
+              {viewed.ville && <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Ville</span><span className="sheet-value">{viewed.ville}</span></div>}
+              <div className="sheet-row"><span className="sheet-label">Client depuis</span><span className="sheet-value">{formatDate(viewed.createdAt)}</span></div>
+            </div>
 
             <div className="client-bilan">
               <div className="client-bilan-item">
@@ -157,34 +195,45 @@ export default function ClientsTab({ company }) {
               <>
                 <div className="sheet-section-title">Historique ({viewedDocs.devis.length} devis · {viewedDocs.factures.length} facture(s))</div>
                 <div className="client-history">
-                  {viewedDocs.factures.map((f) => {
-                    const eff = statutEffectif(f);
-                    return (
-                      <div key={f.id} className="client-history-row">
-                        <Receipt size={15} />
-                        <span className="client-history-title">{f.numero}</span>
-                        <span className={`flat-badge ${STATUT_EFFECTIF_BADGE[eff]}`}>{STATUT_EFFECTIF_LABEL[eff]}</span>
-                        <span className="client-history-amount">{nf(f.totalTTC)} F</span>
-                      </div>
-                    );
-                  })}
-                  {viewedDocs.devis.map((d) => (
-                    <div key={d.id} className="client-history-row">
-                      <FileText size={15} />
-                      <span className="client-history-title">{d.devisNumber}</span>
-                      <span className={`flat-badge ${d.statut === 'brouillon' ? 'muted' : ''}`}>{d.statut === 'brouillon' ? 'Brouillon' : 'Finalisé'}</span>
-                      <span className="client-history-amount">{nf(d.total)} F</span>
-                    </div>
-                  ))}
+                  {/* Factures et devis fusionnés, du plus récent au plus ancien. */}
+                  {[
+                    ...viewedDocs.factures.map((f) => ({ kind: 'facture', doc: f })),
+                    ...viewedDocs.devis.map((d) => ({ kind: 'devis', doc: d })),
+                  ]
+                    .sort((a, b) => new Date(b.doc.createdAt) - new Date(a.doc.createdAt))
+                    .map(({ kind, doc }) => {
+                      if (kind === 'facture') {
+                        const eff = statutEffectif(doc);
+                        return (
+                          <div key={doc.id} className="client-history-row">
+                            <Receipt size={15} />
+                            <span className="client-history-title">{doc.numero}</span>
+                            <span className={`flat-badge ${STATUT_EFFECTIF_BADGE[eff]}`}>{STATUT_EFFECTIF_LABEL[eff]}</span>
+                            <span className="client-history-amount">{formatCFA(doc.totalTTC)}</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={doc.id} className="client-history-row">
+                          <FileText size={15} />
+                          <span className="client-history-title">{doc.devisNumber}</span>
+                          <span className={`flat-badge ${doc.statut === 'brouillon' ? 'muted' : ''}`}>{doc.statut === 'brouillon' ? 'Brouillon' : 'Finalisé'}</span>
+                          <span className="client-history-amount">{formatCFA(doc.total)}</span>
+                        </div>
+                      );
+                    })}
                 </div>
               </>
             )}
 
-            {viewedBilan?.reste > 0 && viewed.phone && (
-              <button className="btn btn-won btn-block" onClick={() => relancer(viewed, viewedDocs.factures)}>
-                <Send size={16} /> Relancer par WhatsApp ({formatCFA(viewedBilan.reste)})
-              </button>
-            )}
+            {viewedBilan?.reste > 0 && viewed.phone && (() => {
+              const cible = factureARelancer(viewedDocs.factures);
+              return cible ? (
+                <button className="btn btn-won btn-block" onClick={() => relancer(viewed, cible)}>
+                  <Send size={16} /> Relancer {cible.numero} · {formatCFA(resteAPayer(cible))}
+                </button>
+              ) : null;
+            })()}
             <button className="btn btn-outline btn-block" onClick={() => openEdit(viewed)}>
               <Pencil size={16} /> Modifier le client
             </button>
@@ -216,11 +265,33 @@ export default function ClientsTab({ company }) {
           </div>
           <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> {editingId === 'new' ? 'Ajouter le client' : 'Enregistrer'}</button>
           {editingId !== 'new' && (
-            <button type="button" className="btn btn-lost btn-block" style={{ marginTop: 10 }} onClick={removeClient}>
-              <Trash2 size={16} /> Supprimer le client
-            </button>
+            <DangerZone
+              label="Supprimer le client"
+              message={`« ${form.name} » sera retiré de votre carnet Pro. Ses devis et factures existants sont conservés.`}
+              onConfirm={() => { deleteProClient(editingId); close(); }}
+            />
           )}
         </form>
+      </Sheet>
+
+      {/* Import depuis le carnet public (pipeline) */}
+      <Sheet open={importOpen} onClose={() => setImportOpen(false)} title="Importer depuis mes clients"
+        subtitle="Clients de votre suivi commercial absents du carnet Pro">
+        {importables.length ? (
+          <div className="lead-select">
+            {importables.map((l) => (
+              <button key={l.id} type="button" className="lead-select-item" onClick={() => importerLead(l)}>
+                <div className="lead-select-name">{l.name}</div>
+                <div className="lead-select-value">
+                  {l.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}
+                  {l.phone ? ` · ${l.phone}` : ''}{l.address ? ` · ${l.address}` : ''}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-secondary">Tous vos clients du suivi commercial sont déjà dans le carnet Pro.</p>
+        )}
       </Sheet>
     </>
   );

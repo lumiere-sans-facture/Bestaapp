@@ -16,6 +16,9 @@ import { TVA_PCT } from '../../config/company';
 
 let rowSeq = 0;
 
+// Noms des étapes, affichés sous les pastilles de progression.
+const STEP_NAMES = ['Client', 'Consommation', 'Type de système', 'Résultat'];
+
 export default function SolarWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
   const { addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
@@ -212,11 +215,12 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
           <div key={s} className={`step-dot ${step >= s ? 'active' : ''} ${step > s ? 'completed' : ''}`} />
         ))}
       </div>
+      <div className="steps-label">Étape {step} sur 4 · {STEP_NAMES[step - 1]}</div>
       <div className="wizard-form card">
         {/* Étape 1 : client */}
         {step === 1 && (
           <div>
-            <div className="wizard-step-title">1. Sélectionnez un client</div>
+            <div className="wizard-step-title">Sélectionnez un client</div>
             <LeadPicker leads={myLeads} selectedLeadId={selectedLeadId} onSelect={setSelectedLeadId} />
             {selectedLeadId && <PartnerField value={partnerId} />}
           </div>
@@ -226,7 +230,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
         {step === 2 && (
           <div>
             <div className="wizard-step-header">
-              <div className="wizard-step-title">2. Estimez la consommation</div>
+              <div className="wizard-step-title">Estimez la consommation</div>
               <button className="btn btn-sm btn-outline" onClick={() => setManualMode((m) => !m)}>
                 <Calculator size={15} /> {manualMode ? 'Calculateur' : 'Saisie directe'}
               </button>
@@ -315,10 +319,10 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
 
             <div className="consumption-summary">
               <div className="consumption-stat day">
-                <Sun size={16} /><div><div className="consumption-value">{consumption.day.toFixed(2)} kWh</div><div className="consumption-label">Jour</div></div>
+                <Sun size={16} /><div><div className="consumption-value">{consumption.day.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWh</div><div className="consumption-label">Jour</div></div>
               </div>
               <div className="consumption-stat night">
-                <Moon size={16} /><div><div className="consumption-value">{consumption.night.toFixed(2)} kWh</div><div className="consumption-label">Nuit</div></div>
+                <Moon size={16} /><div><div className="consumption-value">{consumption.night.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWh</div><div className="consumption-label">Nuit</div></div>
               </div>
               {!manualMode && (
                 <div className="consumption-stat peak">
@@ -326,7 +330,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
                 </div>
               )}
               <div className="consumption-stat total">
-                <Zap size={16} /><div><div className="consumption-value">{totalConsumption.toFixed(2)} kWh</div><div className="consumption-label">Total / jour</div></div>
+                <Zap size={16} /><div><div className="consumption-value">{totalConsumption.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWh</div><div className="consumption-label">Total / jour</div></div>
               </div>
             </div>
           </div>
@@ -335,7 +339,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
         {/* Étape 3 : type de système */}
         {step === 3 && (
           <div>
-            <div className="wizard-step-title">3. Type de système</div>
+            <div className="wizard-step-title">Type de système</div>
             <div className="payment-options">
               {SYSTEM_TYPES.map((t) => (
                 <button key={t.id} className={`payment-option ${systemType === t.id ? 'selected' : ''}`} onClick={() => setSystemType(t.id)}>
@@ -442,7 +446,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
         {/* Étape 4 : résultat */}
         {step === 4 && sizing && (
           <div>
-            <div className="wizard-step-title">4. Choix du kit et devis</div>
+            <div className="wizard-step-title">Choix du kit et devis</div>
 
             {/* Sélection d'un kit préconfiguré */}
             <div className="kit-selector">
@@ -502,18 +506,24 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
         )}
 
         <div className="wizard-actions">
-          {step > 1 && (
+          {/* Dernière étape : une seule primaire (Créer le devis) ; retour réduit
+              à une flèche et brouillon en action secondaire compacte. */}
+          {step > 1 && (step < 4 ? (
             <button className="btn btn-outline btn-block" onClick={() => setStep(step - 1)}>
               <ChevronLeft size={18} /> Précédent
             </button>
-          )}
+          ) : (
+            <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => setStep(step - 1)} aria-label="Étape précédente">
+              <ChevronLeft size={18} />
+            </button>
+          ))}
           {step < 4 ? (
             <button className="btn btn-primary btn-block" onClick={() => setStep(step + 1)} disabled={!canNext}>
               Suivant <ChevronRight size={18} />
             </button>
           ) : (
             <>
-              <button className="btn btn-outline btn-block" onClick={() => handleSubmit('brouillon')}>
+              <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => handleSubmit('brouillon')}>
                 Brouillon
               </button>
               <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')}>

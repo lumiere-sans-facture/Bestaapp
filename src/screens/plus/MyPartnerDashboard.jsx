@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Check, Copy, MessageCircle, MousePointerClick, Network, Users, Trophy, Wallet, Save } from 'lucide-react';
+import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
 import StageBadge from '../../components/StageBadge';
+import { useToast } from '../../components/Toast';
 
 const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };
 
@@ -16,6 +17,7 @@ export default function MyPartnerDashboard({ onBack }) {
   } = useData();
   const [copied, setCopied] = useState(false);
   const [momo, setMomo] = useState(null); // null = non édité
+  const toast = useToast();
 
   // Crée le profil partenaire de l'utilisateur s'il n'existe pas encore
   useEffect(() => {
@@ -44,7 +46,7 @@ export default function MyPartnerDashboard({ onBack }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.prompt('Copiez le lien :', partnerLink(me.code));
+      toast(`Copie impossible — lien : ${partnerLink(me.code)}`, { type: 'error' });
     }
   };
 
@@ -82,27 +84,23 @@ export default function MyPartnerDashboard({ onBack }) {
         </div>
       </div>
 
-      {/* KPI */}
-      <div className="kpi-grid my-partner-kpis">
-        <div className="kpi-card highlight">
-          <div className="kpi-icon"><Wallet size={20} /></div>
-          <div className="kpi-value">{formatCFA(pending)}</div>
-          <div className="kpi-label">Commissions en attente</div>
+      {/* KPI (mêmes tuiles .stat-pill que les tableaux de bord) */}
+      <div className="stat-strip my-partner-kpis">
+        <div className="stat-pill is-warning">
+          <span className="stat-pill-num">{formatCFA(pending)}</span>
+          <span className="stat-pill-label">Commissions en attente</span>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-icon"><Check size={20} /></div>
-          <div className="kpi-value">{formatCFA(paid)}</div>
-          <div className="kpi-label">Commissions payées</div>
+        <div className="stat-pill is-success">
+          <span className="stat-pill-num">{formatCFA(paid)}</span>
+          <span className="stat-pill-label">Commissions payées</span>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-icon"><Trophy size={20} /></div>
-          <div className="kpi-value">{wonLeads.length}/{l1Leads.length}</div>
-          <div className="kpi-label">Affaires gagnées / apportées</div>
+        <div className="stat-pill is-primary">
+          <span className="stat-pill-num">{wonLeads.length}/{l1Leads.length}</span>
+          <span className="stat-pill-label">Affaires gagnées / apportées</span>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-icon"><MousePointerClick size={20} /></div>
-          <div className="kpi-value">{clicks}</div>
-          <div className="kpi-label">Clics sur mon lien</div>
+        <div className="stat-pill is-info">
+          <span className="stat-pill-num">{clicks}</span>
+          <span className="stat-pill-label">Clics sur mon lien</span>
         </div>
       </div>
 

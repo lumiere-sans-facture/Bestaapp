@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Check, Plus, Trash2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { computeFactureTotals } from '../../utils/facture';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
-import { TVA_PCT } from '../../config/company';
+import LigneEditor from '../../components/LigneEditor';
+import TvaToggle from '../../components/TvaToggle';
 
 /**
  * Édition d'un devis (finalisé ou brouillon), commun au mode public et Pro.
@@ -18,6 +19,7 @@ import { TVA_PCT } from '../../config/company';
 export default function DevisEditSheet({ open, onClose, devis, editableClient = false, withTva = false }) {
   const { products, updateDevis } = useData();
   const [lignes, setLignes] = useState([]);
+  const [chargement, setChargement] = useState(false);
   const [client, setClient] = useState({ clientName: '', clientPhone: '', clientVille: '' });
   const [tvaActive, setTvaActive] = useState(false);
 
@@ -26,8 +28,11 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
     setClient({ clientName: devis.clientName || '', clientPhone: devis.clientPhone || '', clientVille: devis.clientVille || '' });
     setTvaActive(!!devis.tvaActive);
     // Lignes initiales (dérivées du devis : Pro/édité → stockées, solaire/manuel → composées).
+    // L'import est asynchrone : on l'affiche, plutôt que d'ouvrir un panneau vide.
+    setChargement(true);
     import('../../utils/proDocPdf').then(({ devisToLignes }) => {
       setLignes(devisToLignes(devis, products).map((l) => ({ designation: l.designation, qty: l.qty, pu: l.pu })));
+      setChargement(false);
     });
   }, [open, devis, products]);
 
@@ -83,29 +88,16 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
       )}
 
       <div className="sheet-section-title">Lignes du devis</div>
-      {lignes.map((l, i) => (
-        <div key={i} className="facture-ligne">
-          <input className="input" placeholder="Désignation" aria-label="Désignation" value={l.designation}
-            onChange={(e) => setLigne(i, { designation: e.target.value })} />
-          <input className="input facture-qty" type="number" min="1" placeholder="Qté" aria-label="Quantité" value={l.qty}
-            onChange={(e) => setLigne(i, { qty: e.target.value })} />
-          <input className="input facture-pu" type="number" min="0" placeholder="P.U. (F CFA)" aria-label="Prix unitaire en F CFA" value={l.pu}
-            onChange={(e) => setLigne(i, { pu: e.target.value })} />
-          {lignes.length > 1 && (
-            <button type="button" className="cart-row-remove" onClick={() => removeLigne(i)} aria-label="Supprimer la ligne"><Trash2 size={14} /></button>
-          )}
-        </div>
-      ))}
-      <button type="button" className="btn btn-sm btn-outline facture-add-ligne" onClick={addLigne}>
-        <Plus size={14} /> Ajouter une ligne
-      </button>
-
-      {withTva && (
-        <label className="pro-tva-toggle">
-          <input type="checkbox" checked={tvaActive} onChange={(e) => setTvaActive(e.target.checked)} />
-          Appliquer la TVA {TVA_PCT} % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
-        </label>
+      {chargement ? (
+        <div className="geo-loading">Chargement des lignes…</div>
+      ) : (
+        <LigneEditor lignes={lignes} onChange={setLigne} onRemove={removeLigne} onAdd={addLigne} />
       )}
+      {!chargement && lignes.length > 0 && !clean().length && (
+        <div className="field-hint">Une ligne sans désignation ou sans prix n'est pas enregistrée — complétez au moins une ligne.</div>
+      )}
+
+      {withTva && <TvaToggle value={tvaActive} onChange={setTvaActive} />}
 
       <div className="devis-summary">
         {withTva ? (

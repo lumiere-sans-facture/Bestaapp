@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass, MoreVertical, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -51,7 +52,9 @@ export default function Pipeline() {
     else requestStageChange(leadId, stageId, user.id);
   };
 
-  const [selectedLeadId, setSelectedLeadId] = useState(null);
+  // « Suivi commercial » depuis la fiche client : ouvre directement l'affaire.
+  const location = useLocation();
+  const [selectedLeadId, setSelectedLeadId] = useState(location.state?.leadId ?? null);
   // Déplacement sans glisser : indispensable au doigt (le drag HTML5 n'émet
   // aucun événement tactile sur Android/iOS).
   const [stagePickerId, setStagePickerId] = useState(null);

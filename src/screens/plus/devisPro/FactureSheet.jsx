@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Check, Plus, Trash2 } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { computeFactureTotals } from '../../../utils/facture';
+import { DAY_MS } from '../../../utils/date';
 import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
+import LigneEditor from '../../../components/LigneEditor';
+import TvaToggle from '../../../components/TvaToggle';
 import { MODELES, EMPTY_LIGNE } from './constants';
-import { TVA_PCT } from '../../../config/company';
 
 const emptyForm = (tvaActive, modele) => ({
   clientName: '', clientPhone: '', clientVille: '', echeance: '',
@@ -89,8 +91,26 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
   );
 
   return (
-    <Sheet open={open} onClose={onClose} title={initial ? `Modifier ${initial.numero}` : 'Nouvelle facture'}>
-      <form onSubmit={(e) => { e.preventDefault(); save(initial ? (initial.statut || 'emise') : 'emise'); }}>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={initial ? `Modifier ${initial.numero}` : 'Nouvelle facture'}
+      footer={
+        initial ? (
+          <button type="submit" form="facture-form" className="btn btn-primary btn-block">
+            <Check size={17} /> Enregistrer les modifications
+          </button>
+        ) : (
+          <div className="form-actions" style={{ marginTop: 0 }}>
+            <button type="submit" form="facture-form" className="btn btn-primary btn-block">
+              <Check size={17} /> Créer la facture
+            </button>
+            <button type="button" className="btn btn-outline" onClick={() => save('brouillon')}>Brouillon</button>
+          </div>
+        )
+      }
+    >
+      <form id="facture-form" onSubmit={(e) => { e.preventDefault(); save(initial ? (initial.statut || 'emise') : 'emise'); }}>
         {!initial && (
           <div className="client-type-toggle" role="group" aria-label="Source du client" style={{ marginBottom: 14 }}>
             <button type="button" className={`client-type-btn ${clientMode === 'existing' ? 'active' : ''}`}
@@ -130,35 +150,28 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
           <input className="input" type="date" value={form.echeance}
             onChange={(e) => setForm({ ...form, echeance: e.target.value })} />
         </Field>
+        {/* Raccourcis d'échéance : les deux cas courants sans clavier. */}
+        <div className="pay-quick">
+          <button type="button" className="btn btn-sm btn-outline"
+            onClick={() => setForm({ ...form, echeance: new Date(Date.now() + 30 * DAY_MS).toISOString().slice(0, 10) })}>
+            30 jours
+          </button>
+          <button type="button" className="btn btn-sm btn-outline"
+            onClick={() => setForm({ ...form, echeance: new Date().toISOString().slice(0, 10) })}>
+            À réception
+          </button>
+        </div>
         <div className="field-hint">Laisser vide pour appliquer le délai par défaut (30 jours).</div>
 
         <div className="sheet-section-title">Lignes de la facture *</div>
-        {form.lignes.map((l, i) => (
-          <div key={i} className="facture-ligne">
-            <input className="input" placeholder="Désignation" aria-label="Désignation" value={l.designation}
-              onChange={(e) => setLigne(i, { designation: e.target.value })} />
-            <input className="input facture-qty" type="number" min="1" placeholder="Qté" aria-label="Quantité" value={l.qty}
-              onChange={(e) => setLigne(i, { qty: e.target.value })} />
-            <input className="input facture-pu" type="number" min="0" placeholder="P.U. (F CFA)" aria-label="Prix unitaire en F CFA" value={l.pu}
-              onChange={(e) => setLigne(i, { pu: e.target.value })} />
-            {form.lignes.length > 1 && (
-              <button type="button" className="cart-row-remove"
-                onClick={() => setForm({ ...form, lignes: form.lignes.filter((_, j) => j !== i) })}>
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-        ))}
-        <button type="button" className="btn btn-sm btn-outline facture-add-ligne"
-          onClick={() => setForm({ ...form, lignes: [...form.lignes, { ...EMPTY_LIGNE }] })}>
-          <Plus size={14} /> Ajouter une ligne
-        </button>
+        <LigneEditor
+          lignes={form.lignes}
+          onChange={setLigne}
+          onRemove={(i) => setForm({ ...form, lignes: form.lignes.filter((_, j) => j !== i) })}
+          onAdd={() => setForm({ ...form, lignes: [...form.lignes, { ...EMPTY_LIGNE }] })}
+        />
 
-        <label className="pro-tva-toggle">
-          <input type="checkbox" checked={form.tvaActive}
-            onChange={(e) => setForm({ ...form, tvaActive: e.target.checked })} />
-          Appliquer la TVA {TVA_PCT} % <span className="text-secondary">(exonérée par défaut sur le solaire au Bénin)</span>
-        </label>
+        <TvaToggle value={form.tvaActive} onChange={(v) => setForm({ ...form, tvaActive: v })} />
 
         <Field label="Modèle de document">
           <select className="input" value={form.modele || modeleDefaut} onChange={(e) => setForm({ ...form, modele: e.target.value })}>
@@ -171,14 +184,6 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
           <div className="devis-summary-row"><span>TVA</span><span>{form.tvaActive ? formatCFA(preview.tva) : 'Exonérée'}</span></div>
           <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(preview.totalTTC)}</span></div>
         </div>
-        {initial ? (
-          <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer les modifications</button>
-        ) : (
-          <div className="wizard-actions">
-            <button type="button" className="btn btn-outline btn-block" onClick={() => save('brouillon')}>Enregistrer en brouillon</button>
-            <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Créer la facture</button>
-          </div>
-        )}
       </form>
     </Sheet>
   );

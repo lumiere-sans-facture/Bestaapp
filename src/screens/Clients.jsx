@@ -176,36 +176,43 @@ export default function Clients() {
       <Sheet open={!!selectedClient} onClose={() => setSelected(null)} title={selectedClient?.name || ''}>
         {selectedClient && (
           <>
-            <div className="sheet-row"><span className="sheet-label"><User size={14} /> Contact</span><span className="sheet-value">{selectedClient.contact}</span></div>
-            {selectedClient.phone && (
+            <div className="sheet-section">
+              <div className="sheet-section-title">Contact</div>
+              <div className="sheet-row"><span className="sheet-label"><User size={14} /> Contact</span><span className="sheet-value">{selectedClient.contact}</span></div>
+              {selectedClient.phone && (
+                <div className="sheet-row">
+                  <span className="sheet-label"><Phone size={14} /> Téléphone</span>
+                  <a className="sheet-value sheet-link" href={`tel:${selectedClient.phone.replace(/\s/g, '')}`}>{selectedClient.phone}</a>
+                </div>
+              )}
+              {selectedClient.address && (
+                <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Adresse</span><span className="sheet-value">{selectedClient.address}</span></div>
+              )}
               <div className="sheet-row">
-                <span className="sheet-label"><Phone size={14} /> Téléphone</span>
-                <span className="sheet-value"><a href={`tel:${selectedClient.phone}`}>{selectedClient.phone}</a></span>
+                <span className="sheet-label">{selectedClient.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type</span>
+                <span className="sheet-value">{selectedClient.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
               </div>
-            )}
-            {selectedClient.address && (
-              <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Adresse</span><span className="sheet-value">{selectedClient.address}</span></div>
-            )}
-            <div className="sheet-row">
-              <span className="sheet-label">{selectedClient.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type</span>
-              <span className="sheet-value">{selectedClient.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
             </div>
-            <div className="sheet-row">
-              <span className="sheet-label"><FolderKanban size={14} /> Étape</span>
-              <span className="sheet-value">
-                {(() => { const st = stageInfo(selectedClient); return st ? <StageBadge stage={st} /> : '—'; })()}
-              </span>
-            </div>
-            {selectedClient.estimatedValue > 0 && (
-              <div className="sheet-row"><span className="sheet-label">Valeur de l'affaire</span><span className="sheet-value amount">{formatCFA(selectedClient.estimatedValue)}</span></div>
-            )}
-            {apporteur && (
+
+            <div className="sheet-section">
+              <div className="sheet-section-title">Suivi commercial</div>
               <div className="sheet-row">
-                <span className="sheet-label"><UserCheck size={14} /> Apporteur</span>
-                <span className="sheet-value">{apporteur.name} <span className="partner-code-chip">{apporteur.code}</span></span>
+                <span className="sheet-label"><FolderKanban size={14} /> Étape</span>
+                <span className="sheet-value">
+                  {(() => { const st = stageInfo(selectedClient); return st ? <StageBadge stage={st} /> : '—'; })()}
+                </span>
               </div>
-            )}
-            <div className="sheet-row"><span className="sheet-label">Ajouté le</span><span className="sheet-value">{formatDate(selectedClient.createdAt)}</span></div>
+              {selectedClient.estimatedValue > 0 && (
+                <div className="sheet-row"><span className="sheet-label">Valeur de l'affaire</span><span className="sheet-value amount">{formatCFA(selectedClient.estimatedValue)}</span></div>
+              )}
+              {apporteur && (
+                <div className="sheet-row">
+                  <span className="sheet-label"><UserCheck size={14} /> Apporteur</span>
+                  <span className="sheet-value">{apporteur.name} <span className="partner-code-chip">{apporteur.code}</span></span>
+                </div>
+              )}
+              <div className="sheet-row"><span className="sheet-label">Ajouté le</span><span className="sheet-value">{formatDate(selectedClient.createdAt)}</span></div>
+            </div>
             {selectedClient.notes && <p className="text-sm text-secondary client-sheet-notes">{selectedClient.notes}</p>}
 
             <div className="client-sheet-actions">
@@ -220,7 +227,9 @@ export default function Clients() {
                   <MessageCircle size={16} /> WhatsApp
                 </a>
               )}
-              <button className="btn btn-outline" onClick={() => navigate('/pipeline')}>
+              {/* Le client est transmis au kanban via l'état de navigation
+                  (fiche à ouvrir à l'arrivée — branchement côté Pipeline à venir). */}
+              <button className="btn btn-outline" onClick={() => navigate('/pipeline', { state: { leadId: selectedClient.id } })}>
                 <FolderKanban size={16} /> Suivi commercial
               </button>
             </div>

@@ -4,9 +4,10 @@ import { FileText, Plus, Download, Search, Check, Trash2, Pencil } from 'lucide-
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
-import {formatCFA, formatDate, formatNombre as nf } from '../utils/format';
+import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import ConfirmSheet from '../components/ConfirmSheet';
 import DevisCreator from './devis/DevisCreator';
 import DevisEditSheet from './devis/DevisEditSheet';
 
@@ -57,6 +58,8 @@ export default function Devis() {
   const [sortBy, setSortBy] = useState('recent');
   const [editDevis, setEditDevis] = useState(null);
   const [actions, setActions] = useState(null);
+  // Brouillon en attente de confirmation de suppression (remplace window.confirm).
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const runAction = (fn) => { fn(); setActions(null); };
   const rowKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
 
@@ -152,7 +155,7 @@ export default function Devis() {
                         <span className="flat-row-date">{formatDate(d.createdAt)} · {d.type === 'solar' ? 'Solaire' : 'Comptant'}</span>
                       </div>
                     </div>
-                    <div className="flat-row-amount">{nf(d.total)}<span className="flat-amount-unit">F CFA</span></div>
+                    <div className="flat-row-amount">{formatCFA(d.total)}</div>
                   </div>
                 );
               })}
@@ -174,12 +177,21 @@ export default function Devis() {
               {actions.statut === 'brouillon' && (
                 <>
                   <button className="btn btn-won btn-block" onClick={() => runAction(() => updateDevis(actions.id, { statut: 'finalise' }))}><Check size={16} /> Finaliser</button>
-                  <button className="btn btn-lost btn-block" onClick={() => { if (window.confirm('Supprimer ce brouillon ?')) runAction(() => deleteDevis(actions.id)); }}><Trash2 size={16} /> Supprimer le brouillon</button>
+                  <button className="btn btn-lost btn-block" onClick={() => setConfirmDelete(actions.id)}><Trash2 size={16} /> Supprimer le brouillon</button>
                 </>
               )}
             </div>
           )}
         </Sheet>
+        <ConfirmSheet
+          open={!!confirmDelete}
+          onClose={() => setConfirmDelete(null)}
+          onConfirm={() => { deleteDevis(confirmDelete); setActions(null); }}
+          title="Supprimer ce brouillon"
+          message="Le brouillon sera définitivement supprimé."
+          confirmLabel="Supprimer"
+          danger
+        />
       </div>
     );
   }

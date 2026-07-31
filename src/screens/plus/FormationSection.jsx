@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Pencil, Check, PlayCircle, FileText, AlignLeft,
-  Clock, ExternalLink, Trash2, GraduationCap, CheckCircle2, Circle, BookOpen, Layers,
+  Clock, ExternalLink, GraduationCap, CheckCircle2, Circle, BookOpen, Layers,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -13,6 +13,7 @@ import {
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
+import DangerZone from '../../components/DangerZone';
 
 const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText };
 const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document' };
@@ -110,8 +111,8 @@ export default function FormationSection({ onBack }) {
     else updateFormation(courseEdit, data);
     setCourseEdit(null);
   };
+  // Suppressions : la confirmation est portée par <DangerZone> dans chaque panneau.
   const removeCourse = () => {
-    if (!window.confirm('Supprimer ce cours et tout son contenu ?')) return;
     deleteFormation(courseEdit);
     setCourseEdit(null);
     if (courseId === courseEdit) { setCourseId(null); setLeconId(null); }
@@ -126,7 +127,6 @@ export default function FormationSection({ onBack }) {
     setModuleEdit(null);
   };
   const removeModule = () => {
-    if (!window.confirm('Supprimer ce module et ses leçons ?')) return;
     deleteModule(course.id, moduleEdit.id);
     setModuleEdit(null);
     setLeconId(null);
@@ -148,7 +148,6 @@ export default function FormationSection({ onBack }) {
     setLeconEdit(null);
   };
   const removeLecon = () => {
-    if (!window.confirm('Supprimer cette leçon ?')) return;
     deleteLecon(course.id, leconEdit.moduleId, leconEdit.id);
     if (leconId === leconEdit.id) setLeconId(null);
     setLeconEdit(null);
@@ -286,7 +285,7 @@ export default function FormationSection({ onBack }) {
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLecon(l); } }}>
                     {done(l.id) ? <CheckCircle2 size={17} className="school-lecon-check ok" /> : <Circle size={17} className="school-lecon-check" />}
                     <span className="school-lecon-title">{l.title}</span>
-                    <span className="school-lecon-meta"><Icon size={13} />{l.duration && ` ${l.duration}`}</span>
+                    <span className="school-lecon-meta"><Icon size={13} /> {LECON_TYPE_LABEL[l.type] || 'Leçon'}{l.duration ? ` · ${l.duration}` : ''}</span>
                     {isManager && (
                       <button className="school-edit-btn" aria-label="Modifier la leçon"
                         onClick={(e) => {
@@ -369,7 +368,7 @@ export default function FormationSection({ onBack }) {
                   <ChevronLeft size={15} /> Précédent
                 </button>
                 {!done(lecon.id) ? (
-                  <button className="btn btn-won lesson-nav-main" onClick={finishAndNext}>
+                  <button className="btn btn-primary lesson-nav-main" onClick={finishAndNext}>
                     <Check size={16} /> {next ? 'Terminer et continuer' : 'Terminer la leçon'}
                   </button>
                 ) : next ? (
@@ -401,12 +400,14 @@ export default function FormationSection({ onBack }) {
             <input className="input" required value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder="Ex : Dimensionner une installation" />
           </Field>
           <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer</button>
-          {moduleEdit?.id !== 'new' && (
-            <button type="button" className="btn btn-lost btn-block" style={{ marginTop: 10 }} onClick={removeModule}>
-              <Trash2 size={16} /> Supprimer le module
-            </button>
-          )}
         </form>
+        {moduleEdit?.id !== 'new' && (
+          <DangerZone
+            label="Supprimer le module"
+            message="Le module et toutes ses leçons seront supprimés."
+            onConfirm={removeModule}
+          />
+        )}
       </Sheet>
 
       {/* Formulaire leçon */}
@@ -448,12 +449,14 @@ export default function FormationSection({ onBack }) {
             </Field>
           )}
           <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer</button>
-          {leconEdit?.id !== 'new' && (
-            <button type="button" className="btn btn-lost btn-block" style={{ marginTop: 10 }} onClick={removeLecon}>
-              <Trash2 size={16} /> Supprimer la leçon
-            </button>
-          )}
         </form>
+        {leconEdit?.id !== 'new' && (
+          <DangerZone
+            label="Supprimer la leçon"
+            message="La leçon et la progression associée seront supprimées."
+            onConfirm={removeLecon}
+          />
+        )}
       </Sheet>
 
       <CourseFormSheet open={!!courseEdit} isNew={courseEdit === 'new'} form={courseForm} setForm={setCourseForm}
@@ -477,12 +480,14 @@ function CourseFormSheet({ open, isNew, form, setForm, onClose, onSubmit, onDele
           <textarea className="input" rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
         <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer</button>
-        {!isNew && (
-          <button type="button" className="btn btn-lost btn-block" style={{ marginTop: 10 }} onClick={onDelete}>
-            <Trash2 size={16} /> Supprimer le cours
-          </button>
-        )}
       </form>
+      {!isNew && (
+        <DangerZone
+          label="Supprimer le cours"
+          message="Le cours, ses modules et ses leçons seront supprimés."
+          onConfirm={onDelete}
+        />
+      )}
     </Sheet>
   );
 }
