@@ -24,15 +24,26 @@
   --warning-light: #fef3c7;
   --error: #ef4444;
   --error-light: #fee2e2;
-  --error-text: #bb3535;
+  --error-text: #bb3535;   /* texte rouge : AA sur blanc et --error-light */
   --success-text: #047857;
+  --warning-dark: #92400e; /* texte orange foncé : AA sur --warning-light */
+  --info: #2563eb;
+  --info-light: rgba(59, 130, 246, 0.12);
   --border: #e5e7eb;
   --shadow: 0 2px 8px rgba(10, 36, 114, 0.08);
   --shadow-lg: 0 8px 30px rgba(10, 36, 114, 0.16);
   --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --control-h: 46px;  /* hauteur standard d'un champ / contrôle */
+  --tap: 44px;        /* cible tactile minimale, souris comprise */
   --sidebar-width: 264px;
   --tab-bar-height: 64px;
 }
+
+/* Focus clavier visible sur tout élément interactif (fonds sombres : orange). */
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { font-size: 16px; -webkit-text-size-adjust: 100%; }
@@ -70,8 +81,9 @@ img { max-width: 100%; }
 .btn-lg { padding: 15px 28px; font-size: 1.0625rem; }
 .btn-block { width: 100%; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-won { background: var(--success); color: white; }
-.btn-lost { background: white; border: 1.5px solid var(--error); color: var(--error); }
+/* Gagné / Perdu : même poids visuel (le plein reste à l'action primaire). */
+.btn-won { background: white; border: 1.5px solid var(--success); color: var(--success-text); }
+.btn-lost { background: white; border: 1.5px solid var(--error); color: var(--error-text); }
 
 /* ============ Champs de saisie ============ */
 .input {
@@ -89,25 +101,14 @@ textarea.input { resize: vertical; }
   display: inline-flex; align-items: center; padding: 4px 10px;
   border-radius: 6px; font-size: 0.75rem; font-weight: 500; white-space: nowrap;
 }
-.badge-success { background: var(--success-light); color: #047857; }
-.badge-warning { background: var(--warning-light); color: #92400e; }
-.badge-muted { background: var(--bg); color: var(--text-muted); }
+.badge-success { background: var(--success-light); color: var(--success-text); }
+.badge-warning { background: var(--warning-light); color: var(--warning-dark); }
+.badge-muted { background: var(--bg); color: var(--text-secondary); }
+.badge-info { background: rgba(26, 58, 140, 0.12); color: var(--primary-light); }
+.badge-danger { background: var(--error-light); color: var(--error-text); }
 
-/* ============ KPI ============ */
-.kpi-card { background: white; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
-.kpi-card.highlight { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; }
-.kpi-card.highlight .kpi-value { color: white; }
-.kpi-card.highlight .kpi-label { color: rgba(255, 255, 255, 0.7); }
-.kpi-card.highlight .kpi-icon { background: rgba(255, 255, 255, 0.15); color: white; }
-.kpi-icon {
-  width: 38px; height: 38px; border-radius: 10px; margin-bottom: 10px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--bg); color: var(--primary);
-}
-.kpi-value { font-size: 1.375rem; font-weight: 700; color: var(--primary); overflow-wrap: anywhere; }
-.kpi-label { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 2px; }
-
-/* ============ Mini-cartes statistiques (stat-pill) ============ */
+/* ============ Mini-cartes statistiques (stat-pill) ============
+   Famille UNIQUE de carte de stat de l'app (.kpi-* a été supprimé). */
 .stat-pill {
   display: flex; align-items: center; gap: 12px;
   background: white; border-radius: var(--radius);
@@ -123,11 +124,11 @@ textarea.input { resize: vertical; }
 }
 .stat-pill-label { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.25; }
 .stat-pill.is-primary .stat-pill-num { background: rgba(10, 36, 114, 0.1); color: var(--primary); }
-.stat-pill.is-info    .stat-pill-num { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
-.stat-pill.is-accent  .stat-pill-num { background: var(--accent); color: white; }
-.stat-pill.is-warning .stat-pill-num { background: var(--warning-light); color: #92400e; }
-.stat-pill.is-success .stat-pill-num { background: var(--success-light); color: #047857; }
-.stat-pill.is-error   .stat-pill-num { background: var(--error-light); color: var(--error); }
+.stat-pill.is-info    .stat-pill-num { background: var(--info-light); color: var(--info); }
+.stat-pill.is-accent  .stat-pill-num { background: var(--accent); color: var(--primary); }
+.stat-pill.is-warning .stat-pill-num { background: var(--warning-light); color: var(--warning-dark); }
+.stat-pill.is-success .stat-pill-num { background: var(--success-light); color: var(--success-text); }
+.stat-pill.is-error   .stat-pill-num { background: var(--error-light); color: var(--error-text); }
 
 /* ============ Anneaux (donut SVG) ============ */
 .ring { position: relative; display: inline-flex; align-items: center; justify-content: center; }
@@ -151,10 +152,11 @@ textarea.input { resize: vertical; }
 /* ============ Stepper d'étapes (chevrons) ============ */
 .stage-stepper { display: flex; }
 .stage-step {
-  flex: 1; min-width: 0; padding: 9px 4px 9px 10px;
+  flex: 1; min-width: 0; padding: 6px 6px 6px 12px; min-height: var(--tap);
+  display: flex; align-items: center; justify-content: center;
   background: var(--bg); color: var(--text-secondary);
-  font-size: 0.6875rem; font-weight: 600; text-align: center;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 0.75rem; font-weight: 600; text-align: center;
+  white-space: normal; line-height: 1.15; overflow-wrap: anywhere;
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
   margin-left: -4px; transition: background 0.15s ease, color 0.15s ease;
 }
@@ -188,9 +190,9 @@ textarea.input { resize: vertical; }
   font-size: 0.625rem; font-weight: 700; letter-spacing: 0.03em;
   padding: 3px 7px; border-radius: 5px; flex-shrink: 0; min-width: 64px; text-align: center;
 }
-.sev-critique { background: var(--error-light); color: var(--error); }
-.sev-alerte   { background: var(--warning-light); color: #92400e; }
-.sev-info     { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.sev-critique { background: var(--error-light); color: var(--error-text); }
+.sev-alerte   { background: var(--warning-light); color: var(--warning-dark); }
+.sev-info     { background: var(--info-light); color: var(--info); }
 .alert-feed-text { min-width: 0; }
 .alert-feed-title { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
 .alert-feed-entity { font-size: 0.75rem; color: var(--text-secondary); }
@@ -218,6 +220,85 @@ textarea.input { resize: vertical; }
 .sheet-label { font-size: 0.875rem; color: var(--text-secondary); }
 .sheet-value { font-size: 0.875rem; font-weight: 500; text-align: right; }
 .sheet-value.amount { font-weight: 700; color: var(--primary); }
+
+/* ============ Segmented (choix exclusif à n options) ============ */
+.segmented { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+.segmented-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); padding: 10px 8px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: white;
+  font-weight: 500; font-size: 0.9375rem; color: var(--text-secondary); text-align: center;
+}
+.segmented-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+
+/* ============ Callout (encart d'attention teinté) ============ */
+.callout { background: var(--warning-light); border-radius: var(--radius); padding: 12px 14px; }
+.callout-title {
+  display: flex; align-items: center; gap: 7px; font-size: 0.8125rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.03em; color: var(--warning-dark);
+}
+
+/* ============ Case à cocher confortable (44 px) ============ */
+.checkbox-row { display: flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 8px 0; font-size: 0.875rem; cursor: pointer; }
+.checkbox-row input { width: 22px; height: 22px; accent-color: var(--primary); }
+
+/* ============ Liste plate (devis, factures, clients) ============ */
+.flat-list { background: white; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.flat-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 15px 16px; border-bottom: 1px solid var(--border); background: white; cursor: pointer;
+}
+.flat-row:last-child { border-bottom: none; }
+.flat-row:hover { background: var(--bg); }
+.flat-row-main { flex: 1; min-width: 0; }
+.flat-row-title { font-size: 1rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flat-row-sub { display: flex; align-items: center; gap: 10px; margin-top: 7px; }
+.flat-badge { flex-shrink: 0; padding: 3px 11px; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 700; background: rgba(10, 36, 114, 0.1); color: var(--primary); }
+.flat-badge.success { background: var(--success-light); color: var(--success-text); }
+.flat-badge.warning { background: var(--warning-light); color: var(--warning-dark); }
+.flat-badge.muted { background: var(--bg); color: var(--text-secondary); }
+.flat-badge.danger { background: var(--error-light); color: var(--error-text); }
+.flat-row-amount { flex-shrink: 0; font-size: 1rem; font-weight: 700; white-space: nowrap; }
+
+/* ============ Barre d'enregistrement collante + actions de formulaire ===== */
+.form-actions { display: flex; gap: 10px; margin-top: 14px; }
+.form-actions .btn-block { flex: 1; width: auto; }
+.form-actions-sticky {
+  position: sticky; bottom: 0; z-index: 20; margin-top: 16px;
+  background: var(--bg-card); border-top: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 12px 16px; display: flex; gap: 12px; align-items: center;
+  box-shadow: 0 -4px 16px rgba(10, 36, 114, 0.08);
+}
+.form-dirty-note { font-size: 0.8125rem; color: var(--warning-dark); font-weight: 600; }
+.input.invalid { border-color: var(--error); }
+.field-error { font-size: 0.75rem; color: var(--error-text); margin-top: 6px; }
+
+/* ============ Toast (confirmation éphémère) ============ */
+.toast {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--primary-dark); color: white;
+  border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow-lg);
+  font-size: 0.875rem; font-weight: 500;
+}
+.toast.error { background: var(--error-text); }
+
+/* ============ Divers documentés ============ */
+.spec-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.spec-list li { display: flex; gap: 8px; align-items: baseline; font-size: 0.875rem; }
+.spec-list li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--primary-light); }
+.copy-block {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--bg); border: 1.5px dashed var(--border); border-radius: 10px; padding: 12px 14px;
+}
+.copy-block-value { font-size: 1rem; font-weight: 700; color: var(--primary); }
+.danger-zone { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+/* ============ Carte-document cliquable (espace Pro) ============ */
+.doc-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer; }
+.doc-card-title { font-size: 0.9375rem; font-weight: 600; }
+.doc-card-meta { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+.doc-card-amount { font-size: 0.9375rem; font-weight: 700; color: var(--primary); }
 
 /* ============ Échafaudage commun aux pages d'aperçu ============ */
 .ds-page { padding: 28px; background: var(--bg); min-height: 100vh; }
