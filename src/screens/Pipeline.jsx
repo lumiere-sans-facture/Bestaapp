@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass } from 'lucide-react';
+import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass, MoreVertical, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
@@ -52,6 +52,9 @@ export default function Pipeline() {
   };
 
   const [selectedLeadId, setSelectedLeadId] = useState(null);
+  // Déplacement sans glisser : indispensable au doigt (le drag HTML5 n'émet
+  // aucun événement tactile sur Android/iOS).
+  const [stagePickerId, setStagePickerId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [ownerFilter, setOwnerFilter] = useState('all');
   const [draggedLeadId, setDraggedLeadId] = useState(null);
@@ -62,6 +65,7 @@ export default function Pipeline() {
 
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
   const selectedLead = allMyLeads.find((l) => l.id === selectedLeadId);
+  const pickerLead = allMyLeads.find((l) => l.id === stagePickerId);
 
   const openValue = myLeads.filter(isOpen).reduce((sum, l) => sum + l.estimatedValue, 0);
   const wonLeads = myLeads.filter((l) => l.stage === 'gagne');
@@ -98,17 +102,9 @@ export default function Pipeline() {
       <PageHeader
         title="Suivi clients"
         actions={
-          <>
-            {user.role === 'gerant' && (
-              <select className="input select-filter" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} aria-label="Filtrer par commercial">
-                <option value="all">Toute l'équipe</option>
-                {team.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-            )}
-            <button className="btn btn-accent" onClick={() => setShowAddForm(true)}>
-              <Plus size={18} /> Nouvelle piste
-            </button>
-          </>
+          <button className="btn btn-accent" onClick={() => setShowAddForm(true)}>
+            <Plus size={18} /> Nouvelle piste
+          </button>
         }
       >
         <div className="pipeline-stats">
@@ -116,12 +112,24 @@ export default function Pipeline() {
           <div className="pipeline-stat"><strong>{formatCFA(wonValue)}</strong> gagné</div>
           {lostCount > 0 && <div className="pipeline-stat"><strong>{lostCount}</strong> perdu(s)</div>}
         </div>
+        {user.role === 'gerant' && (
+          <div className="pipeline-filter-row">
+            <select className="input select-filter" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} aria-label="Filtrer par commercial">
+              <option value="all">Toute l'équipe</option>
+              {team.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+        )}
       </PageHeader>
 
       <div className="page-content page-content-flush">
         {isGerant && allMyLeads.some((l) => l.pendingStage) && (
           <div className="validation-bar">
-            <div className="validation-bar-title"><Hourglass size={15} /> Progressions à valider</div>
+            <div className="validation-bar-title">
+              <Hourglass size={15} /> {allMyLeads.filter((l) => l.pendingStage).length > 1
+                ? `${allMyLeads.filter((l) => l.pendingStage).length} progressions à valider`
+                : '1 progression à valider'}
+            </div>
             {allMyLeads.filter((l) => l.pendingStage).map((l) => {
               const demandeur = getUserById(l.pendingStage.requestedBy);
               return (
@@ -177,7 +185,16 @@ export default function Pipeline() {
                         tabIndex={0}
                         onKeyDown={(e) => e.key === 'Enter' && setSelectedLeadId(lead.id)}
                       >
-                        <div className="kanban-card-title">{lead.name}</div>
+                        <div className="kanban-card-head">
+                          <div className="kanban-card-title">{lead.name}</div>
+                          <button
+                            className="kanban-card-move"
+                            aria-label={`Déplacer ${lead.name} vers une autre étape`}
+                            onClick={(e) => { e.stopPropagation(); setStagePickerId(lead.id); }}
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                        </div>
                         <div className="kanban-card-contact">{lead.contact}</div>
                         {lead.pendingStage && (
                           <div className="pending-chip" title={`Demande en attente de validation du gérant`}>
@@ -185,7 +202,9 @@ export default function Pipeline() {
                           </div>
                         )}
                         <div className="kanban-card-footer">
-                          <span className="kanban-card-value">{lead.estimatedValue > 0 ? formatCFA(lead.estimatedValue) : 'Pas encore de devis'}</span>
+                          <span className={`kanban-card-value${lead.estimatedValue > 0 ? '' : ' none'}`}>
+                            {lead.estimatedValue > 0 ? formatCFA(lead.estimatedValue) : 'Devis à créer'}
+                          </span>
                           <span className="kanban-card-icons">
                             {stale && (
                               <span className="stale-indicator" title={`Inactive depuis ${daysSince(lead.lastActivity)} jours`}>
@@ -269,6 +288,9 @@ export default function Pipeline() {
                     );
                   })}
                 </div>
+                <button className="btn btn-outline btn-block stage-move-btn" onClick={() => setStagePickerId(selectedLead.id)}>
+                  <ArrowRightLeft size={16} /> Déplacer vers…
+                </button>
                 <div className="outcome-actions">
                   <button className="btn btn-won" onClick={() => moveLead(selectedLead.id, 'gagne')}>
                     <Trophy size={16} /> Gagné
@@ -371,6 +393,36 @@ export default function Pipeline() {
               </div>
             </div>
           </>
+        )}
+      </Sheet>
+
+      {/* Sélecteur d'étape : le déplacement sans glisser, au doigt comme au clavier */}
+      <Sheet
+        open={!!pickerLead}
+        onClose={() => setStagePickerId(null)}
+        title="Déplacer vers…"
+        subtitle={pickerLead && `${pickerLead.name} · actuellement « ${stageLabel(pickerLead.stage)} »`}
+      >
+        {pickerLead && (
+          <div className="stage-picker">
+            {openStages.filter((s) => s.id !== pickerLead.stage).map((s) => (
+              <button
+                key={s.id}
+                className="stage-picker-btn"
+                onClick={() => { moveLead(pickerLead.id, s.id); setStagePickerId(null); }}
+              >
+                <span className="stage-picker-dot" style={{ background: s.color }} />
+                {s.label}
+              </button>
+            ))}
+            <button className="stage-picker-btn won" onClick={() => { moveLead(pickerLead.id, 'gagne'); setStagePickerId(null); }}>
+              <Trophy size={16} /> Gagné
+            </button>
+            <button className="stage-picker-btn lost" onClick={() => { moveLead(pickerLead.id, 'perdu'); setStagePickerId(null); }}>
+              <ThumbsDown size={16} /> Perdu
+            </button>
+            {!isGerant && <p className="field-hint">Le changement d'étape sera soumis à la validation du gérant.</p>}
+          </div>
         )}
       </Sheet>
 
