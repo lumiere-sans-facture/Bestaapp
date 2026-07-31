@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
 import { ModeProvider, useMode } from './context/ModeContext';
+import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
 import AppLayout from './components/AppLayout';
 import Login from './screens/Login';
@@ -63,7 +64,9 @@ function AppRoutes() {
     <DataProvider>
       <ModeProvider>
         <CartProvider>
-          <ModeSwitch />
+          <ToastProvider>
+            <ModeSwitch />
+          </ToastProvider>
         </CartProvider>
       </ModeProvider>
     </DataProvider>
