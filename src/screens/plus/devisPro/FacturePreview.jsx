@@ -13,7 +13,8 @@ const SAMPLE = [
  * données d'exemple, pas de génération PDF.
  */
 export default function FacturePreview({ company = {}, modele }) {
-  const bw = normalizeModele(modele || company.modeleDefaut) === 'sobre';
+  // « Classique » est le modèle noir et blanc ; Studio et Vague sont colorés.
+  const bw = normalizeModele(modele || company.modeleDefaut) === 'classique';
   const primary = bw ? '#212529' : (company.couleurPrimaire || '#0a2472');
   const secondary = bw ? '#5a606a' : (company.couleurSecondaire || '#f5a623');
   const name = company.nomEntreprise || 'Mon Entreprise';

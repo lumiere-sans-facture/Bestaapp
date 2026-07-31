@@ -1419,7 +1419,21 @@ textarea.input { resize: vertical; }
 .pro-preview-line { height: 3px; }
 .pro-preview-meta { padding: 8px 14px; font-size: 0.71875rem; color: var(--text-secondary); background: white; }
 .pro-logo-row { margin-bottom: 14px; }
-.pro-color-input { height: 46px; padding: 4px; cursor: pointer; }
+.pro-color-input { height: var(--control-h); padding: 4px; cursor: pointer; }
+/* Couleurs de marque : valeur hex visible (communicable à un imprimeur). */
+.color-input-row { display: flex; align-items: center; gap: 10px; }
+.color-input-row .pro-color-input { width: 64px; flex-shrink: 0; }
+.color-hex { font-size: 0.8125rem; color: var(--text-secondary); }
+.colors-detected-note {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  font-size: 0.8125rem; color: var(--success-text); font-weight: 600; margin-top: 6px;
+}
+.colors-undo { color: var(--primary); font-weight: 600; text-decoration: underline; padding: 8px 4px; }
+/* Champ invalide + message d'erreur dans le design de l'app. */
+.input.invalid { border-color: var(--error); }
+.field-error { font-size: 0.75rem; color: var(--error-text); margin-top: 6px; }
+/* L'aperçu en direct reste borné à la largeur du formulaire. */
+.pro-preview-wrap { max-width: var(--form-max); }
 
 /* Lignes de facture */
 /* Chaque ligne est une carte : désignation pleine largeur, puis Qté / P.U. */
