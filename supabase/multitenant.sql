@@ -135,6 +135,11 @@ end $$;
 -- s'inscrit avec ce code et rejoint l'org — aucun accès admin requis.
 -- ============================================================
 alter table public.orgs add column if not exists invite_code text unique;
+-- Valeur par défaut : indispensable pour que les insertions qui ne fournissent
+-- pas de code (bootstrap org-bestasolar au rejeu, signup_create_org) passent
+-- la contrainte NOT NULL ci-dessous.
+alter table public.orgs alter column invite_code
+  set default upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
 update public.orgs
   set invite_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))
   where invite_code is null;
