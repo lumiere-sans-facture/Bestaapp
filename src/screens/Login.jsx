@@ -159,7 +159,7 @@ export default function Login() {
             {error && <div className="login-error">{error}</div>}
             <div className="segmented" role="group" aria-label="Type d'inscription" style={{ marginBottom: 16 }}>
               <button type="button" className={`segmented-btn ${signupMode === 'create' ? 'active' : ''}`} onClick={() => setSignupMode('create')}>
-                <Building2 size={15} /> Espace Devis Pro
+                <Building2 size={15} /> Mon entreprise
               </button>
               <button type="button" className={`segmented-btn ${signupMode === 'join' ? 'active' : ''}`} onClick={() => setSignupMode('join')}>
                 <UserPlus size={15} /> Rejoindre une équipe
@@ -170,7 +170,7 @@ export default function Login() {
                 <label className="input-label" htmlFor="signup-company">Nom de votre entreprise</label>
                 <input id="signup-company" className="input" required value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)} placeholder="Ex : Fatou Solaire Services" />
-                <div className="field-hint">Vos devis et factures à votre identité + dimensionnement solaire — 5 000 F/mois, activé après paiement.</div>
+                <div className="field-hint">Gratuit : tableau de bord, suivi clients, boutique, formations, espace partenaire. L'option Devis Pro (documents à votre identité) : 5 000 F/mois.</div>
               </div>
             ) : (
               <div className="input-group">
@@ -188,7 +188,7 @@ export default function Login() {
             {emailField}
             {passwordField('Mot de passe (8 caractères min.)', 'new-password')}
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              {loading ? 'Création…' : signupMode === 'create' ? 'Créer mon espace Devis Pro' : "Rejoindre l'équipe"}
+              {loading ? 'Création…' : signupMode === 'create' ? 'Créer mon compte' : "Rejoindre l'équipe"}
             </button>
             <button type="button" className="login-link" onClick={() => switchView('login')}>
               <ChevronLeft size={14} /> J'ai déjà un compte — me connecter

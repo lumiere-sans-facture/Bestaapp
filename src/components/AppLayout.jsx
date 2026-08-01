@@ -46,19 +46,14 @@ const plusSections = (role) => [
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const { getCompanyForUser } = useData();
-  const { mode, setMode, proActive, espaceProSeul } = useMode();
+  const { mode, setMode, proActive } = useMode();
   const navigate = useNavigate();
   const isPro = mode === 'pro';
-  // Org 'pro' sans abonnement validé : la navigation se limite aux deux
-  // écrans accessibles (Entreprise, Abonnement) — pas d'onglets morts.
-  const proItems = espaceProSeul && !proActive
-    ? proNavItems.filter((i) => ['/pro/entreprise', '/pro/abonnement'].includes(i.path))
-    : proNavItems;
-  const navItems = isPro ? proItems : publicNavItems;
+  const navItems = isPro ? proNavItems : publicNavItems;
   // Barre latérale publique : « Plus » n'y figure pas (toutes ses entrées y
   // sont détaillées) — il reste dans la barre d'onglets mobile.
   const sidebarItems = isPro
-    ? proItems
+    ? proNavItems
     : publicNavItems
         .filter((i) => i.path !== '/plus')
         .flatMap((i) => (i.path === '/pipeline' ? [i, clientsItem] : [i]));
@@ -122,9 +117,7 @@ export default function AppLayout() {
           )}
         </nav>
         <div className="sidebar-footer">
-          {/* Retour au CRM interne : réservé à l'équipe BestaSolar — une org
-              'pro' n'a pas de mode public. */}
-          {isPro && !espaceProSeul && (
+          {isPro && (
             <button className="btn btn-accent btn-block sidebar-pro-btn" onClick={() => setMode('public')}>
               <ArrowLeft size={16} /> Revenir au mode public
             </button>

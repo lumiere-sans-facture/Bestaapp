@@ -80,27 +80,20 @@ function AppRoutes() {
 // mode === 'pro'    → routes Pro dans AppLayout (zéro donnée publique visible)
 // mode === 'public' → routes publiques dans AppLayout
 function ModeSwitch() {
-  const { mode, proActive, espaceProSeul } = useMode();
+  const { mode } = useMode();
   usePreloadScreens();
 
   if (mode === 'pro') {
-    // Org 'pro' sans abonnement validé : accès limité à l'activation de
-    // l'abonnement et au réglage de l'entreprise (le reste attend le paiement).
-    const verrouille = espaceProSeul && !proActive;
     return (
       <Routes>
         <Route element={<AppLayout />}>
-          {!verrouille && (
-            <>
-              <Route path="/pro" element={<ProDashboard />} />
-              <Route path="/pro/documents" element={<ProDocuments />} />
-              <Route path="/pro/clients" element={<ProClients />} />
-            </>
-          )}
+          <Route path="/pro" element={<ProDashboard />} />
+          <Route path="/pro/documents" element={<ProDocuments />} />
+          <Route path="/pro/clients" element={<ProClients />} />
           <Route path="/pro/entreprise" element={<ProCompany />} />
           <Route path="/pro/abonnement" element={<ProSubscription />} />
         </Route>
-        <Route path="*" element={<Navigate to={verrouille ? '/pro/abonnement' : '/pro'} replace />} />
+        <Route path="*" element={<Navigate to="/pro" replace />} />
       </Routes>
     );
   }

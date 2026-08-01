@@ -36,11 +36,6 @@ export function ModeProvider({ children }) {
   const sub = isSupabaseConfigured && serverSub !== undefined ? serverSub : localSub;
   const proActive = isSubscriptionActive(sub);
 
-  // Organisation de type 'pro' (installateur abonné Devis Pro) : l'app EST
-  // l'espace Pro — pas de CRM interne BestaSolar (boutique, partenaires,
-  // commissions, équipe). Le mode public n'existe pas pour ces comptes.
-  const espaceProSeul = user.org?.kind === 'pro';
-
   const [mode, setModeState] = useState(() => {
     try {
       return localStorage.getItem(storageKey(user.id)) === 'pro' ? 'pro' : 'public';
@@ -49,14 +44,14 @@ export function ModeProvider({ children }) {
     }
   });
 
-  // Gardes : une org 'pro' est toujours en mode pro (même sans abonnement —
-  // les routes se chargent alors de la limiter à Abonnement / Entreprise) ;
-  // une org interne sans abonnement actif reste en mode public.
-  const effectiveMode = espaceProSeul ? 'pro' : (proActive ? mode : 'public');
+  // Garde : sans abonnement actif, le mode effectif est toujours public.
+  // La partie publique (tableau de bord, suivi clients, boutique, formations,
+  // espace partenaire) est GRATUITE pour tout inscrit — seul l'espace Pro
+  // (devis/factures à l'identité de son entreprise) exige l'abonnement.
+  const effectiveMode = proActive ? mode : 'public';
 
   const setMode = (next) => {
-    if (espaceProSeul && next !== 'pro') return; // pas de mode public pour les orgs pro
-    if (next === 'pro' && !proActive && !espaceProSeul) return; // bascule Pro réservée aux abonnés
+    if (next === 'pro' && !proActive) return; // bascule Pro réservée aux abonnés
     setModeState(next);
     try {
       localStorage.setItem(storageKey(user.id), next);
@@ -65,14 +60,13 @@ export function ModeProvider({ children }) {
     }
   };
 
-  // Repli automatique en public si l'abonnement expire pendant la session Pro
-  // (orgs internes uniquement — une org pro n'a nulle part où « replier »).
+  // Repli automatique en public si l'abonnement expire pendant la session Pro.
   useEffect(() => {
-    if (!espaceProSeul && !proActive && mode === 'pro') setModeState('public');
-  }, [espaceProSeul, proActive, mode]);
+    if (!proActive && mode === 'pro') setModeState('public');
+  }, [proActive, mode]);
 
   return (
-    <ModeContext.Provider value={{ mode: effectiveMode, setMode, proActive, espaceProSeul }}>
+    <ModeContext.Provider value={{ mode: effectiveMode, setMode, proActive }}>
       {children}
     </ModeContext.Provider>
   );
