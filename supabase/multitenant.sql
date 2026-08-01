@@ -27,6 +27,17 @@ create table if not exists public.orgs (
 );
 alter table public.orgs enable row level security;
 
+-- Code d'invitation d'équipe : colonne + DÉFAUT défini AVANT toute insertion
+-- (la vérification NOT NULL précède la résolution ON CONFLICT — sans défaut,
+-- le bootstrap ci-dessous échoue sur une base où la colonne existe déjà).
+alter table public.orgs add column if not exists invite_code text unique;
+alter table public.orgs alter column invite_code
+  set default upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
+update public.orgs
+  set invite_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))
+  where invite_code is null;
+alter table public.orgs alter column invite_code set not null;
+
 -- Org par défaut : rattache toutes les données existantes (BestaSolar).
 insert into public.orgs (id, name, plan)
   values ('org-bestasolar', 'BestaSolar', 'active')
@@ -130,21 +141,10 @@ end $$;
 -- ============================================================
 
 -- ============================================================
--- ÉQUIPE : code d'invitation par organisation.
+-- ÉQUIPE : adhésion par code d'invitation (colonne définie en tête de script).
 -- Le gérant partage le code (visible dans l'écran Équipe) ; le technicien
 -- s'inscrit avec ce code et rejoint l'org — aucun accès admin requis.
 -- ============================================================
-alter table public.orgs add column if not exists invite_code text unique;
--- Valeur par défaut : indispensable pour que les insertions qui ne fournissent
--- pas de code (bootstrap org-bestasolar au rejeu, signup_create_org) passent
--- la contrainte NOT NULL ci-dessous.
-alter table public.orgs alter column invite_code
-  set default upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
-update public.orgs
-  set invite_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))
-  where invite_code is null;
-alter table public.orgs alter column invite_code set not null;
-
 create or replace function public.signup_join_org(p_invite_code text, p_user_name text)
   returns text language plpgsql security definer set search_path = public as $$
 declare v_org text; v_email text;
