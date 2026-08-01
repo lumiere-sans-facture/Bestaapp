@@ -92,8 +92,10 @@ export function AuthProvider({ children }) {
       if (error) return false;
       const profile = (await fetchProfile(email.trim())) || (await provisionProfile(email.trim()));
       if (!profile) {
-        await supabase.auth.signOut();
-        return false;
+        // Compte Auth valide mais profil jamais créé (inscription interrompue,
+        // autre navigateur…) : on garde la session et on laisse l'écran de
+        // connexion proposer de terminer l'inscription.
+        return 'incomplete';
       }
       await adoptProfile(profile);
       return true;
@@ -132,6 +134,29 @@ export function AuthProvider({ children }) {
     return { ok: true };
   };
 
+  /**
+   * Termine une inscription interrompue : la session Auth existe déjà, il ne
+   * manque que le profil (et son entreprise ou son rattachement d'équipe).
+   */
+  const completeSignup = async ({ name, companyName, inviteCode }) => {
+    if (!isSupabaseConfigured) return { ok: false };
+    try {
+      if (inviteCode) {
+        await supabase.rpc('signup_join_org', { p_invite_code: inviteCode, p_user_name: name });
+      } else {
+        await supabase.rpc('signup_create_org', { p_org_name: companyName, p_user_name: name });
+      }
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const profile = session?.user?.email ? await fetchProfile(session.user.email) : null;
+    if (!profile) return { ok: false, error: 'Profil introuvable après création — réessayez.' };
+    localStorage.removeItem(PENDING_KEY);
+    await adoptProfile(profile);
+    return { ok: true };
+  };
+
   /** Envoie l'email de réinitialisation (le lien ramène vers l'app). */
   const resetPassword = async (email) => {
     if (!isSupabaseConfigured) return { ok: false };
@@ -164,7 +189,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, signUp, resetPassword, updatePassword, recovery }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, signUp, completeSignup, resetPassword, updatePassword, recovery }}>
       {children}
     </AuthContext.Provider>
   );

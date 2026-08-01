@@ -11,8 +11,8 @@ import { users } from '../data/seed';
  * En mode local (sans backend), seul le formulaire de connexion est monté.
  */
 export default function Login() {
-  const { login, signUp, resetPassword, updatePassword, recovery } = useAuth();
-  const [view, setView] = useState('login'); // login | signup | forgot
+  const { login, signUp, completeSignup, resetPassword, updatePassword, recovery } = useAuth();
+  const [view, setView] = useState('login'); // login | signup | forgot | complete
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,10 +33,31 @@ export default function Login() {
     setError('');
     setLoading(true);
     const ok = await login(email, password);
+    if (ok === 'incomplete') {
+      // Compte valide mais inscription jamais terminée (profil absent) :
+      // on propose de la finir ici, sans repasser par la création de compte.
+      setLoading(false);
+      switchView('complete');
+      return;
+    }
     if (!ok) {
       setError('Email ou mot de passe incorrect');
       setLoading(false);
     }
+  };
+
+  const handleComplete = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    const res = await completeSignup({
+      name,
+      companyName: signupMode === 'create' ? companyName : null,
+      inviteCode: signupMode === 'join' ? inviteCode : null,
+    });
+    setLoading(false);
+    if (!res.ok) setError(res.error || 'Impossible de terminer l’inscription.');
+    // Succès : l'app monte toute seule (profil chargé).
   };
 
   const handleSignup = async (e) => {
@@ -151,6 +172,43 @@ export default function Login() {
             {passwordField('Choisissez un nouveau mot de passe', 'new-password')}
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
               {loading ? 'Enregistrement…' : 'Enregistrer et continuer'}
+            </button>
+          </form>
+        ) : view === 'complete' && isSupabaseConfigured ? (
+          <form className="login-form card" onSubmit={handleComplete}>
+            <h2 className="login-form-title">Terminer l'inscription</h2>
+            <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
+              Votre compte existe, il ne manque que votre entreprise. Une dernière étape :
+            </p>
+            {error && <div className="login-error">{error}</div>}
+            <div className="segmented" role="group" aria-label="Type d'inscription" style={{ marginBottom: 16 }}>
+              <button type="button" className={`segmented-btn ${signupMode === 'create' ? 'active' : ''}`} onClick={() => setSignupMode('create')}>
+                <Building2 size={15} /> Mon entreprise
+              </button>
+              <button type="button" className={`segmented-btn ${signupMode === 'join' ? 'active' : ''}`} onClick={() => setSignupMode('join')}>
+                <UserPlus size={15} /> Rejoindre une équipe
+              </button>
+            </div>
+            {signupMode === 'create' ? (
+              <div className="input-group">
+                <label className="input-label" htmlFor="complete-company">Nom de votre entreprise</label>
+                <input id="complete-company" className="input" required value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)} placeholder="Ex : Fatou Solaire Services" />
+              </div>
+            ) : (
+              <div className="input-group">
+                <label className="input-label" htmlFor="complete-code">Code d'invitation</label>
+                <input id="complete-code" className="input" required value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())} placeholder="Code fourni par votre gérant" />
+              </div>
+            )}
+            <div className="input-group">
+              <label className="input-label" htmlFor="complete-name">Votre nom complet</label>
+              <input id="complete-name" className="input" required value={name}
+                onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
+            </div>
+            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? 'Finalisation…' : "Terminer et entrer dans l'app"}
             </button>
           </form>
         ) : view === 'signup' && isSupabaseConfigured ? (
