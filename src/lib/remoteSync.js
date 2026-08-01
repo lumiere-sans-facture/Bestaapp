@@ -105,11 +105,12 @@ export async function fetchTeamProfiles() {
   }));
 }
 
-/** Organisation de l'utilisateur courant (nom + code d'invitation d'équipe).
+/** Organisation de l'utilisateur courant (nom, type interne/pro, code
+ *  d'invitation). select('*') : tolère les schémas avec ou sans colonne kind.
  *  Retourne null sur l'ancien schéma mono-équipe (table orgs absente). */
 export async function fetchMyOrg() {
   try {
-    const { data, error } = await supabase.from('orgs').select('id, name, invite_code').limit(1);
+    const { data, error } = await supabase.from('orgs').select('*').limit(1);
     if (error) return null;
     return data?.[0] || null;
   } catch {

@@ -25,6 +25,10 @@ export const COMPANY = {
 // Alias historique : les documents existants lisent encore COMPANY.terms.
 COMPANY.terms = COMPANY.termsDevis;
 
+// Numéro Mobile Money encaissant les abonnements Devis Pro (paywall public
+// et écran Abonnement des installateurs inscrits).
+export const PAY_NUMBER = '+229 016 173 2956';
+
 export const TVA_RATE = 0.18;
 // Libellé du taux pour l'UI (« 18 ») — toujours dérivé, jamais recopié.
 export const TVA_PCT = Math.round(TVA_RATE * 100);

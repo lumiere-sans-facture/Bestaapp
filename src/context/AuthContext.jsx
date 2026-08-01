@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { users } from '../data/seed';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { setSyncOrg } from '../lib/remoteSync';
+import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
@@ -32,9 +32,14 @@ export function AuthProvider({ children }) {
   // l'app demande alors le nouveau mot de passe avant tout le reste.
   const [recovery, setRecovery] = useState(false);
 
-  const adoptProfile = (profile) => {
-    setUser(profile);
+  // Attache l'organisation au profil (type interne/pro, nom, code d'invitation).
+  // user.org absent = ancien schéma mono-équipe ou mode local → comportement
+  // « interne » (CRM complet), comme avant.
+  const adoptProfile = async (profile) => {
     setSyncOrg(profile?.org_id);
+    let org = null;
+    if (profile?.org_id) org = await fetchMyOrg();
+    setUser(org ? { ...profile, org } : profile);
   };
 
   // Le compte Auth existe mais pas encore le profil : crée l'organisation (ou
@@ -61,7 +66,7 @@ export function AuthProvider({ children }) {
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (session?.user?.email) {
           const profile = (await fetchProfile(session.user.email)) || (await provisionProfile(session.user.email));
-          if (profile) adoptProfile(profile);
+          if (profile) await adoptProfile(profile);
         }
         setIsLoading(false);
       });
@@ -90,7 +95,7 @@ export function AuthProvider({ children }) {
         await supabase.auth.signOut();
         return false;
       }
-      adoptProfile(profile);
+      await adoptProfile(profile);
       return true;
     }
     const found = users.find(
@@ -123,7 +128,7 @@ export function AuthProvider({ children }) {
     if (!data.session) return { ok: true, needsConfirmation: true };
     const profile = await provisionProfile(email.trim());
     if (!profile) return { ok: false, error: 'Compte créé mais profil introuvable — reconnectez-vous.' };
-    adoptProfile(profile);
+    await adoptProfile(profile);
     return { ok: true };
   };
 
@@ -145,7 +150,7 @@ export function AuthProvider({ children }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
         const profile = await fetchProfile(session.user.email);
-        if (profile) adoptProfile(profile);
+        if (profile) await adoptProfile(profile);
       }
     }
     return { ok: !error, error: error?.message };

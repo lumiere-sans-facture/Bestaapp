@@ -36,6 +36,11 @@ export function ModeProvider({ children }) {
   const sub = isSupabaseConfigured && serverSub !== undefined ? serverSub : localSub;
   const proActive = isSubscriptionActive(sub);
 
+  // Organisation de type 'pro' (installateur abonné Devis Pro) : l'app EST
+  // l'espace Pro — pas de CRM interne BestaSolar (boutique, partenaires,
+  // commissions, équipe). Le mode public n'existe pas pour ces comptes.
+  const espaceProSeul = user.org?.kind === 'pro';
+
   const [mode, setModeState] = useState(() => {
     try {
       return localStorage.getItem(storageKey(user.id)) === 'pro' ? 'pro' : 'public';
@@ -44,11 +49,14 @@ export function ModeProvider({ children }) {
     }
   });
 
-  // Garde : sans abonnement actif, le mode effectif est toujours public.
-  const effectiveMode = proActive ? mode : 'public';
+  // Gardes : une org 'pro' est toujours en mode pro (même sans abonnement —
+  // les routes se chargent alors de la limiter à Abonnement / Entreprise) ;
+  // une org interne sans abonnement actif reste en mode public.
+  const effectiveMode = espaceProSeul ? 'pro' : (proActive ? mode : 'public');
 
   const setMode = (next) => {
-    if (next === 'pro' && !proActive) return; // bascule Pro réservée aux abonnés
+    if (espaceProSeul && next !== 'pro') return; // pas de mode public pour les orgs pro
+    if (next === 'pro' && !proActive && !espaceProSeul) return; // bascule Pro réservée aux abonnés
     setModeState(next);
     try {
       localStorage.setItem(storageKey(user.id), next);
@@ -57,13 +65,14 @@ export function ModeProvider({ children }) {
     }
   };
 
-  // Repli automatique en public si l'abonnement expire pendant la session Pro.
+  // Repli automatique en public si l'abonnement expire pendant la session Pro
+  // (orgs internes uniquement — une org pro n'a nulle part où « replier »).
   useEffect(() => {
-    if (!proActive && mode === 'pro') setModeState('public');
-  }, [proActive, mode]);
+    if (!espaceProSeul && !proActive && mode === 'pro') setModeState('public');
+  }, [espaceProSeul, proActive, mode]);
 
   return (
-    <ModeContext.Provider value={{ mode: effectiveMode, setMode, proActive }}>
+    <ModeContext.Provider value={{ mode: effectiveMode, setMode, proActive, espaceProSeul }}>
       {children}
     </ModeContext.Provider>
   );

@@ -27,6 +27,15 @@ create table if not exists public.orgs (
 );
 alter table public.orgs enable row level security;
 
+-- Type d'organisation :
+--   'interne' = BestaSolar (CRM complet : boutique, partenaires, commissions, équipe)
+--   'pro'     = installateur abonné Devis Pro (ses clients, ses devis/factures,
+--               le dimensionnement — offre à 5 000 F/mois)
+-- Les inscriptions self-service créent toujours des orgs 'pro'.
+alter table public.orgs add column if not exists kind text not null default 'pro'
+  check (kind in ('interne', 'pro'));
+update public.orgs set kind = 'interne' where id = 'org-bestasolar';
+
 -- Code d'invitation d'équipe : colonne + DÉFAUT défini AVANT toute insertion
 -- (la vérification NOT NULL précède la résolution ON CONFLICT — sans défaut,
 -- le bootstrap ci-dessous échoue sur une base où la colonne existe déjà).
@@ -41,8 +50,8 @@ alter table public.orgs alter column invite_code set not null;
 -- Org par défaut : rattache toutes les données existantes (BestaSolar).
 -- invite_code fourni explicitement : aucune dépendance à la valeur par défaut
 -- (robuste quel que soit l'état laissé par une exécution précédente).
-insert into public.orgs (id, name, plan, invite_code)
-  values ('org-bestasolar', 'BestaSolar', 'active',
+insert into public.orgs (id, name, plan, kind, invite_code)
+  values ('org-bestasolar', 'BestaSolar', 'active', 'interne',
           upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)))
   on conflict (id) do nothing;
 

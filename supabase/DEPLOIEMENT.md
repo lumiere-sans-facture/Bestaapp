@@ -77,9 +77,23 @@ sont actives, et tester une restauration une fois avant le lancement.
 | Isolation | — | chaque entreprise ne voit que ses données (RLS) |
 | Mode Pro | abonnement local | abonnement relu sur le serveur (infalsifiable) ; repli local si hors-ligne |
 
-## Flux d'abonnement Devis Pro (inchangé côté utilisateur)
+## Les deux types de comptes
 
-1. Le technicien demande l'abonnement dans l'app (paiement MoMo + référence).
-2. La demande est synchronisée (statut `en_attente` — la RLS refuse tout autre statut à un non-admin).
-3. L'admin plateforme valide dans « Abonnements Devis Pro » → statut `actif` (seul l'admin peut l'écrire).
-4. Le mode Pro du technicien s'active (vérification serveur).
+- **Org `interne`** (BestaSolar, `org-bestasolar`) : le CRM complet — pipeline,
+  boutique, commandes, partenaires, commissions, équipe, formations + espace Pro.
+- **Org `pro`** (toute inscription self-service) : **l'espace Devis Pro
+  uniquement** — ses clients, ses devis/factures à son identité, le
+  dimensionnement solaire. Pas de modules internes BestaSolar. C'est l'offre
+  à 5 000 F/mois : tant que l'abonnement n'est pas validé, le compte n'accède
+  qu'aux écrans « Mon abonnement » (paiement) et « Mon entreprise » (identité).
+
+## Flux d'abonnement Devis Pro
+
+1. L'installateur s'inscrit (« Créer mon espace Devis Pro ») et atterrit sur
+   l'écran d'activation : paiement MoMo au numéro affiché + référence.
+2. La demande est synchronisée (statut `en_attente` — la RLS refuse tout autre
+   statut à un non-admin).
+3. L'admin plateforme valide dans « Abonnements Devis Pro » → statut `actif`
+   (seul l'admin peut l'écrire).
+4. L'espace Pro complet s'ouvre (vérification côté serveur). Un renouvellement
+   demandé pendant la période payée ne coupe jamais l'accès avant l'échéance.

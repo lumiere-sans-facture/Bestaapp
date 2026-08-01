@@ -30,6 +30,15 @@ describe('subscription', () => {
     expect(isSubscriptionActive({ status: 'actif', dateFin: isoInDays(-5) })).toBe(false);
   });
 
+  it("un renouvellement demandé pendant la période payée ne coupe pas l'accès", () => {
+    // Statut repassé en attente par la demande, mais la période court encore.
+    expect(isSubscriptionActive({ status: 'en_attente_paiement', dateFin: isoInDays(5) })).toBe(true);
+    // Période échue : l'attente de validation ne donne pas accès.
+    expect(isSubscriptionActive({ status: 'en_attente_paiement', dateFin: isoInDays(-1) })).toBe(false);
+    // Première souscription (jamais activée) : pas d'accès avant validation.
+    expect(isSubscriptionActive({ status: 'en_attente_paiement', dateFin: null })).toBe(false);
+  });
+
   describe('daysLeft', () => {
     it('0 sans date de fin', () => {
       expect(daysLeft({ status: 'actif' })).toBe(0);

@@ -5,6 +5,7 @@ import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, 
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
+import { initials } from '../utils/format';
 import { SyncDot } from './SyncStatus';
 
 const publicNavItems = [
@@ -45,14 +46,19 @@ const plusSections = (role) => [
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const { getCompanyForUser } = useData();
-  const { mode, setMode, proActive } = useMode();
+  const { mode, setMode, proActive, espaceProSeul } = useMode();
   const navigate = useNavigate();
   const isPro = mode === 'pro';
-  const navItems = isPro ? proNavItems : publicNavItems;
+  // Org 'pro' sans abonnement validé : la navigation se limite aux deux
+  // écrans accessibles (Entreprise, Abonnement) — pas d'onglets morts.
+  const proItems = espaceProSeul && !proActive
+    ? proNavItems.filter((i) => ['/pro/entreprise', '/pro/abonnement'].includes(i.path))
+    : proNavItems;
+  const navItems = isPro ? proItems : publicNavItems;
   // Barre latérale publique : « Plus » n'y figure pas (toutes ses entrées y
   // sont détaillées) — il reste dans la barre d'onglets mobile.
   const sidebarItems = isPro
-    ? proNavItems
+    ? proItems
     : publicNavItems
         .filter((i) => i.path !== '/plus')
         .flatMap((i) => (i.path === '/pipeline' ? [i, clientsItem] : [i]));
@@ -116,13 +122,15 @@ export default function AppLayout() {
           )}
         </nav>
         <div className="sidebar-footer">
-          {isPro && (
+          {/* Retour au CRM interne : réservé à l'équipe BestaSolar — une org
+              'pro' n'a pas de mode public. */}
+          {isPro && !espaceProSeul && (
             <button className="btn btn-accent btn-block sidebar-pro-btn" onClick={() => setMode('public')}>
               <ArrowLeft size={16} /> Revenir au mode public
             </button>
           )}
           <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{user.avatar}</div>
+            <div className="sidebar-user-avatar">{user.avatar || initials(user.name)}</div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{user.name} <SyncDot /></div>
               <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>

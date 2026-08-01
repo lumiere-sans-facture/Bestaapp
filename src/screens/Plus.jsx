@@ -7,6 +7,7 @@ import { useMode } from '../context/ModeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { formatCFA, formatDate } from '../utils/format';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
+import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
@@ -72,8 +73,6 @@ export default function Plus() {
     }
   };
 
-  // Numéro Mobile Money pour le paiement de l'abonnement Pro.
-  const PAY_NUMBER = '+229 016 173 2956';
   const copyPayNumber = async () => {
     try {
       await navigator.clipboard.writeText(PAY_NUMBER);

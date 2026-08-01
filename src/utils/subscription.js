@@ -14,7 +14,14 @@ export const effectiveStatus = (sub) => {
   return sub.status;
 };
 
-export const isSubscriptionActive = (sub) => effectiveStatus(sub) === 'actif';
+// Actif = statut « actif » non expiré, OU renouvellement demandé alors que la
+// période déjà payée court encore (demander son renouvellement ne doit jamais
+// couper l'accès avant l'échéance).
+export const isSubscriptionActive = (sub) => {
+  const st = effectiveStatus(sub);
+  if (st === 'actif') return true;
+  return st === 'en_attente_paiement' && !!sub?.dateFin && new Date(sub.dateFin).getTime() > Date.now();
+};
 
 export const daysLeft = (sub) => {
   if (!sub?.dateFin) return 0;
