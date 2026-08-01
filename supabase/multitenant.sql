@@ -39,8 +39,11 @@ update public.orgs
 alter table public.orgs alter column invite_code set not null;
 
 -- Org par défaut : rattache toutes les données existantes (BestaSolar).
-insert into public.orgs (id, name, plan)
-  values ('org-bestasolar', 'BestaSolar', 'active')
+-- invite_code fourni explicitement : aucune dépendance à la valeur par défaut
+-- (robuste quel que soit l'état laissé par une exécution précédente).
+insert into public.orgs (id, name, plan, invite_code)
+  values ('org-bestasolar', 'BestaSolar', 'active',
+          upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)))
   on conflict (id) do nothing;
 
 -- 2. Rattachement utilisateur → organisation
@@ -128,7 +131,9 @@ begin
     raise exception 'profil déjà existant pour cet email';
   end if;
   v_org := 'org-' || replace(gen_random_uuid()::text, '-', '');
-  insert into public.orgs (id, name, plan) values (v_org, p_org_name, 'trial');
+  insert into public.orgs (id, name, plan, invite_code)
+    values (v_org, p_org_name, 'trial',
+            upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)));
   insert into public.profiles (id, email, name, role, org_id)
     values (auth.uid()::text, v_email, p_user_name, 'gerant', v_org);
   return v_org;
