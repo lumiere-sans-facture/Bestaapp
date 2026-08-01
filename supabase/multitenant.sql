@@ -192,7 +192,8 @@ create policy "subs write" on public.subscriptions for all to authenticated
   );
 
 -- subscriptionPayments : demande de paiement par les membres ; la validation
--- (statut confirmé) reste à l'admin plateforme.
+-- (statut « confirme ») reste à l'admin plateforme. NB : le champ du paiement
+-- s'appelle `statut` (celui de l'abonnement s'appelle `status`).
 drop policy if exists "org isolation" on public."subscriptionPayments";
 drop policy if exists "subpay read" on public."subscriptionPayments";
 drop policy if exists "subpay write" on public."subscriptionPayments";
@@ -201,11 +202,11 @@ create policy "subpay read" on public."subscriptionPayments" for select to authe
 create policy "subpay write" on public."subscriptionPayments" for all to authenticated
   using (
     public.auth_is_platform_admin()
-    or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') not in ('confirme'))
+    or (org_id = public.auth_org_id() and coalesce(data ->> 'statut', '') <> 'confirme')
   )
   with check (
     public.auth_is_platform_admin()
-    or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') not in ('confirme'))
+    or (org_id = public.auth_org_id() and coalesce(data ->> 'statut', '') <> 'confirme')
   );
 
 -- L'admin plateforme lit les profils de toutes les orgs (écran Abonnements).
