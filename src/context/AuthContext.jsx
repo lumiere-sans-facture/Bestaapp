@@ -199,8 +199,15 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  /** Recharge l'organisation attachée au profil (après attribution du parrainage…). */
+  const refreshOrg = async () => {
+    if (!isSupabaseConfigured) return;
+    const org = await fetchMyOrg();
+    if (org) setUser((u) => (u ? { ...u, org } : u));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, signUp, completeSignup, resetPassword, updatePassword, recovery }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, signUp, completeSignup, resetPassword, updatePassword, refreshOrg, recovery }}>
       {children}
     </AuthContext.Provider>
   );

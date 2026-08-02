@@ -163,6 +163,45 @@ end $$;
 -- ============================================================
 
 -- ============================================================
+-- PARRAINAGE APRÈS INSCRIPTION : attribution unique, verrouillée.
+-- Le gérant d'une entreprise peut saisir le code de son parrain UNE SEULE
+-- FOIS (s'il n'est pas venu par le lien). Ensuite, la base refuse tout
+-- changement — seule l'admin plateforme (BestaSolar) peut modifier, sur
+-- demande expresse du partenaire.
+-- ============================================================
+create or replace function public.set_org_referral(p_code text)
+  returns void language plpgsql security definer set search_path = public as $$
+declare v_org text; v_role text; v_existing text; v_code text;
+begin
+  select org_id, role into v_org, v_role
+    from public.profiles where lower(email) = lower(auth.jwt() ->> 'email');
+  if v_org is null then raise exception 'non authentifié'; end if;
+  if v_role <> 'gerant' then
+    raise exception 'seul le gérant de l''entreprise peut attribuer le code de parrainage';
+  end if;
+  v_code := nullif(upper(trim(coalesce(p_code, ''))), '');
+  if v_code is null then raise exception 'code de parrainage vide'; end if;
+  select referred_by into v_existing from public.orgs where id = v_org;
+  if v_existing is not null then
+    raise exception 'code de parrainage déjà attribué (%) — contactez BestaSolar pour le modifier', v_existing;
+  end if;
+  update public.orgs set referred_by = v_code where id = v_org;
+end $$;
+
+-- Modification / correction : admin plateforme uniquement (p_code null = retirer).
+create or replace function public.admin_set_org_referral(p_org_id text, p_code text)
+  returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  update public.orgs
+    set referred_by = nullif(upper(trim(coalesce(p_code, ''))), '')
+    where id = p_org_id;
+  if not found then raise exception 'organisation inconnue : %', p_org_id; end if;
+end $$;
+
+-- ============================================================
 -- ÉQUIPE : adhésion par code d'invitation (colonne définie en tête de script).
 -- Le gérant partage le code (visible dans l'écran Équipe) ; le technicien
 -- s'inscrit avec ce code et rejoint l'org — aucun accès admin requis.

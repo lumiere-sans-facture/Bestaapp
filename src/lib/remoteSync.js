@@ -105,6 +105,15 @@ export async function fetchTeamProfiles() {
   }));
 }
 
+/**
+ * Attribue le code de parrainage de l'entreprise (une seule fois — la base
+ * refuse tout changement ultérieur ; seule l'admin plateforme peut modifier).
+ */
+export async function setOrgReferral(code) {
+  const { error } = await supabase.rpc('set_org_referral', { p_code: code });
+  if (error) throw new Error(error.message);
+}
+
 /** Organisation de l'utilisateur courant (nom, type interne/pro, code
  *  d'invitation). select('*') : tolère les schémas avec ou sans colonne kind.
  *  Retourne null sur l'ancien schéma mono-équipe (table orgs absente). */

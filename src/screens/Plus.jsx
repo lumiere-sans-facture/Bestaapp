@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { setOrgReferral } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
 import { PAY_NUMBER } from '../config/company';
@@ -27,7 +28,10 @@ import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_M
 import { reconcileMissingCommissions } from '../utils/commissionSync';
 
 export default function Plus() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshOrg } = useAuth();
+  // Parrainage de l'entreprise : saisie une seule fois, puis verrouillé (serveur).
+  const [refInput, setRefInput] = useState('');
+  const [refSaving, setRefSaving] = useState(false);
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
@@ -333,6 +337,51 @@ export default function Plus() {
           <ChevronRight size={20} className="pro-cta-arrow" />
         </button>
       <div className="sync-inline"><SyncStatusRow /></div>
+
+      {/* Parrainage de l'entreprise : attribution unique, ensuite verrouillée
+          (seul BestaSolar peut la modifier, sur demande du partenaire). */}
+      {isSupabaseConfigured && user.org && user.role === 'gerant' && (
+        <div className="card">
+          <div className="sheet-section-title"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Parrainage</div>
+          {user.org.referred_by ? (
+            <>
+              <div className="sheet-row">
+                <span className="sheet-label">Parrainé par</span>
+                <span className="sheet-value"><span className="flat-badge">{user.org.referred_by}</span></span>
+              </div>
+              <div className="field-hint">Ce code est définitif — pour toute correction, le partenaire doit en faire la demande à BestaSolar.</div>
+            </>
+          ) : (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!refInput.trim()) return;
+                setRefSaving(true);
+                try {
+                  await setOrgReferral(refInput);
+                  await refreshOrg();
+                  toast('Code de parrainage enregistré.');
+                } catch (err) {
+                  toast(err.message || 'Attribution impossible.', { type: 'error' });
+                } finally {
+                  setRefSaving(false);
+                }
+              }}
+            >
+              <p className="text-sm text-secondary" style={{ marginBottom: 10 }}>
+                Un partenaire BestaSolar vous a recommandé ? Saisissez son code — attention,
+                ce choix est <strong>définitif</strong>.
+              </p>
+              <div className="momo-input-row">
+                <input className="input" value={refInput} onChange={(e) => setRefInput(e.target.value.toUpperCase())} placeholder="BESTA-…" aria-label="Code partenaire" />
+                <button type="submit" className="btn btn-primary" disabled={refSaving || !refInput.trim()}>
+                  {refSaving ? '…' : 'Attribuer'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Sections thématiques */}
       <div className="plus-sections">
