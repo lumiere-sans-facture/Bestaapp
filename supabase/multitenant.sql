@@ -151,8 +151,11 @@ begin
     values (v_org, p_org_name, 'trial',
             upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
             nullif(upper(trim(coalesce(p_ref_code, ''))), ''));
+  -- Utilisateur CLASSIQUE (pas gérant) : l'inscription self-service ne donne
+  -- aucun menu de gestion — l'app simple (tableau de bord, clients, boutique,
+  -- formations, espace partenaire) + l'option Pro payante.
   insert into public.profiles (id, email, name, role, org_id)
-    values (auth.uid()::text, v_email, p_user_name, 'gerant', v_org);
+    values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org);
   return v_org;
 end $$;
 
@@ -176,7 +179,11 @@ begin
   select org_id, role into v_org, v_role
     from public.profiles where lower(email) = lower(auth.jwt() ->> 'email');
   if v_org is null then raise exception 'non authentifié'; end if;
-  if v_role <> 'gerant' then
+  -- Autorisé : le gérant, OU l'utilisateur d'un espace SANS gérant (compte
+  -- classique seul dans son espace — il en est le propriétaire de fait).
+  if v_role <> 'gerant' and exists (
+    select 1 from public.profiles where org_id = v_org and role = 'gerant'
+  ) then
     raise exception 'seul le gérant de l''entreprise peut attribuer le code de parrainage';
   end if;
   v_code := nullif(upper(trim(coalesce(p_code, ''))), '');

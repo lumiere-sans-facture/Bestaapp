@@ -116,13 +116,16 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * Inscription self-service (backend requis).
-   * `companyName` crée une nouvelle entreprise (rôle gérant) ;
-   * `inviteCode` rejoint une entreprise existante (rôle technicien).
+   * Inscription self-service (backend requis) — une seule page simple.
+   * Sans code d'invitation : espace personnel créé silencieusement (utilisateur
+   * classique) ; avec `inviteCode` (lien ?equipe=) : rejoint l'équipe.
    * Retourne { ok, needsConfirmation, error }.
    */
   const signUp = async ({ email, password, name, companyName, inviteCode, refCode }) => {
     if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
+    // L'espace personnel porte le nom de l'utilisateur (renommable plus tard
+    // dans « Mon entreprise » de l'espace Pro).
+    if (!inviteCode && !companyName) companyName = name;
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -145,6 +148,7 @@ export function AuthProvider({ children }) {
    */
   const completeSignup = async ({ name, companyName, inviteCode }) => {
     if (!isSupabaseConfigured) return { ok: false };
+    if (!inviteCode && !companyName) companyName = name;
     try {
       if (inviteCode) {
         await supabase.rpc('signup_join_org', { p_invite_code: inviteCode, p_user_name: name });

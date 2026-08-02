@@ -35,7 +35,7 @@ export default function Plus() {
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
-    partners, commissions, leads, orders, devis, referrals,
+    partners, commissions, leads, orders, devis, referrals, team,
     getPartnerById, getLeadById,
     payCommission, addCommission, syncCommissions,
     getSubscriptionForUser, requestSubscription, importData,
@@ -339,8 +339,9 @@ export default function Plus() {
       <div className="sync-inline"><SyncStatusRow /></div>
 
       {/* Parrainage de l'entreprise : attribution unique, ensuite verrouillée
-          (seul BestaSolar peut la modifier, sur demande du partenaire). */}
-      {isSupabaseConfigured && user.org && user.role === 'gerant' && (
+          (seul BestaSolar peut la modifier, sur demande du partenaire).
+          Visible pour le gérant — ou l'utilisateur seul dans son espace. */}
+      {isSupabaseConfigured && user.org && (user.role === 'gerant' || !team.some((u) => u.role === 'gerant')) && (
         <div className="card">
           <div className="sheet-section-title"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Parrainage</div>
           {user.org.referred_by ? (

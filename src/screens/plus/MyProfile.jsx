@@ -85,7 +85,7 @@ export default function MyProfile({ onBack }) {
           {me.name}
           {me.tier === 'or' && <span className="tier-badge"><Star size={12} /> OR</span>}
         </div>
-        <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'} · <span className="partner-code-chip">{me.code}</span></div>
+        <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'} · <span className="partner-code-chip">{me.code}</span></div>
         {/* L'unité (F) vit dans le libellé pour garder des valeurs compactes */}
         <div className="profile-stats">
           <div><div className="profile-stat-value">{formatNombre(pending)}</div><div className="profile-stat-label">En attente (F)</div></div>

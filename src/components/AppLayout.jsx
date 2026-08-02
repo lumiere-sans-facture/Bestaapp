@@ -126,7 +126,7 @@ export default function AppLayout() {
             <div className="sidebar-user-avatar">{user.avatar || initials(user.name)}</div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{user.name} <SyncDot /></div>
-              <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
+              <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'}</div>
             </div>
             <button className="sidebar-logout" onClick={logout} title="Déconnexion" aria-label="Déconnexion">
               <LogOut size={18} />

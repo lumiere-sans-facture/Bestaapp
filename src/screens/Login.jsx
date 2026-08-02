@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sun, Mail, Lock, Eye, EyeOff, Building2, KeyRound, UserPlus, ChevronLeft, Handshake } from 'lucide-react';
+import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
@@ -16,7 +16,12 @@ export default function Login() {
   // Lien de parrainage (?ref=BESTA-XXX) actif sur cet appareil : on ouvre
   // directement l'inscription, code partenaire prérempli.
   const [refCode, setRefCode] = useState(() => (isSupabaseConfigured ? getActiveRef()?.code || '' : ''));
-  const [view, setView] = useState(refCode ? 'signup' : 'login'); // login | signup | forgot | complete
+  // Lien d'invitation d'équipe (?equipe=CODE) partagé par un gérant : la même
+  // page d'inscription rattache silencieusement le compte à son équipe.
+  const [teamCode] = useState(() => {
+    try { return (new URLSearchParams(window.location.search).get('equipe') || '').trim().toUpperCase(); } catch { return ''; }
+  });
+  const [view, setView] = useState(refCode || teamCode ? 'signup' : 'login'); // login | signup | forgot | complete
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,11 +29,8 @@ export default function Login() {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Inscription
-  const [signupMode, setSignupMode] = useState('create'); // create | join
+  // Inscription (une seule page simple : nom, email, mot de passe)
   const [name, setName] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
 
   const switchView = (v) => { setView(v); setError(''); setNotice(''); };
 
@@ -54,11 +56,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const res = await completeSignup({
-      name,
-      companyName: signupMode === 'create' ? companyName : null,
-      inviteCode: signupMode === 'join' ? inviteCode : null,
-    });
+    const res = await completeSignup({ name, inviteCode: teamCode || null });
     setLoading(false);
     if (!res.ok) setError(res.error || 'Impossible de terminer l’inscription.');
     // Succès : l'app monte toute seule (profil chargé).
@@ -71,9 +69,8 @@ export default function Login() {
     setLoading(true);
     const res = await signUp({
       email, password, name,
-      companyName: signupMode === 'create' ? companyName : null,
-      inviteCode: signupMode === 'join' ? inviteCode : null,
-      refCode: signupMode === 'create' ? refCode.trim() || null : null,
+      inviteCode: teamCode || null,
+      refCode: teamCode ? null : refCode.trim() || null,
     });
     setLoading(false);
     if (!res.ok) { setError(res.error || 'Inscription impossible.'); return; }
@@ -183,30 +180,9 @@ export default function Login() {
           <form className="login-form card" onSubmit={handleComplete}>
             <h2 className="login-form-title">Terminer l'inscription</h2>
             <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
-              Votre compte existe, il ne manque que votre entreprise. Une dernière étape :
+              Votre compte existe — une dernière étape :
             </p>
             {error && <div className="login-error">{error}</div>}
-            <div className="segmented" role="group" aria-label="Type d'inscription" style={{ marginBottom: 16 }}>
-              <button type="button" className={`segmented-btn ${signupMode === 'create' ? 'active' : ''}`} onClick={() => setSignupMode('create')}>
-                <Building2 size={15} /> Mon entreprise
-              </button>
-              <button type="button" className={`segmented-btn ${signupMode === 'join' ? 'active' : ''}`} onClick={() => setSignupMode('join')}>
-                <UserPlus size={15} /> Rejoindre une équipe
-              </button>
-            </div>
-            {signupMode === 'create' ? (
-              <div className="input-group">
-                <label className="input-label" htmlFor="complete-company">Nom de votre entreprise</label>
-                <input id="complete-company" className="input" required value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)} placeholder="Ex : Fatou Solaire Services" />
-              </div>
-            ) : (
-              <div className="input-group">
-                <label className="input-label" htmlFor="complete-code">Code d'invitation</label>
-                <input id="complete-code" className="input" required value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())} placeholder="Code fourni par votre gérant" />
-              </div>
-            )}
             <div className="input-group">
               <label className="input-label" htmlFor="complete-name">Votre nom complet</label>
               <input id="complete-name" className="input" required value={name}
@@ -220,37 +196,10 @@ export default function Login() {
           <form className="login-form card" onSubmit={handleSignup}>
             <h2 className="login-form-title">Créer un compte</h2>
             {error && <div className="login-error">{error}</div>}
-            <div className="segmented" role="group" aria-label="Type d'inscription" style={{ marginBottom: 16 }}>
-              <button type="button" className={`segmented-btn ${signupMode === 'create' ? 'active' : ''}`} onClick={() => setSignupMode('create')}>
-                <Building2 size={15} /> Mon entreprise
-              </button>
-              <button type="button" className={`segmented-btn ${signupMode === 'join' ? 'active' : ''}`} onClick={() => setSignupMode('join')}>
-                <UserPlus size={15} /> Rejoindre une équipe
-              </button>
-            </div>
-            {signupMode === 'create' ? (
-              <>
-                <div className="input-group">
-                  <label className="input-label" htmlFor="signup-company">Nom de votre entreprise</label>
-                  <input id="signup-company" className="input" required value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)} placeholder="Ex : Fatou Solaire Services" />
-                  <div className="field-hint">Gratuit : tableau de bord, suivi clients, boutique, formations, espace partenaire. L'option Devis Pro (documents à votre identité) : 5 000 F/mois.</div>
-                </div>
-                {refCode !== '' && (
-                  <div className="input-group">
-                    <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (parrainage)</label>
-                    <input id="signup-ref" className="input" value={refCode}
-                      onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
-                    <div className="field-hint">Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli.</div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="input-group">
-                <label className="input-label" htmlFor="signup-code">Code d'invitation</label>
-                <input id="signup-code" className="input" required value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())} placeholder="Code fourni par votre gérant" />
-                <div className="field-hint">Votre gérant le trouve dans Plus → Équipe.</div>
+            {teamCode && (
+              <div className="login-notice">
+                <UserPlus size={14} style={{ verticalAlign: -2, marginRight: 5 }} />
+                Vous rejoignez une équipe (invitation {teamCode}).
               </div>
             )}
             <div className="input-group">
@@ -260,9 +209,23 @@ export default function Login() {
             </div>
             {emailField}
             {passwordField('Mot de passe (8 caractères min.)', 'new-password')}
+            {!teamCode && refCode !== '' && (
+              <div className="input-group">
+                <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (parrainage)</label>
+                <input id="signup-ref" className="input" value={refCode}
+                  onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
+                <div className="field-hint">Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli.</div>
+              </div>
+            )}
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              {loading ? 'Création…' : signupMode === 'create' ? 'Créer mon compte' : "Rejoindre l'équipe"}
+              {loading ? 'Création…' : 'Créer mon compte'}
             </button>
+            {!teamCode && (
+              <div className="field-hint" style={{ textAlign: 'center' }}>
+                Gratuit : tableau de bord, suivi clients, boutique, formations, espace partenaire.
+                L'option Devis Pro (documents à votre identité) : 5 000 F/mois.
+              </div>
+            )}
             <button type="button" className="login-link" onClick={() => switchView('login')}>
               <ChevronLeft size={14} /> J'ai déjà un compte — me connecter
             </button>

@@ -44,11 +44,14 @@ export default function Pipeline() {
   const isGerant = user.role === 'gerant';
   const stageLabel = (id) => [...stages, lostStage].find((st) => st.id === id)?.label || id;
 
-  // Gérant : passage direct. Technicien : demande, validée ensuite par le gérant.
+  // Gérant : passage direct. Technicien : demande, validée ensuite par le
+  // gérant — SAUF si l'équipe n'a pas de gérant (utilisateur seul dans son
+  // espace) : personne ne pourrait valider, le passage est donc direct.
+  const orgSansGerant = !team.some((u) => u.role === 'gerant');
   const moveLead = (leadId, stageId) => {
     const lead = allMyLeads.find((l) => l.id === leadId);
     if (!lead || lead.stage === stageId) return;
-    if (isGerant) updateLeadStage(leadId, stageId);
+    if (isGerant || orgSansGerant) updateLeadStage(leadId, stageId);
     else requestStageChange(leadId, stageId, user.id);
   };
 

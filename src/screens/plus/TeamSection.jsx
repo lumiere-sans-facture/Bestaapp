@@ -24,12 +24,15 @@ export default function TeamSection({ onBack }) {
     return () => { on = false; };
   }, [user.role]);
 
+  // L'inscription étant une page unique, l'invitation passe par un LIEN :
+  // il ouvre la page d'inscription déjà rattachée à l'équipe (?equipe=CODE).
+  const lienInvitation = org ? `${window.location.origin}/?equipe=${org.invite_code}` : '';
   const copierCode = async () => {
     try {
-      await navigator.clipboard.writeText(org.invite_code);
-      toast('Code d\'invitation copié.');
+      await navigator.clipboard.writeText(lienInvitation);
+      toast('Lien d\'invitation copié.');
     } catch {
-      toast(`Copie impossible — code : ${org.invite_code}`, { type: 'error' });
+      toast(`Copie impossible — lien : ${lienInvitation}`, { type: 'error' });
     }
   };
 
@@ -53,11 +56,11 @@ export default function TeamSection({ onBack }) {
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="sheet-section-title"><UserPlus size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Inviter un technicien</div>
           <p className="text-sm text-secondary">
-            Partagez ce code : votre technicien crée son compte depuis l'écran de
-            connexion (« Rejoindre une équipe ») et arrive directement dans votre entreprise.
+            Partagez ce lien : votre technicien crée son compte en un clic et
+            arrive directement dans votre équipe.
           </p>
           <div className="copy-block">
-            <span className="copy-block-value">{org.invite_code}</span>
+            <span className="copy-block-value">{lienInvitation}</span>
             <button type="button" className="btn btn-sm btn-outline" onClick={copierCode}>Copier</button>
           </div>
         </div>
