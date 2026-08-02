@@ -189,7 +189,7 @@ drop function if exists public.signup_create_org(text, text);
 drop function if exists public.signup_create_org(text, text, text);
 create or replace function public.signup_create_org(p_org_name text, p_user_name text, p_ref_code text default null, p_phone text default '')
   returns text language plpgsql security definer set search_path = public as $$
-declare v_org text; v_email text;
+declare v_org text; v_email text; v_ref text; v_rid text;
 begin
   v_email := auth.jwt() ->> 'email';
   if v_email is null then raise exception 'non authentifié'; end if;
@@ -197,15 +197,39 @@ begin
     raise exception 'profil déjà existant pour cet email';
   end if;
   v_org := 'org-' || replace(gen_random_uuid()::text, '-', '');
+  v_ref := nullif(upper(trim(coalesce(p_ref_code, ''))), '');
   insert into public.orgs (id, name, plan, invite_code, referred_by)
     values (v_org, p_org_name, 'trial',
             upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
-            nullif(upper(trim(coalesce(p_ref_code, ''))), ''));
+            v_ref);
   -- Utilisateur CLASSIQUE (pas gérant) : l'inscription self-service ne donne
   -- aucun menu de gestion — l'app simple (tableau de bord, clients, boutique,
   -- formations, espace partenaire) + l'option Pro payante.
   insert into public.profiles (id, email, name, role, org_id, phone)
     values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org, coalesce(trim(p_phone), ''));
+  -- ATTRIBUTION du parrainage : trace l'inscription CHEZ LE PARRAIN — une
+  -- ligne au registre d'affiliation de SON organisation. C'est ce qui alimente
+  -- « Historique de mes parrainages » et le suivi des filleuls du partenaire.
+  -- En cas de code présent dans plusieurs orgs (homonymes), le plus ancien gagne.
+  if v_ref is not null then
+    v_rid := gen_random_uuid()::text;
+    insert into public.referrals (org_id, id, data, updated_at)
+    select pt.org_id, v_rid, jsonb_build_object(
+        'id', v_rid,
+        'partnerCode', pt.data->>'code',
+        'type', 'inscription',
+        'status', 'validé',
+        'amount', null,
+        'leadId', null,
+        'filleulOrg', v_org,
+        'filleulName', p_user_name,
+        'createdAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+      ), now()
+    from public.partners pt
+    where upper(pt.data->>'code') = v_ref
+    order by pt.updated_at asc
+    limit 1;
+  end if;
   return v_org;
 end $$;
 
@@ -303,17 +327,27 @@ $$;
 drop policy if exists "org isolation" on public.subscriptions;
 drop policy if exists "subs read" on public.subscriptions;
 drop policy if exists "subs write" on public.subscriptions;
+drop policy if exists "subs insert" on public.subscriptions;
+drop policy if exists "subs update" on public.subscriptions;
+drop policy if exists "subs delete" on public.subscriptions;
 create policy "subs read" on public.subscriptions for select to authenticated
   using (org_id = public.auth_org_id() or public.auth_is_platform_admin());
-create policy "subs write" on public.subscriptions for all to authenticated
-  using (
-    public.auth_is_platform_admin()
-    or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') <> 'actif')
-  )
+-- Un membre ne peut jamais ÉCRIRE « actif » (with check), mais il peut
+-- PARTIR d'une ligne active (using) : c'est le renouvellement — l'abonnement
+-- actif repasse « en_attente_paiement » à la demande suivante.
+create policy "subs insert" on public.subscriptions for insert to authenticated
   with check (
     public.auth_is_platform_admin()
     or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') <> 'actif')
   );
+create policy "subs update" on public.subscriptions for update to authenticated
+  using (org_id = public.auth_org_id() or public.auth_is_platform_admin())
+  with check (
+    public.auth_is_platform_admin()
+    or (org_id = public.auth_org_id() and coalesce(data ->> 'status', '') <> 'actif')
+  );
+create policy "subs delete" on public.subscriptions for delete to authenticated
+  using (org_id = public.auth_org_id() or public.auth_is_platform_admin());
 
 -- subscriptionPayments : demande de paiement par les membres ; la validation
 -- (statut « confirme ») reste à l'admin plateforme. NB : le champ du paiement
@@ -321,9 +355,20 @@ create policy "subs write" on public.subscriptions for all to authenticated
 drop policy if exists "org isolation" on public."subscriptionPayments";
 drop policy if exists "subpay read" on public."subscriptionPayments";
 drop policy if exists "subpay write" on public."subscriptionPayments";
+drop policy if exists "subpay insert" on public."subscriptionPayments";
+drop policy if exists "subpay update" on public."subscriptionPayments";
+drop policy if exists "subpay delete" on public."subscriptionPayments";
 create policy "subpay read" on public."subscriptionPayments" for select to authenticated
   using (org_id = public.auth_org_id() or public.auth_is_platform_admin());
-create policy "subpay write" on public."subscriptionPayments" for all to authenticated
+-- Un paiement confirmé est un reçu IMMUABLE pour les membres : ni création
+-- ni modification d'une ligne « confirme » (l'app ne pousse d'ailleurs plus
+-- ces lignes — elles n'appartiennent qu'au serveur).
+create policy "subpay insert" on public."subscriptionPayments" for insert to authenticated
+  with check (
+    public.auth_is_platform_admin()
+    or (org_id = public.auth_org_id() and coalesce(data ->> 'statut', '') <> 'confirme')
+  );
+create policy "subpay update" on public."subscriptionPayments" for update to authenticated
   using (
     public.auth_is_platform_admin()
     or (org_id = public.auth_org_id() and coalesce(data ->> 'statut', '') <> 'confirme')
@@ -332,6 +377,8 @@ create policy "subpay write" on public."subscriptionPayments" for all to authent
     public.auth_is_platform_admin()
     or (org_id = public.auth_org_id() and coalesce(data ->> 'statut', '') <> 'confirme')
   );
+create policy "subpay delete" on public."subscriptionPayments" for delete to authenticated
+  using (org_id = public.auth_org_id() or public.auth_is_platform_admin());
 
 -- L'admin plateforme lit les profils de toutes les orgs (écran Abonnements).
 drop policy if exists "platform admin read" on public.profiles;
@@ -340,4 +387,171 @@ create policy "platform admin read" on public.profiles for select to authenticat
 
 -- Se déclarer admin plateforme (à exécuter UNE FOIS, avec ton email) :
 --   update public.profiles set is_platform_admin = true where email = 'ton@email';
+-- ============================================================
+
+-- ============================================================
+-- AFFILIATION CROSS-ORG : suivi des filleuls + commissions d'abonnement.
+-- Le partenaire (org A) parraine une inscription (org B) : le suivi et les
+-- commissions doivent TRAVERSER les organisations — impossible avec la seule
+-- RLS d'isolation, d'où ces fonctions security definer.
+-- ============================================================
+
+-- Taux de commission sur chaque paiement d'abonnement d'un filleul (10 % de
+-- 5 000 F = 500 F). Modifier ICI puis ré-exécuter le script pour changer.
+create or replace function public.referral_commission_rate()
+  returns numeric language sql immutable as $$ select 0.10 $$;
+
+-- Filleuls de MON organisation : les entreprises inscrites via un des codes
+-- partenaires de mon org, avec leur état d'abonnement Pro. Le tableau de bord
+-- partenaire filtre ensuite par code pour n'afficher que SES filleuls.
+create or replace function public.my_referred_orgs()
+  returns table (partner_code text, org_id text, org_name text, member_name text,
+                 inscrit_le timestamptz, pro_actif boolean)
+  language sql stable security definer set search_path = public as $$
+  select o.referred_by, o.id, o.name,
+         (select p.name from public.profiles p where p.org_id = o.id limit 1),
+         o.created_at,
+         exists (
+           select 1 from public.subscriptions s
+           where s.org_id = o.id
+             and s.data ->> 'status' = 'actif'
+             and coalesce(nullif(s.data ->> 'dateFin', ''), '1970-01-01')::timestamptz > now()
+         )
+  from public.orgs o
+  where o.referred_by is not null
+    and o.referred_by in (
+      select upper(pt.data ->> 'code') from public.partners pt
+      where pt.org_id = public.auth_org_id() and coalesce(pt.data ->> 'code', '') <> ''
+    )
+  order by o.created_at desc
+$$;
+
+-- Vue ADMIN : tous les abonnements et paiements de TOUTES les organisations
+-- (l'écran « Abonnements Devis Pro » lisait l'état local — il ne voyait donc
+-- jamais les demandes des autres entreprises).
+create or replace function public.admin_subscriptions_overview()
+  returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select jsonb_build_object(
+    'subscriptions', coalesce((
+      select jsonb_agg(s.data || jsonb_build_object(
+        'orgId', s.org_id, 'orgName', o.name, 'referredBy', o.referred_by,
+        'memberName', (select p.name from public.profiles p where p.org_id = s.org_id limit 1)
+      ) order by s.updated_at desc)
+      from public.subscriptions s join public.orgs o on o.id = s.org_id
+    ), '[]'::jsonb),
+    'payments', coalesce((
+      select jsonb_agg(sp.data || jsonb_build_object(
+        'orgId', sp.org_id, 'orgName', o.name,
+        'memberName', (select p.name from public.profiles p where p.org_id = sp.org_id limit 1)
+      ) order by sp.updated_at desc)
+      from public."subscriptionPayments" sp join public.orgs o on o.id = sp.org_id
+    ), '[]'::jsonb)
+  ) into v;
+  return v;
+end $$;
+
+-- Confirmation d'un paiement par l'admin plateforme :
+--   1) le paiement passe « confirme » (reçu immuable),
+--   2) l'abonnement de l'org est activé +30 jours (depuis sa fin si elle court),
+--   3) le partenaire PARRAIN de l'org touche sa commission (taux ci-dessus),
+--      dédupliquée par paiement — reconfirmer ne crée jamais de doublon.
+create or replace function public.admin_confirm_subscription_payment(p_org_id text, p_payment_id text)
+  returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_pay jsonb; v_sub_id text; v_montant numeric; v_now timestamptz := now();
+  v_base timestamptz; v_ref text; v_partner_org text; v_partner_id text;
+  v_cid text; v_iso text; v_fin text;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select data into v_pay from public."subscriptionPayments"
+    where org_id = p_org_id and id = p_payment_id;
+  if v_pay is null then raise exception 'paiement introuvable'; end if;
+  if coalesce(v_pay ->> 'statut', '') <> 'initie' then
+    raise exception 'paiement déjà traité (statut « % »)', v_pay ->> 'statut';
+  end if;
+  v_sub_id  := v_pay ->> 'subscriptionId';
+  v_montant := coalesce(nullif(v_pay ->> 'montant', '')::numeric, 5000);
+  v_iso := to_char(v_now at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+
+  update public."subscriptionPayments"
+    set data = data || jsonb_build_object('statut', 'confirme'), updated_at = v_now
+    where org_id = p_org_id and id = p_payment_id;
+
+  -- +30 jours depuis maintenant, ou depuis la fin actuelle si elle court encore.
+  select greatest(v_now, coalesce(nullif(data ->> 'dateFin', '')::timestamptz, v_now))
+    into v_base
+    from public.subscriptions where org_id = p_org_id and id = v_sub_id;
+  if v_base is null then raise exception 'abonnement introuvable (%)', v_sub_id; end if;
+  v_fin := to_char((v_base + interval '30 days') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+  update public.subscriptions
+    set data = data
+      || jsonb_build_object('status', 'actif', 'dateFin', v_fin, 'lastPaymentAt', v_iso)
+      || case when coalesce(data ->> 'dateDebut', '') = ''
+              then jsonb_build_object('dateDebut', v_iso) else '{}'::jsonb end,
+        updated_at = v_now
+    where org_id = p_org_id and id = v_sub_id;
+
+  -- Commission du parrain, créée DANS SON organisation (elle arrive dans son
+  -- espace partenaire à la synchronisation suivante).
+  select o.referred_by into v_ref from public.orgs o where o.id = p_org_id;
+  if v_ref is not null then
+    select pt.org_id, pt.id into v_partner_org, v_partner_id
+      from public.partners pt
+      where upper(pt.data ->> 'code') = upper(v_ref)
+      order by pt.updated_at asc
+      limit 1;
+    if v_partner_id is not null and not exists (
+      select 1 from public.commissions c
+      where c.org_id = v_partner_org and c.data ->> 'paymentId' = p_payment_id
+    ) then
+      v_cid := gen_random_uuid()::text;
+      insert into public.commissions (org_id, id, data, updated_at)
+      values (v_partner_org, v_cid, jsonb_build_object(
+        'id', v_cid,
+        'partnerId', v_partner_id,
+        'leadId', null,
+        'level', 1,
+        'amount', round(v_montant * public.referral_commission_rate()),
+        'status', 'en_attente',
+        'paidAt', null,
+        'createdAt', to_char(v_now at time zone 'utc', 'YYYY-MM-DD'),
+        'source', 'abonnement',
+        'paymentId', p_payment_id,
+        'note', 'Abonnement Devis Pro d''un filleul'
+      ), v_now);
+    end if;
+  end if;
+end $$;
+
+-- Refus d'un paiement : le reçu passe « rejete » ; l'abonnement en attente
+-- retombe sur son état réel (actif si la période payée court encore, sinon expiré).
+create or replace function public.admin_reject_subscription_payment(p_org_id text, p_payment_id text)
+  returns void language plpgsql security definer set search_path = public as $$
+declare v_pay jsonb; v_sub_id text; v_now timestamptz := now();
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select data into v_pay from public."subscriptionPayments"
+    where org_id = p_org_id and id = p_payment_id;
+  if v_pay is null then raise exception 'paiement introuvable'; end if;
+  update public."subscriptionPayments"
+    set data = data || jsonb_build_object('statut', 'rejete'), updated_at = v_now
+    where org_id = p_org_id and id = p_payment_id;
+  v_sub_id := v_pay ->> 'subscriptionId';
+  update public.subscriptions
+    set data = data || jsonb_build_object('status',
+        case when coalesce(nullif(data ->> 'dateFin', ''), '1970-01-01')::timestamptz > v_now
+             then 'actif' else 'expire' end),
+        updated_at = v_now
+    where org_id = p_org_id and id = v_sub_id
+      and data ->> 'status' = 'en_attente_paiement';
+end $$;
 -- ============================================================

@@ -80,6 +80,11 @@ export async function pushCollections(collections) {
       if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items)) return;
       // Le catalogue n'est poussé que par l'organisation interne BestaSolar.
       if (table === 'products' && !pushesProducts()) return;
+      // Vérité serveur : un abonnement « actif » et un paiement « confirme »
+      // ne s'écrivent que côté serveur (RPC admin). L'app ne les repousse
+      // jamais — la RLS les rejetterait et bloquerait toute la réplication.
+      if (currentOrgId && table === 'subscriptions') items = items.filter((i) => i.status !== 'actif');
+      if (currentOrgId && table === 'subscriptionPayments') items = items.filter((i) => i.statut !== 'confirme');
       const rows = items.map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
       if (!rows.length) return;
       const { error } = await supabase.from(table).upsert(rows);
@@ -149,6 +154,41 @@ export async function fetchMyOrg() {
   } catch {
     return null;
   }
+}
+
+/**
+ * Filleuls de mon organisation : entreprises inscrites via un de nos codes
+ * partenaires (RPC cross-org — la RLS d'isolation ne permet pas de les voir).
+ * Chaque ligne : { partner_code, org_id, org_name, member_name, inscrit_le, pro_actif }.
+ */
+export async function fetchMyReferredOrgs() {
+  const { data, error } = await supabase.rpc('my_referred_orgs');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/** Vue admin plateforme : abonnements + paiements de TOUTES les organisations. */
+export async function adminSubscriptionsOverview() {
+  const { data, error } = await supabase.rpc('admin_subscriptions_overview');
+  if (error) throw new Error(error.message);
+  return data || { subscriptions: [], payments: [] };
+}
+
+/** Confirme un paiement d'abonnement (admin) : active +30 j et crédite la
+ *  commission du parrain — tout est fait côté serveur, atomiquement. */
+export async function adminConfirmSubscriptionPayment(orgId, paymentId) {
+  const { error } = await supabase.rpc('admin_confirm_subscription_payment', {
+    p_org_id: orgId, p_payment_id: paymentId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Refuse un paiement d'abonnement (admin). */
+export async function adminRejectSubscriptionPayment(orgId, paymentId) {
+  const { error } = await supabase.rpc('admin_reject_subscription_payment', {
+    p_org_id: orgId, p_payment_id: paymentId,
+  });
+  if (error) throw new Error(error.message);
 }
 
 /** Écoute les changements distants (autres appareils). Retourne une fonction de désabonnement. */

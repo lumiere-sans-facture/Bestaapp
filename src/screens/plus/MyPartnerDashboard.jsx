@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save } from 'lucide-react';
+import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save, UserPlus, Crown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { fetchMyReferredOrgs } from '../../lib/remoteSync';
 import StageBadge from '../../components/StageBadge';
 import { useToast } from '../../components/Toast';
 
-const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };
+const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé', inscription: 'Inscription via mon lien' };
 
 export default function MyPartnerDashboard({ onBack }) {
   const { user } = useAuth();
@@ -24,8 +26,18 @@ export default function MyPartnerDashboard({ onBack }) {
     ensurePartnerForUser(user);
   }, [user, ensurePartnerForUser]);
 
+  // Filleuls INSCRITS sur la plateforme via mon lien (autres entreprises) :
+  // lecture serveur — la RLS d'isolation ne les montre pas dans l'état local.
+  const [referredOrgs, setReferredOrgs] = useState([]);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    fetchMyReferredOrgs().then((rows) => setReferredOrgs(rows || [])).catch(() => {});
+  }, []);
+
   const me = partners.find((p) => p.userId === user.id);
   if (!me) return null;
+
+  const mesInscrits = referredOrgs.filter((r) => (r.partner_code || '').toUpperCase() === me.code);
 
   const l1Leads = leads.filter((l) => l.parrainL1 === me.id);
   const l2Leads = leads.filter((l) => l.parrainL2 === me.id);
@@ -104,6 +116,31 @@ export default function MyPartnerDashboard({ onBack }) {
         </div>
       </div>
 
+      {/* Filleuls inscrits sur la plateforme via mon lien (mode SaaS) */}
+      {isSupabaseConfigured && (
+        <div className="card my-partner-section">
+          <div className="card-title"><UserPlus size={15} /> Mes filleuls inscrits ({mesInscrits.length})</div>
+          {mesInscrits.length ? mesInscrits.map((r) => (
+            <div key={r.org_id} className="sheet-row">
+              <span className="sheet-label">
+                {r.member_name || r.org_name}
+                <span className="text-secondary"> · inscrit le {formatDate(r.inscrit_le)}</span>
+              </span>
+              <span className="sheet-value">
+                {r.pro_actif
+                  ? <span className="badge badge-success"><Crown size={11} style={{ verticalAlign: -1 }} /> Abonné Pro</span>
+                  : <span className="badge badge-muted">Gratuit</span>}
+              </span>
+            </div>
+          )) : (
+            <div className="text-sm text-secondary">
+              Personne ne s'est encore inscrit avec votre lien. Chaque filleul abonné à
+              Devis Pro vous rapporte une commission à chacun de ses paiements.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Mes affaires */}
       <div className="card my-partner-section">
         <div className="card-title">Mes affaires apportées — niveau 1 (3 %)</div>
@@ -156,7 +193,8 @@ export default function MyPartnerDashboard({ onBack }) {
         {conversions.length ? conversions.map((r) => (
           <div key={r.id} className="sheet-row">
             <span className="sheet-label">
-              {REFERRAL_TYPE_LABELS[r.type]}{r.leadId && getLeadById(r.leadId) ? ` — ${getLeadById(r.leadId).name}` : ''}
+              {REFERRAL_TYPE_LABELS[r.type] || r.type}
+              {r.leadId && getLeadById(r.leadId) ? ` — ${getLeadById(r.leadId).name}` : r.filleulName ? ` — ${r.filleulName}` : ''}
               <span className="text-secondary"> · {formatDate(r.createdAt)}</span>
             </span>
             <span className="sheet-value">
@@ -178,7 +216,12 @@ export default function MyPartnerDashboard({ onBack }) {
         </div>
         <div className="sheet-row">
           <span className="sheet-label"><Users size={14} /> Mes filleuls</span>
-          <span className="sheet-value">{filleuls.length ? filleuls.map((f) => f.name).join(', ') : 'Aucun'}</span>
+          <span className="sheet-value">
+            {(() => {
+              const noms = [...filleuls.map((f) => f.name), ...mesInscrits.map((r) => r.member_name || r.org_name)];
+              return noms.length ? noms.join(', ') : 'Aucun';
+            })()}
+          </span>
         </div>
         <div className="momo-row">
           <label className="input-label" htmlFor="mpd-momo">Numéro Mobile Money (réception des commissions)</label>
