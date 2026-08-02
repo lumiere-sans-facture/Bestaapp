@@ -183,6 +183,17 @@ export async function adminConfirmSubscriptionPayment(orgId, paymentId) {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Vue gérant : tous les devis PUBLICS de la plateforme (toutes organisations,
+ * hors espace Pro payant), enrichis du client (clientName…), de l'auteur et
+ * de l'entreprise d'origine. Réservé à l'admin plateforme (vérifié serveur).
+ */
+export async function fetchAdminPublicDevis() {
+  const { data, error } = await supabase.rpc('admin_public_devis');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 /** Refuse un paiement d'abonnement (admin). */
 export async function adminRejectSubscriptionPayment(orgId, paymentId) {
   const { error } = await supabase.rpc('admin_reject_subscription_payment', {

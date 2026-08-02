@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FileText, Plus, Download, Search, Check, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { fetchAdminPublicDevis } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
@@ -63,9 +65,25 @@ export default function Devis() {
   const runAction = (fn) => { fn(); setActions(null); };
   const rowKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
 
+  // Vue plateforme (gérant BestaSolar) : les devis publics créés par TOUS les
+  // comptes remontent ici en lecture seule — la boutique et le solaire sont
+  // l'activité commerciale de BestaSolar. Les devis de l'espace Pro payant
+  // restent privés (jamais remontés par la RPC).
+  const isAdminPlateforme = isSupabaseConfigured && !!user.is_platform_admin;
+  const [devisExternes, setDevisExternes] = useState([]);
+  useEffect(() => {
+    if (!isAdminPlateforme) return;
+    fetchAdminPublicDevis()
+      .then((rows) => setDevisExternes((rows || []).map((d) => ({ ...d, _externe: true }))))
+      .catch(() => {});
+  }, [isAdminPlateforme]);
+
   // Les devis créés dans l'Espace Pro (type 'pro') restent cantonnés au mode Pro.
-  const myDevis = (user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id))
-    .filter((d) => d.type !== 'pro');
+  const myDevis = [
+    ...(user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id))
+      .filter((d) => d.type !== 'pro'),
+    ...devisExternes,
+  ];
 
   // Recherche (client, numéro, partenaire/code) + filtre type + tri
   const visibleDevis = myDevis
@@ -75,9 +93,9 @@ export default function Devis() {
     .filter((d) => {
       if (!search.trim()) return true;
       const q = search.trim().toLowerCase();
-      const lead = getLeadById(d.leadId);
+      const lead = d._externe ? null : getLeadById(d.leadId);
       const partner = d.partnerId ? getPartnerById(d.partnerId) : null;
-      return [d.devisNumber, lead?.name, lead?.contact, partner?.name, d.partnerCode || partner?.code]
+      return [d.devisNumber, lead?.name, lead?.contact, d.clientName, d.authorName, d.orgName, partner?.name, d.partnerCode || partner?.code]
         .some((v) => v && v.toLowerCase().includes(q));
     })
     .sort((a, b) => {
@@ -143,16 +161,19 @@ export default function Devis() {
             {visibleDevis.length === 0 && <div className="empty-state card">Aucun devis ne correspond à votre recherche.</div>}
             <div className="flat-list">
               {visibleDevis.map((d) => {
-                const lead = getLeadById(d.leadId);
+                const lead = d._externe ? null : getLeadById(d.leadId);
                 const [bcls, blabel] = d.statut === 'brouillon' ? ['muted', 'Brouillon'] : ['', 'Finalisé'];
                 return (
-                  <div key={d.id} className="flat-row" role="button" tabIndex={0}
+                  <div key={`${d.orgId || ''}-${d.id}`} className="flat-row" role="button" tabIndex={0}
                     onClick={() => setActions(d)} onKeyDown={(e) => rowKey(e, () => setActions(d))}>
                     <div className="flat-row-main">
-                      <div className="flat-row-title">{d.devisNumber ? `${d.devisNumber} - ` : ''}{lead?.name || 'Client supprimé'}</div>
+                      <div className="flat-row-title">{d.devisNumber ? `${d.devisNumber} - ` : ''}{lead?.name || d.clientName || 'Client supprimé'}</div>
                       <div className="flat-row-sub">
                         <span className={`flat-badge ${bcls}`}>{blabel}</span>
-                        <span className="flat-row-date">{formatDate(d.createdAt)} · {d.type === 'solar' ? 'Solaire' : 'Comptant'}</span>
+                        <span className="flat-row-date">
+                          {formatDate(d.createdAt)} · {d.type === 'solar' ? 'Solaire' : 'Comptant'}
+                          {d._externe && ` · par ${d.authorName || d.orgName}`}
+                        </span>
                       </div>
                     </div>
                     <div className="flat-row-amount">{formatCFA(d.total)}</div>
@@ -167,17 +188,25 @@ export default function Devis() {
         <Sheet open={!!actions} onClose={() => setActions(null)} title={actions?.devisNumber || 'Devis'}>
           {actions && (
             <div className="doc-actions-list">
-              <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{getLeadById(actions.leadId)?.name || 'Client'}</span></div>
+              <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{(actions._externe ? actions.clientName : getLeadById(actions.leadId)?.name) || 'Client'}</span></div>
               <div className="sheet-row"><span className="sheet-label">Total</span><span className="sheet-value amount">{formatCFA(actions.total)}</span></div>
-              {actions.partnerId && (
+              {actions._externe && (
+                <div className="sheet-row"><span className="sheet-label">Créé par</span><span className="sheet-value">{actions.authorName || '—'}{actions.orgName && actions.orgName !== actions.authorName ? ` · ${actions.orgName}` : ''}</span></div>
+              )}
+              {actions.partnerId && !actions._externe && (
                 <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{getPartnerById(actions.partnerId)?.name}{(actions.partnerCode || getPartnerById(actions.partnerId)?.code) ? ` · ${actions.partnerCode || getPartnerById(actions.partnerId)?.code}` : ''}</span></div>
               )}
               <button className="btn btn-primary btn-block" onClick={() => runAction(() => ouvrirDocument(actions))}><Download size={16} /> Devis imprimable (PDF)</button>
-              <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions); setActions(null); }}><Pencil size={16} /> Éditer</button>
-              {actions.statut === 'brouillon' && (
+              {/* Un devis d'un autre compte se consulte : il s'édite chez son auteur. */}
+              {!actions._externe && (
                 <>
-                  <button className="btn btn-won btn-block" onClick={() => runAction(() => updateDevis(actions.id, { statut: 'finalise' }))}><Check size={16} /> Finaliser</button>
-                  <button className="btn btn-lost btn-block" onClick={() => setConfirmDelete(actions.id)}><Trash2 size={16} /> Supprimer le brouillon</button>
+                  <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions); setActions(null); }}><Pencil size={16} /> Éditer</button>
+                  {actions.statut === 'brouillon' && (
+                    <>
+                      <button className="btn btn-won btn-block" onClick={() => runAction(() => updateDevis(actions.id, { statut: 'finalise' }))}><Check size={16} /> Finaliser</button>
+                      <button className="btn btn-lost btn-block" onClick={() => setConfirmDelete(actions.id)}><Trash2 size={16} /> Supprimer le brouillon</button>
+                    </>
+                  )}
                 </>
               )}
             </div>

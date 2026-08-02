@@ -530,6 +530,39 @@ begin
   end if;
 end $$;
 
+-- Vue GÉRANT : tous les devis PUBLICS de la plateforme (solaires + comptants),
+-- créés par n'importe quel compte. Le nom du client est joint depuis la piste
+-- de l'org d'origine ; les devis de l'espace Pro payant (type 'pro') restent
+-- STRICTEMENT privés — c'est l'activité propre de l'abonné, jamais remontée.
+create or replace function public.admin_public_devis()
+  returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select coalesce(jsonb_agg(x.doc order by x.tri desc), '[]'::jsonb) into v
+  from (
+    select d.updated_at as tri, d.data || jsonb_build_object(
+      'orgId', d.org_id,
+      'orgName', o.name,
+      'authorName', coalesce(
+        (select p.name from public.profiles p where p.id = d.data ->> 'createdBy'),
+        (select p.name from public.profiles p where p.org_id = d.org_id limit 1)
+      ),
+      'clientName',  coalesce(nullif(d.data ->> 'clientName', ''),  l.data ->> 'name'),
+      'clientPhone', coalesce(nullif(d.data ->> 'clientPhone', ''), l.data ->> 'phone'),
+      'clientVille', coalesce(nullif(d.data ->> 'clientVille', ''), l.data ->> 'address')
+    ) as doc
+    from public.devis d
+    join public.orgs o on o.id = d.org_id
+    left join public.leads l on l.org_id = d.org_id and l.id = d.data ->> 'leadId'
+    where d.org_id <> 'org-bestasolar'
+      and coalesce(d.data ->> 'type', '') <> 'pro'
+  ) x;
+  return v;
+end $$;
+
 -- Refus d'un paiement : le reçu passe « rejete » ; l'abonnement en attente
 -- retombe sur son état réel (actif si la période payée court encore, sinon expiré).
 create or replace function public.admin_reject_subscription_payment(p_org_id text, p_payment_id text)
