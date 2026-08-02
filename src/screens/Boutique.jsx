@@ -44,6 +44,10 @@ export default function Boutique() {
   const detailProduct = products.find((p) => p.id === detailId);
 
   const isManager = user.role === 'gerant';
+  // Le paiement en ligne alimente les commandes internes BestaSolar : réservé
+  // à l'organisation interne (en SaaS, les comptes externes consultent et
+  // créent leur devis ; la commande cross-entreprise viendra plus tard).
+  const canPayOnline = !user.org || user.org.kind === 'interne';
   const getPrice = (basePrice) => (isManager ? prixPublic(basePrice) : basePrice);
   const categoryLabel = (id) => productCategories.find((c) => c.id === id)?.label || '';
 
@@ -279,9 +283,11 @@ export default function Boutique() {
           <button className="btn btn-accent btn-block" onClick={goToDevis}>
             <FileText size={17} /> Créer le devis
           </button>
-          <button className="btn btn-outline btn-block" onClick={handlePayOnline}>
-            <Smartphone size={17} /> Payer en ligne
-          </button>
+          {canPayOnline && (
+            <button className="btn btn-outline btn-block" onClick={handlePayOnline}>
+              <Smartphone size={17} /> Payer en ligne
+            </button>
+          )}
         </div>
         <button
           type="button"

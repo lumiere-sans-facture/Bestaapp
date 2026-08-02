@@ -40,6 +40,8 @@ export function AuthProvider({ children }) {
     setSyncOrg(profile?.org_id);
     let org = null;
     if (profile?.org_id) org = await fetchMyOrg();
+    // Le type (interne/pro) conditionne la sync du catalogue partagé.
+    setSyncOrg(profile?.org_id, org?.kind);
     setUser(org ? { ...profile, org } : profile);
   };
 
@@ -209,7 +211,10 @@ export function AuthProvider({ children }) {
   const refreshOrg = async () => {
     if (!isSupabaseConfigured) return;
     const org = await fetchMyOrg();
-    if (org) setUser((u) => (u ? { ...u, org } : u));
+    if (org) {
+      setSyncOrg(org.id, org.kind);
+      setUser((u) => (u ? { ...u, org } : u));
+    }
   };
 
   return (

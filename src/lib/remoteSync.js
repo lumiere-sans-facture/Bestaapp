@@ -10,7 +10,17 @@ export const SYNCED_COLLECTIONS = ['products', 'leads', 'partners', 'commissions
 // au chargement du profil ; absente (null) sur l'ancien schéma mono-équipe —
 // les lignes sont alors poussées sans org_id, comme avant.
 let currentOrgId = null;
-export const setSyncOrg = (orgId) => { currentOrgId = orgId || null; };
+// Type de l'organisation ('interne' = BestaSolar, 'pro' = externe). Le catalogue
+// est l'actif interne BestaSolar, partagé en LECTURE à toutes les entreprises :
+// seule l'organisation interne le pousse. Tant que le type est inconnu, on
+// s'abstient de pousser les produits (prudence : jamais de copie).
+let currentOrgKind = null;
+const SHARED_ORG_ID = 'org-bestasolar';
+const pushesProducts = () => !currentOrgId || currentOrgKind === 'interne';
+export const setSyncOrg = (orgId, kind = null) => {
+  currentOrgId = orgId || null;
+  currentOrgKind = kind || null;
+};
 const withOrg = (row) => (currentOrgId ? { ...row, org_id: currentOrgId } : row);
 
 /** Récupère toutes les collections + les tombstones. { empty, collections, tombstones } */
@@ -18,9 +28,18 @@ export async function pullAll() {
   // Lecture des collections en parallèle (au lieu de 15 allers-retours séquentiels).
   const fetched = await Promise.all(
     SYNCED_COLLECTIONS.map(async (table) => {
-      const { data, error } = await supabase.from(table).select('id, data');
+      // Catalogue partagé : en multi-entreprise, la lecture renvoie aussi les
+      // produits BestaSolar. Une entreprise ayant reçu une copie historique
+      // verrait des doublons — on garde la ligne BestaSolar (source de vérité).
+      const dedupe = table === 'products' && currentOrgId;
+      const { data, error } = await supabase.from(table).select(dedupe ? 'id, data, org_id' : 'id, data');
       if (error) throw error;
-      return [table, (data || []).map((row) => ({ ...row.data, id: row.id }))];
+      let rows = data || [];
+      if (dedupe) {
+        const shared = new Set(rows.filter((r) => r.org_id === SHARED_ORG_ID).map((r) => r.id));
+        rows = rows.filter((r) => r.org_id === SHARED_ORG_ID || !shared.has(r.id));
+      }
+      return [table, rows.map((row) => ({ ...row.data, id: row.id }))];
     })
   );
   const collections = {};
@@ -59,6 +78,8 @@ export async function pushCollections(collections) {
   await Promise.all(
     Object.entries(collections).map(async ([table, items]) => {
       if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items)) return;
+      // Le catalogue n'est poussé que par l'organisation interne BestaSolar.
+      if (table === 'products' && !pushesProducts()) return;
       const rows = items.map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
       if (!rows.length) return;
       const { error } = await supabase.from(table).upsert(rows);
@@ -69,6 +90,9 @@ export async function pushCollections(collections) {
 
 /** Enregistre une suppression dans la table tombstones (non-destructif). */
 export async function pushTombstone(table, id) {
+  // Une entreprise externe ne supprime jamais le catalogue partagé (un
+  // tombstone local masquerait les produits BestaSolar à la réception).
+  if (table === 'products' && !pushesProducts()) return;
   const { error } = await supabase
     .from('tombstones')
     .upsert(withOrg({ id, collection: table, deleted_at: new Date().toISOString() }));

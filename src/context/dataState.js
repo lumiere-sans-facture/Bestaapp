@@ -15,13 +15,13 @@ const keyFor = (scope) => (scope ? `${STORAGE_KEY}_${scope}` : STORAGE_KEY);
 
 export const buildInitialState = () => ({
   version: seed.SEED_VERSION,
-  // Backend configuré (mode SaaS) : une nouvelle entreprise démarre SANS les
-  // données métier de démonstration — ses pistes/partenaires arrivent de la
-  // synchronisation ou de sa propre saisie. Elle reçoit en dotation le
-  // catalogue de référence et les cours de formation.
+  // Backend configuré (mode SaaS) : une nouvelle entreprise démarre SANS
+  // données de démonstration ni catalogue — le catalogue est l'actif interne
+  // BestaSolar, reçu du serveur en lecture partagée (jamais copié). Seuls les
+  // cours de formation sont dotés.
   // Mode local (sans backend) : jeu de démonstration complet, comme avant.
   leads: isSupabaseConfigured ? [] : seed.leads,
-  products: seed.products,
+  products: isSupabaseConfigured ? [] : seed.products,
   partners: isSupabaseConfigured ? [] : seed.partners,
   commissions: isSupabaseConfigured ? [] : seed.commissions,
   devis: [],

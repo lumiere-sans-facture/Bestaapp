@@ -149,6 +149,20 @@ begin
   end loop;
 end $$;
 
+-- CATALOGUE : actif interne BestaSolar, PARTAGÉ EN LECTURE avec toutes les
+-- organisations (boutique en consultation, dimensionnement solaire Pro).
+-- Écriture strictement limitée à sa propre org — en pratique, seule l'org
+-- interne alimente le catalogue ; les inscrits n'en reçoivent aucune copie.
+drop policy if exists "org isolation" on public.products;
+drop policy if exists "catalogue lecture partagee" on public.products;
+drop policy if exists "catalogue ecriture org" on public.products;
+create policy "catalogue lecture partagee" on public.products for select to authenticated
+  using (org_id = public.auth_org_id() or org_id = 'org-bestasolar');
+create policy "catalogue ecriture org" on public.products
+  for all to authenticated
+  using (org_id = public.auth_org_id())
+  with check (org_id = public.auth_org_id());
+
 -- profiles : chacun ne lit que les profils de sa propre org
 drop policy if exists "team read" on public.profiles;
 drop policy if exists "org read" on public.profiles;
