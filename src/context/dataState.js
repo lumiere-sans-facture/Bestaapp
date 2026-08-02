@@ -6,6 +6,13 @@ import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
 
 export const STORAGE_KEY = 'bestasolar_data';
 
+// Clé de stockage par PÉRIMÈTRE de compte. En mode SaaS (backend configuré),
+// le cache local est séparé par organisation : sans cela, deux comptes
+// utilisés sur le même appareil partageraient leurs données — et la sync
+// pousserait celles du premier dans l'entreprise du second (fuite croisée).
+// En mode local (démo, sans backend), la clé historique est conservée.
+const keyFor = (scope) => (scope ? `${STORAGE_KEY}_${scope}` : STORAGE_KEY);
+
 export const buildInitialState = () => ({
   version: seed.SEED_VERSION,
   // Backend configuré (mode SaaS) : une nouvelle entreprise démarre SANS les
@@ -36,9 +43,9 @@ export const buildInitialState = () => ({
 // volontaires, elles, ne correspondent plus à l'ancienne valeur et sont gardées).
 const CATALOGUE_FIXES = { 'cat-p14r4': 65000, 'cat-p14r5': 70000 };
 
-export const loadState = () => {
+export const loadState = (scope = null) => {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const saved = JSON.parse(localStorage.getItem(keyFor(scope)));
     if (saved && saved.version === seed.SEED_VERSION) {
       // Injecte les nouveaux produits du catalogue officiel sans toucher
       // aux données locales (modifications de prix, photos, pistes, devis…)
@@ -108,9 +115,9 @@ export const loadState = () => {
 };
 
 /** Écrit l'état dans localStorage (silencieux en cas de quota / mode privé). */
-export const persist = (state) => {
+export const persist = (state, scope = null) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(keyFor(scope), JSON.stringify(state));
   } catch {
     /* quota dépassé / navigation privée */
   }

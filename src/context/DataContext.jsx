@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as seed from '../data/seed';
 import { consumeRefClick } from '../utils/referral';
+import { useAuth } from './AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchTeamProfiles } from '../lib/remoteSync';
 import { loadState, persist } from './dataState';
@@ -21,7 +22,13 @@ const DataContext = createContext(null);
 // (dataActions), la réplication (useRemoteSync) et les sélecteurs, puis les
 // expose via useData(). Aucune logique métier ici — uniquement le câblage.
 export function DataProvider({ children }) {
-  const [state, setState] = useState(loadState);
+  const { user } = useAuth();
+  // Périmètre du cache local : par ORGANISATION en mode SaaS (deux comptes sur
+  // le même appareil ne partagent jamais leurs données), clé historique en
+  // mode local. Stable pendant toute la vie du Provider (remonté au login).
+  const scopeRef = useRef(isSupabaseConfigured ? (user.org?.id || user.org_id || user.id) : null);
+  const scope = scopeRef.current;
+  const [state, setState] = useState(() => loadState(scope));
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -40,14 +47,14 @@ export function DataProvider({ children }) {
   // Persistance locale débattue : éviter de sérialiser tout l'état (coût
   // O(taille des données) sur le thread principal) à chaque micro-mutation.
   useEffect(() => {
-    const id = setTimeout(() => persist(state), 400);
+    const id = setTimeout(() => persist(state, scope), 400);
     return () => clearTimeout(id);
-  }, [state]);
+  }, [state, scope]);
 
   // Flush immédiat de la dernière valeur avant fermeture ou passage en
   // arrière-plan (crucial sur mobile) — garantit zéro perte malgré le débat.
   useEffect(() => {
-    const flush = () => persist(stateRef.current);
+    const flush = () => persist(stateRef.current, scope);
     const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', onVisibility);
@@ -56,7 +63,7 @@ export function DataProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisibility);
       flush();
     };
-  }, []);
+  }, [scope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Réplication Supabase (optionnelle, auto-détectée)
   const syncStatus = useRemoteSync(state, setState, stateRef);
