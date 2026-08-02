@@ -50,12 +50,13 @@ export function AuthProvider({ children }) {
     if (!pending || pending.email?.toLowerCase() !== email.toLowerCase()) return null;
     try {
       if (pending.inviteCode) {
-        await supabase.rpc('signup_join_org', { p_invite_code: pending.inviteCode, p_user_name: pending.name });
+        await supabase.rpc('signup_join_org', { p_invite_code: pending.inviteCode, p_user_name: pending.name, p_phone: pending.phone || '' });
       } else {
         await supabase.rpc('signup_create_org', {
           p_org_name: pending.companyName,
           p_user_name: pending.name,
           p_ref_code: pending.refCode || null,
+          p_phone: pending.phone || '',
         });
       }
       localStorage.removeItem(PENDING_KEY);
@@ -121,7 +122,7 @@ export function AuthProvider({ children }) {
    * classique) ; avec `inviteCode` (lien ?equipe=) : rejoint l'équipe.
    * Retourne { ok, needsConfirmation, error }.
    */
-  const signUp = async ({ email, password, name, companyName, inviteCode, refCode }) => {
+  const signUp = async ({ email, password, name, phone, companyName, inviteCode, refCode }) => {
     if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
     // L'espace personnel porte le nom de l'utilisateur (renommable plus tard
     // dans « Mon entreprise » de l'espace Pro).
@@ -129,12 +130,12 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { name, companyName: companyName || null, inviteCode: inviteCode || null } },
+      options: { data: { name, phone: phone || '', companyName: companyName || null, inviteCode: inviteCode || null } },
     });
     if (error) return { ok: false, error: error.message };
     // Si la confirmation d'email est activée, le profil sera créé au premier
     // login : on mémorise l'entreprise / le code (invitation, parrainage) en attendant.
-    localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, companyName, inviteCode, refCode: refCode || null }));
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, phone: phone || '', companyName, inviteCode, refCode: refCode || null }));
     if (!data.session) return { ok: true, needsConfirmation: true };
     const profile = await provisionProfile(email.trim());
     if (!profile) return { ok: false, error: 'Compte créé mais profil introuvable — reconnectez-vous.' };
@@ -146,12 +147,12 @@ export function AuthProvider({ children }) {
    * Termine une inscription interrompue : la session Auth existe déjà, il ne
    * manque que le profil (et son entreprise ou son rattachement d'équipe).
    */
-  const completeSignup = async ({ name, companyName, inviteCode }) => {
+  const completeSignup = async ({ name, phone, companyName, inviteCode }) => {
     if (!isSupabaseConfigured) return { ok: false };
     if (!inviteCode && !companyName) companyName = name;
     try {
       if (inviteCode) {
-        await supabase.rpc('signup_join_org', { p_invite_code: inviteCode, p_user_name: name });
+        await supabase.rpc('signup_join_org', { p_invite_code: inviteCode, p_user_name: name, p_phone: phone || '' });
       } else {
         await supabase.rpc('signup_create_org', {
           p_org_name: companyName,
@@ -159,6 +160,7 @@ export function AuthProvider({ children }) {
           // Parrainage encore actif sur l'appareil (lien ?ref= cliqué) : conservé
           // même quand l'inscription se termine à la connexion.
           p_ref_code: getActiveRef()?.code || null,
+          p_phone: phone || '',
         });
       }
     } catch (e) {

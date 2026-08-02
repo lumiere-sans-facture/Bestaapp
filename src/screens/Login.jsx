@@ -29,8 +29,9 @@ export default function Login() {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Inscription (une seule page simple : nom, email, mot de passe)
+  // Inscription (une seule page simple : nom, téléphone, email, mot de passe)
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
 
   const switchView = (v) => { setView(v); setError(''); setNotice(''); };
 
@@ -56,7 +57,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const res = await completeSignup({ name, inviteCode: teamCode || null });
+    const res = await completeSignup({ name, phone, inviteCode: teamCode || null });
     setLoading(false);
     if (!res.ok) setError(res.error || 'Impossible de terminer l’inscription.');
     // Succès : l'app monte toute seule (profil chargé).
@@ -68,7 +69,7 @@ export default function Login() {
     if (password.length < 8) { setError('Le mot de passe doit faire au moins 8 caractères.'); return; }
     setLoading(true);
     const res = await signUp({
-      email, password, name,
+      email, password, name, phone,
       inviteCode: teamCode || null,
       refCode: teamCode ? null : refCode.trim() || null,
     });
@@ -188,6 +189,11 @@ export default function Login() {
               <input id="complete-name" className="input" required value={name}
                 onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
             </div>
+            <div className="input-group">
+              <label className="input-label" htmlFor="complete-phone">Numéro de téléphone</label>
+              <input id="complete-phone" className="input" type="tel" required value={phone}
+                onChange={(e) => setPhone(e.target.value)} placeholder="+229 01 XX XX XX XX" autoComplete="tel" />
+            </div>
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
               {loading ? 'Finalisation…' : "Terminer et entrer dans l'app"}
             </button>
@@ -206,6 +212,11 @@ export default function Login() {
               <label className="input-label" htmlFor="signup-name">Votre nom complet</label>
               <input id="signup-name" className="input" required value={name}
                 onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
+            </div>
+            <div className="input-group">
+              <label className="input-label" htmlFor="signup-phone">Numéro de téléphone</label>
+              <input id="signup-phone" className="input" type="tel" required value={phone}
+                onChange={(e) => setPhone(e.target.value)} placeholder="+229 01 XX XX XX XX" autoComplete="tel" />
             </div>
             {emailField}
             {passwordField('Mot de passe (8 caractères min.)', 'new-password')}

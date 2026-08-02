@@ -133,11 +133,12 @@ create policy "own org" on public.orgs for select to authenticated
 -- Parrainage : code partenaire (?ref=BESTA-XXX) ayant amené l'inscription.
 alter table public.orgs add column if not exists referred_by text;
 
--- L'ancienne signature à 2 arguments est supprimée AVANT de recréer la
--- version à 3 arguments (sinon PostgREST verrait deux fonctions homonymes
--- et rejetterait les appels pour ambiguïté).
+-- Les anciennes signatures sont supprimées AVANT de recréer la fonction
+-- (sinon PostgREST verrait plusieurs fonctions homonymes et rejetterait
+-- les appels pour ambiguïté).
 drop function if exists public.signup_create_org(text, text);
-create or replace function public.signup_create_org(p_org_name text, p_user_name text, p_ref_code text default null)
+drop function if exists public.signup_create_org(text, text, text);
+create or replace function public.signup_create_org(p_org_name text, p_user_name text, p_ref_code text default null, p_phone text default '')
   returns text language plpgsql security definer set search_path = public as $$
 declare v_org text; v_email text;
 begin
@@ -154,8 +155,8 @@ begin
   -- Utilisateur CLASSIQUE (pas gérant) : l'inscription self-service ne donne
   -- aucun menu de gestion — l'app simple (tableau de bord, clients, boutique,
   -- formations, espace partenaire) + l'option Pro payante.
-  insert into public.profiles (id, email, name, role, org_id)
-    values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org);
+  insert into public.profiles (id, email, name, role, org_id, phone)
+    values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org, coalesce(trim(p_phone), ''));
   return v_org;
 end $$;
 
@@ -213,7 +214,8 @@ end $$;
 -- Le gérant partage le code (visible dans l'écran Équipe) ; le technicien
 -- s'inscrit avec ce code et rejoint l'org — aucun accès admin requis.
 -- ============================================================
-create or replace function public.signup_join_org(p_invite_code text, p_user_name text)
+drop function if exists public.signup_join_org(text, text);
+create or replace function public.signup_join_org(p_invite_code text, p_user_name text, p_phone text default '')
   returns text language plpgsql security definer set search_path = public as $$
 declare v_org text; v_email text;
 begin
@@ -224,8 +226,8 @@ begin
   end if;
   select id into v_org from public.orgs where invite_code = upper(trim(p_invite_code));
   if v_org is null then raise exception 'code d''invitation invalide'; end if;
-  insert into public.profiles (id, email, name, role, org_id)
-    values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org);
+  insert into public.profiles (id, email, name, role, org_id, phone)
+    values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org, coalesce(trim(p_phone), ''));
   return v_org;
 end $$;
 
