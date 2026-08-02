@@ -16,6 +16,8 @@ export default function Login() {
   // Lien de parrainage (?ref=BESTA-XXX) actif sur cet appareil : on ouvre
   // directement l'inscription, code partenaire prérempli.
   const [refCode, setRefCode] = useState(() => (isSupabaseConfigured ? getActiveRef()?.code || '' : ''));
+  // Venu par un lien partenaire (le champ est alors prérempli, hint adapté).
+  const [refFromLink] = useState(() => refCode !== '');
   // Lien d'invitation d'équipe (?equipe=CODE) partagé par un gérant : la même
   // page d'inscription rattache silencieusement le compte à son équipe.
   const [teamCode] = useState(() => {
@@ -57,7 +59,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const res = await completeSignup({ name, phone, inviteCode: teamCode || null });
+    const res = await completeSignup({ name, phone, inviteCode: teamCode || null, refCode: teamCode ? null : refCode.trim() || null });
     setLoading(false);
     if (!res.ok) setError(res.error || 'Impossible de terminer l’inscription.');
     // Succès : l'app monte toute seule (profil chargé).
@@ -194,6 +196,13 @@ export default function Login() {
               <input id="complete-phone" className="input" type="tel" required value={phone}
                 onChange={(e) => setPhone(e.target.value)} placeholder="+229 01 XX XX XX XX" autoComplete="tel" />
             </div>
+            {!teamCode && (
+              <div className="input-group">
+                <label className="input-label" htmlFor="complete-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
+                <input id="complete-ref" className="input" value={refCode}
+                  onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
+              </div>
+            )}
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
               {loading ? 'Finalisation…' : "Terminer et entrer dans l'app"}
             </button>
@@ -220,12 +229,16 @@ export default function Login() {
             </div>
             {emailField}
             {passwordField('Mot de passe (8 caractères min.)', 'new-password')}
-            {!teamCode && refCode !== '' && (
+            {!teamCode && (
               <div className="input-group">
-                <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (parrainage)</label>
+                <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
                 <input id="signup-ref" className="input" value={refCode}
                   onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
-                <div className="field-hint">Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli.</div>
+                <div className="field-hint">
+                  {refFromLink
+                    ? "Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli."
+                    : 'Un partenaire BestaSolar vous a recommandé l’app ? Saisissez son code — sinon laissez vide (attribuable une seule fois plus tard, dans Plus → Parrainage).'}
+                </div>
               </div>
             )}
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>

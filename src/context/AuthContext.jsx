@@ -149,7 +149,7 @@ export function AuthProvider({ children }) {
    * Termine une inscription interrompue : la session Auth existe déjà, il ne
    * manque que le profil (et son entreprise ou son rattachement d'équipe).
    */
-  const completeSignup = async ({ name, phone, companyName, inviteCode }) => {
+  const completeSignup = async ({ name, phone, companyName, inviteCode, refCode }) => {
     if (!isSupabaseConfigured) return { ok: false };
     if (!inviteCode && !companyName) companyName = name;
     try {
@@ -159,9 +159,10 @@ export function AuthProvider({ children }) {
         await supabase.rpc('signup_create_org', {
           p_org_name: companyName,
           p_user_name: name,
-          // Parrainage encore actif sur l'appareil (lien ?ref= cliqué) : conservé
-          // même quand l'inscription se termine à la connexion.
-          p_ref_code: getActiveRef()?.code || null,
+          // Code saisi dans le formulaire, sinon parrainage encore actif sur
+          // l'appareil (lien ?ref= cliqué) : conservé même quand l'inscription
+          // se termine à la connexion.
+          p_ref_code: refCode || getActiveRef()?.code || null,
           p_phone: phone || '',
         });
       }
