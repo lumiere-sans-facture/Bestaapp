@@ -99,6 +99,41 @@ begin
 end $$;
 create index if not exists idx_tombstones_org_deleted on public.tombstones (org_id, deleted_at);
 
+-- 5 bis. Clés primaires PAR ORGANISATION : (org_id, id) au lieu de (id).
+-- Indispensable : la dotation de départ (catalogue, formations) porte les
+-- mêmes identifiants dans chaque entreprise — avec une clé globale, seule la
+-- première entreprise pouvait pousser ses données, la synchronisation des
+-- suivantes échouait (voyant « pas en ligne »).
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'products','leads','partners','commissions','devis','referrals','orders',
+    'formations','formationProgress','subscriptions','subscriptionPayments',
+    'companies','factures','proClients'
+  ] loop
+    if not exists (
+      select 1 from pg_constraint c
+      join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
+      where c.conrelid = format('public.%I', t)::regclass
+        and c.contype = 'p' and a.attname = 'org_id'
+    ) then
+      execute format('alter table public.%I drop constraint %I', t, t || '_pkey');
+      execute format('alter table public.%I add primary key (org_id, id)', t);
+    end if;
+  end loop;
+  -- tombstones : (org_id, id, collection)
+  if not exists (
+    select 1 from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
+    where c.conrelid = 'public.tombstones'::regclass
+      and c.contype = 'p' and a.attname = 'org_id'
+  ) then
+    alter table public.tombstones drop constraint tombstones_pkey;
+    alter table public.tombstones add primary key (org_id, id, collection);
+  end if;
+end $$;
+
 -- 6. RLS : isolation stricte par organisation (remplace « team full access »)
 do $$
 declare t text;
