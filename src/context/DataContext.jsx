@@ -4,7 +4,7 @@ import { consumeRefClick } from '../utils/referral';
 import { useAuth } from './AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchTeamProfiles } from '../lib/remoteSync';
-import { loadState, persist } from './dataState';
+import { loadState, persist, STORAGE_KEY } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
 
@@ -29,6 +29,18 @@ export function DataProvider({ children }) {
   const scopeRef = useRef(isSupabaseConfigured ? (user.org?.id || user.org_id || user.id) : null);
   const scope = scopeRef.current;
   const [state, setState] = useState(() => loadState(scope));
+
+  // Durcissement : en mode SaaS, on efface l'ancien tiroir PARTAGÉ de
+  // l'appareil (clés historiques non préfixées). Même si un navigateur
+  // ressert une vieille version de l'app depuis son cache, elle n'y
+  // trouvera plus les données d'un autre compte à re-pousser.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('bestasolar_cart');
+    } catch { /* stockage indisponible */ }
+  }, []);
 
   const stateRef = useRef(state);
   stateRef.current = state;
