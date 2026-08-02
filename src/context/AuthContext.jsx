@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { users } from '../data/seed';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
+import { getActiveRef } from '../utils/referral';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
@@ -51,7 +52,11 @@ export function AuthProvider({ children }) {
       if (pending.inviteCode) {
         await supabase.rpc('signup_join_org', { p_invite_code: pending.inviteCode, p_user_name: pending.name });
       } else {
-        await supabase.rpc('signup_create_org', { p_org_name: pending.companyName, p_user_name: pending.name });
+        await supabase.rpc('signup_create_org', {
+          p_org_name: pending.companyName,
+          p_user_name: pending.name,
+          p_ref_code: pending.refCode || null,
+        });
       }
       localStorage.removeItem(PENDING_KEY);
       return await fetchProfile(email);
@@ -116,7 +121,7 @@ export function AuthProvider({ children }) {
    * `inviteCode` rejoint une entreprise existante (rôle technicien).
    * Retourne { ok, needsConfirmation, error }.
    */
-  const signUp = async ({ email, password, name, companyName, inviteCode }) => {
+  const signUp = async ({ email, password, name, companyName, inviteCode, refCode }) => {
     if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -125,8 +130,8 @@ export function AuthProvider({ children }) {
     });
     if (error) return { ok: false, error: error.message };
     // Si la confirmation d'email est activée, le profil sera créé au premier
-    // login : on mémorise l'entreprise / le code en attendant.
-    localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, companyName, inviteCode }));
+    // login : on mémorise l'entreprise / le code (invitation, parrainage) en attendant.
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, companyName, inviteCode, refCode: refCode || null }));
     if (!data.session) return { ok: true, needsConfirmation: true };
     const profile = await provisionProfile(email.trim());
     if (!profile) return { ok: false, error: 'Compte créé mais profil introuvable — reconnectez-vous.' };
@@ -144,7 +149,13 @@ export function AuthProvider({ children }) {
       if (inviteCode) {
         await supabase.rpc('signup_join_org', { p_invite_code: inviteCode, p_user_name: name });
       } else {
-        await supabase.rpc('signup_create_org', { p_org_name: companyName, p_user_name: name });
+        await supabase.rpc('signup_create_org', {
+          p_org_name: companyName,
+          p_user_name: name,
+          // Parrainage encore actif sur l'appareil (lien ?ref= cliqué) : conservé
+          // même quand l'inscription se termine à la connexion.
+          p_ref_code: getActiveRef()?.code || null,
+        });
       }
     } catch (e) {
       return { ok: false, error: e.message };

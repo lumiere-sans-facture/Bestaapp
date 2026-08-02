@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Sun, Mail, Lock, Eye, EyeOff, Building2, KeyRound, UserPlus, ChevronLeft } from 'lucide-react';
+import { Sun, Mail, Lock, Eye, EyeOff, Building2, KeyRound, UserPlus, ChevronLeft, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { getActiveRef } from '../utils/referral';
 import { users } from '../data/seed';
 
 /**
@@ -12,7 +13,10 @@ import { users } from '../data/seed';
  */
 export default function Login() {
   const { login, signUp, completeSignup, resetPassword, updatePassword, recovery } = useAuth();
-  const [view, setView] = useState('login'); // login | signup | forgot | complete
+  // Lien de parrainage (?ref=BESTA-XXX) actif sur cet appareil : on ouvre
+  // directement l'inscription, code partenaire prérempli.
+  const [refCode, setRefCode] = useState(() => (isSupabaseConfigured ? getActiveRef()?.code || '' : ''));
+  const [view, setView] = useState(refCode ? 'signup' : 'login'); // login | signup | forgot | complete
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -69,6 +73,7 @@ export default function Login() {
       email, password, name,
       companyName: signupMode === 'create' ? companyName : null,
       inviteCode: signupMode === 'join' ? inviteCode : null,
+      refCode: signupMode === 'create' ? refCode.trim() || null : null,
     });
     setLoading(false);
     if (!res.ok) { setError(res.error || 'Inscription impossible.'); return; }
@@ -224,12 +229,22 @@ export default function Login() {
               </button>
             </div>
             {signupMode === 'create' ? (
-              <div className="input-group">
-                <label className="input-label" htmlFor="signup-company">Nom de votre entreprise</label>
-                <input id="signup-company" className="input" required value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)} placeholder="Ex : Fatou Solaire Services" />
-                <div className="field-hint">Gratuit : tableau de bord, suivi clients, boutique, formations, espace partenaire. L'option Devis Pro (documents à votre identité) : 5 000 F/mois.</div>
-              </div>
+              <>
+                <div className="input-group">
+                  <label className="input-label" htmlFor="signup-company">Nom de votre entreprise</label>
+                  <input id="signup-company" className="input" required value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)} placeholder="Ex : Fatou Solaire Services" />
+                  <div className="field-hint">Gratuit : tableau de bord, suivi clients, boutique, formations, espace partenaire. L'option Devis Pro (documents à votre identité) : 5 000 F/mois.</div>
+                </div>
+                {refCode !== '' && (
+                  <div className="input-group">
+                    <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (parrainage)</label>
+                    <input id="signup-ref" className="input" value={refCode}
+                      onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
+                    <div className="field-hint">Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli.</div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="input-group">
                 <label className="input-label" htmlFor="signup-code">Code d'invitation</label>

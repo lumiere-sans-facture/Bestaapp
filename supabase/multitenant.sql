@@ -130,7 +130,14 @@ create policy "own org" on public.orgs for select to authenticated
 -- RPC appelée juste après auth.signUp() — security definer car le nouvel
 -- utilisateur n'a pas encore d'org (donc aucune RLS ne le laisserait insérer).
 -- ============================================================
-create or replace function public.signup_create_org(p_org_name text, p_user_name text)
+-- Parrainage : code partenaire (?ref=BESTA-XXX) ayant amené l'inscription.
+alter table public.orgs add column if not exists referred_by text;
+
+-- L'ancienne signature à 2 arguments est supprimée AVANT de recréer la
+-- version à 3 arguments (sinon PostgREST verrait deux fonctions homonymes
+-- et rejetterait les appels pour ambiguïté).
+drop function if exists public.signup_create_org(text, text);
+create or replace function public.signup_create_org(p_org_name text, p_user_name text, p_ref_code text default null)
   returns text language plpgsql security definer set search_path = public as $$
 declare v_org text; v_email text;
 begin
@@ -140,9 +147,10 @@ begin
     raise exception 'profil déjà existant pour cet email';
   end if;
   v_org := 'org-' || replace(gen_random_uuid()::text, '-', '');
-  insert into public.orgs (id, name, plan, invite_code)
+  insert into public.orgs (id, name, plan, invite_code, referred_by)
     values (v_org, p_org_name, 'trial',
-            upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)));
+            upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
+            nullif(upper(trim(coalesce(p_ref_code, ''))), ''));
   insert into public.profiles (id, email, name, role, org_id)
     values (auth.uid()::text, v_email, p_user_name, 'gerant', v_org);
   return v_org;
