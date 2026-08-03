@@ -83,7 +83,7 @@ export function DataProvider({ children }) {
   }, [scope]);
 
   // Réplication Supabase (optionnelle, auto-détectée)
-  const syncStatus = useRemoteSync(state, setState, stateRef);
+  const { syncStatus, syncError } = useRemoteSync(state, setState, stateRef);
 
   // Équipe : profils de MON organisation quand le backend est configuré,
   // utilisateurs du seed sinon (mode local / démo).
@@ -128,7 +128,7 @@ export function DataProvider({ children }) {
   }), [state, team]);
 
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, storageError }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, syncError, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, storageError }}>
       {children}
     </DataContext.Provider>
   );

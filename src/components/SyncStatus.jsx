@@ -8,18 +8,25 @@ const SYNC_LABELS = {
 };
 
 export function SyncDot() {
-  const { syncStatus } = useData();
+  const { syncStatus, syncError } = useData();
   const [cls, label] = SYNC_LABELS[syncStatus] || SYNC_LABELS.local;
-  return <span className={`sync-dot ${cls}`} title={label} aria-label={label} />;
+  // Le motif exact est porté par l'infobulle : « Serveur injoignable » seul
+  // n'a jamais permis de diagnostiquer quoi que ce soit.
+  const titre = syncError ? `${label}\n${syncError}` : label;
+  return <span className={`sync-dot ${cls}`} title={titre} aria-label={label} />;
 }
 
 export function SyncStatusRow() {
-  const { syncStatus } = useData();
+  const { syncStatus, syncError } = useData();
   const [cls, label] = SYNC_LABELS[syncStatus] || SYNC_LABELS.local;
   return (
     <div className="sync-status-row">
-      <span className={`sync-dot ${cls}`} />
-      <span>{label}</span>
+      <div className="sync-status-line">
+        <span className={`sync-dot ${cls}`} />
+        <span>{label}</span>
+      </div>
+      {/* Détail lisible sans ouvrir la console du navigateur. */}
+      {syncError && <div className="sync-status-detail">{syncError}</div>}
     </div>
   );
 }

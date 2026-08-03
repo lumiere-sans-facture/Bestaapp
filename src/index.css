@@ -1522,6 +1522,13 @@ form .login-link { width: 100%; margin-top: 4px; }
   background: var(--bg); border-radius: 14px;
   font-size: 0.75rem; color: var(--text-secondary);
 }
+/* Motif de l'échec de synchronisation, lisible sans ouvrir la console. */
+.sync-status-line { display: flex; align-items: center; gap: 8px; }
+.sync-status-detail {
+  margin-top: 4px; padding-left: 16px;
+  font-size: 0.72rem; line-height: 1.35; color: var(--danger);
+  overflow-wrap: anywhere;
+}
 .sync-status-row .sync-dot { margin-left: 0; }
 .partner-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .partner-avatar {

@@ -12,6 +12,9 @@ export function useRemoteSync(state, setState, stateRef) {
   const retryTimer = useRef(null);
   const [retryTick, setRetryTick] = useState(0); // relance un envoi échoué
   const [syncStatus, setSyncStatus] = useState(isSupabaseConfigured ? 'connecting' : 'local');
+  // Motif du dernier échec, affiché dans l'app : sans lui, « Serveur
+  // injoignable » n'aide personne à comprendre CE qui est refusé.
+  const [syncError, setSyncError] = useState(null);
 
   // ---- Pull initial + abonnement temps réel ----
   useEffect(() => {
@@ -75,7 +78,7 @@ export function useRemoteSync(state, setState, stateRef) {
         });
       } catch (e) {
         console.error('Supabase indisponible, mode local :', e.message);
-        if (!cancelled) setSyncStatus('error');
+        if (!cancelled) { setSyncError(e.message); setSyncStatus('error'); }
       }
     })();
 
@@ -122,6 +125,7 @@ export function useRemoteSync(state, setState, stateRef) {
         // Réellement répliqué : on peut enfin considérer ces données à jour.
         syncedRef.current = { ...syncedRef.current, ...changed };
         echecs.current = 0;
+        setSyncError(null);
         setSyncStatus('online');
       } catch (e) {
         console.error('Réplication Supabase échouée :', e.message);
@@ -129,6 +133,8 @@ export function useRemoteSync(state, setState, stateRef) {
         // Le voyant passe au rouge et l'envoi est REJOUÉ : les données locales
         // restent marquées « à pousser » tant qu'elles ne sont pas arrivées.
         echecs.current += 1;
+        // Le nom des tables en cours d'envoi cible immédiatement le blocage.
+        setSyncError(`${e.message} (envoi de : ${Object.keys(changed).join(', ')})`);
         setSyncStatus('error');
         const delai = Math.min(60000, 5000 * 2 ** (echecs.current - 1));
         clearTimeout(retryTimer.current);
@@ -142,5 +148,5 @@ export function useRemoteSync(state, setState, stateRef) {
   // Arrêt du minuteur de reprise au démontage (évite un setState post-unmount).
   useEffect(() => () => clearTimeout(retryTimer.current), []);
 
-  return syncStatus;
+  return { syncStatus, syncError };
 }
