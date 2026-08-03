@@ -563,6 +563,39 @@ begin
   return v;
 end $$;
 
+-- Vue GÉRANT : le SUIVI COMMERCIAL de toute la plateforme — pistes et devis
+-- publics de toutes les organisations (le kanban du gérant affiche ces
+-- affaires en lecture seule ; elles se déplacent chez leur auteur).
+-- Les devis de l'espace Pro payant restent strictement privés.
+create or replace function public.admin_public_pipeline()
+  returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select jsonb_build_object(
+    'leads', coalesce((
+      select jsonb_agg(l.data || jsonb_build_object(
+        'orgId', l.org_id, 'orgName', o.name,
+        'authorName', coalesce(
+          (select p.name from public.profiles p where p.id = l.data ->> 'assignedTo'),
+          (select p.name from public.profiles p where p.org_id = l.org_id limit 1)
+        )
+      ))
+      from public.leads l join public.orgs o on o.id = l.org_id
+      where l.org_id <> 'org-bestasolar'
+    ), '[]'::jsonb),
+    'devis', coalesce((
+      select jsonb_agg(d.data || jsonb_build_object('orgId', d.org_id))
+      from public.devis d
+      where d.org_id <> 'org-bestasolar'
+        and coalesce(d.data ->> 'type', '') <> 'pro'
+    ), '[]'::jsonb)
+  ) into v;
+  return v;
+end $$;
+
 -- Refus d'un paiement : le reçu passe « rejete » ; l'abonnement en attente
 -- retombe sur son état réel (actif si la période payée court encore, sinon expiré).
 create or replace function public.admin_reject_subscription_payment(p_org_id text, p_payment_id text)

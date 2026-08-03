@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass, MoreVertical, ArrowRightLeft, FileText } from 'lucide-react';
+import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass, MoreVertical, ArrowRightLeft, FileText, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { fetchAdminPublicPipeline } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import { daysSince } from '../utils/date';
 import { buildAffaires } from '../utils/affaires';
@@ -58,7 +60,7 @@ export default function Pipeline() {
   // Le suivi se fait PAR AFFAIRE (= par devis) : un client avec deux devis a
   // deux cartes, déplacées indépendamment.
   const moveAffaire = (aff, stageId) => {
-    if (!aff || aff.stage === stageId) return;
+    if (!aff || aff.externe || aff.stage === stageId) return;
     if (aff.kind === 'devis') {
       if (direct) updateDevisStage(aff.devis.id, stageId);
       else requestDevisStageChange(aff.devis.id, stageId, user.id);
@@ -89,13 +91,31 @@ export default function Pipeline() {
   // Pas de « valeur estimée » à saisir : elle se déduit des devis du client.
   const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', notes: '', clientType: 'particulier' });
 
+  // Vue plateforme (gérant BestaSolar) : les affaires de TOUS les comptes
+  // remontent dans le kanban en LECTURE SEULE — elles se déplacent chez leur
+  // auteur. (Même principe que la remontée des devis publics.)
+  const isAdminPlateforme = isSupabaseConfigured && !!user.is_platform_admin;
+  const [pipelineExterne, setPipelineExterne] = useState({ leads: [], devis: [] });
+  useEffect(() => {
+    if (!isAdminPlateforme) return;
+    fetchAdminPublicPipeline()
+      .then((data) => setPipelineExterne(data || { leads: [], devis: [] }))
+      .catch(() => {});
+  }, [isAdminPlateforme]);
+
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
-  const affaires = buildAffaires(myLeads, devis);
+  const affairesExternes = ownerFilter === 'all'
+    ? buildAffaires(pipelineExterne.leads, pipelineExterne.devis)
+        .map((a) => ({ ...a, key: `ext-${a.key}`, externe: true }))
+    : [];
+  const affaires = [...buildAffaires(myLeads, devis), ...affairesExternes];
   const findAff = (key) => affaires.find((a) => a.key === key)
     || (key?.startsWith('client:') ? affaires.find((a) => a.lead.id === key.slice(7)) : null);
   const selectedAff = findAff(selectedKey);
   const pickerAff = findAff(stagePickerKey);
-  const pendingAffaires = affaires.filter((a) => a.pendingStage);
+  // Validation : uniquement les demandes de SA propre équipe (les affaires
+  // externes se valident chez leur auteur).
+  const pendingAffaires = affaires.filter((a) => a.pendingStage && !a.externe);
 
   const openValue = affaires.filter(isOpen).reduce((sum, a) => sum + a.value, 0);
   const wonAffaires = affaires.filter((a) => a.stage === 'gagne');
@@ -208,8 +228,8 @@ export default function Pipeline() {
                       <div
                         key={aff.key}
                         className={`kanban-card ${draggedKey === aff.key ? 'dragging' : ''}`}
-                        draggable
-                        onDragStart={() => setDraggedKey(aff.key)}
+                        draggable={!aff.externe}
+                        onDragStart={() => !aff.externe && setDraggedKey(aff.key)}
                         onDragEnd={() => { setDraggedKey(null); setDragOverZone(null); }}
                         onClick={() => setSelectedKey(aff.key)}
                         role="button"
@@ -218,18 +238,21 @@ export default function Pipeline() {
                       >
                         <div className="kanban-card-head">
                           <div className="kanban-card-title">{lead.name}</div>
-                          <button
-                            className="kanban-card-move"
-                            aria-label={`Déplacer ${lead.name}${aff.devis?.devisNumber ? ` (${aff.devis.devisNumber})` : ''} vers une autre étape`}
-                            onClick={(e) => { e.stopPropagation(); setStagePickerKey(aff.key); }}
-                          >
-                            <MoreVertical size={16} />
-                          </button>
+                          {!aff.externe && (
+                            <button
+                              className="kanban-card-move"
+                              aria-label={`Déplacer ${lead.name}${aff.devis?.devisNumber ? ` (${aff.devis.devisNumber})` : ''} vers une autre étape`}
+                              onClick={(e) => { e.stopPropagation(); setStagePickerKey(aff.key); }}
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                          )}
                         </div>
                         <div className="kanban-card-contact">
                           {aff.kind === 'devis'
                             ? <><FileText size={11} style={{ verticalAlign: -1 }} /> {aff.devis.devisNumber || 'Devis'}{aff.devis.statut === 'brouillon' ? ' · brouillon' : ''}</>
                             : lead.contact}
+                          {aff.externe && <> · par {lead.authorName || lead.orgName}</>}
                         </div>
                         {aff.pendingStage && (
                           <div className="pending-chip" title={`Demande en attente de validation du gérant`}>
@@ -296,7 +319,15 @@ export default function Pipeline() {
       >
         {selectedAff && (
           <>
-            {selectedAff.pendingStage && (
+            {selectedAff.externe && (
+              <div className="callout" role="note">
+                <div className="callout-title">
+                  <Eye size={13} /> Affaire suivie par {selectedAff.lead.authorName || '—'}
+                  {selectedAff.lead.orgName && selectedAff.lead.orgName !== selectedAff.lead.authorName ? ` (${selectedAff.lead.orgName})` : ''} — consultation seule, elle se déplace chez son auteur.
+                </div>
+              </div>
+            )}
+            {selectedAff.pendingStage && !selectedAff.externe && (
               <div className="pending-banner">
                 <span className="pending-banner-text">
                   <Hourglass size={15} /> Passage à « <strong>{stageLabel(selectedAff.pendingStage.stage)}</strong> » demandé par {getUserById(selectedAff.pendingStage.requestedBy)?.name || '—'} — en attente de validation.
@@ -320,7 +351,17 @@ export default function Pipeline() {
                 ))}
               </div>
             )}
-            {isOpen(selectedAff) ? (
+            {selectedAff.externe ? (
+              !isOpen(selectedAff) && (
+                <div className={`outcome-banner ${selectedAff.stage === 'gagne' ? 'won' : 'lost'}`}>
+                  <span className="outcome-banner-label">
+                    {selectedAff.stage === 'gagne'
+                      ? <><Trophy size={16} /> Affaire gagnée le {formatDate(selectedAff.kind === 'devis' ? selectedAff.devis.wonAt : selectedAff.lead.wonAt)}</>
+                      : <><ThumbsDown size={16} /> Affaire perdue le {formatDate(selectedAff.kind === 'devis' ? selectedAff.devis.lostAt : selectedAff.lead.lostAt)}</>}
+                  </span>
+                </div>
+              )
+            ) : isOpen(selectedAff) ? (
               <>
                 <div className="stage-stepper">
                   {openStages.map((stage, i) => {
@@ -373,12 +414,15 @@ export default function Pipeline() {
                 <span className="sheet-label">{selectedAff.lead.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type de client</span>
                 <span className="sheet-value">{selectedAff.lead.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
               </div>
-              {user.role === 'gerant' && (
+              {user.role === 'gerant' && !selectedAff.externe && (
                 <div className="sheet-row"><span className="sheet-label">Assignée à</span><span className="sheet-value">{getUserById(selectedAff.lead.assignedTo)?.name}</span></div>
+              )}
+              {selectedAff.externe && (
+                <div className="sheet-row"><span className="sheet-label">Suivie par</span><span className="sheet-value">{selectedAff.lead.authorName || '—'}{selectedAff.lead.orgName && selectedAff.lead.orgName !== selectedAff.lead.authorName ? ` · ${selectedAff.lead.orgName}` : ''}</span></div>
               )}
             </div>
 
-            {(selectedAff.lead.parrainL1 || selectedAff.lead.parrainL2) && (
+            {!selectedAff.externe && (selectedAff.lead.parrainL1 || selectedAff.lead.parrainL2) && (
               <div className="sheet-section">
                 <div className="sheet-section-title">Chaîne de parrainage</div>
                 <div className="referral-chain">
@@ -409,6 +453,7 @@ export default function Pipeline() {
 
             <div className="sheet-section">
               <div className="sheet-section-title">Notes et activités</div>
+              {!selectedAff.externe && (
               <form className="note-form" onSubmit={handleAddNote}>
                 <input
                   className="input"
@@ -420,6 +465,7 @@ export default function Pipeline() {
                   <Send size={16} />
                 </button>
               </form>
+              )}
               <div className="activity-timeline">
                 {(selectedAff.lead.activities || []).map((act) => (
                   <div key={act.id} className="activity-item">

@@ -194,6 +194,18 @@ export async function fetchAdminPublicDevis() {
   return data || [];
 }
 
+/**
+ * Vue gérant : le suivi commercial de toute la plateforme — pistes et devis
+ * publics de toutes les organisations (lecture seule dans le kanban).
+ * Retourne { leads: [...], devis: [...] }, chaque piste enrichie de
+ * orgId/orgName/authorName. Réservé à l'admin plateforme (vérifié serveur).
+ */
+export async function fetchAdminPublicPipeline() {
+  const { data, error } = await supabase.rpc('admin_public_pipeline');
+  if (error) throw new Error(error.message);
+  return data || { leads: [], devis: [] };
+}
+
 /** Refuse un paiement d'abonnement (admin). */
 export async function adminRejectSubscriptionPayment(orgId, paymentId) {
   const { error } = await supabase.rpc('admin_reject_subscription_payment', {
