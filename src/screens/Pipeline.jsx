@@ -4,7 +4,7 @@ import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, 
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { fetchAdminPublicPipeline } from '../lib/remoteSync';
+import { fetchAdminPublicPipeline, fetchPendingProgressions, decideProgression, setProgression } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import { daysSince } from '../utils/date';
 import { buildAffaires } from '../utils/affaires';
@@ -21,7 +21,7 @@ const isOpen = (aff) => aff.stage !== 'gagne' && aff.stage !== 'perdu';
 export default function Pipeline() {
   const { user } = useAuth();
   const {
-    stages, lostStage, team, teamChargee, commissions, devis,
+    stages, lostStage, team, commissions, devis,
     leadsForUser, getPartnerById, getUserById,
     updateLeadStage, requestStageChange, approveStageChange, rejectStageChange,
     updateDevisStage, requestDevisStageChange, approveDevisStageChange, rejectDevisStageChange,
@@ -54,13 +54,28 @@ export default function Pipeline() {
   const openStages = stages.filter((s) => s.id !== 'gagne');
   const stageLabel = (id) => [...stages, lostStage].find((st) => st.id === id)?.label || id;
 
-  // Le commercial DEMANDE le changement d'étape ; le gérant VALIDE. Le gérant
-  // lui-même (et l'utilisateur seul dans son espace, qui n'aurait personne pour
-  // valider) applique directement. Une carte = un DEVIS, ou la piste tant qu'il
-  // n'y a aucun devis.
-  const peutValider = peutValiderProgression(user, team, teamChargee);
+  // Le commercial DEMANDE le changement d'étape ; le gérant VALIDE. Seuls le
+  // gérant de l'entreprise et l'admin plateforme appliquent directement : la
+  // progression commerciale se suit à deux, y compris pour un inscrit seul
+  // dans son espace. Une carte = un DEVIS, ou la piste tant qu'il n'y a aucun
+  // devis.
+  const peutValider = peutValiderProgression(user);
+  // BestaSolar supervise les affaires des AUTRES comptes : elles vivent dans
+  // leur organisation, donc chaque décision passe par le serveur (RPC).
+  const isAdminPlateforme = isSupabaseConfigured && !!user.is_platform_admin;
+  const refExterne = (aff) => (aff.kind === 'devis'
+    ? { orgId: aff.devis.orgId, kind: 'devis', id: aff.devis.id }
+    : { orgId: aff.lead.orgId, kind: 'lead', id: aff.lead.id });
+
   const moveAffaire = (aff, stageId) => {
-    if (!aff || aff.externe || aff.stage === stageId) return;
+    if (!aff || aff.stage === stageId) return;
+    if (aff.externe) {
+      if (!isAdminPlateforme) return;
+      setProgression({ ...refExterne(aff), stage: stageId })
+        .catch((e) => console.error('Progression impossible :', e.message))
+        .finally(() => setRafraichir((n) => n + 1));
+      return;
+    }
     if (aff.kind === 'devis') {
       if (peutValider) updateDevisStage(aff.devis.id, stageId);
       else requestDevisStageChange(aff.devis.id, stageId, user.id);
@@ -70,12 +85,14 @@ export default function Pipeline() {
       requestStageChange(aff.lead.id, stageId, user.id);
     }
   };
-  const approuver = (aff) => (aff.kind === 'devis'
-    ? approveDevisStageChange(aff.devis.id, user.id)
-    : approveStageChange(aff.lead.id, user.id));
-  const refuser = (aff) => (aff.kind === 'devis'
-    ? rejectDevisStageChange(aff.devis.id, user.id)
-    : rejectStageChange(aff.lead.id, user.id));
+  const approuver = (aff) => (aff.externe ? trancher(refExterne(aff), true)
+    : aff.kind === 'devis'
+      ? approveDevisStageChange(aff.devis.id, user.id)
+      : approveStageChange(aff.lead.id, user.id));
+  const refuser = (aff) => (aff.externe ? trancher(refExterne(aff), false)
+    : aff.kind === 'devis'
+      ? rejectDevisStageChange(aff.devis.id, user.id)
+      : rejectStageChange(aff.lead.id, user.id));
 
   // « Suivi commercial » depuis la fiche client : ouvre directement sa carte
   // (sentinelle client:<id> résolue sur la liste des cartes).
@@ -93,16 +110,31 @@ export default function Pipeline() {
   const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', notes: '', clientType: 'particulier' });
 
   // Vue plateforme (gérant BestaSolar) : les affaires de TOUS les comptes
-  // remontent dans le kanban en LECTURE SEULE — elles se déplacent chez leur
-  // auteur. (Même principe que la remontée des devis publics.)
-  const isAdminPlateforme = isSupabaseConfigured && !!user.is_platform_admin;
+  // remontent dans le kanban, et BestaSolar peut les faire avancer — c'est le
+  // même suivi, partagé. (Même principe que la remontée des devis publics.)
   const [pipelineExterne, setPipelineExterne] = useState({ leads: [], devis: [] });
+  // Demandes de progression venues des AUTRES organisations : tout commercial
+  // de la plateforme propose, BestaSolar tranche.
+  const [demandesPlateforme, setDemandesPlateforme] = useState([]);
+  const [rafraichir, setRafraichir] = useState(0);
   useEffect(() => {
     if (!isAdminPlateforme) return;
     fetchAdminPublicPipeline()
       .then((data) => setPipelineExterne(data || { leads: [], devis: [] }))
       .catch(() => {});
-  }, [isAdminPlateforme]);
+    fetchPendingProgressions()
+      .then((d) => setDemandesPlateforme(d || []))
+      .catch(() => {});
+  }, [isAdminPlateforme, rafraichir]);
+
+  const trancher = async (d, approuver) => {
+    try {
+      await decideProgression({ orgId: d.orgId, kind: d.kind, id: d.id, approuver });
+    } catch (e) {
+      console.error('Décision impossible :', e.message);
+    }
+    setRafraichir((n) => n + 1);
+  };
 
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
   // Filet de sécurité : jamais MES clients parmi les affaires « externes »
@@ -198,13 +230,34 @@ export default function Pipeline() {
       </PageHeader>
 
       <div className="page-content page-content-flush">
-        {peutValider && enAttente.length > 0 && (
+        {peutValider && (enAttente.length + demandesPlateforme.length) > 0 && (
           <div className="validation-bar">
             <div className="validation-bar-title">
-              <Hourglass size={15} /> {enAttente.length > 1
-                ? `${enAttente.length} progressions à valider`
+              <Hourglass size={15} /> {(enAttente.length + demandesPlateforme.length) > 1
+                ? `${enAttente.length + demandesPlateforme.length} progressions à valider`
                 : '1 progression à valider'}
             </div>
+            {/* Demandes des autres comptes de la plateforme */}
+            {demandesPlateforme.map((d) => (
+              <div key={`${d.orgId}-${d.kind}-${d.id}`} className="validation-row">
+                <div className="validation-info">
+                  <span className="validation-lead">
+                    {d.clientName || 'Client'}{d.devisNumber ? ` · ${d.devisNumber}` : ''}
+                  </span>
+                  <span className="validation-move">
+                    {stageLabel(d.stageActuel)} → <strong>{stageLabel(d.stageDemande)}</strong>
+                  </span>
+                  <span className="validation-by">
+                    par {d.demandeurNom || '—'}{d.orgName ? ` · ${d.orgName}` : ''}
+                    {d.demandeLe ? ` · ${formatDate(d.demandeLe)}` : ''}
+                  </span>
+                </div>
+                <div className="validation-actions">
+                  <button className="btn btn-sm btn-won" onClick={() => trancher(d, true)}><Check size={14} /> Valider</button>
+                  <button className="btn btn-sm btn-lost" onClick={() => trancher(d, false)}><X size={14} /> Refuser</button>
+                </div>
+              </div>
+            ))}
             {enAttente.map((a) => {
               const d = demandeDe(a);
               return (
@@ -260,8 +313,8 @@ export default function Pipeline() {
                       <div
                         key={aff.key}
                         className={`kanban-card ${draggedKey === aff.key ? 'dragging' : ''}`}
-                        draggable={!aff.externe}
-                        onDragStart={() => !aff.externe && setDraggedKey(aff.key)}
+                        draggable={!aff.externe || isAdminPlateforme}
+                        onDragStart={() => (!aff.externe || isAdminPlateforme) && setDraggedKey(aff.key)}
                         onDragEnd={() => { setDraggedKey(null); setDragOverZone(null); }}
                         onClick={() => setSelectedKey(aff.key)}
                         role="button"
@@ -270,7 +323,7 @@ export default function Pipeline() {
                       >
                         <div className="kanban-card-head">
                           <div className="kanban-card-title">{lead.name}</div>
-                          {!aff.externe && (
+                          {(!aff.externe || isAdminPlateforme) && (
                             <button
                               className="kanban-card-move"
                               aria-label={`Déplacer ${lead.name}${aff.kind === 'devis' && aff.devis.devisNumber ? ` (${aff.devis.devisNumber})` : ''} vers une autre étape`}
@@ -288,7 +341,7 @@ export default function Pipeline() {
                           {aff.externe && <> · par {lead.authorName || lead.orgName}</>}
                         </div>
                         {demandeDe(aff) && (
-                          <div className="pending-chip" title="En attente de validation du gérant">
+                          <div className="pending-chip" title="En attente de validation">
                             <Hourglass size={11} /> → {stageLabel(demandeDe(aff).stage)}
                           </div>
                         )}
@@ -356,15 +409,18 @@ export default function Pipeline() {
               <div className="callout" role="note">
                 <div className="callout-title">
                   <Eye size={13} /> Affaire suivie par {selectedAff.lead.authorName || '—'}
-                  {selectedAff.lead.orgName && selectedAff.lead.orgName !== selectedAff.lead.authorName ? ` (${selectedAff.lead.orgName})` : ''} — consultation seule, elle se déplace chez son auteur.
+                  {selectedAff.lead.orgName && selectedAff.lead.orgName !== selectedAff.lead.authorName ? ` (${selectedAff.lead.orgName})` : ''}
+                  {isAdminPlateforme
+                    ? ' — vous suivez sa progression avec lui : vos décisions s’appliquent chez lui.'
+                    : ' — consultation seule, elle se déplace chez son auteur.'}
                 </div>
               </div>
             )}
-            {demandeDe(selectedAff) && !selectedAff.externe && (
+            {demandeDe(selectedAff) && (!selectedAff.externe || isAdminPlateforme) && (
               <div className="pending-banner">
                 <span className="pending-banner-text">
                   <Hourglass size={15} /> Passage à « <strong>{stageLabel(demandeDe(selectedAff).stage)}</strong> » demandé
-                  par {getUserById(demandeDe(selectedAff).requestedBy)?.name || '—'} — en attente de validation.
+                  par {getUserById(demandeDe(selectedAff).requestedBy)?.name || selectedAff.lead.authorName || '—'} — en attente de validation.
                 </span>
                 {peutValider && (
                   <span className="pending-banner-actions">
@@ -374,9 +430,10 @@ export default function Pipeline() {
                 )}
               </div>
             )}
-            {selectedAff.externe ? (
-              /* Affaire d'un autre compte : le gérant VOIT l'avancement
-                 (barre de progression en lecture seule), sans pouvoir agir. */
+            {selectedAff.externe && !isAdminPlateforme ? (
+              /* Affaire d'un autre compte : on VOIT l'avancement (barre en
+                 lecture seule), sans pouvoir agir. L'admin plateforme, lui,
+                 la fait avancer comme les siennes (branche suivante). */
               isOpen(selectedAff) ? (
                 <div className="stage-stepper is-readonly">
                   {openStages.map((stage, i) => {

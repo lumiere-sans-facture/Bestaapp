@@ -621,6 +621,207 @@ begin
   return v;
 end $$;
 
+-- ============================================================
+-- SUPERVISION DES PROGRESSIONS : BestaSolar valide les demandes de TOUS les
+-- comptes de la plateforme, pas seulement de sa propre équipe.
+-- Un commercial inscrit sur la plateforme propose l'avancement de ses clients ;
+-- l'admin tranche. Comme ces affaires vivent dans d'AUTRES organisations, la
+-- RLS d'isolation les rend inaccessibles : d'où ces fonctions security definer.
+-- ============================================================
+
+-- Toutes les demandes en attente, toutes organisations (hors la sienne, déjà
+-- présente dans son état local), avec de quoi décider : client, devis, étape
+-- demandée, auteur de la demande.
+create or replace function public.admin_pending_progressions()
+  returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select coalesce(jsonb_agg(x.d order by x.demande_le desc), '[]'::jsonb) into v
+  from (
+    -- Demandes portant sur une PISTE
+    select (l.data -> 'pendingStage' ->> 'requestedAt') as demande_le,
+           jsonb_build_object(
+             'kind', 'lead', 'orgId', l.org_id, 'orgName', o.name, 'id', l.id,
+             'clientName', l.data ->> 'name',
+             'devisNumber', null,
+             'stageActuel', l.data ->> 'stage',
+             'stageDemande', l.data -> 'pendingStage' ->> 'stage',
+             'demandeurNom', coalesce(
+               (select p.name from public.profiles p where p.id = l.data -> 'pendingStage' ->> 'requestedBy'),
+               (select p.name from public.profiles p where p.org_id = l.org_id limit 1)),
+             'demandeLe', l.data -> 'pendingStage' ->> 'requestedAt'
+           ) as d
+    from public.leads l join public.orgs o on o.id = l.org_id
+    where l.org_id <> public.auth_org_id()
+      and l.data -> 'pendingStage' is not null
+      and l.data -> 'pendingStage' <> 'null'::jsonb
+    union all
+    -- Demandes portant sur un DEVIS public
+    select (d.data -> 'pendingStage' ->> 'requestedAt'),
+           jsonb_build_object(
+             'kind', 'devis', 'orgId', d.org_id, 'orgName', o.name, 'id', d.id,
+             'clientName', (select l.data ->> 'name' from public.leads l
+                            where l.org_id = d.org_id and l.id = d.data ->> 'leadId'),
+             'devisNumber', d.data ->> 'devisNumber',
+             'stageActuel', coalesce(d.data ->> 'stage', 'proposition'),
+             'stageDemande', d.data -> 'pendingStage' ->> 'stage',
+             'demandeurNom', coalesce(
+               (select p.name from public.profiles p where p.id = d.data -> 'pendingStage' ->> 'requestedBy'),
+               (select p.name from public.profiles p where p.org_id = d.org_id limit 1)),
+             'demandeLe', d.data -> 'pendingStage' ->> 'requestedAt'
+           )
+    from public.devis d join public.orgs o on o.id = d.org_id
+    where d.org_id <> public.auth_org_id()
+      and coalesce(d.data ->> 'type', '') <> 'pro'
+      and d.data -> 'pendingStage' is not null
+      and d.data -> 'pendingStage' <> 'null'::jsonb
+  ) x;
+  return v;
+end $$;
+
+-- Décision de l'admin sur une demande d'une autre organisation.
+-- p_approuver = true  : l'étape s'applique (et le « gagné » crée la commission
+--                       de l'apporteur, DANS SON organisation) ;
+--            = false  : la demande est simplement levée.
+create or replace function public.admin_decide_progression(
+  p_org_id text, p_kind text, p_id text, p_approuver boolean)
+  returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_data jsonb; v_stage text; v_now timestamptz := now();
+  v_jour text; v_lead_id text; v_total numeric; v_l1 text; v_l2 text;
+  v_partner_org text; v_cid text;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  v_jour := to_char(v_now at time zone 'utc', 'YYYY-MM-DD');
+
+  if p_kind = 'lead' then
+    select data into v_data from public.leads where org_id = p_org_id and id = p_id;
+    if v_data is null then raise exception 'client introuvable'; end if;
+    v_stage := v_data -> 'pendingStage' ->> 'stage';
+    if v_stage is null then raise exception 'aucune demande en attente'; end if;
+    if not p_approuver then
+      update public.leads set data = data - 'pendingStage', updated_at = v_now
+        where org_id = p_org_id and id = p_id;
+      return;
+    end if;
+    update public.leads
+      set data = (data - 'pendingStage')
+        || jsonb_build_object('stage', v_stage, 'lastActivity', v_jour)
+        || case when v_stage = 'gagne' then jsonb_build_object('wonAt', v_jour) else '{}'::jsonb end
+        || case when v_stage = 'perdu' then jsonb_build_object('lostAt', v_jour) else '{}'::jsonb end,
+          updated_at = v_now
+      where org_id = p_org_id and id = p_id;
+    v_lead_id := p_id;
+    v_total := coalesce(nullif(v_data ->> 'estimatedValue', '')::numeric, 0);
+    v_l1 := v_data ->> 'parrainL1';
+    v_l2 := v_data ->> 'parrainL2';
+
+  elsif p_kind = 'devis' then
+    select data into v_data from public.devis where org_id = p_org_id and id = p_id;
+    if v_data is null then raise exception 'devis introuvable'; end if;
+    v_stage := v_data -> 'pendingStage' ->> 'stage';
+    if v_stage is null then raise exception 'aucune demande en attente'; end if;
+    if not p_approuver then
+      update public.devis set data = data - 'pendingStage', updated_at = v_now
+        where org_id = p_org_id and id = p_id;
+      return;
+    end if;
+    update public.devis
+      set data = (data - 'pendingStage') || jsonb_build_object('stage', v_stage)
+        || case when v_stage = 'gagne' then jsonb_build_object('wonAt', v_jour) else '{}'::jsonb end
+        || case when v_stage = 'perdu' then jsonb_build_object('lostAt', v_jour) else '{}'::jsonb end,
+          updated_at = v_now
+      where org_id = p_org_id and id = p_id;
+    v_lead_id := v_data ->> 'leadId';
+    v_total := coalesce(nullif(v_data ->> 'total', '')::numeric, 0);
+    v_l1 := v_data ->> 'partnerId';
+    -- Le parrain de la piste prime sur l'apporteur du devis.
+    select coalesce(l.data ->> 'parrainL1', v_l1), l.data ->> 'parrainL2'
+      into v_l1, v_l2
+      from public.leads l where l.org_id = p_org_id and l.id = v_lead_id;
+  else
+    raise exception 'type inconnu : %', p_kind;
+  end if;
+
+  -- Commission de l'apporteur, créée dans l'organisation où vit son profil.
+  if v_stage = 'gagne' and v_total > 0 and v_l1 is not null then
+    select org_id into v_partner_org from public.partners
+      where id = v_l1 order by (org_id = p_org_id) desc limit 1;
+    if v_partner_org is not null and not exists (
+      select 1 from public.commissions c
+      where c.org_id = v_partner_org
+        and coalesce(c.data ->> 'devisId', '') = case when p_kind = 'devis' then p_id else '' end
+        and c.data ->> 'partnerId' = v_l1
+        and (c.data ->> 'level')::int = 1
+        and coalesce(c.data ->> 'leadId', '') = coalesce(v_lead_id, '')
+    ) then
+      v_cid := gen_random_uuid()::text;
+      insert into public.commissions (org_id, id, data, updated_at)
+      values (v_partner_org, v_cid, jsonb_build_object(
+        'id', v_cid, 'partnerId', v_l1, 'leadId', v_lead_id,
+        'devisId', case when p_kind = 'devis' then p_id else null end,
+        'level', 1, 'amount', round(v_total * 0.03),
+        'status', 'en_attente', 'paidAt', null, 'createdAt', v_jour
+      ), v_now);
+    end if;
+    -- Niveau 2 : le parrain de l'apporteur.
+    if v_l2 is not null and v_l2 <> v_l1 then
+      select org_id into v_partner_org from public.partners
+        where id = v_l2 order by (org_id = p_org_id) desc limit 1;
+      if v_partner_org is not null and not exists (
+        select 1 from public.commissions c
+        where c.org_id = v_partner_org
+          and coalesce(c.data ->> 'devisId', '') = case when p_kind = 'devis' then p_id else '' end
+          and c.data ->> 'partnerId' = v_l2
+          and (c.data ->> 'level')::int = 2
+      ) then
+        v_cid := gen_random_uuid()::text;
+        insert into public.commissions (org_id, id, data, updated_at)
+        values (v_partner_org, v_cid, jsonb_build_object(
+          'id', v_cid, 'partnerId', v_l2, 'leadId', v_lead_id,
+          'devisId', case when p_kind = 'devis' then p_id else null end,
+          'level', 2, 'amount', round(v_total * 0.015),
+          'status', 'en_attente', 'paidAt', null, 'createdAt', v_jour
+        ), v_now);
+      end if;
+    end if;
+  end if;
+end $$;
+
+-- L'admin fait avancer LUI-MÊME l'affaire d'un autre compte, sans attendre de
+-- demande (« je peux aussi valider la progression de leur client sans qu'il
+-- demande »). On dépose la demande puis on la valide : mêmes effets exactement
+-- — étape appliquée, commissions créées une seule fois.
+create or replace function public.admin_set_progression(
+  p_org_id text, p_kind text, p_id text, p_stage text)
+  returns void language plpgsql security definer set search_path = public as $$
+declare v_pending jsonb;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  if p_stage is null or p_stage = '' then raise exception 'étape manquante'; end if;
+  v_pending := jsonb_build_object(
+    'stage', p_stage, 'requestedBy', auth.uid()::text,
+    'requestedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+  if p_kind = 'lead' then
+    update public.leads set data = data || jsonb_build_object('pendingStage', v_pending)
+      where org_id = p_org_id and id = p_id;
+  elsif p_kind = 'devis' then
+    update public.devis set data = data || jsonb_build_object('pendingStage', v_pending)
+      where org_id = p_org_id and id = p_id;
+  else
+    raise exception 'type inconnu : %', p_kind;
+  end if;
+  if not found then raise exception 'affaire introuvable'; end if;
+  perform public.admin_decide_progression(p_org_id, p_kind, p_id, true);
+end $$;
+
 -- Refus d'un paiement : le reçu passe « rejete » ; l'abonnement en attente
 -- retombe sur son état réel (actif si la période payée court encore, sinon expiré).
 create or replace function public.admin_reject_subscription_payment(p_org_id text, p_payment_id text)

@@ -1,41 +1,48 @@
 import { describe, it, expect } from 'vitest';
-import { peutValiderProgression } from '../roles';
+import { peutValiderProgression, estProprietaireEspace } from '../roles';
 
 const GERANT = { id: 'u1', role: 'gerant' };
 const TECH = { id: 'u2', role: 'technicien' };
+const ADMIN = { id: 'u3', role: 'technicien', is_platform_admin: true };
 
-describe('peutValiderProgression — qui applique, qui doit demander', () => {
+describe('peutValiderProgression — qui tranche les progressions', () => {
   it('le gérant applique et valide', () => {
-    expect(peutValiderProgression(GERANT, [GERANT, TECH], true)).toBe(true);
+    expect(peutValiderProgression(GERANT)).toBe(true);
   });
 
-  it('un commercial dans une équipe AVEC gérant doit DEMANDER', () => {
-    expect(peutValiderProgression(TECH, [GERANT, TECH], true)).toBe(false);
+  it("l'admin plateforme applique et valide, quel que soit son rôle", () => {
+    expect(peutValiderProgression(ADMIN)).toBe(true);
   });
 
-  it('un utilisateur SEUL dans son espace applique (personne pour valider)', () => {
-    expect(peutValiderProgression(TECH, [TECH], true)).toBe(true);
+  it('TOUT commercial doit demander — y compris seul dans son espace', () => {
+    // Règle métier : la progression commerciale se suit à deux, le commercial
+    // propose et BestaSolar tranche. Aucune exception, sinon un inscrit
+    // s'auto-validerait en créant simplement son propre espace.
+    expect(peutValiderProgression(TECH)).toBe(false);
   });
 
-  it("tant que l'annuaire n'a pas répondu, un commercial DOIT demander", () => {
-    // Régression réelle : au démarrage l'annuaire ne contient que
-    // l'utilisateur. En conclure « aucun gérant, donc je décide » laissait un
-    // commercial appliquer ses progressions sans validation.
-    expect(peutValiderProgression(TECH, [TECH], false)).toBe(false);
-    expect(peutValiderProgression(TECH, [], false)).toBe(false);
+  it('ne dépend plus de l’annuaire : aucune fenêtre de chargement exploitable', () => {
+    expect(peutValiderProgression(TECH)).toBe(false);
+    expect(peutValiderProgression({ role: 'technicien' })).toBe(false);
+    expect(peutValiderProgression(undefined)).toBe(false);
+  });
+});
+
+describe('estProprietaireEspace — qui engage l’entreprise (parrainage…)', () => {
+  it('le gérant et l’admin plateforme', () => {
+    expect(estProprietaireEspace(GERANT, [GERANT, TECH], true)).toBe(true);
+    expect(estProprietaireEspace(ADMIN, [GERANT], true)).toBe(true);
   });
 
-  it("le gérant garde ses droits même avant le chargement de l'annuaire", () => {
-    expect(peutValiderProgression(GERANT, [], false)).toBe(true);
+  it('un inscrit SEUL dans son espace en est le propriétaire de fait', () => {
+    expect(estProprietaireEspace(TECH, [TECH], true)).toBe(true);
   });
 
-  it("l'admin plateforme applique toujours", () => {
-    expect(peutValiderProgression({ id: 'u3', role: 'technicien', is_platform_admin: true }, [GERANT], true)).toBe(true);
+  it('un commercial d’une équipe avec gérant ne l’est pas', () => {
+    expect(estProprietaireEspace(TECH, [GERANT, TECH], true)).toBe(false);
   });
 
-  it("une équipe polluée par le gérant d'une AUTRE entreprise bloquerait à tort", () => {
-    // La règle est juste ; c'est son entrée qui doit être filtrée par
-    // organisation (cf. fetchTeamProfiles).
-    expect(peutValiderProgression(TECH, [TECH, { id: 'x', role: 'gerant' }], true)).toBe(false);
+  it("tant que l'annuaire n'a pas répondu, on ne conclut rien", () => {
+    expect(estProprietaireEspace(TECH, [TECH], false)).toBe(false);
   });
 });

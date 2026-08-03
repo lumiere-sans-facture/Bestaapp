@@ -274,6 +274,34 @@ export async function fetchAdminPublicDevis() {
 }
 
 /**
+ * Demandes de progression en attente sur TOUTE la plateforme (hors sa propre
+ * organisation, déjà dans l'état local). Réservé à l'admin plateforme.
+ */
+export async function fetchPendingProgressions() {
+  const { data, error } = await supabase.rpc('admin_pending_progressions');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/** Valide (ou refuse) une demande venue d'une autre organisation. La validation
+ *  applique l'étape et crée la commission de l'apporteur — côté serveur. */
+export async function decideProgression({ orgId, kind, id, approuver }) {
+  const { error } = await supabase.rpc('admin_decide_progression', {
+    p_org_id: orgId, p_kind: kind, p_id: id, p_approuver: approuver,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Fait avancer directement l'affaire d'un autre compte, sans demande préalable.
+ *  Mêmes effets qu'une validation (étape + commissions). */
+export async function setProgression({ orgId, kind, id, stage }) {
+  const { error } = await supabase.rpc('admin_set_progression', {
+    p_org_id: orgId, p_kind: kind, p_id: id, p_stage: stage,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
  * Vue gérant : le suivi commercial de toute la plateforme — pistes et devis
  * publics de toutes les organisations (lecture seule dans le kanban).
  * Retourne { leads: [...], devis: [...] }, chaque piste enrichie de
