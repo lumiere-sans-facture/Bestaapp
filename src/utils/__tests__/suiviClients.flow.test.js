@@ -54,19 +54,42 @@ describe('flux réel du suivi clients', () => {
   });
 });
 
-describe('le VENDEUR fait progresser lui-même (aucune validation gérant)', () => {
-  it('un technicien applique l’étape directement, sans demande', () => {
+describe('circuit demande → validation du gérant', () => {
+  it('le commercial DEMANDE : la piste ne bouge pas, la demande est enregistrée', () => {
     const s = store();
     s.a.ensurePartnerForUser({ id: 'u2', name: 'Fatou' });
-    s.a.addLead({ name: 'Pharmacie', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
+    s.a.addLead({ name: 'Clinique', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
     const lead = s.get().leads[0];
 
-    s.a.updateLeadStage(lead.id, 'negociation', 'u2');
-    expect(s.get().leads[0].stage).toBe('negociation');
-    expect(s.get().leads[0].pendingStage).toBeUndefined(); // plus de circuit de demande
+    s.a.requestStageChange(lead.id, 'proposition', 'u2');
+    expect(s.get().leads[0].stage).toBe('nouveau');            // rien n'a bougé
+    expect(s.get().leads[0].pendingStage).toMatchObject({ stage: 'proposition', requestedBy: 'u2' });
+    expect(s.get().leads[0].activities[0].text).toMatch(/en attente de validation/);
   });
 
-  it('un devis passé à « gagné » par le vendeur crée la commission immédiatement', () => {
+  it('le gérant VALIDE : l’étape s’applique et la demande est levée', () => {
+    const s = store();
+    s.a.addLead({ name: 'Clinique', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.requestStageChange(lead.id, 'proposition', 'u2');
+    s.a.approveStageChange(lead.id, 'u1');
+    expect(s.get().leads[0].stage).toBe('proposition');
+    expect(s.get().leads[0].pendingStage).toBeNull();
+    expect(s.get().leads[0].activities[0].text).toMatch(/validé par le gérant/);
+  });
+
+  it('le gérant REFUSE : la piste reste en place, le refus est tracé', () => {
+    const s = store();
+    s.a.addLead({ name: 'Clinique', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.requestStageChange(lead.id, 'gagne', 'u2');
+    s.a.rejectStageChange(lead.id, 'u1');
+    expect(s.get().leads[0].stage).toBe('nouveau');
+    expect(s.get().leads[0].pendingStage).toBeNull();
+    expect(s.get().leads[0].activities[0].text).toMatch(/refusée par le gérant/);
+  });
+
+  it('demande sur un DEVIS gagné : la commission ne naît qu’à la validation', () => {
     const s = store();
     s.a.ensurePartnerForUser({ id: 'u2', name: 'Fatou' });
     s.a.addLead({ name: 'Hôtel', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
@@ -74,18 +97,25 @@ describe('le VENDEUR fait progresser lui-même (aucune validation gérant)', () 
     s.a.addDevis({ leadId: lead.id, type: 'manual', total: 400000, statut: 'finalise', createdBy: 'u2', items: [] });
     const d = s.get().devis[0];
 
-    s.a.updateDevisStage(d.id, 'gagne');
+    s.a.requestDevisStageChange(d.id, 'gagne', 'u2');
+    expect(s.get().devis[0].stage).toBe('proposition');   // le devis n'a pas bougé
+    expect(s.get().commissions).toHaveLength(0);          // aucune commission avant validation
+
+    s.a.approveDevisStageChange(d.id, 'u1');
     expect(s.get().devis[0].stage).toBe('gagne');
+    expect(s.get().devis[0].pendingStage).toBeNull();
     expect(s.get().commissions).toHaveLength(1);
     expect(s.get().commissions[0].amount).toBe(12000);
   });
 
-  it('le passage direct reste tracé dans l’activité du client', () => {
+  it('le gérant applique directement : aucune demande créée', () => {
     const s = store();
-    s.a.addLead({ name: 'Boulangerie', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
+    s.a.ensurePartnerForUser(USER);
+    s.a.addLead({ name: 'Boulangerie', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u1', parrainL1: null });
     const lead = s.get().leads[0];
     s.a.updateLeadStage(lead.id, 'visite', 'u1');
-    expect(s.get().leads[0].activities[0].text).toMatch(/Étape passée de « Nouveau » à « Visite »/);
+    expect(s.get().leads[0].stage).toBe('visite');
+    expect(s.get().leads[0].pendingStage ?? null).toBeNull();
   });
 });
 

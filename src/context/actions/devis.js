@@ -2,7 +2,9 @@
 // SUIVI DEVIS PAR DEVIS — chaque devis est une affaire à part entière, avec sa
 // propre étape, sa propre issue (gagné/perdu) et sa propre commission. L'étape
 // du client en est la synthèse (la plus avancée de ses devis).
-import { COMMISSION_RATES, newReferral, partnerFromActiveRef } from './shared';
+// Comme pour les pistes, un commercial DEMANDE le changement d'étape et le
+// gérant valide : la commission ne naît qu'à la validation.
+import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForDevis, rattacherCommissionsClient } from '../../utils/commissionSync';
 import { devisStage, etapeDuClient, prochainNumeroDevis } from '../../utils/affaires';
 
@@ -68,6 +70,7 @@ export function createDevisActions(setState) {
           ? {
               ...x,
               stage,
+              pendingStage: null,
               wonAt: stage === 'gagne' ? today : x.wonAt,
               lostAt: stage === 'perdu' ? today : null,
             }
@@ -141,6 +144,64 @@ export function createDevisActions(setState) {
     // Le vendeur applique l'étape immédiatement — le « gagné » génère la
     // commission de CE devis.
     updateDevisStage: (devisId, stage) => setState((s) => devisStageState(s, devisId, stage)),
+
+    // Un commercial DEMANDE l'étape d'une affaire : le devis ne bouge pas, la
+    // demande attend la validation du gérant.
+    requestDevisStageChange: (devisId, stage, userId) =>
+      setState((s) => {
+        const d = s.devis.find((x) => x.id === devisId);
+        if (!d) return s;
+        return {
+          ...s,
+          devis: s.devis.map((x) =>
+            x.id === devisId
+              ? { ...x, pendingStage: { stage, requestedBy: userId, requestedAt: new Date().toISOString() } }
+              : x
+          ),
+          leads: s.leads.map((l) =>
+            l.id === d.leadId
+              ? {
+                  ...l,
+                  activities: [note(`Demande de passage du devis ${d.devisNumber || ''} à « ${STAGE_LABEL[stage] || stage} » — en attente de validation du gérant.`, userId), ...(l.activities || [])],
+                  lastActivity: new Date().toISOString().slice(0, 10),
+                }
+              : l
+          ),
+        };
+      }),
+
+    // Le gérant valide : l'étape s'applique, et le « gagné » crée la commission.
+    approveDevisStageChange: (devisId, approverId) =>
+      setState((s) => {
+        const d = s.devis.find((x) => x.id === devisId);
+        if (!d?.pendingStage) return s;
+        const { stage } = d.pendingStage;
+        const ns = devisStageState(s, devisId, stage);
+        return {
+          ...ns,
+          leads: ns.leads.map((l) =>
+            l.id === d.leadId
+              ? { ...l, activities: [note(`Passage du devis ${d.devisNumber || ''} à « ${STAGE_LABEL[stage] || stage} » validé par le gérant.`, approverId), ...(l.activities || [])] }
+              : l
+          ),
+        };
+      }),
+
+    // Le gérant refuse : l'affaire reste à son étape, la demande est levée.
+    rejectDevisStageChange: (devisId, approverId) =>
+      setState((s) => {
+        const d = s.devis.find((x) => x.id === devisId);
+        if (!d?.pendingStage) return s;
+        return {
+          ...s,
+          devis: s.devis.map((x) => (x.id === devisId ? { ...x, pendingStage: null } : x)),
+          leads: s.leads.map((l) =>
+            l.id === d.leadId
+              ? { ...l, activities: [note(`Demande de passage du devis ${d.devisNumber || ''} à « ${STAGE_LABEL[d.pendingStage.stage] || d.pendingStage.stage} » refusée par le gérant.`, approverId), ...(l.activities || [])] }
+              : l
+          ),
+        };
+      }),
 
     // Marque un devis comme document Pro (rendu à l'identité du technicien)
     markDevisPro: (devisId, { modele, companySnapshot }) =>

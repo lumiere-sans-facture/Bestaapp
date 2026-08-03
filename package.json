@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
-    "e2e": "node e2e/suivi-clients.mjs && node e2e/commissions.mjs"
+    "e2e": "node e2e/suivi-clients.mjs && node e2e/commissions.mjs && node e2e/validation.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
