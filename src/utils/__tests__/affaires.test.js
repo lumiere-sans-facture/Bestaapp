@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAffaires, aggregateLeadStage, devisStage } from '../affaires';
+import { buildAffaires, devisStage } from '../affaires';
 import { missingCommissionsForDevis, reconcileMissingCommissions } from '../commissionSync';
 
 const RATES = { 1: 0.03, 2: 0.015 };
@@ -12,7 +12,7 @@ describe('devisStage', () => {
   });
 });
 
-describe('buildAffaires — le suivi se fait par devis, pas par client', () => {
+describe('buildAffaires — une carte par CLIENT, ses devis attachés', () => {
   const leads = [
     { id: 'l1', name: 'Hôtel du Parc', stage: 'qualifie', estimatedValue: 100000 },
     { id: 'l2', name: 'Pharmacie', stage: 'nouveau', estimatedValue: 0 },
@@ -23,43 +23,43 @@ describe('buildAffaires — le suivi se fait par devis, pas par client', () => {
     { id: 'dpro', leadId: 'l1', total: 50000, type: 'pro', stage: 'proposition' },
   ];
 
-  it('un client avec deux devis a DEUX affaires indépendantes', () => {
+  it('un client = une seule carte, à SON étape (le kanban suit le client)', () => {
     const affaires = buildAffaires(leads, devis);
-    const affL1 = affaires.filter((a) => a.lead.id === 'l1');
-    expect(affL1).toHaveLength(2);
-    expect(affL1.map((a) => a.stage).sort()).toEqual(['negociation', 'proposition']);
-    expect(affL1.map((a) => a.value).sort((x, y) => x - y)).toEqual([250000, 900000]);
+    const carte = affaires.filter((a) => a.lead.id === 'l1');
+    expect(carte).toHaveLength(1);
+    expect(carte[0].stage).toBe('qualifie');
   });
 
-  it('un client sans devis reste une affaire « piste » (prospection)', () => {
-    const affaires = buildAffaires(leads, devis);
-    const piste = affaires.find((a) => a.lead.id === 'l2');
-    expect(piste.kind).toBe('piste');
-    expect(piste.stage).toBe('nouveau');
+  it('les devis du client sont attachés à sa carte, suivis séparément', () => {
+    const carte = buildAffaires(leads, devis).find((a) => a.lead.id === 'l1');
+    expect(carte.devis.map((d) => d.id).sort()).toEqual(['d1', 'd2']);
+    expect(carte.devis.map((d) => devisStage(d, carte.lead)).sort())
+      .toEqual(['negociation', 'proposition']);
   });
 
-  it('les devis de l’espace Pro ne créent jamais d’affaire publique', () => {
-    const affaires = buildAffaires(leads, devis);
-    expect(affaires.some((a) => a.devis?.id === 'dpro')).toBe(false);
+  it('la valeur du client cumule ses devis en cours', () => {
+    const carte = buildAffaires(leads, devis).find((a) => a.lead.id === 'l1');
+    expect(carte.value).toBe(1150000);
   });
 
-  it('la carte piste disparaît dès que le client a un devis', () => {
-    const affaires = buildAffaires(leads, devis);
-    expect(affaires.filter((a) => a.lead.id === 'l1' && a.kind === 'piste')).toHaveLength(0);
+  it('un devis perdu ne compte plus dans la valeur du client', () => {
+    const carte = buildAffaires(leads, [
+      { id: 'd1', leadId: 'l1', total: 250000, stage: 'proposition' },
+      { id: 'd2', leadId: 'l1', total: 900000, stage: 'perdu' },
+    ]).find((a) => a.lead.id === 'l1');
+    expect(carte.value).toBe(250000);
   });
-});
 
-describe('aggregateLeadStage — étape client cohérente avec ses affaires', () => {
-  it('retient la plus avancée des affaires non perdues', () => {
-    expect(aggregateLeadStage(['proposition', 'negociation'])).toBe('negociation');
-    expect(aggregateLeadStage(['gagne', 'proposition'])).toBe('gagne');
-    expect(aggregateLeadStage(['perdu', 'visite'])).toBe('visite');
+  it('sans devis, la carte garde la valeur estimée du client', () => {
+    const carte = buildAffaires(leads, devis).find((a) => a.lead.id === 'l2');
+    expect(carte.devis).toHaveLength(0);
+    expect(carte.stage).toBe('nouveau');
+    expect(carte.value).toBe(0);
   });
-  it('« perdu » seulement si toutes les affaires le sont', () => {
-    expect(aggregateLeadStage(['perdu', 'perdu'])).toBe('perdu');
-  });
-  it('null sans devis (la piste garde sa propre étape)', () => {
-    expect(aggregateLeadStage([])).toBeNull();
+
+  it('les devis de l’espace Pro ne sont jamais rattachés', () => {
+    const carte = buildAffaires(leads, devis).find((a) => a.lead.id === 'l1');
+    expect(carte.devis.some((d) => d.id === 'dpro')).toBe(false);
   });
 });
 

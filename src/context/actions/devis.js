@@ -1,32 +1,14 @@
 // Domaine devis : création (avec attribution d'affiliation), marquage Pro et
-// SUIVI PAR AFFAIRE — chaque devis a sa propre étape dans le pipeline (un
-// client peut avoir plusieurs devis suivis indépendamment).
+// SUIVI DEVIS PAR DEVIS — chaque devis porte sa propre issue (gagné/perdu) et
+// donc sa propre commission, sans jamais déplacer le client dans le kanban :
+// l'étape du client reste pilotée à la main par le commercial.
 import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForDevis } from '../../utils/commissionSync';
-import { aggregateLeadStage, devisStage } from '../../utils/affaires';
 
-// Répercute l'étape agrégée d'une piste depuis les étapes de ses devis
-// (les tableaux de bord et l'espace partenaire raisonnent par client).
-const syncLeadStage = (s, leadId, today) => {
-  const lead = s.leads.find((l) => l.id === leadId);
-  if (!lead) return s.leads;
-  const stagesDevis = s.devis
-    .filter((d) => d.leadId === leadId && d.type !== 'pro')
-    .map((d) => devisStage(d, lead));
-  const agg = aggregateLeadStage(stagesDevis);
-  if (!agg || agg === lead.stage) return s.leads;
-  return s.leads.map((l) =>
-    l.id === leadId
-      ? {
-          ...l,
-          stage: agg,
-          lastActivity: today,
-          wonAt: agg === 'gagne' ? l.wonAt || today : l.wonAt,
-          lostAt: agg === 'perdu' ? today : null,
-        }
-      : l
-  );
-};
+// L'issue d'un devis compte comme une activité sur la fiche du client
+// (indicateur « affaire inactive depuis N jours »).
+const touchLead = (leads, leadId, today) =>
+  leads.map((l) => (l.id === leadId ? { ...l, lastActivity: today } : l));
 
 export function createDevisActions(setState) {
   // Application effective du changement d'étape d'UNE affaire (devis) :
@@ -68,7 +50,7 @@ export function createDevisActions(setState) {
           : x
       ),
     };
-    return { ...ns, leads: syncLeadStage(ns, d.leadId, today) };
+    return { ...ns, leads: touchLead(ns.leads, d.leadId, today) };
   };
 
   return {
@@ -109,19 +91,17 @@ export function createDevisActions(setState) {
           referrals,
           devis: [
             // Une affaire naît à « Proposition » : un devis émis est, par
-            // nature, une proposition faite au client (suivi par affaire).
+            // nature, une proposition faite au client.
             { ...devis, partnerId, partnerCode, stage: devis.stage || 'proposition', id: crypto.randomUUID(), devisNumber, createdAt: now.toISOString() },
             ...s.devis,
           ],
           leads: s.leads.map((l) => {
             if (l.id !== devis.leadId) return l;
             // La valeur de l'affaire se déduit du devis (pas de saisie manuelle) ;
-            // le dernier devis créé fait référence. La piste avance au moins à
-            // « Proposition » : son suivi passe désormais par ses devis.
+            // le dernier devis créé fait référence. L'ÉTAPE du client, elle,
+            // reste pilotée à la main dans le kanban — créer un devis ne fait
+            // jamais sauter une étape dans le dos du commercial.
             let next = devis.total > 0 ? { ...l, estimatedValue: devis.total } : l;
-            if (['nouveau', 'qualifie', 'visite'].includes(next.stage)) {
-              next = { ...next, stage: 'proposition' };
-            }
             if (partnerId && !l.parrainL1) {
               const sponsor = s.partners.find((p) => p.id === partnerId)?.sponsorId || null;
               next = { ...next, parrainL1: partnerId, parrainL2: l.parrainL2 || sponsor };
@@ -131,7 +111,7 @@ export function createDevisActions(setState) {
         };
       }),
 
-    // ---- Suivi par affaire : chaque devis a sa propre étape ----
+    // ---- Suivi devis par devis : chaque devis a sa propre issue ----
     // Passage direct (gérant, ou espace sans gérant) : applique l'étape
     // immédiatement — le « gagné » génère les commissions de CE devis.
     updateDevisStage: (devisId, stage) => setState((s) => devisStageState(s, devisId, stage)),
