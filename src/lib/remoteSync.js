@@ -139,6 +139,18 @@ export async function fetchTeamProfiles(orgId = null) {
 }
 
 /**
+ * Met à jour MES coordonnées dans l'annuaire de l'équipe (nom, téléphone,
+ * avatar). Le rôle et les droits ne sont pas modifiables : la fonction serveur
+ * ne les expose pas.
+ */
+export async function updateMyProfile({ name, phone, avatar }) {
+  const { error } = await supabase.rpc('update_my_profile', {
+    p_name: name, p_phone: phone || null, p_avatar: avatar || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
  * Attribue le code de parrainage de l'entreprise (une seule fois — la base
  * refuse tout changement ultérieur ; seule l'admin plateforme peut modifier).
  */

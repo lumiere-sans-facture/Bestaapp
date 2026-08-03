@@ -390,6 +390,29 @@ create policy "platform admin read" on public.profiles for select to authenticat
 -- ============================================================
 
 -- ============================================================
+-- PROFIL PERSONNEL : chacun corrige SES coordonnées, jamais son rôle.
+-- `profiles` n'a que des politiques de LECTURE : c'est volontaire (personne ne
+-- peut s'auto-promouvoir gérant ou admin plateforme en appelant l'API REST).
+-- Mais personne ne pouvait non plus corriger son nom ou son téléphone : l'écran
+-- Équipe affichait éternellement l'ancien. Cette RPC ouvre exactement les trois
+-- champs personnels, et rien d'autre.
+-- ============================================================
+create or replace function public.update_my_profile(p_name text, p_phone text default null, p_avatar text default null)
+  returns void language plpgsql security definer set search_path = public as $$
+declare v_email text;
+begin
+  v_email := auth.jwt() ->> 'email';
+  if v_email is null then raise exception 'non authentifié'; end if;
+  if coalesce(trim(p_name), '') = '' then raise exception 'le nom ne peut pas être vide'; end if;
+  update public.profiles
+     set name   = trim(p_name),
+         phone  = coalesce(nullif(trim(p_phone), ''), phone),
+         avatar = coalesce(nullif(trim(p_avatar), ''), avatar)
+   where lower(email) = lower(v_email);
+  -- role, is_platform_admin et org_id ne sont volontairement PAS modifiables.
+end $$;
+
+-- ============================================================
 -- AFFILIATION CROSS-ORG : suivi des filleuls + commissions d'abonnement.
 -- Le partenaire (org A) parraine une inscription (org B) : le suivi et les
 -- commissions doivent TRAVERSER les organisations — impossible avec la seule

@@ -8,6 +8,8 @@ import { fileToResizedDataUrl } from '../../utils/image';
 import { ENSOLEILLEMENT } from '../../data/ensoleillement';
 import Field from '../../components/Field';
 import { useToast } from '../../components/Toast';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { updateMyProfile } from '../../lib/remoteSync';
 
 export default function MyProfile({ onBack }) {
   const { user } = useAuth();
@@ -48,16 +50,27 @@ export default function MyProfile({ onBack }) {
     e.target.value = '';
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
+    const nom = form.name.trim() || me.name;
     updatePartner(me.id, {
-      name: form.name.trim() || me.name,
+      name: nom,
       phone: form.phone.trim(),
       email: form.email.trim(),
       zone: form.zone,
       momoNumber: form.momoNumber.trim(),
     });
     setForm(null);
+    // L'annuaire de l'équipe vit dans `profiles` (serveur) : sans cet appel,
+    // les collègues continueraient de voir l'ancien nom.
+    if (isSupabaseConfigured) {
+      try {
+        await updateMyProfile({ name: nom, phone: form.phone.trim() });
+      } catch {
+        toast('Coordonnées enregistrées ici, mais pas encore partagées à l’équipe.', { type: 'error' });
+        return;
+      }
+    }
     toast('Modifications enregistrées.');
   };
 
