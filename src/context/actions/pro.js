@@ -1,6 +1,7 @@
 // Domaine Devis Pro (abonnement premium 5 000 F/mois) : abonnements + paiements
 // Mobile Money, identité d'entreprise du technicien et facturation.
 import { defaultEcheance } from '../../utils/paiement';
+import { prochainNumeroFacture } from '../../utils/facture';
 
 export function createProActions(setState) {
   return {
@@ -90,9 +91,10 @@ export function createProActions(setState) {
       setState((s) => {
         const companies = s.companies || [];
         const company = companies.find((c) => c.userId === facture.userId);
-        const counter = (company?.factureCounter || 0) + 1;
         const prefix = company?.facturePrefix || 'FAC';
-        const numero = `${prefix}-${new Date().getFullYear()}-${String(counter).padStart(3, '0')}`;
+        // Numéro déduit des factures existantes (répliquées) ET du compteur :
+        // deux appareils hors-ligne ne produisent plus le même numéro.
+        const { numero, rang: counter } = prochainNumeroFacture(s.factures, facture.userId, company || {});
         const createdAt = new Date().toISOString();
         created = {
           ...facture,

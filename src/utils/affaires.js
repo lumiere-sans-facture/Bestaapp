@@ -56,6 +56,27 @@ export function buildAffaires(leads = [], devisList = []) {
   return cartes;
 }
 
+/**
+ * Prochain numéro de devis du jour : `BS-AAAAMMJJ-NNNN`.
+ *
+ * Le rang est DÉDUIT des devis déjà enregistrés, jamais d'un compteur séparé :
+ * un compteur vit dans l'état local, n'est pas répliqué, et diverge donc d'un
+ * appareil à l'autre — deux devis finissaient par porter le même numéro.
+ * @param {Array<{devisNumber?: string}>} devisList tous les devis connus
+ * @param {Date} maintenant
+ */
+export function prochainNumeroDevis(devisList = [], maintenant = new Date()) {
+  const j = `${maintenant.getFullYear()}${String(maintenant.getMonth() + 1).padStart(2, '0')}${String(maintenant.getDate()).padStart(2, '0')}`;
+  const prefixe = `BS-${j}-`;
+  const rangs = devisList
+    .map((d) => d.devisNumber)
+    .filter((n) => typeof n === 'string' && n.startsWith(prefixe))
+    .map((n) => parseInt(n.slice(prefixe.length), 10))
+    .filter((n) => Number.isFinite(n));
+  const rang = (rangs.length ? Math.max(...rangs) : 0) + 1;
+  return `${prefixe}${String(rang).padStart(4, '0')}`;
+}
+
 /** Tous les devis publics d'un client (pour la fiche : « ses autres affaires »). */
 export const devisDuClient = (leadId, devisList = []) =>
   devisList.filter((d) => d.leadId === leadId && d.type !== 'pro');

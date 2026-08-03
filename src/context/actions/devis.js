@@ -4,7 +4,7 @@
 // du client en est la synthèse (la plus avancée de ses devis).
 import { COMMISSION_RATES, newReferral, partnerFromActiveRef } from './shared';
 import { missingCommissionsForDevis, rattacherCommissionsClient } from '../../utils/commissionSync';
-import { devisStage, etapeDuClient } from '../../utils/affaires';
+import { devisStage, etapeDuClient, prochainNumeroDevis } from '../../utils/affaires';
 
 // L'issue d'un devis met à jour la fiche du CLIENT : son activité (indicateur
 // « affaire inactive depuis N jours ») et son étape de synthèse — la plus
@@ -84,9 +84,9 @@ export function createDevisActions(setState) {
     addDevis: (devis) =>
       setState((s) => {
         const now = new Date();
-        const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-        const counter = (s.devisCounter || 0) + 1;
-        const devisNumber = `BS-${dateStr}-${String(counter).padStart(4, '0')}`;
+        // Numéro DÉDUIT des devis existants (répliqués), pas d'un compteur
+        // local : deux appareils ne peuvent plus produire le même numéro.
+        const devisNumber = prochainNumeroDevis(s.devis, now);
         // Attribution automatique : partenaire choisi > parrain de la piste
         // > lien d'affiliation > profil partenaire du créateur du devis
         // (chaque devis a impérativement un apporteur).
@@ -111,7 +111,9 @@ export function createDevisActions(setState) {
         const partnerCode = s.partners.find((p) => p.id === partnerId)?.code || null;
         return {
           ...s,
-          devisCounter: counter,
+          // Conservé pour compatibilité des sauvegardes ; n'est plus la source
+          // de vérité de la numérotation.
+          devisCounter: (s.devisCounter || 0) + 1,
           referrals,
           devis: [
             // Une affaire naît à « Proposition » : un devis émis est, par
