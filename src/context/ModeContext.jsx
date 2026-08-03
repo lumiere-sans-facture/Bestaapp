@@ -66,7 +66,7 @@ export function ModeProvider({ children }) {
   }, [proActive, mode]);
 
   return (
-    <ModeContext.Provider value={{ mode: effectiveMode, setMode, proActive }}>
+    <ModeContext.Provider value={{ mode: effectiveMode, setMode, proActive, sub }}>
       {children}
     </ModeContext.Provider>
   );

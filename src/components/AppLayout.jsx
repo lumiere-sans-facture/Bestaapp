@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
+import AbonnementAlert from './AbonnementAlert';
 import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -149,6 +150,7 @@ export default function AppLayout() {
             </span>
           </div>
         )}
+        <AbonnementAlert />
         <ChunkErrorBoundary>
           <Suspense fallback={<div className="splash-screen">Chargement…</div>}>
             <Outlet />

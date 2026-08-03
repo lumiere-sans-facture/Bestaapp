@@ -617,7 +617,17 @@ export default function Plus() {
           toast('Sauvegarde restaurée avec succès.');
         }}
         title="Restaurer la sauvegarde"
-        message="Importer cette sauvegarde remplacera toutes les données actuelles de l'application."
+        message={pendingRestore
+          ? [
+              `Sauvegarde du ${formatDate(pendingRestore.exportedAt)}.`,
+              'Toutes les données actuelles seront remplacées par celles du fichier.',
+              // En mode SaaS la restauration se réplique : ce qui a été créé
+              // depuis cette sauvegarde sera supprimé pour TOUTE l'équipe.
+              isSupabaseConfigured
+                ? 'Attention : cette restauration est synchronisée. Tout ce qui a été créé depuis cette date sera supprimé sur le serveur et sur les appareils de votre équipe.'
+                : 'Cette action ne peut pas être annulée.',
+            ].join(' ')
+          : ''}
         confirmLabel="Restaurer"
         danger
       />

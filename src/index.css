@@ -434,6 +434,10 @@ form .login-link { width: 100%; margin-top: 4px; }
   border-radius: var(--radius-sm); color: #7f1d1d; font-size: 0.85rem; line-height: 1.4;
 }
 .storage-alert svg { flex: none; margin-top: 1px; }
+.storage-alert .btn { flex: none; margin-left: auto; align-self: center; }
+/* Rappel d'abonnement : information, pas erreur — ton neutre puis orangé. */
+.abo-alert { background: var(--bg); border-color: var(--border); border-left-color: var(--primary); color: var(--text-primary); align-items: center; }
+.abo-alert.is-warning { background: #fffbeb; border-color: #fde68a; border-left-color: var(--warning, #f59e0b); color: #78350f; }
 
 /* Encart d'information contextuelle : .callout (fond teinté). */
 .validation-bar { margin: 0 16px 14px; padding: 12px 14px; background: var(--warning-light); border-radius: var(--radius); }
