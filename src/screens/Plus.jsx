@@ -7,7 +7,7 @@ import { useMode } from '../context/ModeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { setOrgReferral } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
-import { peutValiderProgression } from '../utils/roles';
+import { estProprietaireEspace } from '../utils/roles';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
 import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
@@ -347,7 +347,7 @@ export default function Plus() {
       {/* Parrainage de l'entreprise : attribution unique, ensuite verrouillée
           (seul BestaSolar peut la modifier, sur demande du partenaire).
           Visible pour le gérant — ou l'utilisateur seul dans son espace. */}
-      {isSupabaseConfigured && user.org && peutValiderProgression(user, team) && (
+      {isSupabaseConfigured && user.org && estProprietaireEspace(user, team) && (
         <div className="card">
           <div className="sheet-section-title"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Parrainage</div>
           {user.org.referred_by ? (

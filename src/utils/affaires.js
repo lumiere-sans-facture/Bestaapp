@@ -59,3 +59,21 @@ export function buildAffaires(leads = [], devisList = []) {
 /** Tous les devis publics d'un client (pour la fiche : « ses autres affaires »). */
 export const devisDuClient = (leadId, devisList = []) =>
   devisList.filter((d) => d.leadId === leadId && d.type !== 'pro');
+
+const ORDRE_ETAPES = ['nouveau', 'qualifie', 'visite', 'proposition', 'negociation', 'gagne'];
+
+/**
+ * Étape d'un CLIENT déduite de ses affaires : la plus avancée de ses devis non
+ * perdus ; « perdu » seulement si toutes le sont ; null s'il n'a aucun devis
+ * (sa piste garde alors sa propre étape).
+ * Le kanban suit les devis, mais les écrans qui raisonnent par client (fiche
+ * client, tableau de bord, espace partenaire) ont besoin de cette synthèse —
+ * sans elle, un client dont le devis est gagné resterait badgé « Nouveau ».
+ */
+export function etapeDuClient(stagesDevis = []) {
+  if (!stagesDevis.length) return null;
+  const ouvertes = stagesDevis.filter((st) => st !== 'perdu');
+  if (!ouvertes.length) return 'perdu';
+  return ouvertes.reduce((best, st) =>
+    (ORDRE_ETAPES.indexOf(st) > ORDRE_ETAPES.indexOf(best) ? st : best));
+}

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, MoreVertical, ArrowRightLeft, FileText, Eye } from 'lucide-react';
+import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, MoreVertical, ArrowRightLeft, FileText, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchAdminPublicPipeline } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import { daysSince } from '../utils/date';
-import { buildAffaires, devisDuClient } from '../utils/affaires';
+import { buildAffaires } from '../utils/affaires';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
@@ -30,7 +30,9 @@ export default function Pipeline() {
   const renderCommissionInfo = (aff, partnerId, level, rate) => {
     const commission = commissions.find((c) =>
       c.partnerId === partnerId && c.level === level
-      && c.leadId === aff.lead.id);
+      && (aff.kind === 'devis'
+        ? c.devisId === aff.devis.id            // la commission de CE devis
+        : !c.devisId && c.leadId === aff.lead.id));
     if (commission) {
       return (
         <>
@@ -514,7 +516,6 @@ export default function Pipeline() {
             <button className="stage-picker-btn lost" onClick={() => { moveAffaire(pickerAff, 'perdu'); setStagePickerKey(null); }}>
               <ThumbsDown size={16} /> Perdu
             </button>
-            {!direct && <p className="field-hint">Le changement d'étape sera soumis à la validation du gérant.</p>}
           </div>
         )}
       </Sheet>

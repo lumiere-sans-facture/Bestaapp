@@ -1,14 +1,34 @@
 // Domaine devis : création (avec attribution d'affiliation), marquage Pro et
-// SUIVI DEVIS PAR DEVIS — chaque devis porte sa propre issue (gagné/perdu) et
-// donc sa propre commission, sans jamais déplacer le client dans le kanban :
-// l'étape du client reste pilotée à la main par le commercial.
+// SUIVI DEVIS PAR DEVIS — chaque devis est une affaire à part entière, avec sa
+// propre étape, sa propre issue (gagné/perdu) et sa propre commission. L'étape
+// du client en est la synthèse (la plus avancée de ses devis).
 import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForDevis, rattacherCommissionsClient } from '../../utils/commissionSync';
+import { devisStage, etapeDuClient } from '../../utils/affaires';
 
-// L'issue d'un devis compte comme une activité sur la fiche du client
-// (indicateur « affaire inactive depuis N jours »).
-const touchLead = (leads, leadId, today) =>
-  leads.map((l) => (l.id === leadId ? { ...l, lastActivity: today } : l));
+// L'issue d'un devis met à jour la fiche du CLIENT : son activité (indicateur
+// « affaire inactive depuis N jours ») et son étape de synthèse — la plus
+// avancée de ses devis. Le kanban suit les devis ; la fiche client, le tableau
+// de bord et l'espace partenaire raisonnent par client et doivent suivre.
+const majClient = (state, leadId, today) =>
+  state.leads.map((l) => {
+    if (l.id !== leadId) return l;
+    const etapes = state.devis
+      .filter((d) => d.leadId === leadId && d.type !== 'pro')
+      .map((d) => devisStage(d, l));
+    const synthese = etapeDuClient(etapes);
+    return {
+      ...l,
+      lastActivity: today,
+      ...(synthese && synthese !== l.stage
+        ? {
+            stage: synthese,
+            wonAt: synthese === 'gagne' ? l.wonAt || today : l.wonAt,
+            lostAt: synthese === 'perdu' ? today : null,
+          }
+        : {}),
+    };
+  });
 
 export function createDevisActions(setState) {
   // Application effective du changement d'étape d'UNE affaire (devis) :
@@ -54,7 +74,7 @@ export function createDevisActions(setState) {
           : x
       ),
     };
-    return { ...ns, leads: touchLead(ns.leads, d.leadId, today) };
+    return { ...ns, leads: majClient(ns, d.leadId, today) };
   };
 
   return {
@@ -116,8 +136,8 @@ export function createDevisActions(setState) {
       }),
 
     // ---- Suivi devis par devis : chaque devis a sa propre issue ----
-    // Passage direct (gérant, ou espace sans gérant) : applique l'étape
-    // immédiatement — le « gagné » génère les commissions de CE devis.
+    // Le vendeur applique l'étape immédiatement — le « gagné » génère la
+    // commission de CE devis.
     updateDevisStage: (devisId, stage) => setState((s) => devisStageState(s, devisId, stage)),
 
     // Marque un devis comme document Pro (rendu à l'identité du technicien)

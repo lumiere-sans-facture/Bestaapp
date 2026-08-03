@@ -187,3 +187,56 @@ describe('jamais de commission payée en double', () => {
     expect(s.get().commissions).toHaveLength(1);
   });
 });
+
+describe('cohérence client ↔ devis (régressions vérifiées)', () => {
+  const USR = { id: 'u5', name: 'Vendeur', role: 'technicien' };
+
+  it('l’étape du CLIENT suit ses devis (plus de badge « Nouveau » sur un client gagné)', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(USR);
+    s.a.addLead({ name: 'Hôtel', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: USR.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 500000, statut: 'finalise', createdBy: USR.id, items: [] });
+    const d = s.get().devis[0];
+
+    expect(s.get().leads[0].stage).toBe('nouveau'); // création : rien ne bouge
+    s.a.updateDevisStage(d.id, 'negociation');
+    expect(s.get().leads[0].stage).toBe('negociation');
+    s.a.updateDevisStage(d.id, 'gagne');
+    expect(s.get().leads[0].stage).toBe('gagne');
+    expect(s.get().leads[0].wonAt).toBeTruthy();
+  });
+
+  it('l’étape du client est la plus avancée de ses devis, « perdu » seulement si tous le sont', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(USR);
+    s.a.addLead({ name: 'Ecole', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: USR.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 100000, statut: 'finalise', createdBy: USR.id, items: [] });
+    s.a.addDevis({ leadId: lead.id, type: 'solar', total: 200000, statut: 'finalise', createdBy: USR.id, items: [] });
+    const [d2, d1] = s.get().devis;
+
+    s.a.updateDevisStage(d1.id, 'perdu');
+    expect(s.get().leads[0].stage).toBe('proposition'); // d2 est encore ouvert
+    s.a.updateDevisStage(d2.id, 'perdu');
+    expect(s.get().leads[0].stage).toBe('perdu');
+  });
+
+  it('chaque devis gagné porte SA commission, identifiable par devisId', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(USR);
+    s.a.addLead({ name: 'Hôtel', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: USR.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 500000, statut: 'finalise', createdBy: USR.id, items: [] });
+    s.a.addDevis({ leadId: lead.id, type: 'solar', total: 300000, statut: 'finalise', createdBy: USR.id, items: [] });
+    const [dB, dA] = s.get().devis;
+    s.a.updateDevisStage(dA.id, 'gagne');
+    s.a.updateDevisStage(dB.id, 'gagne');
+
+    // Chaque commission est rattachée à SON devis : l'affichage par affaire
+    // ne peut plus montrer le montant de l'autre devis.
+    const parDevis = Object.fromEntries(s.get().commissions.map((c) => [c.devisId, c.amount]));
+    expect(parDevis[dA.id]).toBe(15000); // 3 % de 500 000
+    expect(parDevis[dB.id]).toBe(9000);  // 3 % de 300 000
+  });
+});

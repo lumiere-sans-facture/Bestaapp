@@ -1,21 +1,16 @@
-// Règle d'autorisation du suivi commercial — logique pure.
-//
-// Deux usages, une seule règle : qui peut APPLIQUER une progression
-// directement, et qui peut VALIDER la demande d'un autre. Les deux doivent
-// coïncider, sinon une demande peut être créée sans que personne ne puisse la
-// valider (verrou mortel : l'affaire n'avance plus, la commission ne naît pas).
+// Rôle et propriété d'un espace de travail — logique pure.
 
 /**
- * Vrai si l'utilisateur pilote lui-même les étapes (et valide les demandes) :
- *  - le gérant de l'entreprise ;
- *  - l'admin plateforme (BestaSolar), propriétaire de fait de ses affaires ;
- *  - tout utilisateur dont l'espace n'a PAS de gérant — un inscrit seul est le
- *    propriétaire de son espace : sans cela, sa demande n'aurait aucun
- *    destinataire.
+ * Vrai si l'utilisateur est propriétaire de son espace : le gérant de
+ * l'entreprise, l'admin plateforme (BestaSolar), ou tout utilisateur dont
+ * l'espace n'a pas de gérant (inscrit self-service, seul dans son espace).
+ * Sert à ouvrir les réglages qui engagent l'entreprise entière (parrainage…).
+ * NB : la progression des affaires, elle, n'est soumise à aucune autorisation —
+ * chaque vendeur fait avancer ses propres affaires.
  * @param {{role?: string, is_platform_admin?: boolean}} user
  * @param {Array<{role?: string}>} team profils de SON organisation uniquement
  */
-export const peutValiderProgression = (user, team = []) =>
+export const estProprietaireEspace = (user, team = []) =>
   user?.role === 'gerant'
   || !!user?.is_platform_admin
   || !team.some((u) => u.role === 'gerant');

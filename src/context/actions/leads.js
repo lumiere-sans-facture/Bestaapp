@@ -7,8 +7,7 @@ import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef 
 import { missingCommissionsForLead } from '../../utils/commissionSync';
 
 export function createLeadActions(setState) {
-  // Application effective d'un changement d'étape (commissions comprises) —
-  // partagée entre le passage direct (gérant) et la validation d'une demande.
+  // Application effective d'un changement d'étape (commissions comprises).
   const stageState = (s, leadId, stage) => {
     const today = new Date().toISOString().slice(0, 10);
     const lead = s.leads.find((l) => l.id === leadId);
@@ -96,10 +95,10 @@ export function createLeadActions(setState) {
         ),
       })),
 
-    // Passage direct (gérant) : applique l'étape immédiatement — le « gagné »
-    // génère les commissions de parrainage (3 % N1, 1,5 % N2) si absentes.
-    // Le passage est TRACÉ dans l'activité du client : le commercial qui suit
-    // l'affaire voit ainsi que le gérant l'a fait progresser, même sans demande.
+    // Le vendeur applique l'étape immédiatement — le « gagné » génère les
+    // commissions de parrainage (3 % N1, 1,5 % N2) si absentes. Le passage est
+    // TRACÉ dans l'activité du client (avec son auteur), pour que l'équipe
+    // sache qui a fait avancer l'affaire.
     updateLeadStage: (leadId, stage, byUserId = null) =>
       setState((s) => {
         const avant = s.leads.find((l) => l.id === leadId);
@@ -110,7 +109,7 @@ export function createLeadActions(setState) {
           ...ns,
           leads: ns.leads.map((l) =>
             l.id === leadId
-              ? { ...l, activities: [note(`Étape passée de « ${STAGE_LABEL[avant.stage] || avant.stage} » à « ${STAGE_LABEL[stage] || stage} » par le gérant.`, byUserId), ...(l.activities || [])] }
+              ? { ...l, activities: [note(`Étape passée de « ${STAGE_LABEL[avant.stage] || avant.stage} » à « ${STAGE_LABEL[stage] || stage} ».`, byUserId), ...(l.activities || [])] }
               : l
           ),
         };
