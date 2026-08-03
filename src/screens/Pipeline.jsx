@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass, MoreVertical, ArrowRightLeft } from 'lucide-react';
+import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass, MoreVertical, ArrowRightLeft, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { daysSince } from '../utils/date';
+import { buildAffaires } from '../utils/affaires';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
@@ -12,19 +13,24 @@ import Field from '../components/Field';
 const STALE_DAYS = 5;
 
 // Étapes ouvertes uniquement : « Gagné » est une issue, pas une colonne
-const isOpen = (lead) => lead.stage !== 'gagne' && lead.stage !== 'perdu';
+const isOpen = (aff) => aff.stage !== 'gagne' && aff.stage !== 'perdu';
 
 export default function Pipeline() {
   const { user } = useAuth();
   const {
-    stages, lostStage, team, commissions, partners,
+    stages, lostStage, team, commissions, devis,
     leadsForUser, getPartnerById, getUserById,
-    updateLeadStage, requestStageChange, approveStageChange, rejectStageChange, addLead, addLeadNote,
+    updateLeadStage, requestStageChange, approveStageChange, rejectStageChange,
+    updateDevisStage, requestDevisStageChange, approveDevisStageChange, rejectDevisStageChange,
+    addLead, addLeadNote,
   } = useData();
 
-  // Commission réelle si l'affaire est gagnée, sinon estimation au taux du niveau
-  const renderCommissionInfo = (lead, partnerId, level, rate) => {
-    const commission = commissions.find((c) => c.leadId === lead.id && c.partnerId === partnerId && c.level === level);
+  // Commission de l'affaire : réelle si gagnée (celle du devis pour une
+  // affaire-devis), sinon estimation au taux du niveau.
+  const renderCommissionInfo = (aff, partnerId, level, rate) => {
+    const commission = commissions.find((c) =>
+      c.partnerId === partnerId && c.level === level
+      && (aff.kind === 'devis' ? c.devisId === aff.devis.id : c.leadId === aff.lead.id && !c.devisId));
     if (commission) {
       return (
         <>
@@ -35,8 +41,8 @@ export default function Pipeline() {
         </>
       );
     }
-    if (!lead.estimatedValue) return <>Commission : calculée sur le devis du client</>;
-    return <>Commission estimée : {formatCFA(Math.round(lead.estimatedValue * rate))}</>;
+    if (!aff.value) return <>Commission : calculée sur le devis du client</>;
+    return <>Commission estimée : {formatCFA(Math.round(aff.value * rate))}</>;
   };
 
   const allMyLeads = leadsForUser(user);
@@ -48,39 +54,57 @@ export default function Pipeline() {
   // gérant — SAUF si l'équipe n'a pas de gérant (utilisateur seul dans son
   // espace) : personne ne pourrait valider, le passage est donc direct.
   const orgSansGerant = !team.some((u) => u.role === 'gerant');
-  const moveLead = (leadId, stageId) => {
-    const lead = allMyLeads.find((l) => l.id === leadId);
-    if (!lead || lead.stage === stageId) return;
-    if (isGerant || orgSansGerant) updateLeadStage(leadId, stageId);
-    else requestStageChange(leadId, stageId, user.id);
+  const direct = isGerant || orgSansGerant;
+  // Le suivi se fait PAR AFFAIRE (= par devis) : un client avec deux devis a
+  // deux cartes, déplacées indépendamment.
+  const moveAffaire = (aff, stageId) => {
+    if (!aff || aff.stage === stageId) return;
+    if (aff.kind === 'devis') {
+      if (direct) updateDevisStage(aff.devis.id, stageId);
+      else requestDevisStageChange(aff.devis.id, stageId, user.id);
+    } else {
+      if (direct) updateLeadStage(aff.lead.id, stageId);
+      else requestStageChange(aff.lead.id, stageId, user.id);
+    }
   };
+  const approveAffaire = (aff) => (aff.kind === 'devis'
+    ? approveDevisStageChange(aff.devis.id, user.id)
+    : approveStageChange(aff.lead.id, user.id));
+  const rejectAffaire = (aff) => (aff.kind === 'devis'
+    ? rejectDevisStageChange(aff.devis.id, user.id)
+    : rejectStageChange(aff.lead.id, user.id));
 
-  // « Suivi commercial » depuis la fiche client : ouvre directement l'affaire.
+  // « Suivi commercial » depuis la fiche client : ouvre la première affaire
+  // du client (sentinelle client:<id> résolue sur la liste des affaires).
   const location = useLocation();
-  const [selectedLeadId, setSelectedLeadId] = useState(location.state?.leadId ?? null);
+  const [selectedKey, setSelectedKey] = useState(location.state?.leadId ? `client:${location.state.leadId}` : null);
   // Déplacement sans glisser : indispensable au doigt (le drag HTML5 n'émet
   // aucun événement tactile sur Android/iOS).
-  const [stagePickerId, setStagePickerId] = useState(null);
+  const [stagePickerKey, setStagePickerKey] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [ownerFilter, setOwnerFilter] = useState('all');
-  const [draggedLeadId, setDraggedLeadId] = useState(null);
+  const [draggedKey, setDraggedKey] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [noteText, setNoteText] = useState('');
   // Pas de « valeur estimée » à saisir : elle se déduit des devis du client.
   const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', notes: '', clientType: 'particulier' });
 
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
-  const selectedLead = allMyLeads.find((l) => l.id === selectedLeadId);
-  const pickerLead = allMyLeads.find((l) => l.id === stagePickerId);
+  const affaires = buildAffaires(myLeads, devis);
+  const findAff = (key) => affaires.find((a) => a.key === key)
+    || (key?.startsWith('client:') ? affaires.find((a) => a.lead.id === key.slice(7)) : null);
+  const selectedAff = findAff(selectedKey);
+  const pickerAff = findAff(stagePickerKey);
+  const pendingAffaires = affaires.filter((a) => a.pendingStage);
 
-  const openValue = myLeads.filter(isOpen).reduce((sum, l) => sum + l.estimatedValue, 0);
-  const wonLeads = myLeads.filter((l) => l.stage === 'gagne');
-  const lostCount = myLeads.filter((l) => l.stage === 'perdu').length;
-  const wonValue = wonLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
+  const openValue = affaires.filter(isOpen).reduce((sum, a) => sum + a.value, 0);
+  const wonAffaires = affaires.filter((a) => a.stage === 'gagne');
+  const lostCount = affaires.filter((a) => a.stage === 'perdu').length;
+  const wonValue = wonAffaires.reduce((sum, a) => sum + a.value, 0);
 
   const handleDrop = (stageId) => {
-    if (draggedLeadId) moveLead(draggedLeadId, stageId);
-    setDraggedLeadId(null);
+    if (draggedKey) moveAffaire(findAff(draggedKey), stageId);
+    setDraggedKey(null);
     setDragOverZone(null);
   };
 
@@ -99,7 +123,7 @@ export default function Pipeline() {
   const handleAddNote = (e) => {
     e.preventDefault();
     if (!noteText.trim()) return;
-    addLeadNote(selectedLead.id, noteText.trim(), user.id);
+    addLeadNote(selectedAff.lead.id, noteText.trim(), user.id);
     setNoteText('');
   };
 
@@ -129,27 +153,27 @@ export default function Pipeline() {
       </PageHeader>
 
       <div className="page-content page-content-flush">
-        {isGerant && allMyLeads.some((l) => l.pendingStage) && (
+        {isGerant && pendingAffaires.length > 0 && (
           <div className="validation-bar">
             <div className="validation-bar-title">
-              <Hourglass size={15} /> {allMyLeads.filter((l) => l.pendingStage).length > 1
-                ? `${allMyLeads.filter((l) => l.pendingStage).length} progressions à valider`
+              <Hourglass size={15} /> {pendingAffaires.length > 1
+                ? `${pendingAffaires.length} progressions à valider`
                 : '1 progression à valider'}
             </div>
-            {allMyLeads.filter((l) => l.pendingStage).map((l) => {
-              const demandeur = getUserById(l.pendingStage.requestedBy);
+            {pendingAffaires.map((a) => {
+              const demandeur = getUserById(a.pendingStage.requestedBy);
               return (
-                <div key={l.id} className="validation-row">
+                <div key={a.key} className="validation-row">
                   <div className="validation-info" role="button" tabIndex={0}
-                    onClick={() => setSelectedLeadId(l.id)}
-                    onKeyDown={(e) => e.key === 'Enter' && setSelectedLeadId(l.id)}>
-                    <span className="validation-lead">{l.name}</span>
-                    <span className="validation-move">{stageLabel(l.stage)} → <strong>{stageLabel(l.pendingStage.stage)}</strong></span>
-                    <span className="validation-by">par {demandeur?.name || '—'} · {formatDate(l.pendingStage.requestedAt)}</span>
+                    onClick={() => setSelectedKey(a.key)}
+                    onKeyDown={(e) => e.key === 'Enter' && setSelectedKey(a.key)}>
+                    <span className="validation-lead">{a.lead.name}{a.kind === 'devis' && a.devis.devisNumber ? ` · ${a.devis.devisNumber}` : ''}</span>
+                    <span className="validation-move">{stageLabel(a.stage)} → <strong>{stageLabel(a.pendingStage.stage)}</strong></span>
+                    <span className="validation-by">par {demandeur?.name || '—'} · {formatDate(a.pendingStage.requestedAt)}</span>
                   </div>
                   <div className="validation-actions">
-                    <button className="btn btn-sm btn-won" onClick={() => approveStageChange(l.id, user.id)}><Check size={14} /> Valider</button>
-                    <button className="btn btn-sm btn-lost" onClick={() => rejectStageChange(l.id, user.id)}><X size={14} /> Refuser</button>
+                    <button className="btn btn-sm btn-won" onClick={() => approveAffaire(a)}><Check size={14} /> Valider</button>
+                    <button className="btn btn-sm btn-lost" onClick={() => rejectAffaire(a)}><X size={14} /> Refuser</button>
                   </div>
                 </div>
               );
@@ -158,8 +182,8 @@ export default function Pipeline() {
         )}
         <div className="kanban-container">
           {openStages.map((stage) => {
-            const stageLeads = myLeads.filter((l) => l.stage === stage.id);
-            const stageValue = stageLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
+            const stageAffaires = affaires.filter((a) => a.stage === stage.id);
+            const stageValue = stageAffaires.reduce((sum, a) => sum + a.value, 0);
             return (
               <div
                 key={stage.id}
@@ -171,45 +195,50 @@ export default function Pipeline() {
                 <div className="kanban-column-header" style={{ borderTopColor: stage.color }}>
                   <div className="kanban-column-title">
                     <span>{stage.label}</span>
-                    <span className="kanban-column-count">{stageLeads.length}</span>
+                    <span className="kanban-column-count">{stageAffaires.length}</span>
                   </div>
-                  <div className="kanban-column-summary">{formatCFA(stageValue)} · {stageLeads.length} affaire{stageLeads.length > 1 ? 's' : ''}</div>
+                  <div className="kanban-column-summary">{formatCFA(stageValue)} · {stageAffaires.length} affaire{stageAffaires.length > 1 ? 's' : ''}</div>
                 </div>
                 <div className="kanban-column-body">
-                  {stageLeads.map((lead) => {
+                  {stageAffaires.map((aff) => {
+                    const lead = aff.lead;
                     const stale = daysSince(lead.lastActivity) > STALE_DAYS;
                     const owner = getUserById(lead.assignedTo);
                     return (
                       <div
-                        key={lead.id}
-                        className={`kanban-card ${draggedLeadId === lead.id ? 'dragging' : ''}`}
+                        key={aff.key}
+                        className={`kanban-card ${draggedKey === aff.key ? 'dragging' : ''}`}
                         draggable
-                        onDragStart={() => setDraggedLeadId(lead.id)}
-                        onDragEnd={() => { setDraggedLeadId(null); setDragOverZone(null); }}
-                        onClick={() => setSelectedLeadId(lead.id)}
+                        onDragStart={() => setDraggedKey(aff.key)}
+                        onDragEnd={() => { setDraggedKey(null); setDragOverZone(null); }}
+                        onClick={() => setSelectedKey(aff.key)}
                         role="button"
                         tabIndex={0}
-                        onKeyDown={(e) => e.key === 'Enter' && setSelectedLeadId(lead.id)}
+                        onKeyDown={(e) => e.key === 'Enter' && setSelectedKey(aff.key)}
                       >
                         <div className="kanban-card-head">
                           <div className="kanban-card-title">{lead.name}</div>
                           <button
                             className="kanban-card-move"
-                            aria-label={`Déplacer ${lead.name} vers une autre étape`}
-                            onClick={(e) => { e.stopPropagation(); setStagePickerId(lead.id); }}
+                            aria-label={`Déplacer ${lead.name}${aff.devis?.devisNumber ? ` (${aff.devis.devisNumber})` : ''} vers une autre étape`}
+                            onClick={(e) => { e.stopPropagation(); setStagePickerKey(aff.key); }}
                           >
                             <MoreVertical size={16} />
                           </button>
                         </div>
-                        <div className="kanban-card-contact">{lead.contact}</div>
-                        {lead.pendingStage && (
+                        <div className="kanban-card-contact">
+                          {aff.kind === 'devis'
+                            ? <><FileText size={11} style={{ verticalAlign: -1 }} /> {aff.devis.devisNumber || 'Devis'}{aff.devis.statut === 'brouillon' ? ' · brouillon' : ''}</>
+                            : lead.contact}
+                        </div>
+                        {aff.pendingStage && (
                           <div className="pending-chip" title={`Demande en attente de validation du gérant`}>
-                            <Hourglass size={11} /> → {stageLabel(lead.pendingStage.stage)}
+                            <Hourglass size={11} /> → {stageLabel(aff.pendingStage.stage)}
                           </div>
                         )}
                         <div className="kanban-card-footer">
-                          <span className={`kanban-card-value${lead.estimatedValue > 0 ? '' : ' none'}`}>
-                            {lead.estimatedValue > 0 ? formatCFA(lead.estimatedValue) : 'Devis à créer'}
+                          <span className={`kanban-card-value${aff.value > 0 ? '' : ' none'}`}>
+                            {aff.value > 0 ? formatCFA(aff.value) : 'Devis à créer'}
                           </span>
                           <span className="kanban-card-icons">
                             {stale && (
@@ -225,7 +254,7 @@ export default function Pipeline() {
                       </div>
                     );
                   })}
-                  {stageLeads.length === 0 && <div className="kanban-empty">Déposez une carte ici</div>}
+                  {stageAffaires.length === 0 && <div className="kanban-empty">Déposez une carte ici</div>}
                 </div>
               </div>
             );
@@ -234,7 +263,7 @@ export default function Pipeline() {
       </div>
 
       {/* Zones de dépôt Gagné / Perdu visibles pendant le glissement */}
-      {draggedLeadId && (
+      {draggedKey && (
         <div className="drag-zones">
           <div
             className={`drag-zone drag-zone-lost ${dragOverZone === 'perdu' ? 'active' : ''}`}
@@ -257,36 +286,50 @@ export default function Pipeline() {
 
       {/* Fiche affaire */}
       <Sheet
-        open={!!selectedLead}
-        onClose={() => setSelectedLeadId(null)}
-        title={selectedLead?.name}
-        subtitle={selectedLead && `${selectedLead.contact}${selectedLead.estimatedValue > 0 ? ` · ${formatCFA(selectedLead.estimatedValue)}` : ''}`}
+        open={!!selectedAff}
+        onClose={() => setSelectedKey(null)}
+        title={selectedAff?.lead.name}
+        subtitle={selectedAff && [
+          selectedAff.kind === 'devis' ? selectedAff.devis.devisNumber : selectedAff.lead.contact,
+          selectedAff.value > 0 ? formatCFA(selectedAff.value) : null,
+        ].filter(Boolean).join(' · ')}
       >
-        {selectedLead && (
+        {selectedAff && (
           <>
-            {selectedLead.pendingStage && (
+            {selectedAff.pendingStage && (
               <div className="pending-banner">
                 <span className="pending-banner-text">
-                  <Hourglass size={15} /> Passage à « <strong>{stageLabel(selectedLead.pendingStage.stage)}</strong> » demandé par {getUserById(selectedLead.pendingStage.requestedBy)?.name || '—'} — en attente de validation.
+                  <Hourglass size={15} /> Passage à « <strong>{stageLabel(selectedAff.pendingStage.stage)}</strong> » demandé par {getUserById(selectedAff.pendingStage.requestedBy)?.name || '—'} — en attente de validation.
                 </span>
                 {isGerant && (
                   <span className="pending-banner-actions">
-                    <button className="btn btn-sm btn-won" onClick={() => approveStageChange(selectedLead.id, user.id)}><Check size={14} /> Valider</button>
-                    <button className="btn btn-sm btn-lost" onClick={() => rejectStageChange(selectedLead.id, user.id)}><X size={14} /> Refuser</button>
+                    <button className="btn btn-sm btn-won" onClick={() => approveAffaire(selectedAff)}><Check size={14} /> Valider</button>
+                    <button className="btn btn-sm btn-lost" onClick={() => rejectAffaire(selectedAff)}><X size={14} /> Refuser</button>
                   </span>
                 )}
               </div>
             )}
-            {isOpen(selectedLead) ? (
+            {/* Les autres affaires du même client, pour naviguer entre ses devis */}
+            {affaires.filter((a) => a.lead.id === selectedAff.lead.id && a.key !== selectedAff.key).length > 0 && (
+              <div className="callout" role="note">
+                <div className="callout-title"><FileText size={13} /> Autres affaires de ce client</div>
+                {affaires.filter((a) => a.lead.id === selectedAff.lead.id && a.key !== selectedAff.key).map((a) => (
+                  <button key={a.key} type="button" className="login-link" onClick={() => setSelectedKey(a.key)}>
+                    {a.kind === 'devis' ? (a.devis.devisNumber || 'Devis') : 'Prospection'} · {stageLabel(a.stage)}{a.value > 0 ? ` · ${formatCFA(a.value)}` : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+            {isOpen(selectedAff) ? (
               <>
                 <div className="stage-stepper">
                   {openStages.map((stage, i) => {
-                    const currentIndex = openStages.findIndex((s) => s.id === selectedLead.stage);
+                    const currentIndex = openStages.findIndex((s) => s.id === selectedAff.stage);
                     return (
                       <button
                         key={stage.id}
-                        className={`stage-step ${i <= currentIndex ? 'reached' : ''} ${selectedLead.stage === stage.id ? 'current' : ''}`}
-                        onClick={() => moveLead(selectedLead.id, stage.id)}
+                        className={`stage-step ${i <= currentIndex ? 'reached' : ''} ${selectedAff.stage === stage.id ? 'current' : ''}`}
+                        onClick={() => moveAffaire(selectedAff, stage.id)}
                         title={stage.label}
                       >
                         {stage.label}
@@ -294,24 +337,26 @@ export default function Pipeline() {
                     );
                   })}
                 </div>
-                <button className="btn btn-outline btn-block stage-move-btn" onClick={() => setStagePickerId(selectedLead.id)}>
+                <button className="btn btn-outline btn-block stage-move-btn" onClick={() => setStagePickerKey(selectedAff.key)}>
                   <ArrowRightLeft size={16} /> Déplacer vers…
                 </button>
                 <div className="outcome-actions">
-                  <button className="btn btn-won" onClick={() => moveLead(selectedLead.id, 'gagne')}>
+                  <button className="btn btn-won" onClick={() => moveAffaire(selectedAff, 'gagne')}>
                     <Trophy size={16} /> Gagné
                   </button>
-                  <button className="btn btn-lost" onClick={() => moveLead(selectedLead.id, 'perdu')}>
+                  <button className="btn btn-lost" onClick={() => moveAffaire(selectedAff, 'perdu')}>
                     <ThumbsDown size={16} /> Perdu
                   </button>
                 </div>
               </>
             ) : (
-              <div className={`outcome-banner ${selectedLead.stage === 'gagne' ? 'won' : 'lost'}`}>
+              <div className={`outcome-banner ${selectedAff.stage === 'gagne' ? 'won' : 'lost'}`}>
                 <span className="outcome-banner-label">
-                  {selectedLead.stage === 'gagne' ? <><Trophy size={16} /> Affaire gagnée le {formatDate(selectedLead.wonAt)}</> : <><ThumbsDown size={16} /> Affaire perdue le {formatDate(selectedLead.lostAt)}</>}
+                  {selectedAff.stage === 'gagne'
+                    ? <><Trophy size={16} /> Affaire gagnée le {formatDate(selectedAff.kind === 'devis' ? selectedAff.devis.wonAt : selectedAff.lead.wonAt)}</>
+                    : <><ThumbsDown size={16} /> Affaire perdue le {formatDate(selectedAff.kind === 'devis' ? selectedAff.devis.lostAt : selectedAff.lead.lostAt)}</>}
                 </span>
-                <button className="btn btn-sm btn-outline" onClick={() => moveLead(selectedLead.id, 'negociation')}>
+                <button className="btn btn-sm btn-outline" onClick={() => moveAffaire(selectedAff, 'negociation')}>
                   <RotateCcw size={14} /> Rouvrir
                 </button>
               </div>
@@ -321,40 +366,40 @@ export default function Pipeline() {
               <div className="sheet-section-title">Contact</div>
               <div className="sheet-row">
                 <span className="sheet-label"><Phone size={14} /> Téléphone</span>
-                <a className="sheet-value sheet-link" href={`tel:${selectedLead.phone.replace(/\s/g, '')}`}>{selectedLead.phone}</a>
+                <a className="sheet-value sheet-link" href={`tel:${selectedAff.lead.phone.replace(/\s/g, '')}`}>{selectedAff.lead.phone}</a>
               </div>
-              <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Adresse</span><span className="sheet-value">{selectedLead.address}</span></div>
+              <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Adresse</span><span className="sheet-value">{selectedAff.lead.address}</span></div>
               <div className="sheet-row">
-                <span className="sheet-label">{selectedLead.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type de client</span>
-                <span className="sheet-value">{selectedLead.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
+                <span className="sheet-label">{selectedAff.lead.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type de client</span>
+                <span className="sheet-value">{selectedAff.lead.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
               </div>
               {user.role === 'gerant' && (
-                <div className="sheet-row"><span className="sheet-label">Assignée à</span><span className="sheet-value">{getUserById(selectedLead.assignedTo)?.name}</span></div>
+                <div className="sheet-row"><span className="sheet-label">Assignée à</span><span className="sheet-value">{getUserById(selectedAff.lead.assignedTo)?.name}</span></div>
               )}
             </div>
 
-            {(selectedLead.parrainL1 || selectedLead.parrainL2) && (
+            {(selectedAff.lead.parrainL1 || selectedAff.lead.parrainL2) && (
               <div className="sheet-section">
                 <div className="sheet-section-title">Chaîne de parrainage</div>
                 <div className="referral-chain">
-                  {selectedLead.parrainL1 && (
+                  {selectedAff.lead.parrainL1 && (
                     <>
                       <div className="referral-level referral-level-1">
                         <div className="referral-level-icon">L1</div>
                         <div className="referral-level-info">
-                          <div className="referral-level-name">{getPartnerById(selectedLead.parrainL1)?.name}</div>
-                          <div className="referral-level-commission">{renderCommissionInfo(selectedLead, selectedLead.parrainL1, 1, 0.03)}</div>
+                          <div className="referral-level-name">{getPartnerById(selectedAff.lead.parrainL1)?.name}</div>
+                          <div className="referral-level-commission">{renderCommissionInfo(selectedAff, selectedAff.lead.parrainL1, 1, 0.03)}</div>
                         </div>
                       </div>
-                      {selectedLead.parrainL2 && <div className="referral-connector" />}
+                      {selectedAff.lead.parrainL2 && <div className="referral-connector" />}
                     </>
                   )}
-                  {selectedLead.parrainL2 && (
+                  {selectedAff.lead.parrainL2 && (
                     <div className="referral-level referral-level-2">
                       <div className="referral-level-icon">L2</div>
                       <div className="referral-level-info">
-                        <div className="referral-level-name">{getPartnerById(selectedLead.parrainL2)?.name}</div>
-                        <div className="referral-level-commission">{renderCommissionInfo(selectedLead, selectedLead.parrainL2, 2, 0.015)}</div>
+                        <div className="referral-level-name">{getPartnerById(selectedAff.lead.parrainL2)?.name}</div>
+                        <div className="referral-level-commission">{renderCommissionInfo(selectedAff, selectedAff.lead.parrainL2, 2, 0.015)}</div>
                       </div>
                     </div>
                   )}
@@ -376,7 +421,7 @@ export default function Pipeline() {
                 </button>
               </form>
               <div className="activity-timeline">
-                {(selectedLead.activities || []).map((act) => (
+                {(selectedAff.lead.activities || []).map((act) => (
                   <div key={act.id} className="activity-item">
                     <div className="activity-dot" />
                     <div className="activity-content">
@@ -387,12 +432,12 @@ export default function Pipeline() {
                     </div>
                   </div>
                 ))}
-                {selectedLead.notes && (
+                {selectedAff.lead.notes && (
                   <div className="activity-item">
                     <div className="activity-dot" />
                     <div className="activity-content">
-                      <div className="activity-text">{selectedLead.notes}</div>
-                      <div className="activity-meta">Note initiale · {formatDate(selectedLead.createdAt)}</div>
+                      <div className="activity-text">{selectedAff.lead.notes}</div>
+                      <div className="activity-meta">Note initiale · {formatDate(selectedAff.lead.createdAt)}</div>
                     </div>
                   </div>
                 )}
@@ -404,30 +449,30 @@ export default function Pipeline() {
 
       {/* Sélecteur d'étape : le déplacement sans glisser, au doigt comme au clavier */}
       <Sheet
-        open={!!pickerLead}
-        onClose={() => setStagePickerId(null)}
+        open={!!pickerAff}
+        onClose={() => setStagePickerKey(null)}
         title="Déplacer vers…"
-        subtitle={pickerLead && `${pickerLead.name} · actuellement « ${stageLabel(pickerLead.stage)} »`}
+        subtitle={pickerAff && `${pickerAff.lead.name}${pickerAff.kind === 'devis' && pickerAff.devis.devisNumber ? ` · ${pickerAff.devis.devisNumber}` : ''} · actuellement « ${stageLabel(pickerAff.stage)} »`}
       >
-        {pickerLead && (
+        {pickerAff && (
           <div className="stage-picker">
-            {openStages.filter((s) => s.id !== pickerLead.stage).map((s) => (
+            {openStages.filter((s) => s.id !== pickerAff.stage).map((s) => (
               <button
                 key={s.id}
                 className="stage-picker-btn"
-                onClick={() => { moveLead(pickerLead.id, s.id); setStagePickerId(null); }}
+                onClick={() => { moveAffaire(pickerAff, s.id); setStagePickerKey(null); }}
               >
                 <span className="stage-picker-dot" style={{ background: s.color }} />
                 {s.label}
               </button>
             ))}
-            <button className="stage-picker-btn won" onClick={() => { moveLead(pickerLead.id, 'gagne'); setStagePickerId(null); }}>
+            <button className="stage-picker-btn won" onClick={() => { moveAffaire(pickerAff, 'gagne'); setStagePickerKey(null); }}>
               <Trophy size={16} /> Gagné
             </button>
-            <button className="stage-picker-btn lost" onClick={() => { moveLead(pickerLead.id, 'perdu'); setStagePickerId(null); }}>
+            <button className="stage-picker-btn lost" onClick={() => { moveAffaire(pickerAff, 'perdu'); setStagePickerKey(null); }}>
               <ThumbsDown size={16} /> Perdu
             </button>
-            {!isGerant && <p className="field-hint">Le changement d'étape sera soumis à la validation du gérant.</p>}
+            {!direct && <p className="field-hint">Le changement d'étape sera soumis à la validation du gérant.</p>}
           </div>
         )}
       </Sheet>

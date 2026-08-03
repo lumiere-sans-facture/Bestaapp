@@ -2,12 +2,8 @@
 // commissions de parrainage (couplage métier assumé piste → commission).
 // Les techniciens DEMANDENT un changement d'étape (pendingStage) ; le gérant
 // valide ou refuse — les commissions ne naissent qu'à la validation.
-import { COMMISSION_RATES, newReferral, partnerFromActiveRef } from './shared';
+import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForLead } from '../../utils/commissionSync';
-import { stages, LOST_STAGE } from '../../data/seed';
-
-const STAGE_LABEL = Object.fromEntries([...stages, LOST_STAGE].map((st) => [st.id, st.label]));
-const note = (text, userId) => ({ id: crypto.randomUUID(), date: new Date().toISOString(), text, by: userId });
 
 export function createLeadActions(setState) {
   // Application effective d'un changement d'étape (commissions comprises) —

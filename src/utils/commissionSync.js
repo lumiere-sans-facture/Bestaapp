@@ -60,6 +60,35 @@ export function missingCommissionsForLead({ lead, devis = [], partners = [], com
   return out;
 }
 
+// Commissions manquantes pour UN devis gagné (suivi par affaire : chaque
+// devis gagné rémunère son apporteur — deux devis gagnés d'un même client =
+// deux commissions). Idempotent par (devis, partenaire, niveau).
+export function missingCommissionsForDevis({ devis, lead, partners = [], commissions = [] }, rates, today) {
+  if (!devis) return [];
+  const basis = Number(devis.total) || 0;
+  if (!basis) return [];
+  let l1 = lead?.parrainL1 || devis.partnerId || null;
+  let l2 = lead?.parrainL2 || (l1 ? partners.find((p) => p.id === l1)?.sponsorId || null : null);
+  if (l2 && l2 === l1) l2 = null; // un même partenaire ne cumule pas deux niveaux
+  const exists = (partnerId, level) =>
+    commissions.some((c) => c.devisId === devis.id && c.partnerId === partnerId && c.level === level);
+  const nouvelle = (partnerId, level) => ({
+    id: crypto.randomUUID(),
+    partnerId,
+    leadId: devis.leadId || lead?.id || null,
+    devisId: devis.id,
+    level,
+    amount: Math.round(basis * rates[level]),
+    status: 'en_attente',
+    paidAt: null,
+    createdAt: today,
+  });
+  const out = [];
+  if (l1 && !exists(l1, 1)) out.push(nouvelle(l1, 1));
+  if (l2 && !exists(l2, 2)) out.push(nouvelle(l2, 2));
+  return out;
+}
+
 // Rattrapage global : recense toutes les affaires déjà validées (pistes
 // gagnées + conversions « devis » validées) et retourne les commissions
 // qui auraient dû exister mais manquent. Idempotent : relancé deux fois,
