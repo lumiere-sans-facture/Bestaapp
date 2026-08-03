@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { setOrgReferral } from '../lib/remoteSync';
+import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission } from '../lib/remoteSync';
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
 import { estProprietaireEspace } from '../utils/roles';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
@@ -118,9 +118,27 @@ export default function Plus() {
     setSubSent(true);
   };
 
-  const pendingCommissions = commissions.filter((c) => c.status === 'en_attente');
+  // Commissions de la PLATEFORME : une commission naît dans l'organisation de
+  // son bénéficiaire, donc celles des commerciaux des autres comptes sont
+  // invisibles ici — alors que c'est BestaSolar qui les doit. On les remonte.
+  const isAdminPlateforme = isSupabaseConfigured && !!user.is_platform_admin;
+  const [comExternes, setComExternes] = useState([]);
+  const [comRafraichir, setComRafraichir] = useState(0);
+  useEffect(() => {
+    if (!isAdminPlateforme) return;
+    fetchPlatformCommissions()
+      .then((list) => setComExternes((list || []).map((c) => ({ ...c, externe: true }))))
+      .catch(() => {});
+  }, [isAdminPlateforme, comRafraichir]);
+
+  const toutesCommissions = [...commissions, ...comExternes];
+  const pendingCommissions = toutesCommissions.filter((c) => c.status === 'en_attente');
   const pendingTotal = pendingCommissions.reduce((sum, c) => sum + c.amount, 0);
-  const paidTotal = commissions.filter((c) => c.status === 'payée').reduce((sum, c) => sum + c.amount, 0);
+  const paidTotal = toutesCommissions.filter((c) => c.status === 'payée').reduce((sum, c) => sum + c.amount, 0);
+  // Nom du bénéficiaire / du client : le profil partenaire et la piste vivent
+  // dans l'autre organisation, la vue plateforme les fournit déjà enrichis.
+  const nomPartenaire = (c) => getPartnerById(c.partnerId)?.name || c.partnerName || c.beneficiaire?.name || '—';
+  const nomClient = (c) => getLeadById(c.leadId)?.name || c.leadName || 'Commission manuelle';
 
   const handlePay = (commission) => {
     setPayForm({ mode: 'momo', reference: '', note: '' });
@@ -129,7 +147,13 @@ export default function Plus() {
 
   const submitPayCom = (e) => {
     e.preventDefault();
-    payCommission(payCom.id, { ...payForm, paidBy: user.id });
+    if (payCom.externe) {
+      payPlatformCommission({ orgId: payCom.orgId, id: payCom.id, ...payForm })
+        .catch((err) => toast(`Paiement impossible : ${err.message}`, { type: 'error' }))
+        .finally(() => setComRafraichir((n) => n + 1));
+    } else {
+      payCommission(payCom.id, { ...payForm, paidBy: user.id });
+    }
     setPayCom(null);
   };
 
@@ -137,8 +161,14 @@ export default function Plus() {
   const openRecu = (commission) => {
     openHtmlDoc(buildRecuCommissionHtml({
       commission,
-      partner: getPartnerById(commission.partnerId),
-      lead: commission.leadId ? getLeadById(commission.leadId) : null,
+      partner: getPartnerById(commission.partnerId)
+        || (commission.externe
+          ? { name: commission.partnerName, code: commission.partnerCode, phone: commission.partnerPhone }
+          : commission.beneficiaire),
+      lead: getLeadById(commission.leadId)
+        || (commission.externe && commission.leadName
+          ? { name: commission.leadName, estimatedValue: Number(commission.leadValue) || 0 }
+          : null),
       payeur: commission.paidBy ? { name: (data.team || []).find((u) => u.id === commission.paidBy)?.name || user.name } : { name: user.name },
       rates: COMMISSION_RATES,
     }));
@@ -146,13 +176,16 @@ export default function Plus() {
 
   // Relevé imprimable de toutes les commissions d'un partenaire.
   const openReleve = (partnerId) => {
-    const partner = getPartnerById(partnerId);
+    const lignes = toutesCommissions.filter((c) => c.partnerId === partnerId);
+    const externe = lignes.find((c) => c.externe);
+    const partner = getPartnerById(partnerId)
+      || (externe ? { name: externe.partnerName, code: externe.partnerCode, phone: externe.partnerPhone } : null);
     if (!partner) return;
     openHtmlDoc(buildReleveCommissionsHtml({
       partner,
-      commissions: commissions.filter((c) => c.partnerId === partnerId)
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-      getLeadName: (leadId) => getLeadById(leadId)?.name,
+      commissions: lignes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+      getLeadName: (leadId) => getLeadById(leadId)?.name
+        || lignes.find((c) => c.leadId === leadId)?.leadName,
       rates: COMMISSION_RATES,
     }));
   };
@@ -204,7 +237,19 @@ export default function Plus() {
 
   const renderPartners = () => <PartnersSection onBack={() => setActiveTab('menu')} />;
 
-  const filteredCommissions = commissions
+  // Le filtre par partenaire couvre aussi les apporteurs des autres comptes,
+  // sinon leurs commissions seraient impossibles à isoler et à relever.
+  const partenairesDuFiltre = [
+    ...partners.map((p) => ({ id: p.id, name: p.name, orgName: null })),
+    ...comExternes.reduce((acc, c) => {
+      if (c.partnerId && !acc.some((p) => p.id === c.partnerId)) {
+        acc.push({ id: c.partnerId, name: c.partnerName || c.partnerId, orgName: c.orgName });
+      }
+      return acc;
+    }, []),
+  ];
+
+  const filteredCommissions = toutesCommissions
     .filter((c) => comFilter === 'all' || c.status === comFilter)
     .filter((c) => comPartner === 'all' || c.partnerId === comPartner)
     .sort((a, b) => (a.status === 'en_attente' ? -1 : 1) - (b.status === 'en_attente' ? -1 : 1) || new Date(b.createdAt) - new Date(a.createdAt));
@@ -242,7 +287,9 @@ export default function Plus() {
         <div className="com-partner-tools">
           <select className="input sort-select" value={comPartner} onChange={(e) => setComPartner(e.target.value)} aria-label="Filtrer par partenaire">
             <option value="all">Tous les partenaires</option>
-            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {partenairesDuFiltre.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}{p.orgName ? ` · ${p.orgName}` : ''}</option>
+            ))}
           </select>
           <button className="btn btn-sm btn-outline" disabled={comPartner === 'all'} onClick={() => openReleve(comPartner)}
             title={comPartner === 'all' ? 'Choisissez un partenaire pour générer son relevé' : 'Relevé de commissions imprimable'}>
@@ -252,12 +299,13 @@ export default function Plus() {
       </div>
       <div className="commissions-list">
         {filteredCommissions.map((commission) => (
-          <div key={commission.id} className="card commission-card">
+          <div key={`${commission.orgId || 'moi'}-${commission.id}`} className="card commission-card">
             <div className="commission-header">
               <div>
-                <div className="commission-lead">{getLeadById(commission.leadId)?.name || 'Commission manuelle'}</div>
+                <div className="commission-lead">{nomClient(commission)}</div>
                 <div className="text-sm text-secondary">
-                  {getPartnerById(commission.partnerId)?.name} — Niveau {commission.level}
+                  {nomPartenaire(commission)} — Niveau {commission.level}
+                  {commission.externe && commission.orgName ? ` · ${commission.orgName}` : ''}
                 </div>
               </div>
               <div className="commission-amount">{formatCFA(commission.amount)}</div>
@@ -266,7 +314,7 @@ export default function Plus() {
               <span>
                 {commission.status === 'payée'
                   ? `Payée le ${formatDate(commission.paidAt)} · ${PAY_MODE_LABEL[commission.payMode] || 'Mobile Money'}${commission.payRef ? ` · réf. ${commission.payRef}` : ''}`
-                  : `Créée le ${formatDate(commission.createdAt)}`}
+                  : `Créée le ${formatDate(commission.createdAt)}${commission.devisNumber ? ` · ${commission.devisNumber}` : ''}`}
               </span>
               {commission.status === 'payée' && <span className="badge badge-success">Payée</span>}
             </div>

@@ -292,6 +292,26 @@ export async function decideProgression({ orgId, kind, id, approuver }) {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Commissions de TOUTE la plateforme (hors sa propre organisation, déjà dans
+ * l'état local). Elles naissent chez le partenaire : sans cette vue, BestaSolar
+ * ne verrait jamais ce qu'elle doit. Réservé à l'admin plateforme.
+ */
+export async function fetchPlatformCommissions() {
+  const { data, error } = await supabase.rpc('admin_platform_commissions');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/** Marque payée une commission qui vit dans une autre organisation. */
+export async function payPlatformCommission({ orgId, id, mode, reference, note }) {
+  const { error } = await supabase.rpc('admin_pay_commission', {
+    p_org_id: orgId, p_id: id, p_mode: mode || 'momo',
+    p_ref: reference || null, p_note: note || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
 /** Fait avancer directement l'affaire d'un autre compte, sans demande préalable.
  *  Mêmes effets qu'une validation (étape + commissions). */
 export async function setProgression({ orgId, kind, id, stage }) {

@@ -793,6 +793,65 @@ begin
   end if;
 end $$;
 
+-- Vue GÉRANT : les COMMISSIONS de toute la plateforme. Une commission naît dans
+-- l'organisation de son bénéficiaire (c'est là que vit son profil partenaire),
+-- donc la RLS la cache à BestaSolar — alors que c'est BestaSolar qui la doit.
+-- Enrichie de quoi la lire et la payer sans accès à l'org : nom et téléphone du
+-- partenaire, client apporté, numéro de devis.
+create or replace function public.admin_platform_commissions()
+  returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select coalesce(jsonb_agg(x.doc order by x.tri desc), '[]'::jsonb) into v
+  from (
+    select c.updated_at as tri, c.data || jsonb_build_object(
+      'orgId', c.org_id, 'orgName', o.name,
+      'partnerName',  p.data ->> 'name',
+      'partnerCode',  p.data ->> 'code',
+      'partnerPhone', p.data ->> 'phone',
+      'leadName',     l.data ->> 'name',
+      'leadValue',    l.data ->> 'estimatedValue',
+      'devisNumber',  d.data ->> 'devisNumber'
+    ) as doc
+    from public.commissions c
+    join public.orgs o on o.id = c.org_id
+    left join public.partners p on p.org_id = c.org_id and p.id = c.data ->> 'partnerId'
+    left join public.leads    l on l.org_id = c.org_id and l.id = c.data ->> 'leadId'
+    left join public.devis    d on d.org_id = c.org_id and d.id = c.data ->> 'devisId'
+    -- Hors sa propre organisation : ses commissions sont déjà dans son état
+    -- local (sinon elles compteraient deux fois dans les totaux).
+    where c.org_id <> public.auth_org_id()
+  ) x;
+  return v;
+end $$;
+
+-- Paiement par BestaSolar d'une commission qui vit dans une autre organisation.
+-- Idempotent : une commission déjà payée est refusée, jamais repayée.
+create or replace function public.admin_pay_commission(
+  p_org_id text, p_id text, p_mode text, p_ref text, p_note text)
+  returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  update public.commissions
+    set data = data || jsonb_build_object(
+      'status', 'payée',
+      'paidAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD'),
+      'paidBy', auth.uid()::text,
+      'payMode', coalesce(nullif(p_mode, ''), 'momo'),
+      'payRef', p_ref, 'payNote', p_note),
+      updated_at = now()
+    where org_id = p_org_id and id = p_id
+      and coalesce(data ->> 'status', '') <> 'payée';
+  if not found then
+    raise exception 'commission introuvable ou déjà payée';
+  end if;
+end $$;
+
 -- L'admin fait avancer LUI-MÊME l'affaire d'un autre compte, sans attendre de
 -- demande (« je peux aussi valider la progression de leur client sans qu'il
 -- demande »). On dépose la demande puis on la valide : mêmes effets exactement
