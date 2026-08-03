@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -45,7 +45,7 @@ const plusSections = (role) => [
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
-  const { getCompanyForUser } = useData();
+  const { getCompanyForUser, storageError } = useData();
   const { mode, setMode, proActive } = useMode();
   const navigate = useNavigate();
   const isPro = mode === 'pro';
@@ -136,6 +136,19 @@ export default function AppLayout() {
       </aside>
 
       <main className="app-main">
+        {/* Stockage local saturé : l'app fonctionne encore à l'écran mais plus
+            rien n'est enregistré. Alerte permanente, jamais un simple toast. */}
+        {storageError && (
+          <div className="storage-alert" role="alert">
+            <AlertTriangle size={16} />
+            <span>
+              <strong>Enregistrement impossible sur cet appareil.</strong> La mémoire est
+              saturée (souvent à cause des photos du catalogue) ou vous naviguez en privé.
+              Vos dernières modifications ne seront pas conservées à la fermeture —
+              allégez les photos ou libérez de l'espace.
+            </span>
+          </div>
+        )}
         <ChunkErrorBoundary>
           <Suspense fallback={<div className="splash-screen">Chargement…</div>}>
             <Outlet />

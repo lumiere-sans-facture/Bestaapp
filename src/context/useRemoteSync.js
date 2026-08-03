@@ -6,8 +6,11 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { pullAll, pushCollections, pushTombstone, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 
 export function useRemoteSync(state, setState, stateRef) {
-  const syncedRef = useRef(null); // dernier état répliqué/reçu, par collection
+  const syncedRef = useRef(null); // dernier état RÉELLEMENT répliqué, par collection
   const lastPushAt = useRef(0);
+  const echecs = useRef(0);       // échecs consécutifs de push (délai croissant)
+  const retryTimer = useRef(null);
+  const [retryTick, setRetryTick] = useState(0); // relance un envoi échoué
   const [syncStatus, setSyncStatus] = useState(isSupabaseConfigured ? 'connecting' : 'local');
 
   // ---- Pull initial + abonnement temps réel ----
@@ -85,8 +88,15 @@ export function useRemoteSync(state, setState, stateRef) {
 
   // ---- Réplication des changements locaux ----
   // Push uniquement les collections modifiées ; les suppressions passent par tombstones.
+  //
+  // RÈGLE CRITIQUE : `syncedRef` n'est mis à jour qu'APRÈS un push réussi.
+  // Le marquer avant ferait passer pour répliquées des données restées locales :
+  // elles ne seraient jamais repoussées (perte silencieuse) et le voyant
+  // resterait au vert. En cas d'échec, le statut passe à « error » (visible) et
+  // le même envoi est retenté avec un délai croissant.
   useEffect(() => {
-    if (!isSupabaseConfigured || syncStatus !== 'online' || !syncedRef.current) return;
+    if (!isSupabaseConfigured || !syncedRef.current) return;
+    if (syncStatus !== 'online' && syncStatus !== 'error') return;
     const changed = {};
     const deletedByTable = {};
     for (const table of SYNCED_COLLECTIONS) {
@@ -99,7 +109,8 @@ export function useRemoteSync(state, setState, stateRef) {
       if (deleted.length) deletedByTable[table] = deleted;
     }
     if (!Object.keys(changed).length) return;
-    syncedRef.current = { ...syncedRef.current, ...changed };
+
+    let annule = false;
     lastPushAt.current = Date.now();
     const doSync = async () => {
       try {
@@ -107,12 +118,29 @@ export function useRemoteSync(state, setState, stateRef) {
         for (const [table, ids] of Object.entries(deletedByTable)) {
           for (const id of ids) await pushTombstone(table, id);
         }
+        if (annule) return;
+        // Réellement répliqué : on peut enfin considérer ces données à jour.
+        syncedRef.current = { ...syncedRef.current, ...changed };
+        echecs.current = 0;
+        setSyncStatus('online');
       } catch (e) {
         console.error('Réplication Supabase échouée :', e.message);
+        if (annule) return;
+        // Le voyant passe au rouge et l'envoi est REJOUÉ : les données locales
+        // restent marquées « à pousser » tant qu'elles ne sont pas arrivées.
+        echecs.current += 1;
+        setSyncStatus('error');
+        const delai = Math.min(60000, 5000 * 2 ** (echecs.current - 1));
+        clearTimeout(retryTimer.current);
+        retryTimer.current = setTimeout(() => setRetryTick((t) => t + 1), delai);
       }
     };
     doSync();
-  }, [state, syncStatus]);
+    return () => { annule = true; };
+  }, [state, syncStatus, retryTick]);
+
+  // Arrêt du minuteur de reprise au démontage (évite un setState post-unmount).
+  useEffect(() => () => clearTimeout(retryTimer.current), []);
 
   return syncStatus;
 }

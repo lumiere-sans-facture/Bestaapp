@@ -425,6 +425,16 @@ form .login-link { width: 100%; margin-top: 4px; }
 
 /* ============ Pipeline (kanban, inspiré de Pipedrive) ============ */
 
+/* Alerte permanente : l'app ne peut plus enregistrer localement. Elle doit
+   rester visible tant que le problème dure (pas un toast éphémère). */
+.storage-alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: 0 0 12px; padding: 12px 14px;
+  background: #fef2f2; border: 1px solid #fecaca; border-left: 3px solid var(--danger);
+  border-radius: var(--radius-sm); color: #7f1d1d; font-size: 0.85rem; line-height: 1.4;
+}
+.storage-alert svg { flex: none; margin-top: 1px; }
+
 /* Encart d'information contextuelle : .callout (fond teinté). */
 .validation-bar { margin: 0 16px 14px; padding: 12px 14px; background: var(--warning-light); border-radius: var(--radius); }
 .validation-bar-title { display: flex; align-items: center; gap: 7px; font-size: 0.8125rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: var(--warning-dark); margin-bottom: 8px; }

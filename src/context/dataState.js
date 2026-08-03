@@ -114,11 +114,18 @@ export const loadState = (scope = null) => {
   return buildInitialState();
 };
 
-/** Écrit l'état dans localStorage (silencieux en cas de quota / mode privé). */
+/**
+ * Écrit l'état dans localStorage. Retourne `false` si l'écriture a échoué
+ * (quota dépassé — typiquement des photos produits volumineuses — ou
+ * navigation privée). L'appelant DOIT en avertir l'utilisateur : sans cela,
+ * l'app continue de fonctionner à l'écran alors que plus rien n'est
+ * enregistré, et tout est perdu à la fermeture.
+ */
 export const persist = (state, scope = null) => {
   try {
     localStorage.setItem(keyFor(scope), JSON.stringify(state));
+    return true;
   } catch {
-    /* quota dépassé / navigation privée */
+    return false; // quota dépassé / navigation privée
   }
 };

@@ -56,17 +56,22 @@ export function DataProvider({ children }) {
     );
   }, []);
 
+  // Échec d'enregistrement local (quota saturé, navigation privée) : signalé à
+  // l'utilisateur, jamais avalé — sinon il travaille sur des données qui
+  // disparaîtront à la fermeture de l'app.
+  const [storageError, setStorageError] = useState(false);
+
   // Persistance locale débattue : éviter de sérialiser tout l'état (coût
   // O(taille des données) sur le thread principal) à chaque micro-mutation.
   useEffect(() => {
-    const id = setTimeout(() => persist(state, scope), 400);
+    const id = setTimeout(() => setStorageError(!persist(state, scope)), 400);
     return () => clearTimeout(id);
   }, [state, scope]);
 
   // Flush immédiat de la dernière valeur avant fermeture ou passage en
   // arrière-plan (crucial sur mobile) — garantit zéro perte malgré le débat.
   useEffect(() => {
-    const flush = () => persist(stateRef.current, scope);
+    const flush = () => { if (!persist(stateRef.current, scope)) setStorageError(true); };
     const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', onVisibility);
@@ -123,7 +128,7 @@ export function DataProvider({ children }) {
   }), [state, team]);
 
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, storageError }}>
       {children}
     </DataContext.Provider>
   );
