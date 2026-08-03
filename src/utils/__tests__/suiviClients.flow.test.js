@@ -3,7 +3,7 @@ globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: 
 // verrouiller le comportement du suivi clients bout en bout.
 import { describe, it, expect } from 'vitest';
 import { createActions } from '../../context/dataActions';
-import { buildAffaires, devisStage } from '../affaires';
+import { buildAffaires } from '../affaires';
 
 function store() {
   let state = { devisCounter: 0, leads: [], devis: [], partners: [], commissions: [], referrals: [] };

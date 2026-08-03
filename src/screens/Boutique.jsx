@@ -134,7 +134,9 @@ export default function Boutique() {
         return w !== null && w >= powerFilter.min && w < powerFilter.max;
       })
       .sort((a, b) => (a.stock === 0) - (b.stock === 0));
-  }, [products, selectedCategory, search, priceRange, powerRange, isManager]);
+  // getPrice n'est pas listé : il ne dépend que de `isManager` (déjà en
+  // dépendance) et serait recréé à chaque rendu, invalidant le mémo en vain.
+  }, [products, selectedCategory, search, priceRange, powerRange, isManager]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePayOnline = () => {
     setPayForm({ operator: 'MTN MoMo', phone: user.phone || '' });

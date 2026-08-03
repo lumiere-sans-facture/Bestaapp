@@ -29,7 +29,6 @@ export default function MyProfile({ onBack }) {
     .filter((l) => l.assignedTo === user.id && l.stage !== 'gagne' && l.stage !== 'perdu')
     .sort((a, b) => new Date(b.lastActivity || 0) - new Date(a.lastActivity || 0));
   const stageInfo = (l) => (l.stage === 'perdu' ? lostStage : stages.find((st) => st.id === l.stage));
-  const wonValue = wonLeads.reduce((s, l) => s + l.estimatedValue, 0);
   const myComs = commissions.filter((c) => c.partnerId === me.id);
   const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
   const paid = myComs.filter((c) => c.status === 'payée').reduce((s, c) => s + c.amount, 0);

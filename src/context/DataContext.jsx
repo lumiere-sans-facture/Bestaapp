@@ -75,7 +75,7 @@ export function DataProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisibility);
       flush();
     };
-  }, [scope]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scope]);
 
   // Réplication Supabase (optionnelle, auto-détectée)
   const syncStatus = useRemoteSync(state, setState, stateRef);
@@ -95,7 +95,7 @@ export function DataProvider({ children }) {
       .then((t) => { if (on && t.length) setTeam(t); })
       .catch(() => {}); // hors-ligne : on garde l'équipe connue
     return () => { on = false; };
-  }, [user.id, user.org?.id, user.org_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user.id, user.org?.id, user.org_id]);
 
   // Actions métier (stables : créées une fois sur setState)
   const actions = useMemo(() => createActions(setState), []);

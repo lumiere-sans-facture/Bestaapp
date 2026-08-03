@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -118,8 +118,6 @@ export default function Plus() {
     setSubSent(true);
   };
 
-  const userWonLeads = leads.filter((l) => l.assignedTo === user.id && l.stage === 'gagne');
-  const userWonValue = userWonLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
   const pendingCommissions = commissions.filter((c) => c.status === 'en_attente');
   const pendingTotal = pendingCommissions.reduce((sum, c) => sum + c.amount, 0);
   const paidTotal = commissions.filter((c) => c.status === 'payée').reduce((sum, c) => sum + c.amount, 0);

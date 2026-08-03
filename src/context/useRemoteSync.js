@@ -77,7 +77,11 @@ export function useRemoteSync(state, setState, stateRef) {
     })();
 
     return () => { cancelled = true; unsubscribe(); };
-  }, []);
+  // Dépendances volontairement vides : ce pull initial + abonnement temps réel
+  // ne doit s'exécuter QU'UNE FOIS par montage. setState est stable (useState)
+  // et stateRef est une ref — les inclure relancerait la souscription à chaque
+  // rendu, ce qui provoquerait des re-pulls en boucle.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Réplication des changements locaux ----
   // Push uniquement les collections modifiées ; les suppressions passent par tombstones.

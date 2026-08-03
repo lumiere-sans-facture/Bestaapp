@@ -13,7 +13,7 @@ import Ring from '../components/Ring';
 export default function Dashboard() {
   const { user } = useAuth();
   const {
-    products, stages, leadsForUser, devis, partners, commissions,
+    products, stages, leadsForUser, devis, commissions,
     productCategories, getSubscriptionForUser,
   } = useData();
 

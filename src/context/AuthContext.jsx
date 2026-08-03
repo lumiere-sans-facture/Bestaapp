@@ -92,7 +92,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem(STORAGE_KEY);
     }
     setIsLoading(false);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const login = async (email, password) => {
     if (isSupabaseConfigured) {

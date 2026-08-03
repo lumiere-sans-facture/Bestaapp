@@ -2,7 +2,7 @@
 // SUIVI DEVIS PAR DEVIS — chaque devis est une affaire à part entière, avec sa
 // propre étape, sa propre issue (gagné/perdu) et sa propre commission. L'étape
 // du client en est la synthèse (la plus avancée de ses devis).
-import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
+import { COMMISSION_RATES, newReferral, partnerFromActiveRef } from './shared';
 import { missingCommissionsForDevis, rattacherCommissionsClient } from '../../utils/commissionSync';
 import { devisStage, etapeDuClient } from '../../utils/affaires';
 
