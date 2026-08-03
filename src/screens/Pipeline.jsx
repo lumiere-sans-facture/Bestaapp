@@ -8,7 +8,7 @@ import { fetchAdminPublicPipeline } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import { daysSince } from '../utils/date';
 import { buildAffaires } from '../utils/affaires';
-import { estProprietaireEspace } from '../utils/roles';
+import { peutValiderProgression } from '../utils/roles';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
@@ -21,7 +21,7 @@ const isOpen = (aff) => aff.stage !== 'gagne' && aff.stage !== 'perdu';
 export default function Pipeline() {
   const { user } = useAuth();
   const {
-    stages, lostStage, team, commissions, devis,
+    stages, lostStage, team, teamChargee, commissions, devis,
     leadsForUser, getPartnerById, getUserById,
     updateLeadStage, requestStageChange, approveStageChange, rejectStageChange,
     updateDevisStage, requestDevisStageChange, approveDevisStageChange, rejectDevisStageChange,
@@ -58,7 +58,7 @@ export default function Pipeline() {
   // lui-même (et l'utilisateur seul dans son espace, qui n'aurait personne pour
   // valider) applique directement. Une carte = un DEVIS, ou la piste tant qu'il
   // n'y a aucun devis.
-  const peutValider = estProprietaireEspace(user, team);
+  const peutValider = peutValiderProgression(user, team, teamChargee);
   const moveAffaire = (aff, stageId) => {
     if (!aff || aff.externe || aff.stage === stageId) return;
     if (aff.kind === 'devis') {

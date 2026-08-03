@@ -36,7 +36,7 @@ export default function Plus() {
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
-    partners, commissions, leads, orders, devis, referrals, team,
+    partners, commissions, leads, orders, devis, referrals, team, teamChargee,
     getPartnerById, getLeadById,
     payCommission, addCommission, syncCommissions,
     getSubscriptionForUser, requestSubscription, importData,
@@ -345,7 +345,7 @@ export default function Plus() {
       {/* Parrainage de l'entreprise : attribution unique, ensuite verrouillée
           (seul BestaSolar peut la modifier, sur demande du partenaire).
           Visible pour le gérant — ou l'utilisateur seul dans son espace. */}
-      {isSupabaseConfigured && user.org && estProprietaireEspace(user, team) && (
+      {isSupabaseConfigured && user.org && estProprietaireEspace(user, team, teamChargee) && (
         <div className="card">
           <div className="sheet-section-title"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Parrainage</div>
           {user.org.referred_by ? (

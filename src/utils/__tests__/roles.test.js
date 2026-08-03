@@ -1,36 +1,41 @@
 import { describe, it, expect } from 'vitest';
-import { estProprietaireEspace } from '../roles';
+import { peutValiderProgression } from '../roles';
 
 const GERANT = { id: 'u1', role: 'gerant' };
 const TECH = { id: 'u2', role: 'technicien' };
 
-describe('estProprietaireEspace — qui engage l’entreprise', () => {
-  it('le gérant est propriétaire de son espace', () => {
-    expect(estProprietaireEspace(GERANT, [GERANT, TECH])).toBe(true);
+describe('peutValiderProgression — qui applique, qui doit demander', () => {
+  it('le gérant applique et valide', () => {
+    expect(peutValiderProgression(GERANT, [GERANT, TECH], true)).toBe(true);
   });
 
-  it('un technicien dans une équipe AVEC gérant ne l’est pas', () => {
-    expect(estProprietaireEspace(TECH, [GERANT, TECH])).toBe(false);
+  it('un commercial dans une équipe AVEC gérant doit DEMANDER', () => {
+    expect(peutValiderProgression(TECH, [GERANT, TECH], true)).toBe(false);
   });
 
-  it('un inscrit SEUL dans son espace en est le propriétaire', () => {
-    // Inscription self-service : rôle « technicien », aucun gérant dans l'org.
-    expect(estProprietaireEspace(TECH, [TECH])).toBe(true);
+  it('un utilisateur SEUL dans son espace applique (personne pour valider)', () => {
+    expect(peutValiderProgression(TECH, [TECH], true)).toBe(true);
   });
 
-  it('équipe pas encore chargée : on ne bloque pas l’utilisateur', () => {
-    expect(estProprietaireEspace(TECH, [])).toBe(true);
+  it("tant que l'annuaire n'a pas répondu, un commercial DOIT demander", () => {
+    // Régression réelle : au démarrage l'annuaire ne contient que
+    // l'utilisateur. En conclure « aucun gérant, donc je décide » laissait un
+    // commercial appliquer ses progressions sans validation.
+    expect(peutValiderProgression(TECH, [TECH], false)).toBe(false);
+    expect(peutValiderProgression(TECH, [], false)).toBe(false);
   });
 
-  it('l’admin plateforme l’est toujours, même entouré d’un gérant', () => {
-    expect(estProprietaireEspace({ id: 'u3', role: 'technicien', is_platform_admin: true }, [GERANT])).toBe(true);
+  it("le gérant garde ses droits même avant le chargement de l'annuaire", () => {
+    expect(peutValiderProgression(GERANT, [], false)).toBe(true);
   });
 
-  it('une équipe polluée par un gérant d’une AUTRE entreprise bloquerait à tort', () => {
-    // Régression réelle : fetchTeamProfiles renvoyait tous les profils de la
-    // plateforme à un admin. La règle reste juste, c'est son entrée qui doit
-    // être filtrée par organisation (cf. DataContext).
-    const gerantAutreOrg = { id: 'x', role: 'gerant' };
-    expect(estProprietaireEspace(TECH, [TECH, gerantAutreOrg])).toBe(false);
+  it("l'admin plateforme applique toujours", () => {
+    expect(peutValiderProgression({ id: 'u3', role: 'technicien', is_platform_admin: true }, [GERANT], true)).toBe(true);
+  });
+
+  it("une équipe polluée par le gérant d'une AUTRE entreprise bloquerait à tort", () => {
+    // La règle est juste ; c'est son entrée qui doit être filtrée par
+    // organisation (cf. fetchTeamProfiles).
+    expect(peutValiderProgression(TECH, [TECH, { id: 'x', role: 'gerant' }], true)).toBe(false);
   });
 });

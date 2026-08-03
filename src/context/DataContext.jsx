@@ -93,12 +93,16 @@ export function DataProvider({ children }) {
   // seul dans son espace perdrait alors le droit de faire avancer ses clients.
   const [team, setTeam] = useState(() =>
     (isSupabaseConfigured ? [{ id: user.id, name: user.name, role: user.role, phone: user.phone || '', avatar: user.avatar }] : LOCAL_TEAM));
+  // L'annuaire de départ ne contient que l'utilisateur : tant que le serveur
+  // n'a pas répondu, on ne peut RIEN conclure sur la présence d'un gérant.
+  // (En mode local, l'équipe de démonstration est connue d'emblée.)
+  const [teamChargee, setTeamChargee] = useState(!isSupabaseConfigured);
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let on = true;
     fetchTeamProfiles(user.org?.id || user.org_id)
-      .then((t) => { if (on && t.length) setTeam(t); })
-      .catch(() => {}); // hors-ligne : on garde l'équipe connue
+      .then((t) => { if (on && t.length) { setTeam(t); setTeamChargee(true); } })
+      .catch(() => {}); // hors-ligne : équipe inconnue, aucun pouvoir déduit
     return () => { on = false; };
   }, [user.id, user.org?.id, user.org_id]);
 
@@ -128,7 +132,7 @@ export function DataProvider({ children }) {
   }), [state, team]);
 
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, syncError, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, storageError }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, syncError, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
       {children}
     </DataContext.Provider>
   );
