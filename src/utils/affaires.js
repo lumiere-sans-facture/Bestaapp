@@ -1,8 +1,10 @@
 // Suivi commercial — logique métier pure.
-// Le kanban suit le CLIENT (une carte, une étape, comme le pipeline
-// historique). Chaque devis du client porte en plus sa propre issue
-// (gagné / perdu), suivie dans la fiche : deux devis d'un même client se
-// concluent séparément et donnent chacun leur commission.
+// Le kanban suit les AFFAIRES : une carte par devis (un client avec deux devis
+// a deux cartes, avancées séparément et rémunérées chacune), et une carte de
+// prospection tant qu'un client n'a aucun devis. Les écrans qui raisonnent par
+// client utilisent `etapeDuClient` pour la synthèse.
+// La numérotation des documents est déduite de l'existant : un compteur local
+// n'est pas répliqué et produirait des numéros en double entre appareils.
 
 /** Étape d'un devis : la sienne, sinon celle de son client (devis créés avant
  *  le suivi par devis), sinon « proposition » (un devis émis est, par nature,
@@ -75,6 +77,22 @@ export function prochainNumeroDevis(devisList = [], maintenant = new Date()) {
     .filter((n) => Number.isFinite(n));
   const rang = (rangs.length ? Math.max(...rangs) : 0) + 1;
   return `${prefixe}${String(rang).padStart(4, '0')}`;
+}
+
+/**
+ * Prochain numéro de commande du jour : `CMD-AAAAMMJJ-NNNN`.
+ * Déduit des commandes enregistrées, pour la même raison que les devis :
+ * un compteur local n'est pas répliqué et diverge entre appareils.
+ */
+export function prochainNumeroCommande(orders = [], maintenant = new Date()) {
+  const j = `${maintenant.getFullYear()}${String(maintenant.getMonth() + 1).padStart(2, '0')}${String(maintenant.getDate()).padStart(2, '0')}`;
+  const prefixe = `CMD-${j}-`;
+  const rangs = orders
+    .map((o) => o.orderNumber)
+    .filter((n) => typeof n === 'string' && n.startsWith(prefixe))
+    .map((n) => parseInt(n.slice(prefixe.length), 10))
+    .filter((n) => Number.isFinite(n));
+  return `${prefixe}${String((rangs.length ? Math.max(...rangs) : 0) + 1).padStart(4, '0')}`;
 }
 
 /** Tous les devis publics d'un client (pour la fiche : « ses autres affaires »). */

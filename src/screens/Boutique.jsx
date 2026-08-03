@@ -287,7 +287,7 @@ export default function Boutique() {
           </button>
           {canPayOnline && (
             <button className="btn btn-outline btn-block" onClick={handlePayOnline}>
-              <Smartphone size={17} /> Payer en ligne
+              <Smartphone size={17} /> Commander en ligne
             </button>
           )}
         </div>
@@ -366,7 +366,7 @@ export default function Boutique() {
       <Sheet
         open={!!payment}
         onClose={() => setPayment(null)}
-        title={payment === 'form' ? 'Payer en ligne' : 'Paiement initié'}
+        title={payment === 'form' ? 'Commander' : 'Commande enregistrée'}
         subtitle={payment === 'form' ? `Total : ${formatCFA(cartTotal)}` : undefined}
       >
         {payment === 'form' ? (
@@ -394,10 +394,11 @@ export default function Boutique() {
               <div className="devis-summary-row total"><span>Montant à payer</span><span>{formatCFA(cartTotal)}</span></div>
             </div>
             <div className="field-hint payment-stub-note">
-              Mode démonstration : la commande sera enregistrée « paiement initié ». L'encaissement réel Mobile Money (agrégateur FedaPay/Kkiapay) sera branché ici.
+              Aucun prélèvement n'est effectué ici : votre commande est enregistrée et
+              BestaSolar vous rappelle sur ce numéro pour convenir du règlement.
             </div>
             <button type="submit" className="btn btn-primary btn-block">
-              <Smartphone size={17} /> Payer {formatCFA(cartTotal)}
+              <Smartphone size={17} /> Enregistrer ma commande · {formatCFA(cartTotal)}
             </button>
           </form>
         ) : payment && (
@@ -405,8 +406,9 @@ export default function Boutique() {
             <div className="payment-confirm-icon"><Check size={28} /></div>
             <div className="payment-confirm-title">Commande {payment.orderNumber}</div>
             <p className="text-sm text-secondary">
-              Paiement de {formatCFA(payment.total)} initié via {payment.operator} ({payment.phone}).
-              Vous serez notifié à la confirmation de l'opérateur.
+              Commande de {formatCFA(payment.total)} enregistrée. BestaSolar vous rappelle au
+              {' '}{payment.phone} pour convenir du règlement ({payment.operator}).
+              <strong> Aucun montant n'a été prélevé.</strong>
             </p>
             <button className="btn btn-primary btn-block" onClick={() => setPayment(null)}>Fermer</button>
           </div>

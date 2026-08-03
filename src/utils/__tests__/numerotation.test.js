@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { prochainNumeroDevis } from '../affaires';
+import { prochainNumeroDevis, prochainNumeroCommande } from '../affaires';
 import { prochainNumeroFacture } from '../facture';
 
 const LE_3_AOUT = new Date(2026, 7, 3);
@@ -64,5 +64,19 @@ describe('prochainNumeroFacture — unique par émetteur', () => {
   it('repart à 001 l’année suivante', () => {
     const factures = [{ userId: 'u1', numero: 'FAC-2026-030' }];
     expect(prochainNumeroFacture(factures, 'u1', company, 2027).numero).toBe('FAC-2027-001');
+  });
+});
+
+describe('prochainNumeroCommande — unique entre appareils', () => {
+  it('démarre à 0001', () => {
+    expect(prochainNumeroCommande([], LE_3_AOUT)).toBe('CMD-20260803-0001');
+  });
+  it('suit les commandes déjà enregistrées', () => {
+    const orders = [{ orderNumber: 'CMD-20260803-0003' }];
+    expect(prochainNumeroCommande(orders, LE_3_AOUT)).toBe('CMD-20260803-0004');
+  });
+  it('repart à 0001 chaque jour', () => {
+    expect(prochainNumeroCommande([{ orderNumber: 'CMD-20260802-0009' }], LE_3_AOUT))
+      .toBe('CMD-20260803-0001');
   });
 });

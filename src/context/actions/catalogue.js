@@ -1,5 +1,6 @@
 // Domaine boutique : catalogue produits et commandes. Le stock est décrémenté
 // à la confirmation d'une commande et restitué à l'annulation (couplage assumé).
+import { prochainNumeroCommande } from '../../utils/affaires';
 export function createCatalogueActions(setState) {
   return {
     // ---- Gestion du catalogue boutique (gérant) ----
@@ -24,18 +25,18 @@ export function createCatalogueActions(setState) {
     // Commande payée en ligne (Mobile Money — stub en attendant l'agrégateur)
     addOrder: (order) => {
       const now = new Date();
-      const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
       let full = null;
       setState((s) => {
-        const counter = (s.orderCounter || 0) + 1;
         full = {
           ...order,
           id: crypto.randomUUID(),
-          orderNumber: `CMD-${dateStr}-${String(counter).padStart(4, '0')}`,
+          // Numéro déduit des commandes existantes (répliquées) : deux
+          // appareils ne peuvent plus produire le même.
+          orderNumber: prochainNumeroCommande(s.orders, now),
           status: 'initie',
           createdAt: now.toISOString(),
         };
-        return { ...s, orderCounter: counter, orders: [full, ...(s.orders || [])] };
+        return { ...s, orderCounter: (s.orderCounter || 0) + 1, orders: [full, ...(s.orders || [])] };
       });
       return full;
     },
