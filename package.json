@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "e2e": "node e2e/suivi-clients.mjs && node e2e/commissions.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
