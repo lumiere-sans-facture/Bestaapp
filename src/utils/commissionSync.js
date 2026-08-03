@@ -15,8 +15,15 @@ export function commissionBasis(lead, devisList = []) {
   return Number(lead.estimatedValue) || 0;
 }
 
+// Profil partenaire d'un utilisateur de l'app (chaque membre de l'équipe en a
+// un, créé à sa première visite de l'espace partenaire ou à son premier devis).
+const partnerOfUser = (userId, partners = []) =>
+  (userId ? partners.find((p) => p.userId === userId)?.id : null) || null;
+
 // Apporteurs N1/N2 d'une piste : ses parrains, sinon le partenaire porté
-// par son dernier devis (et le parrain de ce partenaire en niveau 2).
+// par son dernier devis (et le parrain de ce partenaire en niveau 2), sinon
+// le commercial qui suit l'affaire — TOUTE affaire gagnée a un apporteur,
+// donc une commission.
 export function resolveLeadPartners(lead, devisList = [], partners = []) {
   if (!lead) return { l1: null, l2: null };
   let l1 = lead.parrainL1 || null;
@@ -25,11 +32,16 @@ export function resolveLeadPartners(lead, devisList = [], partners = []) {
     const avecPartenaire = devisList
       .filter((d) => d.leadId === lead.id && d.partnerId)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    if (avecPartenaire.length) {
-      l1 = avecPartenaire[0].partnerId;
-      l2 = l2 || partners.find((p) => p.id === l1)?.sponsorId || null;
-    }
+    if (avecPartenaire.length) l1 = avecPartenaire[0].partnerId;
   }
+  if (!l1) {
+    // Dernier recours : le créateur du dernier devis, sinon l'assigné de la piste.
+    const dernierDevis = devisList
+      .filter((d) => d.leadId === lead.id && d.createdBy)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    l1 = partnerOfUser(dernierDevis?.createdBy, partners) || partnerOfUser(lead.assignedTo, partners);
+  }
+  if (l1 && !l2) l2 = partners.find((p) => p.id === l1)?.sponsorId || null;
   if (l2 && l2 === l1) l2 = null; // un même partenaire ne cumule pas deux niveaux
   return { l1, l2 };
 }
@@ -67,7 +79,11 @@ export function missingCommissionsForDevis({ devis, lead, partners = [], commiss
   if (!devis) return [];
   const basis = Number(devis.total) || 0;
   if (!basis) return [];
-  let l1 = lead?.parrainL1 || devis.partnerId || null;
+  // Apporteur : parrain de la piste > partenaire du devis > créateur du devis
+  // > commercial assigné. Une affaire gagnée génère TOUJOURS sa commission.
+  let l1 = lead?.parrainL1 || devis.partnerId
+    || partnerOfUser(devis.createdBy, partners)
+    || partnerOfUser(lead?.assignedTo, partners);
   let l2 = lead?.parrainL2 || (l1 ? partners.find((p) => p.id === l1)?.sponsorId || null : null);
   if (l2 && l2 === l1) l2 = null; // un même partenaire ne cumule pas deux niveaux
   const exists = (partnerId, level) =>
@@ -94,19 +110,36 @@ export function missingCommissionsForDevis({ devis, lead, partners = [], commiss
 // qui auraient dû exister mais manquent. Idempotent : relancé deux fois,
 // le second passage ne retourne rien.
 export function reconcileMissingCommissions({ leads = [], devis = [], partners = [], commissions = [], referrals = [] }, rates, today) {
-  const eligibles = new Set(leads.filter((l) => l.stage === 'gagne').map((l) => l.id));
-  (referrals || [])
-    .filter((r) => r.type === 'devis' && r.status === 'validé' && r.leadId)
-    .forEach((r) => eligibles.add(r.leadId));
   const out = [];
   let pool = commissions;
-  for (const leadId of eligibles) {
-    const lead = leads.find((l) => l.id === leadId);
-    const created = missingCommissionsForLead({ lead, devis, partners, commissions: pool }, rates, today);
+  const ajouter = (created) => {
     if (created.length) {
       out.push(...created);
       pool = [...created, ...pool];
     }
+  };
+
+  // 1) Suivi PAR AFFAIRE : chaque devis public gagné rémunère son apporteur
+  // (deux devis gagnés d'un même client = deux commissions).
+  const devisGagnes = devis.filter((d) => d.stage === 'gagne' && d.type !== 'pro');
+  const pistesCouvertes = new Set(devisGagnes.map((d) => d.leadId));
+  for (const d of devisGagnes) {
+    ajouter(missingCommissionsForDevis(
+      { devis: d, lead: leads.find((l) => l.id === d.leadId), partners, commissions: pool },
+      rates, today
+    ));
+  }
+
+  // 2) Affaires suivies au niveau du CLIENT (pistes gagnées sans devis gagné,
+  // conversions « devis » validées au registre) : commission par piste.
+  const eligibles = new Set(leads.filter((l) => l.stage === 'gagne').map((l) => l.id));
+  (referrals || [])
+    .filter((r) => r.type === 'devis' && r.status === 'validé' && r.leadId)
+    .forEach((r) => eligibles.add(r.leadId));
+  for (const leadId of eligibles) {
+    if (pistesCouvertes.has(leadId)) continue; // déjà rémunérée par affaire
+    const lead = leads.find((l) => l.id === leadId);
+    ajouter(missingCommissionsForLead({ lead, devis, partners, commissions: pool }, rates, today));
   }
   return out;
 }

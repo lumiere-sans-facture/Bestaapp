@@ -176,8 +176,13 @@ export default function Plus() {
 
   const handleAddCommission = (e) => {
     e.preventDefault();
+    // Bénéficiaire : « user:<id> » pour un membre de l'équipe (son profil
+    // partenaire est créé au besoin), sinon l'id d'un partenaire externe.
+    const choix = newCommission.partnerId;
+    const membre = choix.startsWith('user:') ? team.find((u) => u.id === choix.slice(5)) : null;
     addCommission({
-      partnerId: newCommission.partnerId,
+      partnerId: membre ? null : choix,
+      beneficiaire: membre ? { userId: membre.id, name: membre.name, phone: membre.phone, email: membre.email } : null,
       leadId: newCommission.leadId || null,
       level: Number(newCommission.level),
       amount: Number(newCommission.amount) || 0,
@@ -465,13 +470,27 @@ export default function Plus() {
       {/* Commission manuelle */}
       <Sheet open={showAddCommission} onClose={() => setShowAddCommission(false)} title="Commission manuelle">
         <form onSubmit={handleAddCommission} className="form-grid">
-          <Field label="Partenaire *">
+          <Field label="Bénéficiaire *">
             <select
               className="input" required value={newCommission.partnerId}
               onChange={(e) => setNewCommission({ ...newCommission, partnerId: e.target.value })}
             >
-              <option value="" disabled>Choisir un partenaire…</option>
-              {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="" disabled>Choisir un bénéficiaire…</option>
+              {/* Toute l'équipe est commissionnable : les membres sans profil
+                  partenaire en reçoivent un automatiquement à la création. */}
+              <optgroup label="Mon équipe">
+                {team.map((u) => (
+                  <option key={`u-${u.id}`} value={`user:${u.id}`}>
+                    {u.name}{u.role === 'gerant' ? ' (gérant)' : ''}
+                  </option>
+                ))}
+              </optgroup>
+              {partners.filter((p) => !p.userId || !team.some((u) => u.id === p.userId)).length > 0 && (
+                <optgroup label="Partenaires externes">
+                  {partners.filter((p) => !p.userId || !team.some((u) => u.id === p.userId))
+                    .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </optgroup>
+              )}
             </select>
           </Field>
           <Field label="Affaire liée (optionnel)">

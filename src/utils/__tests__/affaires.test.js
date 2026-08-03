@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildAffaires, aggregateLeadStage, devisStage } from '../affaires';
-import { missingCommissionsForDevis } from '../commissionSync';
+import { missingCommissionsForDevis, reconcileMissingCommissions } from '../commissionSync';
 
 const RATES = { 1: 0.03, 2: 0.015 };
 
@@ -119,5 +119,93 @@ describe('missingCommissionsForDevis — une commission PAR devis gagné', () =>
       { devis: { id: 'd1', leadId: 'l1', total: 0 }, lead, partners, commissions: [] },
       RATES, '2026-08-03'
     )).toHaveLength(0);
+  });
+});
+
+describe('attribution automatique — toute affaire gagnée a son apporteur', () => {
+  const equipe = [
+    { id: 'p-user-u2', userId: 'u2', name: 'Ibrahim', sponsorId: null },
+    { id: 'p-user-u3', userId: 'u3', name: 'Fatou', sponsorId: null },
+  ];
+
+  it('sans parrain ni partenaire, le CRÉATEUR du devis est rémunéré', () => {
+    const coms = missingCommissionsForDevis(
+      { devis: { id: 'd1', leadId: 'l1', total: 300000, createdBy: 'u2' }, lead: { id: 'l1' }, partners: equipe, commissions: [] },
+      RATES, '2026-08-03'
+    );
+    expect(coms).toHaveLength(1);
+    expect(coms[0]).toMatchObject({ partnerId: 'p-user-u2', level: 1, amount: 9000 });
+  });
+
+  it('à défaut de créateur, le commercial assigné à la piste est rémunéré', () => {
+    const coms = missingCommissionsForDevis(
+      { devis: { id: 'd1', leadId: 'l1', total: 200000 }, lead: { id: 'l1', assignedTo: 'u3' }, partners: equipe, commissions: [] },
+      RATES, '2026-08-03'
+    );
+    expect(coms[0].partnerId).toBe('p-user-u3');
+  });
+
+  it('le parrain de la piste reste prioritaire sur le créateur', () => {
+    const coms = missingCommissionsForDevis(
+      { devis: { id: 'd1', leadId: 'l1', total: 100000, createdBy: 'u2' },
+        lead: { id: 'l1', parrainL1: 'p-user-u3' }, partners: equipe, commissions: [] },
+      RATES, '2026-08-03'
+    );
+    expect(coms[0].partnerId).toBe('p-user-u3');
+  });
+});
+
+describe('reconcileMissingCommissions — rattrapage du suivi par affaire', () => {
+  const partners = [{ id: 'p1', name: 'Mamadou', sponsorId: null }];
+
+  it('rattrape un DEVIS gagné même si sa piste n’est pas « gagné »', () => {
+    const created = reconcileMissingCommissions({
+      leads: [{ id: 'l1', stage: 'negociation', parrainL1: 'p1' }],
+      devis: [{ id: 'd1', leadId: 'l1', total: 500000, stage: 'gagne' }],
+      partners, commissions: [], referrals: [],
+    }, RATES, '2026-08-03');
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ devisId: 'd1', amount: 15000 });
+  });
+
+  it('deux devis gagnés du même client donnent deux commissions', () => {
+    const created = reconcileMissingCommissions({
+      leads: [{ id: 'l1', stage: 'gagne', parrainL1: 'p1' }],
+      devis: [
+        { id: 'd1', leadId: 'l1', total: 500000, stage: 'gagne' },
+        { id: 'd2', leadId: 'l1', total: 300000, stage: 'gagne' },
+      ],
+      partners, commissions: [], referrals: [],
+    }, RATES, '2026-08-03');
+    expect(created.map((c) => c.devisId).sort()).toEqual(['d1', 'd2']);
+  });
+
+  it('ne double pas la commission d’une piste déjà rémunérée par affaire', () => {
+    const created = reconcileMissingCommissions({
+      leads: [{ id: 'l1', stage: 'gagne', parrainL1: 'p1', estimatedValue: 500000 }],
+      devis: [{ id: 'd1', leadId: 'l1', total: 500000, stage: 'gagne', statut: 'finalise' }],
+      partners, commissions: [], referrals: [],
+    }, RATES, '2026-08-03');
+    expect(created).toHaveLength(1);
+  });
+
+  it('idempotent : relancé, il ne crée plus rien', () => {
+    const input = {
+      leads: [{ id: 'l1', stage: 'gagne', parrainL1: 'p1' }],
+      devis: [{ id: 'd1', leadId: 'l1', total: 500000, stage: 'gagne' }],
+      partners, referrals: [],
+    };
+    const first = reconcileMissingCommissions({ ...input, commissions: [] }, RATES, '2026-08-03');
+    const again = reconcileMissingCommissions({ ...input, commissions: first }, RATES, '2026-08-03');
+    expect(again).toHaveLength(0);
+  });
+
+  it('ignore les devis de l’espace Pro payant', () => {
+    const created = reconcileMissingCommissions({
+      leads: [{ id: 'l1', stage: 'negociation', parrainL1: 'p1' }],
+      devis: [{ id: 'dpro', leadId: 'l1', total: 500000, stage: 'gagne', type: 'pro' }],
+      partners, commissions: [], referrals: [],
+    }, RATES, '2026-08-03');
+    expect(created).toHaveLength(0);
   });
 });

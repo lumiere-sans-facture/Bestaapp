@@ -96,20 +96,54 @@ export function createPartnerActions(setState) {
         return created.length ? { ...s, commissions: [...created, ...s.commissions] } : s;
       }),
 
-    addCommission: (commission) =>
-      setState((s) => ({
-        ...s,
-        commissions: [
-          {
-            ...commission,
-            id: crypto.randomUUID(),
-            status: 'en_attente',
-            paidAt: null,
-            createdAt: new Date().toISOString().slice(0, 10),
-          },
-          ...s.commissions,
-        ],
-      })),
+    // Commission attribuée à la main. Le bénéficiaire peut être un partenaire
+    // (partnerId) OU un membre de l'équipe (beneficiaire = { userId, name }) :
+    // dans ce cas son profil partenaire est créé à la volée s'il n'en a pas
+    // encore — toute l'équipe est ainsi commissionnable.
+    addCommission: ({ beneficiaire, ...commission }) =>
+      setState((s) => {
+        let partners = s.partners;
+        let partnerId = commission.partnerId || null;
+        if (!partnerId && beneficiaire?.userId) {
+          const existant = partners.find((p) => p.userId === beneficiaire.userId);
+          if (existant) {
+            partnerId = existant.id;
+          } else {
+            partnerId = `p-user-${beneficiaire.userId}`;
+            partners = [
+              {
+                id: partnerId,
+                userId: beneficiaire.userId,
+                name: beneficiaire.name || 'Membre de l’équipe',
+                phone: beneficiaire.phone || '',
+                email: beneficiaire.email || '',
+                momoNumber: '', photo: '', zone: '', tier: 'standard',
+                sponsorId: null,
+                status: 'actif',
+                registeredAt: new Date().toISOString().slice(0, 10),
+                code: generatePartnerCode(beneficiaire.name || 'Membre', partners.map((p) => p.code).filter(Boolean)),
+              },
+              ...partners,
+            ];
+          }
+        }
+        if (!partnerId) return s;
+        return {
+          ...s,
+          partners,
+          commissions: [
+            {
+              ...commission,
+              partnerId,
+              id: crypto.randomUUID(),
+              status: 'en_attente',
+              paidAt: null,
+              createdAt: new Date().toISOString().slice(0, 10),
+            },
+            ...s.commissions,
+          ],
+        };
+      }),
 
     // Paiement tracé (norme comptable) : mode de règlement, référence de la
     // transaction (n° Mobile Money…), payeur et note sont archivés sur la commission.
