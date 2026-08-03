@@ -1433,6 +1433,8 @@ form .login-link { width: 100%; margin-top: 4px; }
   padding: 11px 14px; margin-bottom: 14px; font-size: 0.875rem;
 }
 .pro-alert svg { color: var(--accent-dark); flex-shrink: 0; }
+/* Variante informative (rappel de conformité) : ton neutre, pas d'alarme. */
+.pro-alert.is-info { background: var(--bg); border-color: var(--border); color: var(--text-primary); }
 .pro-alert span { flex: 1; min-width: 180px; }
 .pro-tabs { margin-bottom: 14px; }
 .pro-actions-row { display: flex; gap: 10px; margin-bottom: 4px; }
