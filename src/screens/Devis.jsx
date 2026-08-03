@@ -79,10 +79,15 @@ export default function Devis() {
   }, [isAdminPlateforme]);
 
   // Les devis créés dans l'Espace Pro (type 'pro') restent cantonnés au mode Pro.
+  const mesDevis = (user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id))
+    .filter((d) => d.type !== 'pro');
+  // Filet de sécurité : jamais MES devis parmi les « externes » (doublons +
+  // lecture seule), même si le serveur n'a pas encore le dernier correctif.
+  const monOrg = user.org?.id || user.org_id || null;
+  const mesDevisIds = new Set(devis.map((d) => d.id));
   const myDevis = [
-    ...(user.role === 'gerant' ? devis : devis.filter((d) => d.createdBy === user.id))
-      .filter((d) => d.type !== 'pro'),
-    ...devisExternes,
+    ...mesDevis,
+    ...devisExternes.filter((d) => d.orgId !== monOrg && !mesDevisIds.has(d.id)),
   ];
 
   // Recherche (client, numéro, partenaire/code) + filtre type + tri

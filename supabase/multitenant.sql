@@ -557,7 +557,9 @@ begin
     from public.devis d
     join public.orgs o on o.id = d.org_id
     left join public.leads l on l.org_id = d.org_id and l.id = d.data ->> 'leadId'
-    where d.org_id <> 'org-bestasolar'
+    -- Exclut l'organisation de l'admin lui-même : ses propres devis sont déjà
+    -- dans son état local (sinon ils apparaîtraient en double, en lecture seule).
+    where d.org_id <> public.auth_org_id()
       and coalesce(d.data ->> 'type', '') <> 'pro'
   ) x;
   return v;
@@ -584,12 +586,12 @@ begin
         )
       ))
       from public.leads l join public.orgs o on o.id = l.org_id
-      where l.org_id <> 'org-bestasolar'
+      where l.org_id <> public.auth_org_id()
     ), '[]'::jsonb),
     'devis', coalesce((
       select jsonb_agg(d.data || jsonb_build_object('orgId', d.org_id))
       from public.devis d
-      where d.org_id <> 'org-bestasolar'
+      where d.org_id <> public.auth_org_id()
         and coalesce(d.data ->> 'type', '') <> 'pro'
     ), '[]'::jsonb)
   ) into v;

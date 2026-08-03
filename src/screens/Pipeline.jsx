@@ -102,9 +102,15 @@ export default function Pipeline() {
   }, [isAdminPlateforme]);
 
   const myLeads = ownerFilter === 'all' ? allMyLeads : allMyLeads.filter((l) => l.assignedTo === ownerFilter);
+  // Filet de sécurité : jamais MES clients parmi les affaires « externes »
+  // (sinon ils apparaîtraient en double et passeraient en lecture seule).
+  const monOrg = user.org?.id || user.org_id || null;
+  const mesLeadIds = new Set(allMyLeads.map((l) => l.id));
   const affairesExternes = ownerFilter === 'all'
-    ? buildAffaires(pipelineExterne.leads, pipelineExterne.devis)
-        .map((a) => ({ ...a, key: `ext-${a.key}`, externe: true }))
+    ? buildAffaires(
+        pipelineExterne.leads.filter((l) => l.orgId !== monOrg && !mesLeadIds.has(l.id)),
+        pipelineExterne.devis
+      ).map((a) => ({ ...a, key: `ext-${a.key}`, externe: true }))
     : [];
   const affaires = [...buildAffaires(myLeads, devis), ...affairesExternes];
   const findAff = (key) => affaires.find((a) => a.key === key)
