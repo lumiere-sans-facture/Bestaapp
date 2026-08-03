@@ -119,3 +119,102 @@ describe('validation gérant et visibilité pour le commercial', () => {
     expect(s.get().commissions[0].amount).toBe(12000);
   });
 });
+
+describe('création AUTOMATIQUE de la commission (aucun réglage préalable)', () => {
+  // Reproduit le mode SaaS : état vide, aucun partenaire pré-créé. Seule
+  // l'app peut créer le profil partenaire de l'utilisateur.
+  const OWNER = { id: 'u9', name: 'Siddo Bou', role: 'gerant' };
+
+  it('gagner un CLIENT crée la commission, même sans être passé par l’espace partenaire', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(OWNER); // ce que fait DataContext au démarrage
+    s.a.addLead({ name: 'beta', contact: 'abou', phone: '', address: '', estimatedValue: 0, assignedTo: OWNER.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 1724000, statut: 'finalise', createdBy: OWNER.id, items: [] });
+
+    s.a.updateLeadStage(lead.id, 'gagne', OWNER.id);
+    expect(s.get().commissions).toHaveLength(1);
+    expect(s.get().commissions[0]).toMatchObject({ partnerId: 'p-user-u9', level: 1, amount: 51720 });
+  });
+
+  it('sans AUCUN profil partenaire, aucune commission : le profil est indispensable', () => {
+    const s = store();
+    s.a.addLead({ name: 'beta', contact: '', phone: '', address: '', estimatedValue: 500000, assignedTo: OWNER.id, parrainL1: null });
+    s.a.updateLeadStage(s.get().leads[0].id, 'gagne', OWNER.id);
+    expect(s.get().commissions).toHaveLength(0); // ← d'où l'appel au démarrage
+  });
+
+  it('gagner un CLIENT sans devis mais avec valeur estimée crée la commission', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(OWNER);
+    s.a.addLead({ name: 'Ecole', contact: '', phone: '', address: '', estimatedValue: 3200000, assignedTo: OWNER.id, parrainL1: null });
+    s.a.updateLeadStage(s.get().leads[0].id, 'gagne', OWNER.id);
+    expect(s.get().commissions).toHaveLength(1);
+    expect(s.get().commissions[0].amount).toBe(96000);
+  });
+});
+
+describe('jamais de commission payée en double', () => {
+  const OWNER = { id: 'u9', name: 'Siddo', role: 'gerant' };
+  const prepare = () => {
+    const s = store();
+    s.a.ensurePartnerForUser(OWNER);
+    s.a.addLead({ name: 'Hôtel', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: OWNER.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 1000000, statut: 'finalise', createdBy: OWNER.id, items: [] });
+    return { s, lead, devis: s.get().devis[0] };
+  };
+
+  it('client gagné PUIS devis gagné = une seule commission de 30 000', () => {
+    const { s, lead, devis } = prepare();
+    s.a.updateLeadStage(lead.id, 'gagne', OWNER.id);
+    s.a.updateDevisStage(devis.id, 'gagne');
+    expect(s.get().commissions).toHaveLength(1);
+    expect(s.get().commissions[0].amount).toBe(30000);
+  });
+
+  it('devis gagné PUIS client gagné = une seule commission', () => {
+    const { s, lead, devis } = prepare();
+    s.a.updateDevisStage(devis.id, 'gagne');
+    s.a.updateLeadStage(lead.id, 'gagne', OWNER.id);
+    expect(s.get().commissions).toHaveLength(1);
+  });
+
+  it('client gagné puis DEUX devis gagnés = 15 000 + 9 000, pas plus', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(OWNER);
+    s.a.addLead({ name: 'Hôtel', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: OWNER.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 500000, statut: 'finalise', createdBy: OWNER.id, items: [] });
+    s.a.addDevis({ leadId: lead.id, type: 'solar', total: 300000, statut: 'finalise', createdBy: OWNER.id, items: [] });
+    s.a.updateLeadStage(lead.id, 'gagne', OWNER.id);
+    const ids = s.get().devis.map((d) => d.id);
+    ids.forEach((id) => s.a.updateDevisStage(id, 'gagne'));
+    const total = s.get().commissions.reduce((t, c) => t + c.amount, 0);
+    expect(total).toBe(24000);
+    expect(s.get().commissions).toHaveLength(2);
+  });
+
+  it('une commission DÉJÀ PAYÉE n’est jamais supprimée : elle est rattachée au devis', () => {
+    const { s, lead, devis } = prepare();
+    s.a.updateLeadStage(lead.id, 'gagne', OWNER.id);
+    const com = s.get().commissions[0];
+    s.a.payCommission(com.id, { mode: 'momo', reference: 'MM-1' });
+    s.a.updateDevisStage(devis.id, 'gagne');
+    const restantes = s.get().commissions;
+    expect(restantes).toHaveLength(1);
+    expect(restantes[0].id).toBe(com.id);        // le versement est conservé
+    expect(restantes[0].status).toBe('payée');
+    expect(restantes[0].devisId).toBe(devis.id); // et rattaché au devis
+  });
+
+  it('« Synchroniser » répare un doublon déjà enregistré et n’en crée jamais', () => {
+    const { s, lead, devis } = prepare();
+    s.a.updateLeadStage(lead.id, 'gagne', OWNER.id);
+    s.a.updateDevisStage(devis.id, 'gagne');
+    s.a.syncCommissions();
+    expect(s.get().commissions).toHaveLength(1);
+    s.a.syncCommissions(); // idempotent
+    expect(s.get().commissions).toHaveLength(1);
+  });
+});

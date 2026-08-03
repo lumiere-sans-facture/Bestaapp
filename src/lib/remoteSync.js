@@ -123,10 +123,14 @@ export async function fetchMySubscription(userId) {
   return data?.[0]?.data || null;
 }
 
-/** Profils de l'équipe (la RLS limite déjà à l'organisation de l'utilisateur).
+/** Profils de l'équipe de `orgId`. Le filtre est EXPLICITE : la RLS ne suffit
+ *  pas — un admin plateforme a le droit de lire tous les profils, il verrait
+ *  donc l'équipe des autres entreprises (et croirait avoir un gérant).
  *  Forme identique aux utilisateurs du seed : { id, name, role, phone, avatar }. */
-export async function fetchTeamProfiles() {
-  const { data, error } = await supabase.from('profiles').select('id, email, name, role, phone, avatar');
+export async function fetchTeamProfiles(orgId = null) {
+  let q = supabase.from('profiles').select('id, email, name, role, phone, avatar, org_id');
+  if (orgId) q = q.eq('org_id', orgId);
+  const { data, error } = await q;
   if (error) throw error;
   return (data || []).map((p) => ({
     ...p,

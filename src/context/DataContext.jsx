@@ -80,20 +80,33 @@ export function DataProvider({ children }) {
   // Réplication Supabase (optionnelle, auto-détectée)
   const syncStatus = useRemoteSync(state, setState, stateRef);
 
-  // Équipe : profils de l'organisation quand le backend est configuré,
+  // Équipe : profils de MON organisation quand le backend est configuré,
   // utilisateurs du seed sinon (mode local / démo).
-  const [team, setTeam] = useState(LOCAL_TEAM);
+  // En mode SaaS on part d'une équipe réduite à l'utilisateur courant : les
+  // utilisateurs du seed appartiennent à une entreprise de démonstration et
+  // leur « gérant » ferait croire à tort que l'espace en a un — l'utilisateur
+  // seul dans son espace perdrait alors le droit de faire avancer ses clients.
+  const [team, setTeam] = useState(() =>
+    (isSupabaseConfigured ? [{ id: user.id, name: user.name, role: user.role, phone: user.phone || '', avatar: user.avatar }] : LOCAL_TEAM));
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let on = true;
-    fetchTeamProfiles()
+    fetchTeamProfiles(user.org?.id || user.org_id)
       .then((t) => { if (on && t.length) setTeam(t); })
       .catch(() => {}); // hors-ligne : on garde l'équipe connue
     return () => { on = false; };
-  }, []);
+  }, [user.id, user.org?.id, user.org_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Actions métier (stables : créées une fois sur setState)
   const actions = useMemo(() => createActions(setState), []);
+
+  // Profil partenaire de l'utilisateur garanti dès l'ouverture de l'app.
+  // C'est lui qui porte les commissions : sans profil, une affaire gagnée
+  // n'a aucun apporteur à rémunérer et la commission n'est jamais créée —
+  // silencieusement. L'action est idempotente (id déterministe p-user-<id>).
+  useEffect(() => {
+    if (user?.id) actions.ensurePartnerForUser(user);
+  }, [user?.id, actions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sélecteurs dérivés de l'état courant
   const helpers = useMemo(() => ({

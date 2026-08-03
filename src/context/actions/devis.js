@@ -3,7 +3,7 @@
 // donc sa propre commission, sans jamais déplacer le client dans le kanban :
 // l'étape du client reste pilotée à la main par le commercial.
 import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
-import { missingCommissionsForDevis } from '../../utils/commissionSync';
+import { missingCommissionsForDevis, rattacherCommissionsClient } from '../../utils/commissionSync';
 
 // L'issue d'un devis compte comme une activité sur la fiche du client
 // (indicateur « affaire inactive depuis N jours »).
@@ -22,12 +22,17 @@ export function createDevisActions(setState) {
     let commissions = s.commissions;
     let referrals = s.referrals || [];
     if (stage === 'gagne') {
+      // Une commission « niveau client » (sans devisId) devient caduque dès
+      // qu'un devis de ce client est gagné : la rémunération se fait alors
+      // devis par devis. Sans cela, conclure le client PUIS son devis payait
+      // deux fois la même vente.
+      const pool = rattacherCommissionsClient(s.commissions, d);
       const generated = missingCommissionsForDevis(
-        { devis: d, lead, partners: s.partners, commissions: s.commissions },
+        { devis: d, lead, partners: s.partners, commissions: pool },
         COMMISSION_RATES,
         today
       );
-      if (generated.length) commissions = [...generated, ...s.commissions];
+      commissions = generated.length ? [...generated, ...pool] : pool;
       // Affaire gagnée : les conversions d'affiliation encore en attente sur
       // cette piste sont validées d'office (registre cohérent avec la commission).
       referrals = referrals.map((r) =>

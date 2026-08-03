@@ -8,6 +8,7 @@ import { fetchAdminPublicPipeline } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import { daysSince } from '../utils/date';
 import { buildAffaires, devisStage } from '../utils/affaires';
+import { peutValiderProgression } from '../utils/roles';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
@@ -49,14 +50,17 @@ export default function Pipeline() {
 
   const allMyLeads = leadsForUser(user);
   const openStages = stages.filter((s) => s.id !== 'gagne');
-  const isGerant = user.role === 'gerant';
   const stageLabel = (id) => [...stages, lostStage].find((st) => st.id === id)?.label || id;
 
   // Gérant : passage direct. Technicien : demande, validée ensuite par le
   // gérant — SAUF si l'équipe n'a pas de gérant (utilisateur seul dans son
   // espace) : personne ne pourrait valider, le passage est donc direct.
-  const orgSansGerant = !team.some((u) => u.role === 'gerant');
-  const direct = isGerant || orgSansGerant;
+  // Une seule notion d'autorisation, utilisée pour AGIR comme pour VALIDER
+  // (règle pure, testée dans utils/roles.js). Sans cette unicité, un
+  // utilisateur seul dans son espace créait une demande que personne ne
+  // pouvait valider : verrou mortel, et aucune commission.
+  const peutValider = peutValiderProgression(user, team);
+  const direct = peutValider;
   // Le kanban suit le CLIENT : une carte par client, comme le pipeline
   // historique. Le suivi devis par devis vit dans la fiche (plus bas).
   const moveAffaire = (aff, stageId) => {
@@ -113,14 +117,18 @@ export default function Pipeline() {
       ).map((a) => ({ ...a, key: `ext-${a.key}`, externe: true }))
     : [];
   const affaires = [...buildAffaires(myLeads, devis), ...affairesExternes];
-  const findAff = (key) => affaires.find((a) => a.key === key)
-    || (key?.startsWith('client:') ? affaires.find((a) => a.lead.id === key.slice(7)) : null);
+  // Résolution des clés sur TOUTES les affaires (filtre « par commercial »
+  // compris) : sinon un clic dans la barre de validation, bâtie sur l'équipe
+  // entière, ne trouvait pas sa carte et restait sans effet.
+  const toutesAffaires = [...buildAffaires(allMyLeads, devis), ...affairesExternes];
+  const findAff = (key) => toutesAffaires.find((a) => a.key === key)
+    || (key?.startsWith('client:') ? toutesAffaires.find((a) => a.lead.id === key.slice(7)) : null);
   const selectedAff = findAff(selectedKey);
   const pickerAff = findAff(stagePickerKey);
   // Validation : TOUTES les demandes de l'équipe, y compris celles des devis,
   // et sans tenir compte du filtre par commercial — le gérant ne doit jamais
   // rater une demande. (Les affaires externes se valident chez leur auteur.)
-  const pendingAffaires = buildAffaires(allMyLeads, devis).filter((a) => a.pendingStage);
+  const pendingAffaires = toutesAffaires.filter((a) => a.pendingStage && !a.externe);
   const pendingDevis = devis.filter((d) => d.pendingStage && d.type !== 'pro');
 
   const openValue = affaires.filter(isOpen).reduce((sum, a) => sum + a.value, 0);
@@ -179,7 +187,7 @@ export default function Pipeline() {
       </PageHeader>
 
       <div className="page-content page-content-flush">
-        {isGerant && (pendingAffaires.length + pendingDevis.length) > 0 && (
+        {peutValider && (pendingAffaires.length + pendingDevis.length) > 0 && (
           <div className="validation-bar">
             <div className="validation-bar-title">
               <Hourglass size={15} /> {(pendingAffaires.length + pendingDevis.length) > 1
@@ -361,7 +369,7 @@ export default function Pipeline() {
                 <span className="pending-banner-text">
                   <Hourglass size={15} /> Passage à « <strong>{stageLabel(selectedAff.pendingStage.stage)}</strong> » demandé par {getUserById(selectedAff.pendingStage.requestedBy)?.name || '—'} — en attente de validation.
                 </span>
-                {isGerant && (
+                {peutValider && (
                   <span className="pending-banner-actions">
                     <button className="btn btn-sm btn-won" onClick={() => approveAffaire(selectedAff)}><Check size={14} /> Valider</button>
                     <button className="btn btn-sm btn-lost" onClick={() => rejectAffaire(selectedAff)}><X size={14} /> Refuser</button>
@@ -467,7 +475,7 @@ export default function Pipeline() {
                       {d.pendingStage && (
                         <div className="pending-chip">
                           <Hourglass size={11} /> Passage à « {stageLabel(d.pendingStage.stage)} » en attente
-                          {isGerant && (
+                          {peutValider && (
                             <>
                               {' '}
                               <button className="btn btn-sm btn-won" onClick={() => approveDevisStageChange(d.id, user.id)}><Check size={13} /> Valider</button>

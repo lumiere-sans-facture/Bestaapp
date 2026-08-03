@@ -105,6 +105,27 @@ export function missingCommissionsForDevis({ devis, lead, partners = [], commiss
   return out;
 }
 
+/**
+ * Réconcilie les commissions « niveau client » (sans devisId) quand un devis
+ * de ce client est gagné : la rémunération bascule alors devis par devis.
+ * - commission encore EN ATTENTE : retirée (le devis va générer la sienne) ;
+ * - commission DÉJÀ PAYÉE : jamais supprimée — elle est rattachée au devis
+ *   (devisId posé), ce qui la rend visible comme la rémunération de CE devis
+ *   et empêche d'en créer une seconde. Le montant payé n'est pas retouché :
+ *   un versement effectué ne se réécrit pas.
+ * Retourne la nouvelle liste de commissions.
+ */
+export function rattacherCommissionsClient(commissions = [], devis) {
+  if (!devis?.leadId) return commissions;
+  const concernee = (c) => !c.devisId && c.leadId === devis.leadId;
+  if (!commissions.some(concernee)) return commissions;
+  return commissions.flatMap((c) => {
+    if (!concernee(c)) return [c];
+    if (c.status === 'payée') return [{ ...c, devisId: devis.id }];
+    return []; // en attente : remplacée par la commission du devis
+  });
+}
+
 // Rattrapage global : recense toutes les affaires déjà validées (pistes
 // gagnées + conversions « devis » validées) et retourne les commissions
 // qui auraient dû exister mais manquent. Idempotent : relancé deux fois,
@@ -123,6 +144,10 @@ export function reconcileMissingCommissions({ leads = [], devis = [], partners =
   // (deux devis gagnés d'un même client = deux commissions).
   const devisGagnes = devis.filter((d) => d.stage === 'gagne' && d.type !== 'pro');
   const pistesCouvertes = new Set(devisGagnes.map((d) => d.leadId));
+  // Répare aussi les doublons DÉJÀ enregistrés : une commission « niveau
+  // client » sur une piste dont un devis est gagné est caduque (retirée si en
+  // attente, rattachée au devis si déjà payée).
+  for (const d of devisGagnes) pool = rattacherCommissionsClient(pool, d);
   for (const d of devisGagnes) {
     ajouter(missingCommissionsForDevis(
       { devis: d, lead: leads.find((l) => l.id === d.leadId), partners, commissions: pool },

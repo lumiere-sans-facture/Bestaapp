@@ -1,7 +1,7 @@
 // Domaine programme d'affiliation : réseau de partenaires, validation des
 // conversions et paiement des commissions de parrainage.
 import { generatePartnerCode } from '../../utils/referral';
-import { missingCommissionsForLead, reconcileMissingCommissions } from '../../utils/commissionSync';
+import { missingCommissionsForLead, reconcileMissingCommissions, rattacherCommissionsClient } from '../../utils/commissionSync';
 import { COMMISSION_RATES, partnerFromActiveRef } from './shared';
 
 export function createPartnerActions(setState) {
@@ -88,12 +88,21 @@ export function createPartnerActions(setState) {
     // relancer ne crée jamais de doublon.
     syncCommissions: () =>
       setState((s) => {
+        const today = new Date().toISOString().slice(0, 10);
+        // 1) Réparer les doublons déjà enregistrés (commission « niveau
+        // client » sur une piste dont un devis est gagné).
+        let commissions = s.commissions;
+        for (const d of (s.devis || []).filter((x) => x.stage === 'gagne' && x.type !== 'pro')) {
+          commissions = rattacherCommissionsClient(commissions, d);
+        }
+        // 2) Créer les commissions manquantes sur les affaires validées.
         const created = reconcileMissingCommissions(
-          { leads: s.leads, devis: s.devis, partners: s.partners, commissions: s.commissions, referrals: s.referrals },
+          { leads: s.leads, devis: s.devis, partners: s.partners, commissions, referrals: s.referrals },
           COMMISSION_RATES,
-          new Date().toISOString().slice(0, 10)
+          today
         );
-        return created.length ? { ...s, commissions: [...created, ...s.commissions] } : s;
+        const next = created.length ? [...created, ...commissions] : commissions;
+        return next === s.commissions ? s : { ...s, commissions: next };
       }),
 
     // Commission attribuée à la main. Le bénéficiaire peut être un partenaire
