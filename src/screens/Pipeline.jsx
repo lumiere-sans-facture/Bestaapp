@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, Hourglass, MoreVertical, ArrowRightLeft, FileText, Eye } from 'lucide-react';
+import { Phone, MapPin, Plus, Clock, Trophy, ThumbsDown, RotateCcw, Send, User, Building2, Check, X, MoreVertical, ArrowRightLeft, FileText, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchAdminPublicPipeline } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import { daysSince } from '../utils/date';
-import { buildAffaires, devisStage } from '../utils/affaires';
-import { peutValiderProgression } from '../utils/roles';
+import { buildAffaires, devisDuClient } from '../utils/affaires';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
@@ -23,9 +22,7 @@ export default function Pipeline() {
   const {
     stages, lostStage, team, commissions, devis,
     leadsForUser, getPartnerById, getUserById,
-    updateLeadStage, requestStageChange, approveStageChange, rejectStageChange,
-    updateDevisStage, requestDevisStageChange, approveDevisStageChange, rejectDevisStageChange,
-    addLead, addLeadNote,
+    updateLeadStage, updateDevisStage, addLead, addLeadNote,
   } = useData();
 
   // Commission du client : réelle dès qu'une existe (par piste ou par devis),
@@ -52,30 +49,15 @@ export default function Pipeline() {
   const openStages = stages.filter((s) => s.id !== 'gagne');
   const stageLabel = (id) => [...stages, lostStage].find((st) => st.id === id)?.label || id;
 
-  // Gérant : passage direct. Technicien : demande, validée ensuite par le
-  // gérant — SAUF si l'équipe n'a pas de gérant (utilisateur seul dans son
-  // espace) : personne ne pourrait valider, le passage est donc direct.
-  // Une seule notion d'autorisation, utilisée pour AGIR comme pour VALIDER
-  // (règle pure, testée dans utils/roles.js). Sans cette unicité, un
-  // utilisateur seul dans son espace créait une demande que personne ne
-  // pouvait valider : verrou mortel, et aucune commission.
-  const peutValider = peutValiderProgression(user, team);
-  const direct = peutValider;
-  // Le kanban suit le CLIENT : une carte par client, comme le pipeline
-  // historique. Le suivi devis par devis vit dans la fiche (plus bas).
+  // Le VENDEUR fait progresser ses affaires lui-même : aucune validation du
+  // gérant n'est requise (règle métier explicite). Le gérant garde la vue
+  // d'ensemble et peut agir sur toutes les affaires de son équipe.
+  // Une carte = un DEVIS (ou la piste tant qu'il n'y a aucun devis) : deux
+  // devis d'un même client avancent indépendamment.
   const moveAffaire = (aff, stageId) => {
     if (!aff || aff.externe || aff.stage === stageId) return;
-    if (direct) updateLeadStage(aff.lead.id, stageId, user.id);
-    else requestStageChange(aff.lead.id, stageId, user.id);
-  };
-  const approveAffaire = (aff) => approveStageChange(aff.lead.id, user.id);
-  const rejectAffaire = (aff) => rejectStageChange(aff.lead.id, user.id);
-
-  // Suivi devis par devis, dans la fiche du client : chaque devis a son étape
-  // et son issue propres (deux devis d'un client se suivent séparément).
-  const moveDevis = (d, stageId) => {
-    if (direct) updateDevisStage(d.id, stageId);
-    else requestDevisStageChange(d.id, stageId, user.id);
+    if (aff.kind === 'devis') updateDevisStage(aff.devis.id, stageId);
+    else updateLeadStage(aff.lead.id, stageId, user.id);
   };
 
   // « Suivi commercial » depuis la fiche client : ouvre directement sa carte
@@ -118,23 +100,23 @@ export default function Pipeline() {
     : [];
   const affaires = [...buildAffaires(myLeads, devis), ...affairesExternes];
   // Résolution des clés sur TOUTES les affaires (filtre « par commercial »
-  // compris) : sinon un clic dans la barre de validation, bâtie sur l'équipe
-  // entière, ne trouvait pas sa carte et restait sans effet.
+  // compris) : une carte ouverte depuis un autre écran doit rester trouvable.
   const toutesAffaires = [...buildAffaires(allMyLeads, devis), ...affairesExternes];
   const findAff = (key) => toutesAffaires.find((a) => a.key === key)
     || (key?.startsWith('client:') ? toutesAffaires.find((a) => a.lead.id === key.slice(7)) : null);
   const selectedAff = findAff(selectedKey);
+  // Les autres cartes du même client (ses autres devis), pour naviguer entre elles.
+  const autresAffairesDuClient = selectedAff
+    ? toutesAffaires.filter((a) => a.lead.id === selectedAff.lead.id && a.key !== selectedAff.key)
+    : [];
   const pickerAff = findAff(stagePickerKey);
-  // Validation : TOUTES les demandes de l'équipe, y compris celles des devis,
-  // et sans tenir compte du filtre par commercial — le gérant ne doit jamais
-  // rater une demande. (Les affaires externes se valident chez leur auteur.)
-  const pendingAffaires = toutesAffaires.filter((a) => a.pendingStage && !a.externe);
-  const pendingDevis = devis.filter((d) => d.pendingStage && d.type !== 'pro');
-
-  const openValue = affaires.filter(isOpen).reduce((sum, a) => sum + a.value, 0);
-  const wonAffaires = affaires.filter((a) => a.stage === 'gagne');
-  const lostCount = affaires.filter((a) => a.stage === 'perdu').length;
-  const wonValue = wonAffaires.reduce((sum, a) => sum + a.value, 0);
+  // Sommes de MON équipe (les affaires des autres comptes sont comptées à part,
+  // sinon les chiffres du gérant seraient gonflés par l'activité de la plateforme).
+  const miennes = affaires.filter((a) => !a.externe);
+  const openValue = miennes.filter(isOpen).reduce((sum, a) => sum + a.value, 0);
+  const wonValue = miennes.filter((a) => a.stage === 'gagne').reduce((sum, a) => sum + a.value, 0);
+  const lostCount = miennes.filter((a) => a.stage === 'perdu').length;
+  const valeurExterne = affairesExternes.filter(isOpen).reduce((sum, a) => sum + a.value, 0);
 
   const handleDrop = (stageId) => {
     if (draggedKey) moveAffaire(findAff(draggedKey), stageId);
@@ -175,6 +157,13 @@ export default function Pipeline() {
           <div className="pipeline-stat"><strong>{formatCFA(openValue)}</strong> en cours</div>
           <div className="pipeline-stat"><strong>{formatCFA(wonValue)}</strong> gagné</div>
           {lostCount > 0 && <div className="pipeline-stat"><strong>{lostCount}</strong> perdu(s)</div>}
+          {/* Vue plateforme : ce que pèsent les affaires des AUTRES comptes,
+              isolé pour ne pas gonfler les chiffres de sa propre équipe. */}
+          {affairesExternes.length > 0 && (
+            <div className="pipeline-stat">
+              <strong>{formatCFA(valeurExterne)}</strong> autres comptes ({affairesExternes.length})
+            </div>
+          )}
         </div>
         {user.role === 'gerant' && (
           <div className="pipeline-filter-row">
@@ -187,55 +176,6 @@ export default function Pipeline() {
       </PageHeader>
 
       <div className="page-content page-content-flush">
-        {peutValider && (pendingAffaires.length + pendingDevis.length) > 0 && (
-          <div className="validation-bar">
-            <div className="validation-bar-title">
-              <Hourglass size={15} /> {(pendingAffaires.length + pendingDevis.length) > 1
-                ? `${pendingAffaires.length + pendingDevis.length} progressions à valider`
-                : '1 progression à valider'}
-            </div>
-            {/* Demandes portant sur un DEVIS (issue d'une affaire précise) */}
-            {pendingDevis.map((d) => {
-              const client = allMyLeads.find((l) => l.id === d.leadId);
-              const demandeur = getUserById(d.pendingStage.requestedBy);
-              return (
-                <div key={`d-${d.id}`} className="validation-row">
-                  <div className="validation-info" role="button" tabIndex={0}
-                    onClick={() => client && setSelectedKey(`lead-${client.id}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && client && setSelectedKey(`lead-${client.id}`)}>
-                    <span className="validation-lead">{client?.name || 'Client'} · {d.devisNumber || 'Devis'}</span>
-                    <span className="validation-move">
-                      {stageLabel(devisStage(d, client))} → <strong>{stageLabel(d.pendingStage.stage)}</strong>
-                    </span>
-                    <span className="validation-by">par {demandeur?.name || '—'} · {formatDate(d.pendingStage.requestedAt)}</span>
-                  </div>
-                  <div className="validation-actions">
-                    <button className="btn btn-sm btn-won" onClick={() => approveDevisStageChange(d.id, user.id)}><Check size={14} /> Valider</button>
-                    <button className="btn btn-sm btn-lost" onClick={() => rejectDevisStageChange(d.id, user.id)}><X size={14} /> Refuser</button>
-                  </div>
-                </div>
-              );
-            })}
-            {pendingAffaires.map((a) => {
-              const demandeur = getUserById(a.pendingStage.requestedBy);
-              return (
-                <div key={a.key} className="validation-row">
-                  <div className="validation-info" role="button" tabIndex={0}
-                    onClick={() => setSelectedKey(a.key)}
-                    onKeyDown={(e) => e.key === 'Enter' && setSelectedKey(a.key)}>
-                    <span className="validation-lead">{a.lead.name}</span>
-                    <span className="validation-move">{stageLabel(a.stage)} → <strong>{stageLabel(a.pendingStage.stage)}</strong></span>
-                    <span className="validation-by">par {demandeur?.name || '—'} · {formatDate(a.pendingStage.requestedAt)}</span>
-                  </div>
-                  <div className="validation-actions">
-                    <button className="btn btn-sm btn-won" onClick={() => approveAffaire(a)}><Check size={14} /> Valider</button>
-                    <button className="btn btn-sm btn-lost" onClick={() => rejectAffaire(a)}><X size={14} /> Refuser</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
         <div className="kanban-container">
           {openStages.map((stage) => {
             const stageAffaires = affaires.filter((a) => a.stage === stage.id);
@@ -277,7 +217,7 @@ export default function Pipeline() {
                           {!aff.externe && (
                             <button
                               className="kanban-card-move"
-                              aria-label={`Déplacer ${lead.name} vers une autre étape`}
+                              aria-label={`Déplacer ${lead.name}${aff.kind === 'devis' && aff.devis.devisNumber ? ` (${aff.devis.devisNumber})` : ''} vers une autre étape`}
                               onClick={(e) => { e.stopPropagation(); setStagePickerKey(aff.key); }}
                             >
                               <MoreVertical size={16} />
@@ -285,17 +225,12 @@ export default function Pipeline() {
                           )}
                         </div>
                         <div className="kanban-card-contact">
-                          {lead.contact}
-                          {aff.devis.length > 0 && (
-                            <> · <FileText size={11} style={{ verticalAlign: -1 }} /> {aff.devis.length} devis</>
-                          )}
+                          {aff.kind === 'devis' ? (
+                            <><FileText size={11} style={{ verticalAlign: -1 }} /> {aff.devis.devisNumber || 'Devis'}
+                              {aff.devis.statut === 'brouillon' && ' · brouillon'}</>
+                          ) : lead.contact}
                           {aff.externe && <> · par {lead.authorName || lead.orgName}</>}
                         </div>
-                        {aff.pendingStage && (
-                          <div className="pending-chip" title={`Demande en attente de validation du gérant`}>
-                            <Hourglass size={11} /> → {stageLabel(aff.pendingStage.stage)}
-                          </div>
-                        )}
                         <div className="kanban-card-footer">
                           <span className={`kanban-card-value${aff.value > 0 ? '' : ' none'}`}>
                             {aff.value > 0 ? formatCFA(aff.value) : 'Devis à créer'}
@@ -350,7 +285,7 @@ export default function Pipeline() {
         onClose={() => setSelectedKey(null)}
         title={selectedAff?.lead.name}
         subtitle={selectedAff && [
-          selectedAff.lead.contact,
+          selectedAff.kind === 'devis' ? (selectedAff.devis.devisNumber || 'Devis') : selectedAff.lead.contact,
           selectedAff.value > 0 ? formatCFA(selectedAff.value) : null,
         ].filter(Boolean).join(' · ')}
       >
@@ -364,26 +299,30 @@ export default function Pipeline() {
                 </div>
               </div>
             )}
-            {selectedAff.pendingStage && !selectedAff.externe && (
-              <div className="pending-banner">
-                <span className="pending-banner-text">
-                  <Hourglass size={15} /> Passage à « <strong>{stageLabel(selectedAff.pendingStage.stage)}</strong> » demandé par {getUserById(selectedAff.pendingStage.requestedBy)?.name || '—'} — en attente de validation.
-                </span>
-                {peutValider && (
-                  <span className="pending-banner-actions">
-                    <button className="btn btn-sm btn-won" onClick={() => approveAffaire(selectedAff)}><Check size={14} /> Valider</button>
-                    <button className="btn btn-sm btn-lost" onClick={() => rejectAffaire(selectedAff)}><X size={14} /> Refuser</button>
-                  </span>
-                )}
-              </div>
-            )}
             {selectedAff.externe ? (
-              !isOpen(selectedAff) && (
+              /* Affaire d'un autre compte : le gérant VOIT l'avancement
+                 (barre de progression en lecture seule), sans pouvoir agir. */
+              isOpen(selectedAff) ? (
+                <div className="stage-stepper is-readonly">
+                  {openStages.map((stage, i) => {
+                    const currentIndex = openStages.findIndex((s) => s.id === selectedAff.stage);
+                    return (
+                      <span
+                        key={stage.id}
+                        className={`stage-step ${i <= currentIndex ? 'reached' : ''} ${selectedAff.stage === stage.id ? 'current' : ''}`}
+                        title={stage.label}
+                      >
+                        {stage.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
                 <div className={`outcome-banner ${selectedAff.stage === 'gagne' ? 'won' : 'lost'}`}>
                   <span className="outcome-banner-label">
                     {selectedAff.stage === 'gagne'
-                      ? <><Trophy size={16} /> Affaire gagnée le {formatDate(selectedAff.lead.wonAt)}</>
-                      : <><ThumbsDown size={16} /> Affaire perdue le {formatDate(selectedAff.lead.lostAt)}</>}
+                      ? <><Trophy size={16} /> Affaire gagnée</>
+                      : <><ThumbsDown size={16} /> Affaire perdue</>}
                   </span>
                 </div>
               )
@@ -420,8 +359,8 @@ export default function Pipeline() {
               <div className={`outcome-banner ${selectedAff.stage === 'gagne' ? 'won' : 'lost'}`}>
                 <span className="outcome-banner-label">
                   {selectedAff.stage === 'gagne'
-                    ? <><Trophy size={16} /> Affaire gagnée le {formatDate(selectedAff.lead.wonAt)}</>
-                    : <><ThumbsDown size={16} /> Affaire perdue le {formatDate(selectedAff.lead.lostAt)}</>}
+                    ? <><Trophy size={16} /> Affaire gagnée le {formatDate(selectedAff.kind === 'devis' ? selectedAff.devis.wonAt : selectedAff.lead.wonAt)}</>
+                    : <><ThumbsDown size={16} /> Affaire perdue le {formatDate(selectedAff.kind === 'devis' ? selectedAff.devis.lostAt : selectedAff.lead.lostAt)}</>}
                 </span>
                 <button className="btn btn-sm btn-outline" onClick={() => moveAffaire(selectedAff, 'negociation')}>
                   <RotateCcw size={14} /> Rouvrir
@@ -448,62 +387,33 @@ export default function Pipeline() {
               )}
             </div>
 
-            {/* Suivi DEVIS PAR DEVIS : un client peut avoir plusieurs devis,
-                chacun avec sa propre issue (et donc sa propre commission). */}
-            {selectedAff.devis.length > 0 && (
+            {/* Les AUTRES affaires du même client : chacune a sa propre carte
+                dans le kanban, avec son étape et son issue. */}
+            {autresAffairesDuClient.length > 0 && (
               <div className="sheet-section">
                 <div className="sheet-section-title">
-                  <FileText size={14} /> Devis de ce client ({selectedAff.devis.length})
+                  <FileText size={14} /> Autres affaires de ce client ({autresAffairesDuClient.length})
                 </div>
-                {selectedAff.devis.map((d) => {
-                  const st = devisStage(d, selectedAff.lead);
-                  const clos = st === 'gagne' || st === 'perdu';
-                  return (
-                    <div key={d.id} className="devis-suivi-row">
-                      <div className="sheet-row">
-                        <span className="sheet-label">
-                          {d.devisNumber || 'Devis'}
-                          <span className="text-secondary"> · {formatDate(d.createdAt)}{d.statut === 'brouillon' ? ' · brouillon' : ''}</span>
-                        </span>
-                        <span className="sheet-value">
-                          {formatCFA(d.total)}{' '}
-                          <span className={`badge ${st === 'gagne' ? 'badge-success' : st === 'perdu' ? 'badge-muted' : 'badge-warning'}`}>
-                            {stageLabel(st)}
-                          </span>
-                        </span>
-                      </div>
-                      {d.pendingStage && (
-                        <div className="pending-chip">
-                          <Hourglass size={11} /> Passage à « {stageLabel(d.pendingStage.stage)} » en attente
-                          {peutValider && (
-                            <>
-                              {' '}
-                              <button className="btn btn-sm btn-won" onClick={() => approveDevisStageChange(d.id, user.id)}><Check size={13} /> Valider</button>
-                              <button className="btn btn-sm btn-lost" onClick={() => rejectDevisStageChange(d.id, user.id)}><X size={13} /> Refuser</button>
-                            </>
-                          )}
-                        </div>
+                {autresAffairesDuClient.map((a) => (
+                  <button key={a.key} type="button" className="sheet-row sheet-row-btn"
+                    onClick={() => setSelectedKey(a.key)}>
+                    <span className="sheet-label">
+                      {a.kind === 'devis' ? (a.devis.devisNumber || 'Devis') : 'Prospection'}
+                      {a.kind === 'devis' && a.devis.statut === 'brouillon' && (
+                        <span className="text-secondary"> · brouillon</span>
                       )}
-                      {!selectedAff.externe && (clos ? (
-                        <button className="btn btn-sm btn-outline btn-block" onClick={() => moveDevis(d, 'negociation')}>
-                          <RotateCcw size={14} /> Rouvrir ce devis
-                        </button>
-                      ) : (
-                        <div className="outcome-actions">
-                          <button className="btn btn-sm btn-won" onClick={() => moveDevis(d, 'gagne')}>
-                            <Trophy size={14} /> Devis gagné
-                          </button>
-                          <button className="btn btn-sm btn-lost" onClick={() => moveDevis(d, 'perdu')}>
-                            <ThumbsDown size={14} /> Devis perdu
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
+                    </span>
+                    <span className="sheet-value">
+                      {a.value > 0 ? `${formatCFA(a.value)} ` : ''}
+                      <span className={`badge ${a.stage === 'gagne' ? 'badge-success' : a.stage === 'perdu' ? 'badge-muted' : 'badge-warning'}`}>
+                        {stageLabel(a.stage)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
                 <div className="field-hint">
-                  Chaque devis gagné génère sa propre commission — deux devis gagnés d'un
-                  même client donnent deux commissions.
+                  Chaque devis se suit séparément dans le tableau et génère sa propre
+                  commission une fois gagné.
                 </div>
               </div>
             )}
@@ -584,7 +494,7 @@ export default function Pipeline() {
         open={!!pickerAff}
         onClose={() => setStagePickerKey(null)}
         title="Déplacer vers…"
-        subtitle={pickerAff && `${pickerAff.lead.name} · actuellement « ${stageLabel(pickerAff.stage)} »`}
+        subtitle={pickerAff && `${pickerAff.lead.name}${pickerAff.kind === 'devis' && pickerAff.devis.devisNumber ? ` · ${pickerAff.devis.devisNumber}` : ''} · actuellement « ${stageLabel(pickerAff.stage)} »`}
       >
         {pickerAff && (
           <div className="stage-picker">

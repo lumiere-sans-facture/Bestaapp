@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAffaires, devisStage } from '../affaires';
+import { buildAffaires, devisStage, devisDuClient } from '../affaires';
 import { missingCommissionsForDevis, reconcileMissingCommissions } from '../commissionSync';
 
 const RATES = { 1: 0.03, 2: 0.015 };
@@ -12,54 +12,66 @@ describe('devisStage', () => {
   });
 });
 
-describe('buildAffaires — une carte par CLIENT, ses devis attachés', () => {
+describe('buildAffaires — UNE CARTE PAR DEVIS (deux devis = deux suivis)', () => {
   const leads = [
     { id: 'l1', name: 'Hôtel du Parc', stage: 'qualifie', estimatedValue: 100000 },
     { id: 'l2', name: 'Pharmacie', stage: 'nouveau', estimatedValue: 0 },
   ];
   const devis = [
-    { id: 'd1', leadId: 'l1', total: 250000, stage: 'proposition' },
-    { id: 'd2', leadId: 'l1', total: 900000, stage: 'negociation' },
+    { id: 'd1', leadId: 'l1', total: 250000, stage: 'proposition', createdAt: '2026-08-01' },
+    { id: 'd2', leadId: 'l1', total: 900000, stage: 'negociation', createdAt: '2026-08-02' },
     { id: 'dpro', leadId: 'l1', total: 50000, type: 'pro', stage: 'proposition' },
   ];
 
-  it('un client = une seule carte, à SON étape (le kanban suit le client)', () => {
-    const affaires = buildAffaires(leads, devis);
-    const carte = affaires.filter((a) => a.lead.id === 'l1');
-    expect(carte).toHaveLength(1);
-    expect(carte[0].stage).toBe('qualifie');
+  it('un client avec DEUX devis a DEUX cartes, à des étapes différentes', () => {
+    const cartes = buildAffaires(leads, devis).filter((a) => a.lead.id === 'l1');
+    expect(cartes).toHaveLength(2);
+    expect(cartes.map((c) => c.devis.id)).toEqual(['d2', 'd1']); // plus récent en tête
+    expect(cartes.map((c) => c.stage).sort()).toEqual(['negociation', 'proposition']);
   });
 
-  it('les devis du client sont attachés à sa carte, suivis séparément', () => {
-    const carte = buildAffaires(leads, devis).find((a) => a.lead.id === 'l1');
-    expect(carte.devis.map((d) => d.id).sort()).toEqual(['d1', 'd2']);
-    expect(carte.devis.map((d) => devisStage(d, carte.lead)).sort())
-      .toEqual(['negociation', 'proposition']);
+  it('chaque carte porte le montant de SON devis', () => {
+    const cartes = buildAffaires(leads, devis).filter((a) => a.lead.id === 'l1');
+    expect(cartes.map((c) => c.value).sort((x, y) => x - y)).toEqual([250000, 900000]);
   });
 
-  it('la valeur du client cumule ses devis en cours', () => {
-    const carte = buildAffaires(leads, devis).find((a) => a.lead.id === 'l1');
-    expect(carte.value).toBe(1150000);
+  it('un troisième devis ajoute une troisième carte', () => {
+    const cartes = buildAffaires(leads, [
+      ...devis, { id: 'd3', leadId: 'l1', total: 400000, stage: 'visite', createdAt: '2026-08-03' },
+    ]).filter((a) => a.lead.id === 'l1');
+    expect(cartes).toHaveLength(3);
   });
 
-  it('un devis perdu ne compte plus dans la valeur du client', () => {
-    const carte = buildAffaires(leads, [
-      { id: 'd1', leadId: 'l1', total: 250000, stage: 'proposition' },
-      { id: 'd2', leadId: 'l1', total: 900000, stage: 'perdu' },
-    ]).find((a) => a.lead.id === 'l1');
-    expect(carte.value).toBe(250000);
-  });
-
-  it('sans devis, la carte garde la valeur estimée du client', () => {
+  it('un client SANS devis garde sa carte de prospection', () => {
     const carte = buildAffaires(leads, devis).find((a) => a.lead.id === 'l2');
-    expect(carte.devis).toHaveLength(0);
+    expect(carte.kind).toBe('piste');
+    expect(carte.devis).toBeNull();
     expect(carte.stage).toBe('nouveau');
-    expect(carte.value).toBe(0);
   });
 
-  it('les devis de l’espace Pro ne sont jamais rattachés', () => {
-    const carte = buildAffaires(leads, devis).find((a) => a.lead.id === 'l1');
-    expect(carte.devis.some((d) => d.id === 'dpro')).toBe(false);
+  it('la carte de prospection disparaît dès le premier devis', () => {
+    const cartes = buildAffaires(leads, devis).filter((a) => a.lead.id === 'l1');
+    expect(cartes.every((c) => c.kind === 'devis')).toBe(true);
+  });
+
+  it('les devis de l’espace Pro ne créent jamais de carte publique', () => {
+    expect(buildAffaires(leads, devis).some((a) => a.devis?.id === 'dpro')).toBe(false);
+  });
+
+  it('les clés des cartes sont uniques (pas de collision React)', () => {
+    const cles = buildAffaires(leads, devis).map((a) => a.key);
+    expect(new Set(cles).size).toBe(cles.length);
+  });
+});
+
+describe('devisDuClient', () => {
+  it('ne retourne que les devis publics du client', () => {
+    const tous = [
+      { id: 'd1', leadId: 'l1', type: 'manual' },
+      { id: 'd2', leadId: 'l2', type: 'manual' },
+      { id: 'd3', leadId: 'l1', type: 'pro' },
+    ];
+    expect(devisDuClient('l1', tous).map((d) => d.id)).toEqual(['d1']);
   });
 });
 

@@ -593,6 +593,18 @@ form .login-link { width: 100%; margin-top: 4px; }
 .stage-step.current { background: var(--primary); color: white; }
 .stage-step:hover:not(.current) { background: var(--border); color: var(--text-primary); }
 .stage-step.reached:hover:not(.current) { background: var(--primary); color: white; }
+/* Barre de progression en consultation (affaire d'un autre compte, vue gérant) :
+   même lecture visuelle, mais rien n'est cliquable. */
+.stage-stepper.is-readonly .stage-step { cursor: default; }
+.stage-stepper.is-readonly .stage-step:hover:not(.current) { background: var(--bg); color: var(--text-secondary); }
+.stage-stepper.is-readonly .stage-step.reached:hover:not(.current) { background: var(--primary-light); color: white; }
+
+/* Ligne de fiche cliquable (naviguer vers une autre affaire du client) */
+.sheet-row-btn {
+  width: 100%; background: none; border: none; font: inherit; color: inherit;
+  text-align: left; cursor: pointer; border-radius: var(--radius-sm);
+}
+.sheet-row-btn:hover { background: var(--bg); }
 
 .outcome-actions { display: flex; gap: 10px; margin-bottom: 20px; }
 .outcome-actions .btn { flex: 1; }

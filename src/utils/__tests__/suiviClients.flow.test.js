@@ -13,110 +13,79 @@ function store() {
 const USER = { id: 'u1', name: 'Soumana', role: 'gerant' };
 
 describe('flux réel du suivi clients', () => {
-  it('kanban par client + issues par devis + commissions', () => {
+  it('deux devis d’un client = deux cartes, avancées séparément', () => {
     const s = store();
     s.a.ensurePartnerForUser(USER);
     s.a.addLead({ name: 'Hôtel du Parc', contact: 'M. Kossi', phone: '+229', address: 'Parakou', estimatedValue: 0, assignedTo: 'u1', parrainL1: null });
     const lead = s.get().leads[0];
 
-    // Les étapes amont restent pilotées à la main
-    s.a.updateLeadStage(lead.id, 'visite');
-    expect(s.get().leads[0].stage).toBe('visite');
-
-    // Créer un devis NE déplace PAS le client (régression corrigée)
-    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 500000, statut: 'finalise', createdBy: 'u1', items: [] });
-    expect(s.get().leads[0].stage).toBe('visite');
+    // Prospection : une carte piste, pilotée à la main
+    s.a.updateLeadStage(lead.id, 'visite', 'u1');
     let cartes = buildAffaires(s.get().leads, s.get().devis);
     expect(cartes).toHaveLength(1);
-    expect(cartes[0].stage).toBe('visite');
-    expect(cartes[0].devis).toHaveLength(1);
+    expect(cartes[0]).toMatchObject({ kind: 'piste', stage: 'visite' });
 
-    // Deux devis pour le même client : toujours UNE carte, DEUX devis suivis
-    s.a.addDevis({ leadId: lead.id, type: 'solar', total: 300000, statut: 'finalise', createdBy: 'u1', items: [] });
+    // Premier devis : la carte piste devient une carte devis
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 500000, statut: 'finalise', createdBy: 'u1', items: [] });
     cartes = buildAffaires(s.get().leads, s.get().devis);
     expect(cartes).toHaveLength(1);
-    expect(cartes[0].devis).toHaveLength(2);
-    expect(cartes[0].value).toBe(800000); // cumul des devis en cours
+    expect(cartes[0].kind).toBe('devis');
+    // Créer un devis ne fait sauter aucune étape au client
+    expect(s.get().leads[0].stage).toBe('visite');
 
-    // Chaque devis se conclut séparément → une commission chacun
-    const [d2, d1] = s.get().devis; // le plus récent d'abord
-    s.a.updateDevisStage(d1.id, 'gagne');
-    expect(s.get().commissions).toHaveLength(1);
-    expect(s.get().leads[0].stage).toBe('visite'); // le client ne bouge pas tout seul
-    s.a.updateDevisStage(d2.id, 'gagne');
-    expect(s.get().commissions).toHaveLength(2);
-    expect(s.get().commissions.map((c) => c.amount).sort((x, y) => x - y)).toEqual([9000, 15000]);
-
-    // Le gérant conclut le client : pas de commission en double
-    s.a.updateLeadStage(lead.id, 'gagne');
-    expect(s.get().commissions).toHaveLength(2);
-    expect(s.get().leads[0].stage).toBe('gagne');
-
-    // Un devis perdu sort de la valeur du client
-    s.a.updateDevisStage(d2.id, 'perdu');
+    // Deuxième devis du MÊME client : DEUX cartes
+    s.a.addDevis({ leadId: lead.id, type: 'solar', total: 300000, statut: 'finalise', createdBy: 'u1', items: [] });
     cartes = buildAffaires(s.get().leads, s.get().devis);
-    expect(cartes[0].value).toBe(500000);
-    expect(devisStage(s.get().devis.find((x) => x.id === d2.id), lead)).toBe('perdu');
+    expect(cartes).toHaveLength(2);
+
+    // Chacune avance indépendamment
+    const [recent, ancien] = cartes;
+    s.a.updateDevisStage(recent.devis.id, 'negociation');
+    cartes = buildAffaires(s.get().leads, s.get().devis);
+    expect(cartes.find((c) => c.devis.id === recent.devis.id).stage).toBe('negociation');
+    expect(cartes.find((c) => c.devis.id === ancien.devis.id).stage).toBe('proposition');
+
+    // Chacune se conclut séparément et rapporte SA commission
+    s.a.updateDevisStage(recent.devis.id, 'gagne');
+    expect(s.get().commissions).toHaveLength(1);
+    s.a.updateDevisStage(ancien.devis.id, 'gagne');
+    expect(s.get().commissions).toHaveLength(2);
+    expect(s.get().commissions.reduce((t, c) => t + c.amount, 0)).toBe(24000);
   });
 });
 
-describe('validation gérant et visibilité pour le commercial', () => {
-  it('le technicien demande, le gérant valide, la trace reste sur la fiche', () => {
-    const s = store();
-    s.a.addLead({ name: 'Pharmacie', contact: 'Mme A', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
-    const lead = s.get().leads[0];
-
-    // Le technicien demande : la piste NE bouge PAS
-    s.a.requestStageChange(lead.id, 'negociation', 'u2');
-    expect(s.get().leads[0].stage).toBe('nouveau');
-    expect(s.get().leads[0].pendingStage.stage).toBe('negociation');
-    // ...et la demande est visible dans l'activité du client
-    expect(s.get().leads[0].activities[0].text).toMatch(/Demande de passage/);
-
-    // Le gérant valide : la piste avance et la validation est tracée
-    s.a.approveStageChange(lead.id, 'u1');
-    expect(s.get().leads[0].stage).toBe('negociation');
-    expect(s.get().leads[0].pendingStage).toBeNull();
-    expect(s.get().leads[0].activities[0].text).toMatch(/validé par le gérant/);
-  });
-
-  it('le gérant fait progresser SANS demande : le commercial en voit la trace', () => {
-    const s = store();
-    s.a.addLead({ name: 'Boulangerie', contact: 'M. B', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
-    const lead = s.get().leads[0];
-
-    s.a.updateLeadStage(lead.id, 'visite', 'u1');
-    expect(s.get().leads[0].stage).toBe('visite');
-    expect(s.get().leads[0].activities[0].text).toMatch(/Étape passée de « Nouveau » à « Visite » par le gérant/);
-  });
-
-  it('le gérant refuse : la piste reste en place, le refus est tracé', () => {
-    const s = store();
-    s.a.addLead({ name: 'Station', contact: 'M. C', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
-    const lead = s.get().leads[0];
-    s.a.requestStageChange(lead.id, 'gagne', 'u2');
-    s.a.rejectStageChange(lead.id, 'u1');
-    expect(s.get().leads[0].stage).toBe('nouveau');
-    expect(s.get().leads[0].pendingStage).toBeNull();
-    expect(s.get().leads[0].activities[0].text).toMatch(/refusée par le gérant/);
-  });
-
-  it('demande sur un DEVIS : validée par le gérant, elle crée la commission', () => {
+describe('le VENDEUR fait progresser lui-même (aucune validation gérant)', () => {
+  it('un technicien applique l’étape directement, sans demande', () => {
     const s = store();
     s.a.ensurePartnerForUser({ id: 'u2', name: 'Fatou' });
-    s.a.addLead({ name: 'Hôtel', contact: 'M. D', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
+    s.a.addLead({ name: 'Pharmacie', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
+    const lead = s.get().leads[0];
+
+    s.a.updateLeadStage(lead.id, 'negociation', 'u2');
+    expect(s.get().leads[0].stage).toBe('negociation');
+    expect(s.get().leads[0].pendingStage).toBeUndefined(); // plus de circuit de demande
+  });
+
+  it('un devis passé à « gagné » par le vendeur crée la commission immédiatement', () => {
+    const s = store();
+    s.a.ensurePartnerForUser({ id: 'u2', name: 'Fatou' });
+    s.a.addLead({ name: 'Hôtel', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
     const lead = s.get().leads[0];
     s.a.addDevis({ leadId: lead.id, type: 'manual', total: 400000, statut: 'finalise', createdBy: 'u2', items: [] });
     const d = s.get().devis[0];
 
-    s.a.requestDevisStageChange(d.id, 'gagne', 'u2');
-    expect(s.get().devis[0].pendingStage.stage).toBe('gagne');
-    expect(s.get().commissions).toHaveLength(0); // rien avant validation
-
-    s.a.approveDevisStageChange(d.id, 'u1');
+    s.a.updateDevisStage(d.id, 'gagne');
     expect(s.get().devis[0].stage).toBe('gagne');
     expect(s.get().commissions).toHaveLength(1);
     expect(s.get().commissions[0].amount).toBe(12000);
+  });
+
+  it('le passage direct reste tracé dans l’activité du client', () => {
+    const s = store();
+    s.a.addLead({ name: 'Boulangerie', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: 'u2', parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.updateLeadStage(lead.id, 'visite', 'u1');
+    expect(s.get().leads[0].activities[0].text).toMatch(/Étape passée de « Nouveau » à « Visite »/);
   });
 });
 

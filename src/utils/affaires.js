@@ -10,11 +10,14 @@
 export const devisStage = (d, lead) => d.stage || lead?.stage || 'proposition';
 
 /**
- * Construit la liste des cartes du pipeline : UNE CARTE PAR CLIENT.
- * Le kanban suit le client (son étape, sa valeur cumulée) ; le suivi devis
- * par devis vit dans la fiche du client, où chaque devis porte sa propre
- * étape et déclenche sa propre commission.
- * Chaque carte : { key, lead, stage, value, pendingStage, devis: [...] }.
+ * Construit les cartes du pipeline : UNE CARTE PAR DEVIS.
+ * Un client avec deux devis a donc DEUX cartes, avancées indépendamment
+ * (chacune sa colonne, chacune son issue, chacune sa commission).
+ * Un client sans aucun devis garde une carte « piste » (prospection).
+ *
+ * Chaque carte : { key, kind: 'devis'|'piste', lead, devis, stage, value }.
+ *  - kind 'devis' : `devis` est LE devis suivi
+ *  - kind 'piste' : `devis` vaut null
  */
 export function buildAffaires(leads = [], devisList = []) {
   const parPiste = new Map();
@@ -23,21 +26,36 @@ export function buildAffaires(leads = [], devisList = []) {
     if (!parPiste.has(d.leadId)) parPiste.set(d.leadId, []);
     parPiste.get(d.leadId).push(d);
   }
-  return leads.map((lead) => {
+  const cartes = [];
+  for (const lead of leads) {
     const ds = parPiste.get(lead.id) || [];
-    // Valeur du client : la somme de ses affaires non perdues (un client avec
-    // deux devis en cours pèse le total des deux), sinon sa valeur estimée.
-    const enCours = ds.filter((d) => devisStage(d, lead) !== 'perdu');
-    const value = enCours.length
-      ? enCours.reduce((sum, d) => sum + (Number(d.total) || 0), 0)
-      : Number(lead.estimatedValue) || 0;
-    return {
-      key: `lead-${lead.id}`,
-      lead,
-      devis: ds,
-      stage: lead.stage,
-      value,
-      pendingStage: lead.pendingStage || null,
-    };
-  });
+    if (!ds.length) {
+      cartes.push({
+        key: `piste-${lead.id}`,
+        kind: 'piste',
+        lead,
+        devis: null,
+        stage: lead.stage,
+        value: Number(lead.estimatedValue) || 0,
+      });
+      continue;
+    }
+    // Devis les plus récents en tête : le dernier créé se voit en premier.
+    const tries = [...ds].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    for (const d of tries) {
+      cartes.push({
+        key: `devis-${d.id}`,
+        kind: 'devis',
+        lead,
+        devis: d,
+        stage: devisStage(d, lead),
+        value: Number(d.total) || 0,
+      });
+    }
+  }
+  return cartes;
 }
+
+/** Tous les devis publics d'un client (pour la fiche : « ses autres affaires »). */
+export const devisDuClient = (leadId, devisList = []) =>
+  devisList.filter((d) => d.leadId === leadId && d.type !== 'pro');

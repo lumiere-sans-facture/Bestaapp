@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star, Hourglass } from 'lucide-react';
+import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import StageBadge from '../../components/StageBadge';
@@ -29,7 +29,6 @@ export default function MyProfile({ onBack }) {
     .filter((l) => l.assignedTo === user.id && l.stage !== 'gagne' && l.stage !== 'perdu')
     .sort((a, b) => new Date(b.lastActivity || 0) - new Date(a.lastActivity || 0));
   const stageInfo = (l) => (l.stage === 'perdu' ? lostStage : stages.find((st) => st.id === l.stage));
-  const stageLabel = (id) => [...stages, lostStage].find((st) => st.id === id)?.label || id;
   const wonValue = wonLeads.reduce((s, l) => s + l.estimatedValue, 0);
   const myComs = commissions.filter((c) => c.partnerId === me.id);
   const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
@@ -154,14 +153,7 @@ export default function MyProfile({ onBack }) {
         <div className="card-title">Mes clients en cours ({mesClients.length})</div>
         {mesClients.length ? mesClients.map((l) => (
           <div key={l.id} className="sheet-row">
-            <span className="sheet-label">
-              {l.name}
-              {l.pendingStage && (
-                <span className="text-secondary">
-                  {' '}· <Hourglass size={11} style={{ verticalAlign: -1 }} /> passage à « {stageLabel(l.pendingStage.stage)} » en attente
-                </span>
-              )}
-            </span>
+            <span className="sheet-label">{l.name}</span>
             <span className="sheet-value">
               <StageBadge stage={stageInfo(l)} />
               {l.estimatedValue > 0 && ` ${formatCFA(l.estimatedValue)}`}

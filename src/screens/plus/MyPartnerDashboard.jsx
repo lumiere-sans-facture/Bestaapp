@@ -146,13 +146,7 @@ export default function MyPartnerDashboard({ onBack }) {
         <div className="card-title">Mes affaires apportées — niveau 1 (3 %)</div>
         {l1Leads.length ? l1Leads.map((l) => (
           <div key={l.id} className="sheet-row">
-            <span className="sheet-label">
-              {l.name}
-              {/* Progression demandée et pas encore validée par le gérant */}
-              {l.pendingStage && (
-                <span className="text-secondary"> · passage à « {stageInfo({ stage: l.pendingStage.stage })?.label || l.pendingStage.stage} » en attente</span>
-              )}
-            </span>
+            <span className="sheet-label">{l.name}</span>
             <span className="sheet-value">
               <StageBadge stage={stageInfo(l)} />
               {' '}{formatCFA(l.estimatedValue)}

@@ -1,7 +1,8 @@
 // Domaine CRM : pistes commerciales. Le passage à « gagné » génère les
 // commissions de parrainage (couplage métier assumé piste → commission).
-// Les techniciens DEMANDENT un changement d'étape (pendingStage) ; le gérant
-// valide ou refuse — les commissions ne naissent qu'à la validation.
+// Le vendeur fait progresser ses affaires LUI-MÊME : aucune validation
+// préalable du gérant (règle métier). Le changement est tracé dans l'activité
+// du client pour que l'équipe voie qui a fait quoi.
 import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForLead } from '../../utils/commissionSync';
 
@@ -37,7 +38,6 @@ export function createLeadActions(setState) {
           ? {
               ...l,
               stage,
-              pendingStage: null,
               lastActivity: today,
               wonAt: stage === 'gagne' ? today : l.wonAt,
               lostAt: stage === 'perdu' ? today : null,
@@ -115,57 +115,6 @@ export function createLeadActions(setState) {
           ),
         };
       }),
-
-    // Un technicien DEMANDE un changement d'étape : la piste ne bouge pas,
-    // la demande attend la validation du gérant (une nouvelle demande remplace
-    // la précédente).
-    requestStageChange: (leadId, stage, userId) =>
-      setState((s) => ({
-        ...s,
-        leads: s.leads.map((l) =>
-          l.id === leadId
-            ? {
-                ...l,
-                pendingStage: { stage, requestedBy: userId, requestedAt: new Date().toISOString() },
-                activities: [note(`Demande de passage à « ${STAGE_LABEL[stage] || stage} » — en attente de validation du gérant.`, userId), ...(l.activities || [])],
-                lastActivity: new Date().toISOString().slice(0, 10),
-              }
-            : l
-        ),
-      })),
-
-    // Le gérant valide la demande : l'étape s'applique réellement
-    // (commissions comprises) et la validation est tracée dans l'activité.
-    approveStageChange: (leadId, approverId) =>
-      setState((s) => {
-        const lead = s.leads.find((l) => l.id === leadId);
-        if (!lead?.pendingStage) return s;
-        const { stage } = lead.pendingStage;
-        const ns = stageState(s, leadId, stage);
-        return {
-          ...ns,
-          leads: ns.leads.map((l) =>
-            l.id === leadId
-              ? { ...l, activities: [note(`Passage à « ${STAGE_LABEL[stage] || stage} » validé par le gérant.`, approverId), ...(l.activities || [])] }
-              : l
-          ),
-        };
-      }),
-
-    // Le gérant refuse : la piste reste à son étape, la demande est levée.
-    rejectStageChange: (leadId, approverId) =>
-      setState((s) => ({
-        ...s,
-        leads: s.leads.map((l) =>
-          l.id === leadId && l.pendingStage
-            ? {
-                ...l,
-                pendingStage: null,
-                activities: [note(`Demande de passage à « ${STAGE_LABEL[l.pendingStage.stage] || l.pendingStage.stage} » refusée par le gérant.`, approverId), ...(l.activities || [])],
-              }
-            : l
-        ),
-      })),
 
     addLeadNote: (leadId, text, userId) =>
       setState((s) => ({
