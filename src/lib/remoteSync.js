@@ -71,6 +71,32 @@ export async function pullAll() {
   return { empty: total === 0, collections, tombstones };
 }
 
+// Taille maximale d'un envoi. Le catalogue embarque les photos des produits en
+// base64 : tout pousser d'un coup produit une requête de plusieurs mégaoctets,
+// que le serveur refuse ou laisse expirer — et c'est TOUTE la synchronisation
+// de l'organisation qui reste bloquée. On découpe donc par volume réel.
+const TAILLE_LOT = 400 * 1024;
+
+/** Découpe des lignes en lots dont le poids sérialisé reste raisonnable.
+ *  Une ligne à elle seule plus lourde que la limite part dans son propre lot. */
+export function decouperEnLots(rows, tailleMax = TAILLE_LOT) {
+  const lots = [];
+  let courant = [];
+  let poids = 0;
+  for (const row of rows) {
+    const p = JSON.stringify(row).length;
+    if (courant.length && poids + p > tailleMax) {
+      lots.push(courant);
+      courant = [];
+      poids = 0;
+    }
+    courant.push(row);
+    poids += p;
+  }
+  if (courant.length) lots.push(courant);
+  return lots;
+}
+
 /** Réplique les collections passées : upsert uniquement, non-destructif.
  *  Les suppressions passent exclusivement par pushTombstone. */
 export async function pushCollections(collections) {
@@ -87,8 +113,12 @@ export async function pushCollections(collections) {
       if (currentOrgId && table === 'subscriptionPayments') items = items.filter((i) => i.statut !== 'confirme');
       const rows = items.map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
       if (!rows.length) return;
-      const { error } = await supabase.from(table).upsert(rows);
-      if (error) throw error;
+      // Envois séquentiels par lot : un gros catalogue passe, et une erreur
+      // désigne précisément la table fautive.
+      for (const lot of decouperEnLots(rows)) {
+        const { error } = await supabase.from(table).upsert(lot);
+        if (error) throw new Error(`${table} : ${error.message}`);
+      }
     })
   );
 }

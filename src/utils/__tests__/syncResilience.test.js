@@ -22,7 +22,7 @@ vi.mock('../../lib/supabase', () => ({
   },
 }));
 
-const { pushCollections } = await import('../../lib/remoteSync');
+const { pushCollections, decouperEnLots } = await import('../../lib/remoteSync');
 
 beforeEach(() => { state.echoue.clear(); state.pushes = []; });
 
@@ -40,5 +40,37 @@ describe('pushCollections signale les échecs au lieu de les avaler', () => {
   it('une collection vide n’émet aucune écriture', async () => {
     await pushCollections({ leads: [] });
     expect(state.pushes).toHaveLength(0);
+  });
+});
+
+describe('decouperEnLots — un gros catalogue ne bloque plus la synchronisation', () => {
+  it('un petit ensemble tient dans un seul envoi', () => {
+    const rows = [{ id: 'a' }, { id: 'b' }];
+    expect(decouperEnLots(rows, 10000)).toHaveLength(1);
+  });
+
+  it('découpe dès que le poids dépasse la limite', () => {
+    // 10 lignes d'environ 1 Ko, limite à 3 Ko → au moins 4 lots.
+    const rows = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}`, data: 'x'.repeat(1000) }));
+    const lots = decouperEnLots(rows, 3000);
+    expect(lots.length).toBeGreaterThanOrEqual(4);
+    expect(lots.flat()).toHaveLength(10); // rien n'est perdu
+  });
+
+  it('une ligne plus lourde que la limite part seule, jamais ignorée', () => {
+    const rows = [{ id: 'photo', data: 'x'.repeat(50000) }, { id: 'b' }];
+    const lots = decouperEnLots(rows, 1000);
+    expect(lots[0]).toHaveLength(1);
+    expect(lots.flat()).toHaveLength(2);
+  });
+
+  it('préserve l’ordre des lignes', () => {
+    const rows = Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`, data: 'y'.repeat(500) }));
+    expect(decouperEnLots(rows, 1200).flat().map((r) => r.id))
+      .toEqual(['p0', 'p1', 'p2', 'p3', 'p4', 'p5']);
+  });
+
+  it('ensemble vide : aucun envoi', () => {
+    expect(decouperEnLots([], 1000)).toHaveLength(0);
   });
 });
