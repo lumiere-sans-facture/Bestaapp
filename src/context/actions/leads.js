@@ -98,7 +98,23 @@ export function createLeadActions(setState) {
 
     // Passage direct (gérant) : applique l'étape immédiatement — le « gagné »
     // génère les commissions de parrainage (3 % N1, 1,5 % N2) si absentes.
-    updateLeadStage: (leadId, stage) => setState((s) => stageState(s, leadId, stage)),
+    // Le passage est TRACÉ dans l'activité du client : le commercial qui suit
+    // l'affaire voit ainsi que le gérant l'a fait progresser, même sans demande.
+    updateLeadStage: (leadId, stage, byUserId = null) =>
+      setState((s) => {
+        const avant = s.leads.find((l) => l.id === leadId);
+        if (!avant || avant.stage === stage) return stageState(s, leadId, stage);
+        const ns = stageState(s, leadId, stage);
+        if (!byUserId) return ns;
+        return {
+          ...ns,
+          leads: ns.leads.map((l) =>
+            l.id === leadId
+              ? { ...l, activities: [note(`Étape passée de « ${STAGE_LABEL[avant.stage] || avant.stage} » à « ${STAGE_LABEL[stage] || stage} » par le gérant.`, byUserId), ...(l.activities || [])] }
+              : l
+          ),
+        };
+      }),
 
     // Un technicien DEMANDE un changement d'étape : la piste ne bouge pas,
     // la demande attend la validation du gérant (une nouvelle demande remplace

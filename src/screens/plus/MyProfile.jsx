@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star } from 'lucide-react';
+import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star, Hourglass } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import StageBadge from '../../components/StageBadge';
 import { formatCFA, formatNombre, formatDate, initials } from '../../utils/format';
 import { fileToResizedDataUrl } from '../../utils/image';
 import { ENSOLEILLEMENT } from '../../data/ensoleillement';
@@ -10,7 +11,7 @@ import { useToast } from '../../components/Toast';
 
 export default function MyProfile({ onBack }) {
   const { user } = useAuth();
-  const { partners, leads, commissions, ensurePartnerForUser, updatePartner } = useData();
+  const { partners, leads, commissions, stages, lostStage, ensurePartnerForUser, updatePartner } = useData();
   const fileRef = useRef(null);
   const [form, setForm] = useState(null); // null = lecture
   const toast = useToast();
@@ -23,6 +24,12 @@ export default function MyProfile({ onBack }) {
   if (!me) return null;
 
   const wonLeads = leads.filter((l) => l.assignedTo === user.id && l.stage === 'gagne');
+  // Mes affaires encore ouvertes, de la plus récemment active à la plus ancienne.
+  const mesClients = leads
+    .filter((l) => l.assignedTo === user.id && l.stage !== 'gagne' && l.stage !== 'perdu')
+    .sort((a, b) => new Date(b.lastActivity || 0) - new Date(a.lastActivity || 0));
+  const stageInfo = (l) => (l.stage === 'perdu' ? lostStage : stages.find((st) => st.id === l.stage));
+  const stageLabel = (id) => [...stages, lostStage].find((st) => st.id === id)?.label || id;
   const wonValue = wonLeads.reduce((s, l) => s + l.estimatedValue, 0);
   const myComs = commissions.filter((c) => c.partnerId === me.id);
   const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
@@ -138,6 +145,29 @@ export default function MyProfile({ onBack }) {
             <div className="sheet-row"><span className="sheet-label">Membre depuis</span><span className="sheet-value">{formatDate(me.registeredAt)}</span></div>
           </>
         )}
+      </div>
+
+      {/* Progression de MES clients : le commercial suit l'avancement de ses
+          affaires sans ouvrir le kanban — y compris quand c'est le gérant qui
+          les a fait progresser, ou quand sa demande attend une validation. */}
+      <div className="card my-partner-section">
+        <div className="card-title">Mes clients en cours ({mesClients.length})</div>
+        {mesClients.length ? mesClients.map((l) => (
+          <div key={l.id} className="sheet-row">
+            <span className="sheet-label">
+              {l.name}
+              {l.pendingStage && (
+                <span className="text-secondary">
+                  {' '}· <Hourglass size={11} style={{ verticalAlign: -1 }} /> passage à « {stageLabel(l.pendingStage.stage)} » en attente
+                </span>
+              )}
+            </span>
+            <span className="sheet-value">
+              <StageBadge stage={stageInfo(l)} />
+              {l.estimatedValue > 0 && ` ${formatCFA(l.estimatedValue)}`}
+            </span>
+          </div>
+        )) : <div className="text-sm text-secondary">Aucun client en cours pour le moment.</div>}
       </div>
 
       <div className="card my-partner-section">

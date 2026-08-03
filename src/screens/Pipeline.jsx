@@ -61,7 +61,7 @@ export default function Pipeline() {
   // historique. Le suivi devis par devis vit dans la fiche (plus bas).
   const moveAffaire = (aff, stageId) => {
     if (!aff || aff.externe || aff.stage === stageId) return;
-    if (direct) updateLeadStage(aff.lead.id, stageId);
+    if (direct) updateLeadStage(aff.lead.id, stageId, user.id);
     else requestStageChange(aff.lead.id, stageId, user.id);
   };
   const approveAffaire = (aff) => approveStageChange(aff.lead.id, user.id);
@@ -117,9 +117,11 @@ export default function Pipeline() {
     || (key?.startsWith('client:') ? affaires.find((a) => a.lead.id === key.slice(7)) : null);
   const selectedAff = findAff(selectedKey);
   const pickerAff = findAff(stagePickerKey);
-  // Validation : uniquement les demandes de SA propre équipe (les affaires
-  // externes se valident chez leur auteur).
-  const pendingAffaires = affaires.filter((a) => a.pendingStage && !a.externe);
+  // Validation : TOUTES les demandes de l'équipe, y compris celles des devis,
+  // et sans tenir compte du filtre par commercial — le gérant ne doit jamais
+  // rater une demande. (Les affaires externes se valident chez leur auteur.)
+  const pendingAffaires = buildAffaires(allMyLeads, devis).filter((a) => a.pendingStage);
+  const pendingDevis = devis.filter((d) => d.pendingStage && d.type !== 'pro');
 
   const openValue = affaires.filter(isOpen).reduce((sum, a) => sum + a.value, 0);
   const wonAffaires = affaires.filter((a) => a.stage === 'gagne');
@@ -177,13 +179,35 @@ export default function Pipeline() {
       </PageHeader>
 
       <div className="page-content page-content-flush">
-        {isGerant && pendingAffaires.length > 0 && (
+        {isGerant && (pendingAffaires.length + pendingDevis.length) > 0 && (
           <div className="validation-bar">
             <div className="validation-bar-title">
-              <Hourglass size={15} /> {pendingAffaires.length > 1
-                ? `${pendingAffaires.length} progressions à valider`
+              <Hourglass size={15} /> {(pendingAffaires.length + pendingDevis.length) > 1
+                ? `${pendingAffaires.length + pendingDevis.length} progressions à valider`
                 : '1 progression à valider'}
             </div>
+            {/* Demandes portant sur un DEVIS (issue d'une affaire précise) */}
+            {pendingDevis.map((d) => {
+              const client = allMyLeads.find((l) => l.id === d.leadId);
+              const demandeur = getUserById(d.pendingStage.requestedBy);
+              return (
+                <div key={`d-${d.id}`} className="validation-row">
+                  <div className="validation-info" role="button" tabIndex={0}
+                    onClick={() => client && setSelectedKey(`lead-${client.id}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && client && setSelectedKey(`lead-${client.id}`)}>
+                    <span className="validation-lead">{client?.name || 'Client'} · {d.devisNumber || 'Devis'}</span>
+                    <span className="validation-move">
+                      {stageLabel(devisStage(d, client))} → <strong>{stageLabel(d.pendingStage.stage)}</strong>
+                    </span>
+                    <span className="validation-by">par {demandeur?.name || '—'} · {formatDate(d.pendingStage.requestedAt)}</span>
+                  </div>
+                  <div className="validation-actions">
+                    <button className="btn btn-sm btn-won" onClick={() => approveDevisStageChange(d.id, user.id)}><Check size={14} /> Valider</button>
+                    <button className="btn btn-sm btn-lost" onClick={() => rejectDevisStageChange(d.id, user.id)}><X size={14} /> Refuser</button>
+                  </div>
+                </div>
+              );
+            })}
             {pendingAffaires.map((a) => {
               const demandeur = getUserById(a.pendingStage.requestedBy);
               return (
