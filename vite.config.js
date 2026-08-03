@@ -10,6 +10,13 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(
       (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || 'dev'
     ),
+    // Environnement affiché à côté de la version : « production » seulement
+    // pour un build de la branche main, « test » partout ailleurs (projet
+    // Vercel de test, previews, développement local). Lève toute ambiguïté
+    // quand les deux versions cohabitent.
+    __APP_ENV__: JSON.stringify(
+      process.env.VERCEL_GIT_COMMIT_REF === 'main' ? 'production' : 'test'
+    ),
   },
   // Expose aussi les variables NEXT_PUBLIC_* (créées par l'intégration
   // Vercel ↔ Supabase) en plus de nos VITE_*. Les clés secrètes

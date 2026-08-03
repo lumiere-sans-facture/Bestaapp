@@ -301,7 +301,7 @@ export default function Login() {
         )}
         {/* Version du build : diagnostic des appareils restés sur une vieille
             version en cache (doit correspondre au dernier déploiement). */}
-        <div className="login-version">version {__APP_VERSION__}</div>
+        <div className="login-version">version {__APP_VERSION__} · {__APP_ENV__}</div>
       </div>
     </div>
   );
