@@ -6,7 +6,7 @@ import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { setOrgReferral } from '../lib/remoteSync';
-import { formatCFA, formatDate } from '../utils/format';
+import { formatCFA, formatDate, formatTaux } from '../utils/format';
 import { estProprietaireEspace } from '../utils/roles';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
 import { PAY_NUMBER } from '../config/company';
@@ -512,8 +512,8 @@ export default function Plus() {
                 setNewCommission((c) => ({ ...c, level, amount: suggestAmount(c.leadId, level) || c.amount }));
               }}
             >
-              <option value={1}>Niveau 1 (3%)</option>
-              <option value={2}>Niveau 2 (1,5%)</option>
+              <option value={1}>Niveau 1 ({formatTaux(COMMISSION_RATES[1])})</option>
+              <option value={2}>Niveau 2 ({formatTaux(COMMISSION_RATES[2])})</option>
             </select>
           </Field>
           <Field label="Montant (F CFA) *">

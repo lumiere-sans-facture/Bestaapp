@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick, Search, Star } from 'lucide-react';
-import { useData } from '../../context/DataContext';
-import { formatCFA, formatDate, initials } from '../../utils/format';
+import { useData, COMMISSION_RATES } from '../../context/DataContext';
+import { formatCFA, formatDate, initials, formatTaux } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS, getActiveRef } from '../../utils/referral';
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
@@ -316,7 +316,7 @@ export default function PartnersSection({ onBack }) {
               </div>
 
               <div className="sheet-section">
-                <div className="sheet-section-title">Affaires apportées — niveau 1 (3 %)</div>
+                <div className="sheet-section-title">Affaires apportées — niveau 1 ({formatTaux(COMMISSION_RATES[1])})</div>
                 {st.l1Leads.length ? st.l1Leads.map((l) => (
                   <div key={l.id} className="sheet-row">
                     <span className="sheet-label">{l.name}</span>
@@ -329,7 +329,7 @@ export default function PartnersSection({ onBack }) {
               </div>
 
               <div className="sheet-section">
-                <div className="sheet-section-title">Affaires de ses filleuls — niveau 2 (1,5 %)</div>
+                <div className="sheet-section-title">Affaires de ses filleuls — niveau 2 ({formatTaux(COMMISSION_RATES[2])})</div>
                 {st.l2Leads.length ? st.l2Leads.map((l) => (
                   <div key={l.id} className="sheet-row">
                     <span className="sheet-label">{l.name} <span className="text-secondary">via {getPartnerById(l.parrainL1)?.name}</span></span>

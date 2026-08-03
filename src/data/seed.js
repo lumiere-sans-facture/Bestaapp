@@ -149,7 +149,7 @@ export const formations = [
           },
           {
             id: 'f3m1l2', title: 'Commissions niveau 1 et niveau 2', type: 'texte', duration: '5 min',
-            content: 'Vous touchez 3 % sur les ventes de vos filleuls directs (niveau 1) et 1,5 % sur celles de leurs propres filleuls (niveau 2).\n\nExemple : votre filleul vend un kit à 1 850 000 F → vous gagnez 55 500 F. Si son propre filleul vend le même kit, vous touchez encore 27 750 F.\n\nLes commissions sont validées par le gérant puis payées par Mobile Money.',
+            content: 'Vous touchez 3 % sur les ventes de vos filleuls directs (niveau 1) et 1,5 % sur celles de leurs propres filleuls (niveau 2).\n\nExemple : votre filleul vend un kit à 1 850 000 F → vous gagnez 55 500 F. Si son propre filleul vend le même kit, vous touchez encore 27 750 F.\n\nUne affaire gagnée génère sa commission automatiquement ; le gérant la règle ensuite par Mobile Money.',
           },
           { id: 'f3m1l3', title: 'Être payé par Mobile Money', type: 'video', url: YT, duration: '6 min' },
         ],

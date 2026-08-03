@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCFA, formatDate, initials } from '../format';
+import { formatCFA, formatDate, initials, formatTaux } from '../format';
 
 describe('formatCFA', () => {
   it('groupe les milliers par espaces', () => {
@@ -27,5 +27,19 @@ describe('formatDate', () => {
   it('renvoie un tiret pour une date absente', () => {
     expect(formatDate('')).toBe('—');
     expect(formatDate(null)).toBe('—');
+  });
+});
+
+describe('formatTaux — les libellés suivent le barème', () => {
+  it('formate les taux en vigueur', () => {
+    expect(formatTaux(0.03)).toBe('3 %');
+    expect(formatTaux(0.015)).toBe('1,5 %');
+  });
+  it('suit un changement de barème sans retoucher l’interface', () => {
+    expect(formatTaux(0.05)).toBe('5 %');
+    expect(formatTaux(0.025)).toBe('2,5 %');
+  });
+  it('tolère une valeur absente', () => {
+    expect(formatTaux(undefined)).toBe('0 %');
   });
 });

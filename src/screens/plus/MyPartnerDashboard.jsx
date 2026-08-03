@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save, UserPlus, Crown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useData } from '../../context/DataContext';
-import { formatCFA, formatDate } from '../../utils/format';
+import { useData, COMMISSION_RATES } from '../../context/DataContext';
+import { formatCFA, formatDate, formatTaux } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { fetchMyReferredOrgs } from '../../lib/remoteSync';
@@ -143,7 +143,7 @@ export default function MyPartnerDashboard({ onBack }) {
 
       {/* Mes affaires */}
       <div className="card my-partner-section">
-        <div className="card-title">Mes affaires apportées — niveau 1 (3 %)</div>
+        <div className="card-title">Mes affaires apportées — niveau 1 ({formatTaux(COMMISSION_RATES[1])})</div>
         {l1Leads.length ? l1Leads.map((l) => (
           <div key={l.id} className="sheet-row">
             <span className="sheet-label">{l.name}</span>
@@ -155,7 +155,7 @@ export default function MyPartnerDashboard({ onBack }) {
         )) : <div className="text-sm text-secondary">Aucune affaire pour le moment — partagez votre lien !</div>}
         {l2Leads.length > 0 && (
           <>
-            <div className="card-title my-partner-subtitle">Affaires de mes filleuls — niveau 2 (1,5 %)</div>
+            <div className="card-title my-partner-subtitle">Affaires de mes filleuls — niveau 2 ({formatTaux(COMMISSION_RATES[2])})</div>
             {l2Leads.map((l) => (
               <div key={l.id} className="sheet-row">
                 <span className="sheet-label">{l.name} <span className="text-secondary">via {getPartnerById(l.parrainL1)?.name}</span></span>
