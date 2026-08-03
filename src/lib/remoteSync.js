@@ -97,30 +97,63 @@ export function decouperEnLots(rows, tailleMax = TAILLE_LOT) {
   return lots;
 }
 
-/** Réplique les collections passées : upsert uniquement, non-destructif.
- *  Les suppressions passent exclusivement par pushTombstone. */
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Un envoi, avec deux reprises : absorbe les micro-coupures réseau
+ *  (« Failed to fetch ») fréquentes en connexion mobile. */
+async function envoyerLot(table, lot) {
+  let derniere;
+  for (let essai = 0; essai < 3; essai += 1) {
+    try {
+      const { error } = await supabase.from(table).upsert(lot);
+      if (!error) return;
+      derniere = new Error(error.message);
+    } catch (e) {
+      derniere = e; // requête avortée : le client lève au lieu de retourner error
+    }
+    if (essai < 2) await attendre(500 * (essai + 1));
+  }
+  throw derniere;
+}
+
+/**
+ * Réplique les collections passées : upsert uniquement, non-destructif.
+ * Les suppressions passent exclusivement par pushTombstone.
+ *
+ * Les tables partent l'une APRÈS l'autre : en parallèle, quatorze envois
+ * simultanés — dont le catalogue et ses photos — saturaient la connexion et
+ * échouaient en bloc. Chaque table qui passe est acquise : elle ne sera pas
+ * renvoyée si une autre échoue.
+ * @returns {Promise<string[]>} tables effectivement répliquées
+ */
 export async function pushCollections(collections) {
-  // Upserts indépendants (tables distinctes) exécutés en parallèle.
-  await Promise.all(
-    Object.entries(collections).map(async ([table, items]) => {
-      if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items)) return;
-      // Le catalogue n'est poussé que par l'organisation interne BestaSolar.
-      if (table === 'products' && !pushesProducts()) return;
-      // Vérité serveur : un abonnement « actif » et un paiement « confirme »
-      // ne s'écrivent que côté serveur (RPC admin). L'app ne les repousse
-      // jamais — la RLS les rejetterait et bloquerait toute la réplication.
-      if (currentOrgId && table === 'subscriptions') items = items.filter((i) => i.status !== 'actif');
-      if (currentOrgId && table === 'subscriptionPayments') items = items.filter((i) => i.statut !== 'confirme');
-      const rows = items.map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
-      if (!rows.length) return;
-      // Envois séquentiels par lot : un gros catalogue passe, et une erreur
-      // désigne précisément la table fautive.
-      for (const lot of decouperEnLots(rows)) {
-        const { error } = await supabase.from(table).upsert(lot);
-        if (error) throw new Error(`${table} : ${error.message}`);
-      }
-    })
-  );
+  const reussies = [];
+  const erreurs = [];
+  for (const [table, items0] of Object.entries(collections)) {
+    if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items0)) continue;
+    // Le catalogue n'est poussé que par l'organisation interne BestaSolar.
+    if (table === 'products' && !pushesProducts()) continue;
+    let items = items0;
+    // Vérité serveur : un abonnement « actif » et un paiement « confirme »
+    // ne s'écrivent que côté serveur (RPC admin). L'app ne les repousse
+    // jamais — la RLS les rejetterait et bloquerait toute la réplication.
+    if (currentOrgId && table === 'subscriptions') items = items.filter((i) => i.status !== 'actif');
+    if (currentOrgId && table === 'subscriptionPayments') items = items.filter((i) => i.statut !== 'confirme');
+    const rows = items.map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
+    if (!rows.length) { reussies.push(table); continue; }
+    try {
+      for (const lot of decouperEnLots(rows)) await envoyerLot(table, lot);
+      reussies.push(table);
+    } catch (e) {
+      erreurs.push(`${table} : ${e.message}`);
+    }
+  }
+  if (erreurs.length) {
+    const err = new Error(erreurs.join(' · '));
+    err.reussies = reussies; // l'appelant garde le bénéfice de ce qui est passé
+    throw err;
+  }
+  return reussies;
 }
 
 /** Enregistre une suppression dans la table tombstones (non-destructif). */

@@ -32,7 +32,12 @@ export function useRemoteSync(state, setState, stateRef) {
         const remoteMap = new Map(remoteItems.map((i) => [i.id, i]));
         const deletedIds = tombstones.get(table) || new Set();
         const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id));
-        merged[table] = [...remoteItems, ...localOnly];
+        // Rien à ajouter localement : on garde la RÉFÉRENCE reçue du serveur.
+        // Créer un nouveau tableau ferait croire à une modification locale, et
+        // l'app renverrait l'intégralité des 14 tables au serveur à CHAQUE
+        // ouverture — plusieurs mégaoctets pour un catalogue avec photos, d'où
+        // des envois qui n'aboutissent pas et une synchronisation bloquée.
+        merged[table] = localOnly.length ? [...remoteItems, ...localOnly] : remoteItems;
       }
       syncedRef.current = collections;
       setState(merged);
@@ -132,9 +137,17 @@ export function useRemoteSync(state, setState, stateRef) {
         if (annule) return;
         // Le voyant passe au rouge et l'envoi est REJOUÉ : les données locales
         // restent marquées « à pousser » tant qu'elles ne sont pas arrivées.
+        // Les tables qui SONT passées sont toutefois acquises : sans cela, un
+        // échec sur une seule table ferait tout renvoyer à chaque tentative —
+        // le volume ne redescendrait jamais et la reprise échouerait toujours.
+        if (e.reussies?.length) {
+          const acquis = { ...syncedRef.current };
+          for (const t of e.reussies) if (changed[t]) acquis[t] = changed[t];
+          syncedRef.current = acquis;
+        }
         echecs.current += 1;
-        // Le nom des tables en cours d'envoi cible immédiatement le blocage.
-        setSyncError(`${e.message} (envoi de : ${Object.keys(changed).join(', ')})`);
+        const restantes = Object.keys(changed).filter((t) => !e.reussies?.includes(t));
+        setSyncError(`${e.message}${restantes.length ? ` (en attente : ${restantes.join(', ')})` : ''}`);
         setSyncStatus('error');
         const delai = Math.min(60000, 5000 * 2 ** (echecs.current - 1));
         clearTimeout(retryTimer.current);

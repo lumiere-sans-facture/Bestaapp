@@ -3,13 +3,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Double minimal de Supabase : on choisit quelles tables échouent.
-const state = { echoue: new Set(), pushes: [] };
+const state = { echoue: new Set(), pushes: [], avantUpsert: null };
 vi.mock('../../lib/supabase', () => ({
   isSupabaseConfigured: true,
   supabase: {
     from: (table) => ({
       select: () => Promise.resolve({ data: [], error: null }),
       upsert: (rows) => {
+        if (state.avantUpsert && state.avantUpsert(table)) return Promise.reject(new TypeError('Failed to fetch'));
         if (state.echoue.has(table)) return Promise.resolve({ error: { message: 'réseau' } });
         state.pushes.push({ table, rows });
         return Promise.resolve({ error: null });
@@ -24,7 +25,7 @@ vi.mock('../../lib/supabase', () => ({
 
 const { pushCollections, decouperEnLots } = await import('../../lib/remoteSync');
 
-beforeEach(() => { state.echoue.clear(); state.pushes = []; });
+beforeEach(() => { state.echoue.clear(); state.pushes = []; state.avantUpsert = null; });
 
 describe('pushCollections signale les échecs au lieu de les avaler', () => {
   it('rejette quand le serveur refuse une écriture', async () => {
@@ -32,14 +33,40 @@ describe('pushCollections signale les échecs au lieu de les avaler', () => {
     await expect(pushCollections({ leads: [{ id: 'l1', name: 'X' }] })).rejects.toBeTruthy();
   });
 
-  it('réussit silencieusement quand tout passe', async () => {
-    await expect(pushCollections({ leads: [{ id: 'l1', name: 'X' }] })).resolves.toBeUndefined();
-    expect(state.pushes).toHaveLength(1);
+  it('retourne les tables répliquées quand tout passe', async () => {
+    await expect(pushCollections({ leads: [{ id: 'l1', name: 'X' }] })).resolves.toEqual(['leads']);
   });
 
   it('une collection vide n’émet aucune écriture', async () => {
     await pushCollections({ leads: [] });
     expect(state.pushes).toHaveLength(0);
+  });
+
+  it('une table en échec n’annule PAS les tables déjà passées', async () => {
+    state.echoue.add('partners');
+    try {
+      await pushCollections({
+        leads: [{ id: 'l1' }],
+        partners: [{ id: 'p1' }],
+        devis: [{ id: 'd1' }],
+      });
+      throw new Error('aurait dû échouer');
+    } catch (e) {
+      // Le bénéfice des tables réussies est conservé pour la reprise.
+      expect(e.reussies).toContain('leads');
+      expect(e.reussies).toContain('devis');
+      expect(e.reussies).not.toContain('partners');
+      expect(e.message).toMatch(/partners/);
+    }
+  });
+
+  it('réessaie avant d’abandonner (micro-coupure réseau)', async () => {
+    // La table échoue aux deux premiers essais, réussit au troisième.
+    let n = 0;
+    state.avantUpsert = (table) => { n += 1; return n < 3 && table === 'leads'; };
+    await expect(pushCollections({ leads: [{ id: 'l1' }] })).resolves.toEqual(['leads']);
+    expect(n).toBeGreaterThanOrEqual(3);
+    state.avantUpsert = null;
   });
 });
 
