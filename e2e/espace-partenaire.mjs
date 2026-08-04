@@ -70,13 +70,35 @@ ok(await page.locator('.profile-link-card').count() === 0,
 
 // ---- 3. L'ESPACE PARTENAIRE PORTE TOUT L'ARGENT ----
 await page.goto('http://localhost:3000/plus/mypartner');
-await page.waitForSelector('.my-partner-kpis', { timeout: 15000 });
+await page.waitForSelector('.partner-kpis', { timeout: 15000 });
+await page.waitForTimeout(500);
+
+// La page tient sur un écran tant que rien n'est déplié : c'est tout l'objet
+// des sections repliables.
+const sections = await page.locator('.accordion').count();
+ok(sections >= 6, `espace partenaire : ${sections} sections repliables`);
+ok(await page.locator('.accordion[open]').count() === 0,
+   'espace partenaire : tout est replié à l’ouverture (page courte)');
+const hReplie = await page.evaluate(() => document.querySelector('.page-content').scrollHeight);
+ok(hReplie < 1000, `espace partenaire : page repliée courte (${hReplie} px)`);
+
+// Les en-têtes annoncent le contenu sans qu'on ouvre.
+const entetes = await page.locator('.accordion-head').allInnerTexts();
+ok(entetes.some((t) => /Historique de mes commissions/.test(t) && /15 000 F à venir/.test(t)),
+   'espace partenaire : l’en-tête annonce le montant à encaisser sans ouvrir');
+ok(entetes.some((t) => /Mes affaires gagnées/.test(t) && /500 000 F/.test(t)),
+   'espace partenaire : l’en-tête des affaires gagnées annonce le total');
+
+// On déplie tout pour vérifier le contenu.
+for (const h of await page.locator('.accordion-head').all()) await h.click();
+await page.waitForTimeout(500);
+ok(await page.locator('.accordion[open]').count() === sections,
+   'espace partenaire : chaque section s’ouvre au clic');
 const espace = await page.locator('.page-content').innerText();
-ok(/Mes affaires gagnées \(1\)/.test(espace) && /CLINIQUE SAINT JEAN/.test(espace),
-   'espace partenaire : les affaires gagnées ont bien migré ici');
+ok(/CLINIQUE SAINT JEAN/.test(espace), 'espace partenaire : les affaires gagnées ont bien migré ici');
 ok(/gagnée le 2 août 2026/.test(espace), 'espace partenaire : la date du gain est affichée');
-ok(/Historique de mes commissions \(2\)/.test(espace),
-   'espace partenaire : l’historique des commissions est présent (2 lignes)');
+const lignesCom = await page.locator('.accordion:has-text("Historique de mes commissions") .sheet-row').count();
+ok(lignesCom === 2, `espace partenaire : l’historique des commissions liste ${lignesCom} ligne(s) [attendu 2]`);
 ok(/Niveau 1 \(3\s*%\)/.test(espace), 'espace partenaire : le niveau et son taux sont affichés');
 ok(/BS-20260801-0001/.test(espace), 'espace partenaire : le devis d’origine est rappelé');
 ok(/payée le 3 août 2026/.test(espace), 'espace partenaire : la date de paiement est affichée');
@@ -85,7 +107,7 @@ ok(await page.locator('#mpd-momo').inputValue() === '+229 97 11 22 33',
 ok(/15 000 F/.test(espace) && /7 500 F/.test(espace),
    'espace partenaire : les deux montants sont listés');
 // L'ordre : à encaisser d'abord
-const lignes = await page.locator('.card:has-text("Historique de mes commissions") .sheet-row').allInnerTexts();
+const lignes = await page.locator('.accordion:has-text("Historique de mes commissions") .sheet-row').allInnerTexts();
 ok(/En attente/.test(lignes[0] || '') && /Payée/.test(lignes[1] || ''),
    'espace partenaire : les commissions à encaisser passent en premier');
 

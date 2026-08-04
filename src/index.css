@@ -1501,13 +1501,75 @@ form .login-link { width: 100%; margin-top: 4px; }
 
 /* Espace partenaire personnel */
 .my-affiliate-box { margin-bottom: 0; }
-.my-partner-kpis { margin-top: 16px; }
+
+/* Tuiles de l'espace partenaire : icône, montant, libellé — en colonne, pour
+   que « 150 000 F » tienne sur une ligne (la pastille ronde de .stat-pill est
+   calibrée pour des compteurs à deux chiffres). */
+.partner-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; margin-top: 16px;
+}
+.kpi-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.kpi-icon {
+  width: 34px; height: 34px; border-radius: var(--radius-sm);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--primary);
+}
+.kpi-value { font-size: 1.375rem; font-weight: 700; line-height: 1.15; }
+.kpi-label { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.25; }
+.kpi-card.is-primary .kpi-icon { background: rgba(10, 36, 114, 0.1); color: var(--primary); }
+.kpi-card.is-info    .kpi-icon { background: var(--info-light); color: var(--info); }
+.kpi-card.is-success .kpi-icon { background: var(--success-light); color: var(--success-text); }
+/* Ce qui reste à encaisser : l'information nº 1 de l'écran. */
+.kpi-card.is-highlight { background: var(--primary); }
+.kpi-card.is-highlight .kpi-value { color: #fff; }
+.kpi-card.is-highlight .kpi-label { color: rgba(255, 255, 255, 0.8); }
+.kpi-card.is-highlight .kpi-icon { background: rgba(255, 255, 255, 0.18); color: #fff; }
 .my-partner-section { margin-top: 16px; }
 .my-partner-subtitle { margin-top: 18px; }
 .momo-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 .momo-input-row { display: flex; gap: 8px; }
 .momo-input-row .input { flex: 1; }
 .momo-input-row .btn { flex-shrink: 0; }
+
+/* Sections repliables (details/summary) : évitent la page sans fin quand
+   chaque rubrique est vide ou très longue. */
+.accordion { margin-top: 12px; padding: 0; }
+.accordion-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; min-height: 52px;
+  cursor: pointer; list-style: none; user-select: none;
+  border-radius: var(--radius);
+}
+.accordion-head::-webkit-details-marker { display: none; }
+.accordion-head:hover { background: var(--bg); }
+.accordion-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.accordion-title {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  font-size: 0.9375rem; font-weight: 600;
+}
+.accordion-icon { flex-shrink: 0; color: var(--primary); }
+.accordion-count {
+  flex-shrink: 0; min-width: 24px; padding: 1px 7px;
+  background: var(--bg); border-radius: var(--radius-pill);
+  font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-align: center;
+}
+.accordion-resume {
+  flex-shrink: 0; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary);
+}
+.accordion-chevron { flex-shrink: 0; color: var(--text-secondary); transition: transform 0.18s ease; }
+.accordion[open] > .accordion-head .accordion-chevron { transform: rotate(180deg); }
+.accordion[open] > .accordion-head { border-radius: var(--radius) var(--radius) 0 0; }
+.accordion-body { padding: 12px 16px 16px; border-top: 1px solid var(--border); }
+.accordion-body > .sheet-row:first-child { padding-top: 0; }
+@media (prefers-reduced-motion: reduce) { .accordion-chevron { transition: none; } }
+/* Écrans étroits : le résumé cède la place au titre — les montants clés sont
+   déjà dans les tuiles du haut. */
+@media (max-width: 430px) { .accordion-resume { display: none; } }
 
 /* Indicateur de synchronisation */
 .sync-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 4px; vertical-align: middle; }

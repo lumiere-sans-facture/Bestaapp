@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save, UserPlus, Crown, Wallet, Trophy } from 'lucide-react';
+import { ChevronLeft, Check, CheckCircle, Copy, MessageCircle, MousePointerClick, Network, Users, Save, UserPlus, Crown, Wallet, Trophy, FileText, Share2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, formatTaux } from '../../utils/format';
@@ -7,6 +7,7 @@ import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { fetchMyReferredOrgs } from '../../lib/remoteSync';
 import StageBadge from '../../components/StageBadge';
+import Accordion from '../../components/Accordion';
 import { useToast } from '../../components/Toast';
 
 const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé', inscription: 'Inscription via mon lien' };
@@ -58,6 +59,7 @@ export default function MyPartnerDashboard({ onBack }) {
     .filter((l) => (l.assignedTo === user.id || l.parrainL1 === me.id) && l.stage === 'gagne')
     .sort((a, b) => new Date(b.wonAt || 0) - new Date(a.wonAt || 0));
   const totalGagne = mesGagnees.reduce((s, l) => s + (l.estimatedValue || 0), 0);
+  const mesDevis = (devis || []).filter((d) => d.partnerId === me.id);
   const myReferrals = (referrals || []).filter((r) => r.partnerCode === me.code);
   const clicks = myReferrals.filter((r) => r.type === 'clic').length;
   const conversions = myReferrals.filter((r) => r.type !== 'clic');
@@ -109,55 +111,43 @@ export default function MyPartnerDashboard({ onBack }) {
         </div>
       </div>
 
-      {/* KPI (mêmes tuiles .stat-pill que les tableaux de bord) */}
-      <div className="stat-strip my-partner-kpis">
-        <div className="stat-pill is-warning">
-          <span className="stat-pill-num">{formatCFA(pending)}</span>
-          <span className="stat-pill-label">Commissions en attente</span>
+      {/* KPI : icône, montant, libellé. Les tuiles .stat-pill des tableaux de
+          bord logent leur valeur dans une pastille ronde de 42 px — un montant
+          en F CFA y passe à la ligne. D'où cette variante en colonne, et le
+          montant à encaisser mis en avant : c'est ce qu'on vient voir. */}
+      <div className="partner-kpis">
+        <div className="kpi-card is-highlight">
+          <span className="kpi-icon"><Wallet size={18} /></span>
+          <span className="kpi-value">{formatCFA(pending)}</span>
+          <span className="kpi-label">Commissions en attente</span>
         </div>
-        <div className="stat-pill is-success">
-          <span className="stat-pill-num">{formatCFA(paid)}</span>
-          <span className="stat-pill-label">Commissions payées</span>
+        <div className="kpi-card is-success">
+          <span className="kpi-icon"><CheckCircle size={18} /></span>
+          <span className="kpi-value">{formatCFA(paid)}</span>
+          <span className="kpi-label">Commissions payées</span>
         </div>
-        <div className="stat-pill is-primary">
-          <span className="stat-pill-num">{wonLeads.length}/{l1Leads.length}</span>
-          <span className="stat-pill-label">Affaires gagnées / apportées</span>
+        <div className="kpi-card is-primary">
+          <span className="kpi-icon"><Trophy size={18} /></span>
+          <span className="kpi-value">{wonLeads.length}/{l1Leads.length}</span>
+          <span className="kpi-label">Affaires gagnées / apportées</span>
         </div>
-        <div className="stat-pill is-info">
-          <span className="stat-pill-num">{clicks}</span>
-          <span className="stat-pill-label">Clics sur mon lien</span>
+        <div className="kpi-card is-info">
+          <span className="kpi-icon"><MousePointerClick size={18} /></span>
+          <span className="kpi-value">{clicks}</span>
+          <span className="kpi-label">Clics sur mon lien</span>
         </div>
       </div>
 
-      {/* Mes affaires gagnées : la source des commissions, donc ici. */}
-      <div className="card my-partner-section">
-        <div className="card-title">
-          <Trophy size={15} /> Mes affaires gagnées ({mesGagnees.length})
-          {totalGagne > 0 && <span className="text-secondary"> · {formatCFA(totalGagne)}</span>}
-        </div>
-        {mesGagnees.length ? mesGagnees.map((l) => (
-          <div key={l.id} className="sheet-row">
-            <span className="sheet-label">
-              {l.name}
-              <span className="text-secondary"> · gagnée le {formatDate(l.wonAt)}</span>
-            </span>
-            <span className="sheet-value amount">{formatCFA(l.estimatedValue)}</span>
-          </div>
-        )) : (
-          <div className="text-sm text-secondary">
-            Aucune affaire gagnée pour le moment — chacune vous crée une commission.
-          </div>
-        )}
-      </div>
+      {/* Le détail vit dans des sections repliables : la page tient sur un
+          écran, chaque en-tête annonce son compte et son montant, et on
+          n'ouvre que ce qu'on vient chercher. */}
 
-      {/* Historique détaillé des commissions : tout ce qui touche à l'argent
-          vit ici, dans l'espace partenaire — le profil n'en parle plus. */}
-      <div className="card my-partner-section">
-        <div className="card-title"><Wallet size={15} /> Historique de mes commissions ({myComs.length})</div>
+      <Accordion icon={Wallet} title="Historique de mes commissions" count={myComs.length}
+        resume={pending > 0 ? `${formatCFA(pending)} à venir` : null}>
         {myComs.length ? historiqueComs.map((c) => (
           <div key={c.id} className="sheet-row">
             <span className="sheet-label">
-              <Wallet size={14} /> {getLeadById(c.leadId)?.name || 'Commission manuelle'}
+              {getLeadById(c.leadId)?.name || 'Commission manuelle'}
               <span className="text-secondary">
                 {' · '}Niveau {c.level} ({formatTaux(COMMISSION_RATES[c.level])})
                 {numeroDevis(c) ? ` · ${numeroDevis(c)}` : ''}
@@ -177,36 +167,27 @@ export default function MyPartnerDashboard({ onBack }) {
             qui est déclarée gagnée vous en crée une automatiquement.
           </div>
         )}
-      </div>
+      </Accordion>
 
-      {/* Filleuls inscrits sur la plateforme via mon lien (mode SaaS) */}
-      {isSupabaseConfigured && (
-        <div className="card my-partner-section">
-          <div className="card-title"><UserPlus size={15} /> Mes filleuls inscrits ({mesInscrits.length})</div>
-          {mesInscrits.length ? mesInscrits.map((r) => (
-            <div key={r.org_id} className="sheet-row">
-              <span className="sheet-label">
-                {r.member_name || r.org_name}
-                <span className="text-secondary"> · inscrit le {formatDate(r.inscrit_le)}</span>
-              </span>
-              <span className="sheet-value">
-                {r.pro_actif
-                  ? <span className="badge badge-success"><Crown size={11} style={{ verticalAlign: -1 }} /> Abonné Pro</span>
-                  : <span className="badge badge-muted">Gratuit</span>}
-              </span>
-            </div>
-          )) : (
-            <div className="text-sm text-secondary">
-              Personne ne s'est encore inscrit avec votre lien. Chaque filleul abonné à
-              Devis Pro vous rapporte une commission à chacun de ses paiements.
-            </div>
-          )}
-        </div>
-      )}
+      <Accordion icon={Trophy} title="Mes affaires gagnées" count={mesGagnees.length}
+        resume={totalGagne > 0 ? formatCFA(totalGagne) : null}>
+        {mesGagnees.length ? mesGagnees.map((l) => (
+          <div key={l.id} className="sheet-row">
+            <span className="sheet-label">
+              {l.name}
+              <span className="text-secondary"> · gagnée le {formatDate(l.wonAt)}</span>
+            </span>
+            <span className="sheet-value amount">{formatCFA(l.estimatedValue)}</span>
+          </div>
+        )) : (
+          <div className="text-sm text-secondary">
+            Aucune affaire gagnée pour le moment — chacune vous crée une commission.
+          </div>
+        )}
+      </Accordion>
 
-      {/* Mes affaires */}
-      <div className="card my-partner-section">
-        <div className="card-title">Mes affaires apportées — niveau 1 ({formatTaux(COMMISSION_RATES[1])})</div>
+      <Accordion icon={Users} title="Mes affaires apportées" count={l1Leads.length + l2Leads.length}
+        resume={`niveau 1 · ${formatTaux(COMMISSION_RATES[1])}`}>
         {l1Leads.length ? l1Leads.map((l) => (
           <div key={l.id} className="sheet-row">
             <span className="sheet-label">{l.name}</span>
@@ -230,29 +211,47 @@ export default function MyPartnerDashboard({ onBack }) {
             ))}
           </>
         )}
-      </div>
+      </Accordion>
 
-      {/* Mes devis */}
-      <div className="card my-partner-section">
-        <div className="card-title">Mes devis ({(devis || []).filter((d) => d.partnerId === me.id).length})</div>
-        {(devis || []).filter((d) => d.partnerId === me.id).length ? (
-          (devis || []).filter((d) => d.partnerId === me.id).map((d) => (
-            <div key={d.id} className="sheet-row">
-              <span className="sheet-label">
-                {d.devisNumber} — {getLeadById(d.leadId)?.name || 'Client'}
-                <span className="text-secondary"> · {formatDate(d.createdAt)}</span>
-              </span>
-              <span className="sheet-value amount">{formatCFA(d.total)}</span>
-            </div>
-          ))
-        ) : (
+      <Accordion icon={FileText} title="Mes devis" count={mesDevis.length}>
+        {mesDevis.length ? mesDevis.map((d) => (
+          <div key={d.id} className="sheet-row">
+            <span className="sheet-label">
+              {d.devisNumber} — {getLeadById(d.leadId)?.name || 'Client'}
+              <span className="text-secondary"> · {formatDate(d.createdAt)}</span>
+            </span>
+            <span className="sheet-value amount">{formatCFA(d.total)}</span>
+          </div>
+        )) : (
           <div className="text-sm text-secondary">Aucun devis rattaché pour le moment.</div>
         )}
-      </div>
+      </Accordion>
 
-      {/* Historique des conversions */}
-      <div className="card my-partner-section">
-        <div className="card-title">Historique de mes parrainages</div>
+      {/* Filleuls inscrits sur la plateforme via mon lien (mode SaaS) */}
+      {isSupabaseConfigured && (
+        <Accordion icon={UserPlus} title="Mes filleuls inscrits" count={mesInscrits.length}>
+          {mesInscrits.length ? mesInscrits.map((r) => (
+            <div key={r.org_id} className="sheet-row">
+              <span className="sheet-label">
+                {r.member_name || r.org_name}
+                <span className="text-secondary"> · inscrit le {formatDate(r.inscrit_le)}</span>
+              </span>
+              <span className="sheet-value">
+                {r.pro_actif
+                  ? <span className="badge badge-success"><Crown size={11} style={{ verticalAlign: -1 }} /> Abonné Pro</span>
+                  : <span className="badge badge-muted">Gratuit</span>}
+              </span>
+            </div>
+          )) : (
+            <div className="text-sm text-secondary">
+              Personne ne s'est encore inscrit avec votre lien. Chaque filleul abonné à
+              Devis Pro vous rapporte une commission à chacun de ses paiements.
+            </div>
+          )}
+        </Accordion>
+      )}
+
+      <Accordion icon={Share2} title="Historique de mes parrainages" count={conversions.length}>
         {conversions.length ? conversions.map((r) => (
           <div key={r.id} className="sheet-row">
             <span className="sheet-label">
@@ -268,11 +267,11 @@ export default function MyPartnerDashboard({ onBack }) {
             </span>
           </div>
         )) : <div className="text-sm text-secondary">Aucune conversion enregistrée pour le moment.</div>}
-      </div>
+      </Accordion>
 
       {/* Réseau + paiement */}
-      <div className="card my-partner-section">
-        <div className="card-title">Mon réseau et mon paiement</div>
+      <Accordion icon={Network} title="Mon réseau et mon paiement"
+        resume={me.momoNumber ? me.momoNumber : 'Mobile Money à renseigner'}>
         <div className="sheet-row">
           <span className="sheet-label"><Network size={14} /> Mon parrain</span>
           <span className="sheet-value">{sponsor ? sponsor.name : '— Tête de réseau'}</span>
@@ -302,7 +301,7 @@ export default function MyPartnerDashboard({ onBack }) {
             </button>
           </div>
         </div>
-      </div>
+      </Accordion>
     </>
   );
 }
