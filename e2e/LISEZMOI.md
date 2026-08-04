@@ -14,6 +14,7 @@ npm run dev                 # dans un terminal
 node e2e/suivi-clients.mjs  # dans un autre
 node e2e/commissions.mjs
 node e2e/validation.mjs
+node e2e/espace-partenaire.mjs
 ```
 
 Chaque scénario prépare son propre jeu de données (mode local, sans backend)
@@ -26,3 +27,4 @@ puis vérifie ce que l'utilisateur voit réellement à l'écran.
 | `suivi-clients.mjs` | Deux devis d'un même client donnent deux cartes distinctes, dans des colonnes différentes, chacune avec son numéro et son montant ; un client sans devis garde sa carte de prospection ; la barre de progression est présente ; déplacer une affaire ne touche pas l'autre. |
 | `validation.mjs` | Le commercial demande une progression (rien ne bouge, bandeau « en attente », puce sur la carte, pas de bouton Valider chez lui) ; le gérant voit la barre « Progressions à valider » avec client, étape et demandeur, puis valide (l'étape s'applique) ou refuse (l'étape reste) ; le gérant, lui, agit directement sans créer de demande. |
 | `commissions.mjs` | Une affaire passée à « Gagné » crée la commission **automatiquement**, au bon montant, rattachée au bon devis ; deux affaires gagnées donnent deux commissions sans doublon ; elles apparaissent dans l'écran Commissions. |
+| `espace-partenaire.mjs` | Le profil ne parle plus d'argent (ni tuiles de commissions, ni Mobile Money, ni lignes « Commission niveau … ») et renvoie vers l'espace partenaire ; celui-ci porte l'historique complet des commissions (niveau et taux, devis d'origine, date de paiement, à encaisser d'abord) et le numéro Mobile Money. |

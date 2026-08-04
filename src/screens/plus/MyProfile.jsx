@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import StageBadge from '../../components/StageBadge';
@@ -11,9 +11,12 @@ import { useToast } from '../../components/Toast';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { updateMyProfile } from '../../lib/remoteSync';
 
-export default function MyProfile({ onBack }) {
+// Le profil ne parle QUE de la personne et de son activité commerciale.
+// Tout ce qui touche à l'argent — commissions, Mobile Money, historique des
+// versements — vit dans « Mon espace partenaire », d'un seul tenant.
+export default function MyProfile({ onBack, onGoPartner }) {
   const { user } = useAuth();
-  const { partners, leads, commissions, stages, lostStage, ensurePartnerForUser, updatePartner } = useData();
+  const { partners, leads, stages, lostStage, ensurePartnerForUser, updatePartner } = useData();
   const fileRef = useRef(null);
   const [form, setForm] = useState(null); // null = lecture
   const toast = useToast();
@@ -25,18 +28,18 @@ export default function MyProfile({ onBack }) {
   const me = partners.find((p) => p.userId === user.id);
   if (!me) return null;
 
-  const wonLeads = leads.filter((l) => l.assignedTo === user.id && l.stage === 'gagne');
+  const wonLeads = leads
+    .filter((l) => l.assignedTo === user.id && l.stage === 'gagne')
+    .sort((a, b) => new Date(b.wonAt || 0) - new Date(a.wonAt || 0));
+  const lostCount = leads.filter((l) => l.assignedTo === user.id && l.stage === 'perdu').length;
   // Mes affaires encore ouvertes, de la plus récemment active à la plus ancienne.
   const mesClients = leads
     .filter((l) => l.assignedTo === user.id && l.stage !== 'gagne' && l.stage !== 'perdu')
     .sort((a, b) => new Date(b.lastActivity || 0) - new Date(a.lastActivity || 0));
   const stageInfo = (l) => (l.stage === 'perdu' ? lostStage : stages.find((st) => st.id === l.stage));
-  const myComs = commissions.filter((c) => c.partnerId === me.id);
-  const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
-  const paid = myComs.filter((c) => c.status === 'payée').reduce((s, c) => s + c.amount, 0);
 
   const startEdit = () =>
-    setForm({ name: me.name, phone: me.phone || '', email: me.email || '', zone: me.zone || '', momoNumber: me.momoNumber || '' });
+    setForm({ name: me.name, phone: me.phone || '', email: me.email || '', zone: me.zone || '' });
 
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0];
@@ -58,7 +61,6 @@ export default function MyProfile({ onBack }) {
       phone: form.phone.trim(),
       email: form.email.trim(),
       zone: form.zone,
-      momoNumber: form.momoNumber.trim(),
     });
     setForm(null);
     // L'annuaire de l'équipe vit dans `profiles` (serveur) : sans cet appel,
@@ -74,14 +76,7 @@ export default function MyProfile({ onBack }) {
     toast('Modifications enregistrées.');
   };
 
-  // Historique fusionné (commissions + affaires gagnées), trié du plus récent
-  // au plus ancien AVANT découpe — sinon les affaires passaient toujours après.
-  const history = [
-    ...myComs.map((c) => ({ kind: 'commission', date: c.createdAt, item: c })),
-    ...wonLeads.map((l) => ({ kind: 'won', date: l.wonAt, item: l })),
-  ]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 8);
+  const dernieresGagnees = wonLeads.slice(0, 8);
 
   return (
     <>
@@ -104,11 +99,12 @@ export default function MyProfile({ onBack }) {
           {me.tier === 'or' && <span className="tier-badge"><Star size={12} /> OR</span>}
         </div>
         <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'} · <span className="partner-code-chip">{me.code}</span></div>
-        {/* L'unité (F) vit dans le libellé pour garder des valeurs compactes */}
+        {/* Activité commerciale — les montants de commissions sont dans
+            « Mon espace partenaire », pas ici. */}
         <div className="profile-stats">
-          <div><div className="profile-stat-value">{formatNombre(pending)}</div><div className="profile-stat-label">En attente (F)</div></div>
-          <div><div className="profile-stat-value">{formatNombre(paid)}</div><div className="profile-stat-label">Payées (F)</div></div>
-          <div><div className="profile-stat-value">{wonLeads.length}</div><div className="profile-stat-label">Gagnées</div></div>
+          <div><div className="profile-stat-value">{formatNombre(mesClients.length)}</div><div className="profile-stat-label">En cours</div></div>
+          <div><div className="profile-stat-value">{formatNombre(wonLeads.length)}</div><div className="profile-stat-label">Gagnées</div></div>
+          <div><div className="profile-stat-value">{formatNombre(lostCount)}</div><div className="profile-stat-label">Perdues</div></div>
         </div>
       </div>
 
@@ -139,9 +135,6 @@ export default function MyProfile({ onBack }) {
                 </select>
               </Field>
             </div>
-            <Field label="Numéro Mobile Money (réception des commissions)">
-              <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+229 ..." />
-            </Field>
             <div className="form-actions">
               <button type="submit" className="btn btn-primary btn-block"><Check size={16} /> Enregistrer</button>
               <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>Annuler</button>
@@ -152,11 +145,24 @@ export default function MyProfile({ onBack }) {
             <div className="sheet-row"><span className="sheet-label"><Phone size={14} /> Téléphone</span><span className="sheet-value">{me.phone || '—'}</span></div>
             <div className="sheet-row"><span className="sheet-label"><Mail size={14} /> Email</span><span className="sheet-value">{me.email || '—'}</span></div>
             <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Zone d'intervention</span><span className="sheet-value">{me.zone || '—'}</span></div>
-            <div className="sheet-row"><span className="sheet-label"><Wallet size={14} /> Mobile Money</span><span className="sheet-value">{me.momoNumber || '—'}</span></div>
             <div className="sheet-row"><span className="sheet-label">Membre depuis</span><span className="sheet-value">{formatDate(me.registeredAt)}</span></div>
           </>
         )}
       </div>
+
+      {/* Renvoi vers l'espace partenaire : c'est lui qui porte désormais les
+          commissions, le Mobile Money et l'historique des versements. */}
+      {onGoPartner && (
+        <button type="button" className="card my-partner-section profile-link-card" onClick={onGoPartner}>
+          <span className="profile-link-text">
+            <span className="card-title"><Wallet size={15} /> Mes commissions</span>
+            <span className="text-sm text-secondary">
+              Montants en attente et payés, historique et numéro Mobile Money — dans Mon espace partenaire.
+            </span>
+          </span>
+          <ChevronRight size={18} />
+        </button>
+      )}
 
       {/* Progression de MES clients : le commercial suit l'avancement de ses
           affaires sans ouvrir le kanban — y compris quand c'est le gérant qui
@@ -175,22 +181,15 @@ export default function MyProfile({ onBack }) {
       </div>
 
       <div className="card my-partner-section">
-        <div className="card-title">Historique récent</div>
-        {history.length === 0 && (
-          <div className="text-sm text-secondary">Aucune activité pour le moment.</div>
+        <div className="card-title">Mes affaires gagnées ({wonLeads.length})</div>
+        {dernieresGagnees.length === 0 && (
+          <div className="text-sm text-secondary">Aucune affaire gagnée pour le moment.</div>
         )}
-        {history.map(({ kind, item }) => (
-          kind === 'commission' ? (
-            <div key={item.id} className="sheet-row">
-              <span className="sheet-label"><Wallet size={14} /> Commission niveau {item.level} · {formatDate(item.createdAt)}</span>
-              <span className="sheet-value">{formatCFA(item.amount)} <span className={`badge ${item.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>{item.status === 'payée' ? 'Payée' : 'En attente'}</span></span>
-            </div>
-          ) : (
-            <div key={item.id} className="sheet-row">
-              <span className="sheet-label"><Trophy size={14} /> {item.name} · {formatDate(item.wonAt)}</span>
-              <span className="sheet-value amount">{formatCFA(item.estimatedValue)}</span>
-            </div>
-          )
+        {dernieresGagnees.map((l) => (
+          <div key={l.id} className="sheet-row">
+            <span className="sheet-label"><Trophy size={14} /> {l.name} · {formatDate(l.wonAt)}</span>
+            <span className="sheet-value amount">{formatCFA(l.estimatedValue)}</span>
+          </div>
         ))}
       </div>
     </>

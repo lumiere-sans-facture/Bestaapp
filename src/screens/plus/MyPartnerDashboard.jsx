@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save, UserPlus, Crown } from 'lucide-react';
+import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save, UserPlus, Crown, Wallet } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, formatTaux } from '../../utils/format';
@@ -45,6 +45,12 @@ export default function MyPartnerDashboard({ onBack }) {
   const myComs = commissions.filter((c) => c.partnerId === me.id);
   const paid = myComs.filter((c) => c.status === 'payée').reduce((s, c) => s + c.amount, 0);
   const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
+  // Les commissions à encaisser d'abord, puis de la plus récente à la plus ancienne.
+  const historiqueComs = [...myComs].sort(
+    (a, b) => (a.status === 'en_attente' ? -1 : 1) - (b.status === 'en_attente' ? -1 : 1)
+      || new Date(b.createdAt) - new Date(a.createdAt)
+  );
+  const numeroDevis = (c) => (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber : null);
   const myReferrals = (referrals || []).filter((r) => r.partnerCode === me.code);
   const clicks = myReferrals.filter((r) => r.type === 'clic').length;
   const conversions = myReferrals.filter((r) => r.type !== 'clic');
@@ -114,6 +120,35 @@ export default function MyPartnerDashboard({ onBack }) {
           <span className="stat-pill-num">{clicks}</span>
           <span className="stat-pill-label">Clics sur mon lien</span>
         </div>
+      </div>
+
+      {/* Historique détaillé des commissions : tout ce qui touche à l'argent
+          vit ici, dans l'espace partenaire — le profil n'en parle plus. */}
+      <div className="card my-partner-section">
+        <div className="card-title"><Wallet size={15} /> Historique de mes commissions ({myComs.length})</div>
+        {myComs.length ? historiqueComs.map((c) => (
+          <div key={c.id} className="sheet-row">
+            <span className="sheet-label">
+              <Wallet size={14} /> {getLeadById(c.leadId)?.name || 'Commission manuelle'}
+              <span className="text-secondary">
+                {' · '}Niveau {c.level} ({formatTaux(COMMISSION_RATES[c.level])})
+                {numeroDevis(c) ? ` · ${numeroDevis(c)}` : ''}
+                {' · '}{c.status === 'payée' ? `payée le ${formatDate(c.paidAt)}` : `créée le ${formatDate(c.createdAt)}`}
+              </span>
+            </span>
+            <span className="sheet-value">
+              {formatCFA(c.amount)}{' '}
+              <span className={`badge ${c.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>
+                {c.status === 'payée' ? 'Payée' : 'En attente'}
+              </span>
+            </span>
+          </div>
+        )) : (
+          <div className="text-sm text-secondary">
+            Aucune commission pour le moment. Chaque affaire que vous apportez et
+            qui est déclarée gagnée vous en crée une automatiquement.
+          </div>
+        )}
       </div>
 
       {/* Filleuls inscrits sur la plateforme via mon lien (mode SaaS) */}

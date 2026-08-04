@@ -334,7 +334,9 @@ export default function Plus() {
     </>
   );
 
-  const renderProfile = () => <MyProfile onBack={() => setActiveTab('menu')} />;
+  const renderProfile = () => (
+    <MyProfile onBack={() => setActiveTab('menu')} onGoPartner={() => setActiveTab('mypartner')} />
+  );
 
   const renderBackup = () => (
     <>

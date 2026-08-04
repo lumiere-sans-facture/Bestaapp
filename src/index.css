@@ -1509,6 +1509,16 @@ form .login-link { width: 100%; margin-top: 4px; }
 .momo-input-row .input { flex: 1; }
 .momo-input-row .btn { flex-shrink: 0; }
 
+/* Renvoi du profil vers l'espace partenaire (carte entièrement cliquable) */
+.profile-link-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; text-align: left; cursor: pointer; color: inherit;
+  font: inherit; border: 1px solid var(--border);
+}
+.profile-link-card:hover { border-color: var(--primary); }
+.profile-link-text { display: flex; flex-direction: column; gap: 4px; }
+.profile-link-card .card-title { margin: 0; }
+
 /* Indicateur de synchronisation */
 .sync-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 4px; vertical-align: middle; }
 .sync-online { background: var(--success); }
