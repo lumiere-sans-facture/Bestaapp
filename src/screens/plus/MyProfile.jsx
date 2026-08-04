@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star } from 'lucide-react';
+import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Trophy, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import StageBadge from '../../components/StageBadge';
@@ -12,9 +12,9 @@ import { isSupabaseConfigured } from '../../lib/supabase';
 import { updateMyProfile } from '../../lib/remoteSync';
 
 // Le profil ne parle QUE de la personne et de son activité commerciale.
-// Tout ce qui touche à l'argent — commissions, Mobile Money, historique des
-// versements — vit dans « Mon espace partenaire », d'un seul tenant.
-export default function MyProfile({ onBack, onGoPartner }) {
+// Zéro mention de commission ici — montants, Mobile Money, historique des
+// versements et accès : tout vit dans « Mon espace partenaire ».
+export default function MyProfile({ onBack }) {
   const { user } = useAuth();
   const { partners, leads, stages, lostStage, ensurePartnerForUser, updatePartner } = useData();
   const fileRef = useRef(null);
@@ -149,20 +149,6 @@ export default function MyProfile({ onBack, onGoPartner }) {
           </>
         )}
       </div>
-
-      {/* Renvoi vers l'espace partenaire : c'est lui qui porte désormais les
-          commissions, le Mobile Money et l'historique des versements. */}
-      {onGoPartner && (
-        <button type="button" className="card my-partner-section profile-link-card" onClick={onGoPartner}>
-          <span className="profile-link-text">
-            <span className="card-title"><Wallet size={15} /> Mes commissions</span>
-            <span className="text-sm text-secondary">
-              Montants en attente et payés, historique et numéro Mobile Money — dans Mon espace partenaire.
-            </span>
-          </span>
-          <ChevronRight size={18} />
-        </button>
-      )}
 
       {/* Progression de MES clients : le commercial suit l'avancement de ses
           affaires sans ouvrir le kanban — y compris quand c'est le gérant qui

@@ -58,16 +58,17 @@ await page.waitForTimeout(400);
 const form = await page.locator('.card:has(form)').innerText();
 ok(!/Mobile Money/.test(form), 'profil : le formulaire ne demande plus le numéro Mobile Money');
 await page.locator('button:has-text("Annuler")').first().click();
-await page.waitForTimeout(300);
+await page.waitForTimeout(400);
 
-// ---- 2. LE RENVOI VERS L'ESPACE PARTENAIRE ----
-const lien = page.locator('.profile-link-card');
-ok(await lien.count() === 1, 'profil : une carte renvoie vers « Mes commissions »');
-await lien.click();
-await page.waitForTimeout(700);
-ok(page.url().endsWith('/plus/mypartner'), 'profil : le renvoi ouvre bien Mon espace partenaire');
+// ---- 2. ZÉRO MENTION DE COMMISSION, NULLE PART SUR LE PROFIL ----
+const profilFinal = await page.locator('.page-content').innerText();
+ok(!/[Cc]ommission/.test(profilFinal), 'profil : le mot « commission » n’apparaît plus du tout');
+ok(!/Mobile Money|momo/i.test(profilFinal), 'profil : aucune mention du paiement Mobile Money');
+ok(await page.locator('.profile-link-card').count() === 0,
+   'profil : plus aucun bouton ni renvoi vers les commissions');
 
 // ---- 3. L'ESPACE PARTENAIRE PORTE TOUT L'ARGENT ----
+await page.goto('http://localhost:3000/plus/mypartner');
 await page.waitForSelector('.my-partner-kpis', { timeout: 15000 });
 const espace = await page.locator('.page-content').innerText();
 ok(/Historique de mes commissions \(2\)/.test(espace),
