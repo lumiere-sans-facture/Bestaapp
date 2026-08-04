@@ -70,6 +70,52 @@ await page.waitForTimeout(1200);
 const texte = await page.locator('.page-content, body').first().textContent();
 ok(/15\s?000/.test(texte) && /9\s?000/.test(texte), 'les deux commissions sont affichées dans l’écran Commissions');
 
+// ---- RÉSEAU À DEUX NIVEAUX : le parrain de l'apporteur touche 1,5 % ----
+// MARIE parraine FATOU ; FATOU apporte l'affaire. Le passage à « Gagné » doit
+// créer DEUX commissions : 3 % pour Fatou, 1,5 % pour Marie.
+const ETAT_N2 = {
+  version: 5,
+  leads: [{ id: 'LN2', name: 'HOTEL DU LAC', contact: 'M. K', phone: '+229', address: 'Parakou',
+    clientType: 'entreprise', stage: 'negociation', estimatedValue: 1000000, assignedTo: 'u2',
+    parrainL1: 'p-fatou', parrainL2: null, createdAt: '2026-08-01', lastActivity: '2026-08-01' }],
+  devis: [{ id: 'DN2', devisNumber: 'BS-20260801-0009', leadId: 'LN2', total: 1000000, type: 'manual',
+    stage: 'proposition', statut: 'valide', partnerId: 'p-fatou', createdBy: 'u2', createdAt: '2026-08-01', lignes: [] }],
+  partners: [
+    { id: 'p-marie', userId: 'u1', name: 'Marie', code: 'BESTA-MARIE', status: 'actif', sponsorId: null, registeredAt: '2026-01-01' },
+    { id: 'p-fatou', userId: 'u2', name: 'Fatou', code: 'BESTA-FATOU', status: 'actif', sponsorId: 'p-marie', registeredAt: '2026-02-01' },
+  ],
+  commissions: [], referrals: [], orders: [], products: [], formations: [], formationProgress: [],
+  subscriptions: [], subscriptionPayments: [], companies: [], factures: [], proClients: [],
+  devisCounter: 1, orderCounter: 0,
+};
+// Page neuve : la précédente a son propre état en mémoire, qu'elle
+// ré-enregistrerait par-dessus le nôtre à la première sauvegarde différée.
+const p2 = await nav.newPage();
+p2.on('pageerror', (e) => jsErr.push(String(e)));
+await p2.goto('http://localhost:3000');
+await p2.evaluate((e) => {
+  localStorage.setItem('bestasolar_data', JSON.stringify(e));
+  localStorage.setItem('bestasolar_user', JSON.stringify({ id: 'u1', email: 'marie@bestasolar.bj', name: 'Marie', role: 'gerant', phone: '+229', avatar: 'M' }));
+}, ETAT_N2);
+await p2.goto('http://localhost:3000/pipeline');
+await p2.waitForSelector('.kanban-container', { timeout: 15000 });
+await p2.waitForTimeout(700);
+await p2.locator('.kanban-card:has-text("HOTEL DU LAC")').first().click();
+await p2.waitForTimeout(600);
+await p2.locator('.sheet button:has-text("Gagné")').first().click();
+await p2.waitForTimeout(1200);
+
+const cn2 = await p2.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).commissions || []);
+const n1 = cn2.find((c) => c.level === 1);
+const n2 = cn2.find((c) => c.level === 2);
+ok(cn2.length === 2, `réseau à 2 niveaux → ${cn2.length} commission(s) [attendu 2]`);
+ok(!!n1 && n1.partnerId === 'p-fatou' && n1.amount === 30000,
+   `niveau 1 : ${n1?.amount} F pour l’apporteur [attendu 30 000 = 3 %]`);
+ok(!!n2 && n2.partnerId === 'p-marie' && n2.amount === 15000,
+   `niveau 2 : ${n2?.amount} F pour SON PARRAIN [attendu 15 000 = 1,5 %]`);
+
 console.log(R.join('\n'));
 console.log(jsErr.length ? `\nERREURS JS : ${jsErr.slice(0, 2).join(' | ')}` : '\naucune erreur JS');
 await nav.close();
+const echecs = R.filter((l) => l.startsWith('❌')).length + jsErr.length;
+process.exit(echecs ? 1 : 0);

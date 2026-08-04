@@ -693,6 +693,8 @@ declare
   v_data jsonb; v_stage text; v_now timestamptz := now();
   v_jour text; v_lead_id text; v_total numeric; v_l1 text; v_l2 text;
   v_partner_org text; v_cid text;
+  v_lead_name text; v_code text; v_p1 text; v_p2 text;
+  v_l1_name text; v_l2_code text; v_rid text;
 begin
   if not public.auth_is_platform_admin() then
     raise exception 'réservé à l''admin plateforme';
@@ -717,9 +719,10 @@ begin
           updated_at = v_now
       where org_id = p_org_id and id = p_id;
     v_lead_id := p_id;
+    v_lead_name := v_data ->> 'name';
     v_total := coalesce(nullif(v_data ->> 'estimatedValue', '')::numeric, 0);
-    v_l1 := v_data ->> 'parrainL1';
-    v_l2 := v_data ->> 'parrainL2';
+    v_l1 := nullif(v_data ->> 'parrainL1', '');
+    v_l2 := nullif(v_data ->> 'parrainL2', '');
 
   elsif p_kind = 'devis' then
     select data into v_data from public.devis where org_id = p_org_id and id = p_id;
@@ -739,14 +742,47 @@ begin
       where org_id = p_org_id and id = p_id;
     v_lead_id := v_data ->> 'leadId';
     v_total := coalesce(nullif(v_data ->> 'total', '')::numeric, 0);
-    v_l1 := v_data ->> 'partnerId';
-    -- Le parrain de la piste prime sur l'apporteur du devis.
-    select coalesce(l.data ->> 'parrainL1', v_l1), l.data ->> 'parrainL2'
-      into v_l1, v_l2
+    v_l1 := nullif(v_data ->> 'partnerId', '');
+    -- Le parrain de la piste prime sur l'apporteur du devis. On passe par des
+    -- variables temporaires : un SELECT INTO sans ligne met ses cibles à NULL
+    -- et effacerait l'apporteur du devis quand la piste manque.
+    select nullif(l.data ->> 'parrainL1', ''), nullif(l.data ->> 'parrainL2', ''), l.data ->> 'name'
+      into v_p1, v_p2, v_lead_name
       from public.leads l where l.org_id = p_org_id and l.id = v_lead_id;
+    v_l1 := coalesce(v_p1, v_l1);
+    v_l2 := v_p2;
   else
     raise exception 'type inconnu : %', p_kind;
   end if;
+
+  -- NIVEAU 2 — le parrain de l'apporteur. Trois sources, dans cet ordre :
+  --   1. le parrain figé sur la piste (`parrainL2`) ;
+  --   2. le `sponsorId` du profil partenaire de l'apporteur (même organisation) ;
+  --   3. un CODE de parrainage : celui du profil (`sponsorCode`), sinon celui
+  --      de l'ORGANISATION (`orgs.referred_by`, posé à l'inscription).
+  -- Le cas 3 est le plus courant et c'est lui qui manquait : un commercial qui
+  -- s'inscrit avec un code n'a AUCUN profil partenaire de son parrain dans sa
+  -- propre organisation — aucun `sponsorId` local ne peut donc le désigner, et
+  -- le niveau 2 n'était jamais attribué. On résout alors le code sur toute la
+  -- plateforme, l'organisation courante d'abord.
+  if v_l1 is not null and v_l2 is null then
+    select nullif(trim(pt.data ->> 'sponsorId'), ''),
+           nullif(upper(trim(pt.data ->> 'sponsorCode')), '')
+      into v_l2, v_code
+      from public.partners pt where pt.org_id = p_org_id and pt.id = v_l1;
+    if v_l2 is null then
+      if v_code is null then
+        select nullif(upper(trim(o.referred_by)), '') into v_code
+          from public.orgs o where o.id = p_org_id;
+      end if;
+      if v_code is not null then
+        select pt.id into v_l2 from public.partners pt
+          where upper(pt.data ->> 'code') = v_code
+          order by (pt.org_id = p_org_id) desc, pt.updated_at asc limit 1;
+      end if;
+    end if;
+  end if;
+  if v_l2 is not null and v_l2 = v_l1 then v_l2 := null; end if;
 
   -- Commission de l'apporteur, créée dans l'organisation où vit son profil.
   if v_stage = 'gagne' and v_total > 0 and v_l1 is not null then
@@ -764,6 +800,10 @@ begin
       insert into public.commissions (org_id, id, data, updated_at)
       values (v_partner_org, v_cid, jsonb_build_object(
         'id', v_cid, 'partnerId', v_l1, 'leadId', v_lead_id,
+        -- Le client vit dans l'organisation de l'affaire : son nom est copié
+        -- ici, sinon un parrain d'une AUTRE organisation ne saurait pas à quoi
+        -- se rapporte sa commission.
+        'leadName', v_lead_name, 'leadOrg', p_org_id,
         'devisId', case when p_kind = 'devis' then p_id else null end,
         'level', 1, 'amount', round(v_total * 0.03),
         'status', 'en_attente', 'paidAt', null, 'createdAt', v_jour
@@ -784,9 +824,28 @@ begin
         insert into public.commissions (org_id, id, data, updated_at)
         values (v_partner_org, v_cid, jsonb_build_object(
           'id', v_cid, 'partnerId', v_l2, 'leadId', v_lead_id,
+          'leadName', v_lead_name, 'leadOrg', p_org_id,
           'devisId', case when p_kind = 'devis' then p_id else null end,
           'level', 2, 'amount', round(v_total * 0.015),
           'status', 'en_attente', 'paidAt', null, 'createdAt', v_jour
+        ), v_now);
+
+        -- TRACE DE PARRAINAGE chez le parrain : sans elle, il touche une
+        -- commission de niveau 2 sans que rien n'apparaisse dans « Historique
+        -- de mes parrainages » — l'affaire de son filleul vit dans une autre
+        -- organisation, invisible depuis la sienne.
+        select pt.data ->> 'name' into v_l1_name from public.partners pt
+          where pt.org_id = p_org_id and pt.id = v_l1;
+        select pt.data ->> 'code' into v_l2_code from public.partners pt
+          where pt.org_id = v_partner_org and pt.id = v_l2;
+        v_rid := gen_random_uuid()::text;
+        insert into public.referrals (org_id, id, data, updated_at)
+        values (v_partner_org, v_rid, jsonb_build_object(
+          'id', v_rid, 'partnerCode', v_l2_code, 'type', 'affaire',
+          'status', 'validé', 'amount', round(v_total * 0.015),
+          'leadId', null, 'leadName', v_lead_name, 'filleulName', v_l1_name,
+          'affaireOrg', p_org_id, 'affaireId', p_id,
+          'createdAt', to_char(v_now at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
         ), v_now);
       end if;
     end if;
@@ -812,7 +871,10 @@ begin
       'partnerName',  p.data ->> 'name',
       'partnerCode',  p.data ->> 'code',
       'partnerPhone', p.data ->> 'phone',
-      'leadName',     l.data ->> 'name',
+      -- Une commission de NIVEAU 2 vit chez le parrain, dans une autre
+      -- organisation que le client : la jointure ne trouve rien et le nom
+      -- copié sur la commission prend alors le relais.
+      'leadName',     coalesce(l.data ->> 'name', c.data ->> 'leadName'),
       'leadValue',    l.data ->> 'estimatedValue',
       'devisNumber',  d.data ->> 'devisNumber'
     ) as doc

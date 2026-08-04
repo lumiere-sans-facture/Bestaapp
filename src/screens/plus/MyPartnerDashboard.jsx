@@ -10,7 +10,11 @@ import StageBadge from '../../components/StageBadge';
 import Accordion from '../../components/Accordion';
 import { useToast } from '../../components/Toast';
 
-const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé', inscription: 'Inscription via mon lien' };
+const REFERRAL_TYPE_LABELS = {
+  clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé',
+  inscription: 'Inscription via mon lien',
+  affaire: 'Affaire gagnée par un filleul',
+};
 
 export default function MyPartnerDashboard({ onBack }) {
   const { user } = useAuth();
@@ -147,7 +151,10 @@ export default function MyPartnerDashboard({ onBack }) {
         {myComs.length ? historiqueComs.map((c) => (
           <div key={c.id} className="sheet-row">
             <span className="sheet-label">
-              {getLeadById(c.leadId)?.name || 'Commission manuelle'}
+              {/* Une commission de niveau 2 porte sur le client d'un FILLEUL :
+                  sa piste vit dans une autre organisation, d'où le nom copié
+                  sur la commission. */}
+              {getLeadById(c.leadId)?.name || c.leadName || 'Commission manuelle'}
               <span className="text-secondary">
                 {' · '}Niveau {c.level} ({formatTaux(COMMISSION_RATES[c.level])})
                 {numeroDevis(c) ? ` · ${numeroDevis(c)}` : ''}
@@ -256,7 +263,11 @@ export default function MyPartnerDashboard({ onBack }) {
           <div key={r.id} className="sheet-row">
             <span className="sheet-label">
               {REFERRAL_TYPE_LABELS[r.type] || r.type}
-              {r.leadId && getLeadById(r.leadId) ? ` — ${getLeadById(r.leadId).name}` : r.filleulName ? ` — ${r.filleulName}` : ''}
+              {/* Une affaire de filleul vit hors de mon organisation : son nom
+                  est copié sur la trace, la piste étant introuvable ici. */}
+              {getLeadById(r.leadId)?.name ? ` — ${getLeadById(r.leadId).name}`
+                : r.leadName ? ` — ${r.leadName}${r.filleulName ? ` (via ${r.filleulName})` : ''}`
+                : r.filleulName ? ` — ${r.filleulName}` : ''}
               <span className="text-secondary"> · {formatDate(r.createdAt)}</span>
             </span>
             <span className="sheet-value">

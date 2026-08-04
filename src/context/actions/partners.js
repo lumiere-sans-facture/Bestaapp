@@ -29,13 +29,37 @@ export function createPartnerActions(setState) {
 
     // Chaque utilisateur de l'app (technicien ou gérant) dispose de son propre
     // profil partenaire, créé automatiquement à la première visite de son espace.
+    //
+    // Le parrain se note de DEUX façons, et les deux comptent :
+    //  - `sponsorId` quand son profil partenaire vit dans la même organisation
+    //    (réseau interne monté par le gérant) ;
+    //  - `sponsorCode` sinon. À l'inscription sur la plateforme, le parrain est
+    //    dans une AUTRE organisation : aucun `sponsorId` local ne peut le
+    //    désigner. Sans le code, le niveau 2 n'a plus aucun support et la
+    //    commission de 1,5 % n'est jamais attribuée.
     ensurePartnerForUser: (user) =>
       setState((s) => {
-        if (s.partners.some((p) => p.userId === user.id)) return s;
+        const codeOrg = (user.org?.referred_by || '').trim().toUpperCase() || null;
+        const existant = s.partners.find((p) => p.userId === user.id);
+        if (existant) {
+          // Réparation des profils créés avant que le code d'organisation ne
+          // soit connu : sans parrain, aucune commission de niveau 2.
+          if (!codeOrg || existant.sponsorId || existant.sponsorCode) return s;
+          const local = s.partners.find((p) => p.code === codeOrg && p.id !== existant.id);
+          return {
+            ...s,
+            partners: s.partners.map((p) => (p.id === existant.id
+              ? { ...p, sponsorCode: codeOrg, sponsorId: local?.id || null }
+              : p)),
+          };
+        }
         // Rattachement automatique : si un lien de parrainage (?ref=…) est
         // actif sur l'appareil à la création du profil, son propriétaire
         // devient le parrain — sans saisie manuelle.
         const refPartner = partnerFromActiveRef(s.partners);
+        const parrain = (refPartner && refPartner.userId !== user.id ? refPartner : null)
+          || (codeOrg ? s.partners.find((p) => p.code === codeOrg) : null)
+          || null;
         return {
           ...s,
           partners: [
@@ -49,7 +73,8 @@ export function createPartnerActions(setState) {
               photo: '',
               zone: '',
               tier: 'standard',
-              sponsorId: refPartner && refPartner.userId !== user.id ? refPartner.id : null,
+              sponsorId: parrain?.id || null,
+              sponsorCode: parrain?.code || codeOrg,
               status: 'actif',
               registeredAt: new Date().toISOString().slice(0, 10),
               code: generatePartnerCode(user.name, s.partners.map((p) => p.code).filter(Boolean)),
