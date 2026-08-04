@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Trophy, Star } from 'lucide-react';
+import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import StageBadge from '../../components/StageBadge';
@@ -11,12 +11,13 @@ import { useToast } from '../../components/Toast';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { updateMyProfile } from '../../lib/remoteSync';
 
-// Le profil ne parle QUE de la personne et de son activité commerciale.
-// Zéro mention de commission ici — montants, Mobile Money, historique des
-// versements et accès : tout vit dans « Mon espace partenaire ».
+// Le profil ne parle QUE de la personne et de son travail en cours.
+// Rien de ce qui mène à une commission n'y figure — montants, Mobile Money,
+// affaires gagnées, historique des versements : tout vit dans « Mon espace
+// partenaire », d'un seul tenant.
 export default function MyProfile({ onBack }) {
   const { user } = useAuth();
-  const { partners, leads, stages, lostStage, ensurePartnerForUser, updatePartner } = useData();
+  const { partners, leads, devis, stages, lostStage, ensurePartnerForUser, updatePartner } = useData();
   const fileRef = useRef(null);
   const [form, setForm] = useState(null); // null = lecture
   const toast = useToast();
@@ -28,14 +29,11 @@ export default function MyProfile({ onBack }) {
   const me = partners.find((p) => p.userId === user.id);
   if (!me) return null;
 
-  const wonLeads = leads
-    .filter((l) => l.assignedTo === user.id && l.stage === 'gagne')
-    .sort((a, b) => new Date(b.wonAt || 0) - new Date(a.wonAt || 0));
-  const lostCount = leads.filter((l) => l.assignedTo === user.id && l.stage === 'perdu').length;
   // Mes affaires encore ouvertes, de la plus récemment active à la plus ancienne.
   const mesClients = leads
     .filter((l) => l.assignedTo === user.id && l.stage !== 'gagne' && l.stage !== 'perdu')
     .sort((a, b) => new Date(b.lastActivity || 0) - new Date(a.lastActivity || 0));
+  const mesDevis = (devis || []).filter((d) => d.createdBy === user.id);
   const stageInfo = (l) => (l.stage === 'perdu' ? lostStage : stages.find((st) => st.id === l.stage));
 
   const startEdit = () =>
@@ -76,8 +74,6 @@ export default function MyProfile({ onBack }) {
     toast('Modifications enregistrées.');
   };
 
-  const dernieresGagnees = wonLeads.slice(0, 8);
-
   return (
     <>
       <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={onBack}>
@@ -99,12 +95,11 @@ export default function MyProfile({ onBack }) {
           {me.tier === 'or' && <span className="tier-badge"><Star size={12} /> OR</span>}
         </div>
         <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'} · <span className="partner-code-chip">{me.code}</span></div>
-        {/* Activité commerciale — les montants de commissions sont dans
-            « Mon espace partenaire », pas ici. */}
+        {/* Le travail en cours, rien d'autre : issues des affaires et
+            montants se lisent dans « Mon espace partenaire ». */}
         <div className="profile-stats">
-          <div><div className="profile-stat-value">{formatNombre(mesClients.length)}</div><div className="profile-stat-label">En cours</div></div>
-          <div><div className="profile-stat-value">{formatNombre(wonLeads.length)}</div><div className="profile-stat-label">Gagnées</div></div>
-          <div><div className="profile-stat-value">{formatNombre(lostCount)}</div><div className="profile-stat-label">Perdues</div></div>
+          <div><div className="profile-stat-value">{formatNombre(mesClients.length)}</div><div className="profile-stat-label">Clients en cours</div></div>
+          <div><div className="profile-stat-value">{formatNombre(mesDevis.length)}</div><div className="profile-stat-label">Devis créés</div></div>
         </div>
       </div>
 
@@ -164,19 +159,6 @@ export default function MyProfile({ onBack }) {
             </span>
           </div>
         )) : <div className="text-sm text-secondary">Aucun client en cours pour le moment.</div>}
-      </div>
-
-      <div className="card my-partner-section">
-        <div className="card-title">Mes affaires gagnées ({wonLeads.length})</div>
-        {dernieresGagnees.length === 0 && (
-          <div className="text-sm text-secondary">Aucune affaire gagnée pour le moment.</div>
-        )}
-        {dernieresGagnees.map((l) => (
-          <div key={l.id} className="sheet-row">
-            <span className="sheet-label"><Trophy size={14} /> {l.name} · {formatDate(l.wonAt)}</span>
-            <span className="sheet-value amount">{formatCFA(l.estimatedValue)}</span>
-          </div>
-        ))}
       </div>
     </>
   );

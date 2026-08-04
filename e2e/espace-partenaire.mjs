@@ -46,11 +46,12 @@ const profil = await page.locator('.page-content').innerText();
 ok(!/En attente \(F\)|Payées \(F\)/.test(profil), 'profil : plus de tuiles « En attente / Payées »');
 ok(!/Commission niveau/.test(profil), 'profil : plus de lignes « Commission niveau … » dans l’historique');
 ok(!/\+229 97 11 22 33/.test(profil), 'profil : le numéro Mobile Money n’y figure plus');
-ok(/Mes affaires gagnées/.test(profil), 'profil : l’historique ne garde que les affaires gagnées');
-ok(/CLINIQUE SAINT JEAN/.test(profil), 'profil : l’affaire gagnée est bien listée');
+ok(!/gagné|gagnée/i.test(profil), 'profil : plus aucune affaire gagnée (elles mènent aux commissions)');
+ok(!/CLINIQUE SAINT JEAN/.test(profil), 'profil : l’affaire gagnée n’y est plus listée');
+ok(/BOULANGERIE KANDI/.test(profil), 'profil : le client EN COURS, lui, reste sur le profil');
 const tuiles = await page.locator('.profile-stats .profile-stat-label').allInnerTexts();
-ok(JSON.stringify(tuiles) === JSON.stringify(['En cours', 'Gagnées', 'Perdues']),
-   `profil : tuiles d’activité commerciale — ${tuiles.join(' / ')}`);
+ok(JSON.stringify(tuiles) === JSON.stringify(['Clients en cours', 'Devis créés']),
+   `profil : tuiles du travail en cours — ${tuiles.join(' / ')}`);
 
 // Le formulaire d'édition ne propose plus le Mobile Money
 await page.locator('button:has-text("Modifier")').first().click();
@@ -71,6 +72,9 @@ ok(await page.locator('.profile-link-card').count() === 0,
 await page.goto('http://localhost:3000/plus/mypartner');
 await page.waitForSelector('.my-partner-kpis', { timeout: 15000 });
 const espace = await page.locator('.page-content').innerText();
+ok(/Mes affaires gagnées \(1\)/.test(espace) && /CLINIQUE SAINT JEAN/.test(espace),
+   'espace partenaire : les affaires gagnées ont bien migré ici');
+ok(/gagnée le 2 août 2026/.test(espace), 'espace partenaire : la date du gain est affichée');
 ok(/Historique de mes commissions \(2\)/.test(espace),
    'espace partenaire : l’historique des commissions est présent (2 lignes)');
 ok(/Niveau 1 \(3\s*%\)/.test(espace), 'espace partenaire : le niveau et son taux sont affichés');

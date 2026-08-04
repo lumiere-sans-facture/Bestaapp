@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save, UserPlus, Crown, Wallet } from 'lucide-react';
+import { ChevronLeft, Check, Copy, MessageCircle, Network, Users, Save, UserPlus, Crown, Wallet, Trophy } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, formatTaux } from '../../utils/format';
@@ -51,6 +51,13 @@ export default function MyPartnerDashboard({ onBack }) {
       || new Date(b.createdAt) - new Date(a.createdAt)
   );
   const numeroDevis = (c) => (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber : null);
+  // Mes affaires gagnées : ce sont elles qui déclenchent les commissions, elles
+  // se lisent donc ici et non sur le profil. Celles que j'ai apportées comme
+  // celles que je suis, sans doublon.
+  const mesGagnees = leads
+    .filter((l) => (l.assignedTo === user.id || l.parrainL1 === me.id) && l.stage === 'gagne')
+    .sort((a, b) => new Date(b.wonAt || 0) - new Date(a.wonAt || 0));
+  const totalGagne = mesGagnees.reduce((s, l) => s + (l.estimatedValue || 0), 0);
   const myReferrals = (referrals || []).filter((r) => r.partnerCode === me.code);
   const clicks = myReferrals.filter((r) => r.type === 'clic').length;
   const conversions = myReferrals.filter((r) => r.type !== 'clic');
@@ -120,6 +127,27 @@ export default function MyPartnerDashboard({ onBack }) {
           <span className="stat-pill-num">{clicks}</span>
           <span className="stat-pill-label">Clics sur mon lien</span>
         </div>
+      </div>
+
+      {/* Mes affaires gagnées : la source des commissions, donc ici. */}
+      <div className="card my-partner-section">
+        <div className="card-title">
+          <Trophy size={15} /> Mes affaires gagnées ({mesGagnees.length})
+          {totalGagne > 0 && <span className="text-secondary"> · {formatCFA(totalGagne)}</span>}
+        </div>
+        {mesGagnees.length ? mesGagnees.map((l) => (
+          <div key={l.id} className="sheet-row">
+            <span className="sheet-label">
+              {l.name}
+              <span className="text-secondary"> · gagnée le {formatDate(l.wonAt)}</span>
+            </span>
+            <span className="sheet-value amount">{formatCFA(l.estimatedValue)}</span>
+          </div>
+        )) : (
+          <div className="text-sm text-secondary">
+            Aucune affaire gagnée pour le moment — chacune vous crée une commission.
+          </div>
+        )}
       </div>
 
       {/* Historique détaillé des commissions : tout ce qui touche à l'argent

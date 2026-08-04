@@ -1377,7 +1377,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 }
 /* Grille de 3 : les montants ne se cassent plus sur deux lignes (l'unité vit
    dans le libellé). */
-.profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+.profile-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }
 .profile-stat-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); overflow-wrap: anywhere; }
 .profile-stat-label { font-size: 0.75rem; color: var(--text-muted); }
 
