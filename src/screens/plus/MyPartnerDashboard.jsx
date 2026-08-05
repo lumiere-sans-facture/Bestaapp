@@ -167,7 +167,11 @@ export default function MyPartnerDashboard({ onBack }) {
             </span>
             <span className="sheet-value">
               {formatCFA(c.amount)}{' '}
-              <span className={`badge ${c.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>
+              {/* Statut en neutre : l'ambre et le vert appartiennent au NIVEAU
+                  (pastille de gauche). Les commissions dues passent de toute
+                  façon en tête de liste, et le total « à venir » est annoncé
+                  sur l'en-tête de la section. */}
+              <span className="badge badge-muted">
                 {c.status === 'payée' ? 'Payée' : 'En attente'}
               </span>
             </span>

@@ -197,11 +197,6 @@ img { max-width: 100%; }
 .btn-primary:hover { background: var(--primary-light); }
 .btn-accent { background: var(--accent); color: var(--primary-dark); font-weight: 600; }
 .btn-accent:hover { background: var(--accent-light); }
-/* Action d'encaissement (payer une commission) : vert PLEIN, pas un contour —
-   c'est un mouvement d'argent, il doit se voir. Le fond reprend le vert foncé
-   du texte de succès : le vert clair ne passerait pas le contraste sur blanc. */
-.btn-success { background: var(--success-text); color: white; }
-.btn-success:hover { background: #036048; }
 .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text-primary); }
 .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
 .btn-outline-light { background: transparent; border: 1.5px solid rgba(255,255,255,0.4); color: white; }
@@ -222,7 +217,7 @@ img { max-width: 100%; }
 textarea.input { resize: vertical; }
 
 .badge {
-  display: inline-flex; align-items: center; padding: 4px 10px;
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
   border-radius: 6px; font-size: 0.75rem; font-weight: 500; white-space: nowrap;
 }
 .badge-success { background: var(--success-light); color: var(--success-text); }
@@ -1646,28 +1641,33 @@ form .login-link { width: 100%; margin-top: 4px; }
 .commission-amount { font-size: 1.125rem; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
 .commission-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); }
 
-/* Carte de commission — un liseré dit l'état avant même de lire : ambre tant
-   qu'elle est due, vert une fois réglée. */
-.commission-card { padding: 14px 16px; border-left: 3px solid var(--warning); }
-.commission-card.is-paid { border-left-color: var(--success); }
+/* Carte de commission — le liseré dit le NIVEAU : orange N1, vert N2.
+   L'état de paiement n'emprunte plus ces couleurs : une commission réglée
+   passe en RETRAIT (fond gris, montant estompé) et n'a plus d'action de
+   paiement, seulement son reçu. */
+.commission-card { padding: 14px 16px; border-left: 3px solid var(--accent); }
+.commission-card.niveau-2 { border-left-color: var(--success); }
+.commission-card.is-paid { background: var(--bg); box-shadow: none; }
+.commission-card.is-paid .commission-lead,
+.commission-card.is-paid .commission-amount { color: var(--text-secondary); }
 .commission-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .commission-ident { min-width: 0; }
 .commission-sub {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   margin-top: 4px; font-size: 0.8125rem; color: var(--text-secondary);
 }
-/* Pastille de NIVEAU de parrainage. Sa couleur lui est propre — surtout pas
-   l'ambre et le vert, qui disent partout ailleurs « à payer » et « payée » :
-   les deux langages se confondaient et on lisait le niveau dans le liseré
-   d'état. Ici, deux teintes d'une même famille froide, comme deux étages
-   d'une même chose. Le texte (N1 / N2) porte l'information à lui seul. */
+/* NIVEAU de parrainage : ORANGE pour le niveau 1, VERT pour le niveau 2.
+   Sur une commission, ces deux couleurs ne disent QUE le niveau — jamais
+   l'état de paiement, qui se lit au poids de la carte et à son action.
+   Mélanger les deux langages faisait lire le niveau dans le liseré d'état.
+   Le texte (N1 / N2) porte l'information à lui seul. */
 .chip-level {
   flex-shrink: 0; padding: 1px 8px; border-radius: var(--radius-pill);
   background: var(--bg); color: var(--text-secondary);
   font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em;
 }
-.chip-level.n1 { background: rgba(10, 36, 114, 0.10); color: var(--primary); }
-.chip-level.n2 { background: #ede9fe; color: #5b21b6; }
+.chip-level.n1 { background: var(--warning-light); color: var(--warning-dark); }
+.chip-level.n2 { background: var(--success-light); color: var(--success-text); }
 .commission-ref { font-size: 0.75rem; color: var(--text-muted); }
 .commission-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .commission-foot {

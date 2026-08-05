@@ -107,8 +107,9 @@ const pastilles = await page.locator('.accordion:has-text("Historique de mes com
   (els) => els.map((e) => [e.className, getComputedStyle(e).color]));
 ok(pastilles.some(([c]) => /\bn1\b/.test(c)) && pastilles.some(([c]) => /\bn2\b/.test(c)),
    'espace partenaire : les pastilles portent leur niveau (n1 / n2)');
-ok(new Set(pastilles.map(([, col]) => col)).size === 2,
-   'espace partenaire : N1 et N2 ont deux couleurs distinctes');
+const couleurs = Object.fromEntries(pastilles.map(([c, col]) => [/\bn2\b/.test(c) ? 'n2' : 'n1', col]));
+ok(couleurs.n1 === 'rgb(146, 64, 14)', `espace partenaire : N1 en ORANGE [${couleurs.n1}]`);
+ok(couleurs.n2 === 'rgb(4, 120, 87)', `espace partenaire : N2 en VERT [${couleurs.n2}]`);
 ok(/BS-20260801-0001/.test(espace), 'espace partenaire : le devis d’origine est rappelé');
 ok(/payée le 3 août 2026/.test(espace), 'espace partenaire : la date de paiement est affichée');
 ok(await page.locator('#mpd-momo').inputValue() === '+229 97 11 22 33',

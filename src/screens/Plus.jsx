@@ -326,7 +326,7 @@ export default function Plus() {
         {filteredCommissions.map((commission) => (
           <div
             key={`${commission.orgId || 'moi'}-${commission.id}`}
-            className={`card commission-card ${commission.status === 'payée' ? 'is-paid' : 'is-pending'}`}
+            className={`card commission-card niveau-${commission.level} ${commission.status === 'payée' ? 'is-paid' : 'is-pending'}`}
           >
             <div className="commission-top">
               <div className="commission-ident">
@@ -344,9 +344,11 @@ export default function Plus() {
               </div>
               <div className="commission-right">
                 <div className="commission-amount">{formatCFA(commission.amount)}</div>
-                <span className={`badge ${commission.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>
-                  {commission.status === 'payée' ? 'Payée' : 'À payer'}
-                </span>
+                {/* Statut en NEUTRE : l'ambre et le vert sont réservés au
+                    niveau. Ce qui reste à payer se voit à son bouton plein. */}
+                {commission.status === 'payée' && (
+                  <span className="badge badge-muted"><Check size={11} /> Payée</span>
+                )}
               </div>
             </div>
             {/* Pied de carte : la date reste discrète, l'action se tient à
@@ -363,7 +365,7 @@ export default function Plus() {
                   <Download size={14} /> Reçu
                 </button>
               ) : (
-                <button className="btn btn-sm btn-success" onClick={() => handlePay(commission)}>
+                <button className="btn btn-sm btn-primary" onClick={() => handlePay(commission)}>
                   <CheckCircle size={15} /> Payer {formatCFA(commission.amount)}
                 </button>
               )}
