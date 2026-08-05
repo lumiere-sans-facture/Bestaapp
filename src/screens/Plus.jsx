@@ -90,6 +90,10 @@ export default function Plus() {
   const [retraitForm, setRetraitForm] = useState({ mode: 'momo', reference: '', note: '' });
   const [retraitARefuser, setRetraitARefuser] = useState(null);
   const [motifRefus, setMotifRefus] = useState('');
+  // Décision sur une demande d'un AUTRE compte : passe par le réseau (RPC).
+  // Empêche le double-clic et — surtout — n'annonce « payée » qu'une fois la
+  // confirmation du serveur reçue, jamais avant.
+  const [retraitEnCours, setRetraitEnCours] = useState(false);
   const fileRef = useRef(null);
   const toast = useToast();
 
@@ -193,33 +197,56 @@ export default function Plus() {
     setRetraitForm({ mode: d.methode || 'momo', reference: '', note: '' });
     setRetraitAValider(d);
   };
-  const validerRetrait = (e) => {
+  const validerRetrait = async (e) => {
     e.preventDefault();
     const d = retraitAValider;
-    if (d.externe) {
-      decidePlatformPayout({ orgId: d.orgId, id: d.id, approuver: true, ...retraitForm })
-        .catch((err) => toast(`Règlement impossible : ${err.message}`, { type: 'error' }))
-        .finally(() => setComRafraichir((n) => n + 1));
-    } else {
+    // Compte local : la mutation est synchrone, aucune attente réseau —
+    // le succès est immédiat et certain.
+    if (!d.externe) {
       approvePayout(d.id, { ...retraitForm, decidedBy: user.id });
+      setRetraitAValider(null);
+      toast('Paiement enregistré : les commissions couvertes passent « payées ».');
+      return;
     }
-    setRetraitAValider(null);
-    toast('Paiement enregistré : les commissions couvertes passent « payées ».');
+    // Compte d'une AUTRE organisation : ça part sur le réseau. Le message de
+    // succès n'apparaît qu'après confirmation du serveur — jamais avant,
+    // sinon un échec silencieux ferait croire à un versement qui n'a pas eu
+    // lieu, et la commission resterait « demandée » indéfiniment.
+    setRetraitEnCours(true);
+    try {
+      await decidePlatformPayout({ orgId: d.orgId, id: d.id, approuver: true, ...retraitForm });
+      setRetraitAValider(null);
+      toast('Paiement enregistré : les commissions couvertes passent « payées ».');
+    } catch (err) {
+      toast(`Règlement impossible : ${err.message}`, { type: 'error' });
+    } finally {
+      setRetraitEnCours(false);
+      setComRafraichir((n) => n + 1);
+    }
   };
-  const refuserRetrait = (e) => {
+  const refuserRetrait = async (e) => {
     e.preventDefault();
     if (!motifRefus.trim()) { toast('Indiquez le motif du refus.', { type: 'error' }); return; }
     const d = retraitARefuser;
-    if (d.externe) {
-      decidePlatformPayout({ orgId: d.orgId, id: d.id, approuver: false, motif: motifRefus })
-        .catch((err) => toast(`Refus impossible : ${err.message}`, { type: 'error' }))
-        .finally(() => setComRafraichir((n) => n + 1));
-    } else {
+    if (!d.externe) {
       rejectPayout(d.id, { motif: motifRefus, decidedBy: user.id });
+      setRetraitARefuser(null);
+      setMotifRefus('');
+      toast('Demande refusée — le partenaire en est informé dans son espace.');
+      return;
     }
-    setRetraitARefuser(null);
-    setMotifRefus('');
-    toast('Demande refusée — le partenaire en est informé dans son espace.');
+    setRetraitEnCours(true);
+    try {
+      await decidePlatformPayout({ orgId: d.orgId, id: d.id, approuver: false, motif: motifRefus });
+      setRetraitARefuser(null);
+      setMotifRefus('');
+      toast('Demande refusée — le partenaire en est informé dans son espace.');
+    } catch (err) {
+      toast(`Refus impossible : ${err.message}`, { type: 'error' });
+    } finally {
+      setRetraitEnCours(false);
+      setComRafraichir((n) => n + 1);
+    }
   };
 
   const handlePay = (commission) => {
@@ -227,16 +254,26 @@ export default function Plus() {
     setPayCom(commission);
   };
 
-  const submitPayCom = (e) => {
+  const submitPayCom = async (e) => {
     e.preventDefault();
-    if (payCom.externe) {
-      payPlatformCommission({ orgId: payCom.orgId, id: payCom.id, ...payForm })
-        .catch((err) => toast(`Paiement impossible : ${err.message}`, { type: 'error' }))
-        .finally(() => setComRafraichir((n) => n + 1));
-    } else {
+    if (!payCom.externe) {
       payCommission(payCom.id, { ...payForm, paidBy: user.id });
+      setPayCom(null);
+      return;
     }
-    setPayCom(null);
+    // Même règle que pour les demandes de paiement : pas de confirmation
+    // avant que le serveur n'ait réellement acté le versement.
+    const c = payCom;
+    setRetraitEnCours(true);
+    try {
+      await payPlatformCommission({ orgId: c.orgId, id: c.id, ...payForm });
+      setPayCom(null);
+    } catch (err) {
+      toast(`Paiement impossible : ${err.message}`, { type: 'error' });
+    } finally {
+      setRetraitEnCours(false);
+      setComRafraichir((n) => n + 1);
+    }
   };
 
   // Reçu de paiement imprimable (commission payée).
@@ -757,7 +794,9 @@ export default function Plus() {
             <Field label="Note (facultatif)">
               <input className="input" value={payForm.note} onChange={(e) => setPayForm({ ...payForm, note: e.target.value })} />
             </Field>
-            <button type="submit" className="btn btn-primary btn-block"><CheckCircle size={17} /> Confirmer le paiement</button>
+            <button type="submit" className="btn btn-primary btn-block" disabled={payCom?.externe && retraitEnCours}>
+              <CheckCircle size={17} /> {payCom?.externe && retraitEnCours ? 'Enregistrement…' : 'Confirmer le paiement'}
+            </button>
             <p className="field-hint">Le reçu imprimable reprendra le mode et la référence saisis.</p>
           </form>
         )}
@@ -790,8 +829,8 @@ export default function Plus() {
                 onChange={(e) => setRetraitForm({ ...retraitForm, reference: e.target.value })}
                 placeholder="N° de transaction MoMo, réf. virement…" />
             </Field>
-            <button type="submit" className="btn btn-primary btn-block">
-              <CheckCircle size={17} /> Confirmer le paiement de {formatCFA(retraitAValider.amount)}
+            <button type="submit" className="btn btn-primary btn-block" disabled={retraitEnCours}>
+              <CheckCircle size={17} /> {retraitEnCours ? 'Enregistrement…' : `Confirmer le paiement de ${formatCFA(retraitAValider.amount)}`}
             </button>
             <p className="field-hint">
               Les {(retraitAValider.commissionIds || []).length} commissions couvertes passeront « payées » —
@@ -812,7 +851,9 @@ export default function Plus() {
               <input className="input" required value={motifRefus} onChange={(e) => setMotifRefus(e.target.value)}
                 placeholder="Ex : affaire encore non encaissée par le client" />
             </Field>
-            <button type="submit" className="btn btn-lost btn-block"><X size={17} /> Refuser la demande</button>
+            <button type="submit" className="btn btn-lost btn-block" disabled={retraitEnCours}>
+              <X size={17} /> {retraitEnCours ? 'Enregistrement…' : 'Refuser la demande'}
+            </button>
             <p className="field-hint">
               Les commissions redeviennent disponibles : le partenaire pourra en refaire la demande.
             </p>
