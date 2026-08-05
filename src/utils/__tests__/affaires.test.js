@@ -5,10 +5,10 @@ import { missingCommissionsForDevis, reconcileMissingCommissions } from '../comm
 const RATES = { 1: 0.03, 2: 0.015 };
 
 describe('devisStage', () => {
-  it('prend l’étape du devis, sinon celle de la piste, sinon « proposition »', () => {
+  it('prend l’étape du devis, sinon celle de la piste, sinon « nouveau »', () => {
     expect(devisStage({ stage: 'negociation' }, { stage: 'nouveau' })).toBe('negociation');
     expect(devisStage({}, { stage: 'visite' })).toBe('visite');
-    expect(devisStage({}, null)).toBe('proposition');
+    expect(devisStage({}, null)).toBe('nouveau');
   });
 });
 

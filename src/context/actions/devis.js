@@ -119,9 +119,18 @@ export function createDevisActions(setState) {
           devisCounter: (s.devisCounter || 0) + 1,
           referrals,
           devis: [
-            // Une affaire naît à « Proposition » : un devis émis est, par
-            // nature, une proposition faite au client.
-            { ...devis, partnerId, partnerCode, stage: devis.stage || 'proposition', id: crypto.randomUUID(), devisNumber, createdAt: now.toISOString() },
+            // L'affaire démarre où en est DÉJÀ le client (« Nouveau » pour une
+            // piste qui vient d'être créée), jamais directement à
+            // « Proposition » : émettre un devis ne fait sauter aucune des
+            // étapes réelles du parcours commercial (qualification, visite…).
+            // Un client déjà conclu (gagné/perdu) ne fait pas non plus naître
+            // un nouveau devis directement clos — il repart de « Nouveau ».
+            {
+              ...devis, partnerId, partnerCode,
+              stage: devis.stage
+                || (lead && lead.stage !== 'gagne' && lead.stage !== 'perdu' ? lead.stage : 'nouveau'),
+              id: crypto.randomUUID(), devisNumber, createdAt: now.toISOString(),
+            },
             ...s.devis,
           ],
           leads: s.leads.map((l) => {

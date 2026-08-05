@@ -7,9 +7,10 @@
 // n'est pas répliqué et produirait des numéros en double entre appareils.
 
 /** Étape d'un devis : la sienne, sinon celle de son client (devis créés avant
- *  le suivi par devis), sinon « proposition » (un devis émis est, par nature,
- *  une proposition faite au client). */
-export const devisStage = (d, lead) => d.stage || lead?.stage || 'proposition';
+ *  le suivi par devis), sinon « nouveau » — jamais « proposition » par défaut :
+ *  émettre un devis ne fait sauter aucune étape du parcours commercial réel
+ *  (qualification, visite…), il démarre où en est déjà le client. */
+export const devisStage = (d, lead) => d.stage || lead?.stage || 'nouveau';
 
 /**
  * Construit les cartes du pipeline : UNE CARTE PAR DEVIS.

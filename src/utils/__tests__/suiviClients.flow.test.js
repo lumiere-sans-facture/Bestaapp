@@ -43,7 +43,7 @@ describe('flux réel du suivi clients', () => {
     s.a.updateDevisStage(recent.devis.id, 'negociation');
     cartes = buildAffaires(s.get().leads, s.get().devis);
     expect(cartes.find((c) => c.devis.id === recent.devis.id).stage).toBe('negociation');
-    expect(cartes.find((c) => c.devis.id === ancien.devis.id).stage).toBe('proposition');
+    expect(cartes.find((c) => c.devis.id === ancien.devis.id).stage).toBe('visite'); // inchangée, à l'étape du client au moment de sa création
 
     // Chacune se conclut séparément et rapporte SA commission
     s.a.updateDevisStage(recent.devis.id, 'gagne');
@@ -98,7 +98,7 @@ describe('circuit demande → validation du gérant', () => {
     const d = s.get().devis[0];
 
     s.a.requestDevisStageChange(d.id, 'gagne', 'u2');
-    expect(s.get().devis[0].stage).toBe('proposition');   // le devis n'a pas bougé
+    expect(s.get().devis[0].stage).toBe('nouveau');   // le devis n'a pas bougé
     expect(s.get().commissions).toHaveLength(0);          // aucune commission avant validation
 
     s.a.approveDevisStageChange(d.id, 'u1');
@@ -218,6 +218,40 @@ describe('jamais de commission payée en double', () => {
   });
 });
 
+describe('un devis naît à l’étape du CLIENT, jamais directement à « Proposition »', () => {
+  const USR = { id: 'u6', name: 'Vendeur', role: 'technicien' };
+
+  it('nouvelle piste + devis immédiat → la carte atterrit à « Nouveau »', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(USR);
+    s.a.addLead({ name: 'Client neuf', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: USR.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 300000, statut: 'finalise', createdBy: USR.id, items: [] });
+    expect(s.get().devis[0].stage).toBe('nouveau');
+  });
+
+  it('client déjà à « Visite » + nouveau devis → la carte hérite de « Visite », pas « Proposition »', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(USR);
+    s.a.addLead({ name: 'Client avancé', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: USR.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.updateLeadStage(lead.id, 'visite', USR.id);
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 300000, statut: 'finalise', createdBy: USR.id, items: [] });
+    expect(s.get().devis[0].stage).toBe('visite');
+  });
+
+  it('client déjà gagné + nouveau devis (deuxième vente) → repart de « Nouveau », pas déjà clos', () => {
+    const s = store();
+    s.a.ensurePartnerForUser(USR);
+    s.a.addLead({ name: 'Client fidèle', contact: '', phone: '', address: '', estimatedValue: 0, assignedTo: USR.id, parrainL1: null });
+    const lead = s.get().leads[0];
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 300000, statut: 'finalise', createdBy: USR.id, items: [] });
+    s.a.updateDevisStage(s.get().devis[0].id, 'gagne');
+    s.a.addDevis({ leadId: lead.id, type: 'manual', total: 200000, statut: 'finalise', createdBy: USR.id, items: [] });
+    expect(s.get().devis[0].stage).toBe('nouveau');
+  });
+});
+
 describe('cohérence client ↔ devis (régressions vérifiées)', () => {
   const USR = { id: 'u5', name: 'Vendeur', role: 'technicien' };
 
@@ -247,7 +281,7 @@ describe('cohérence client ↔ devis (régressions vérifiées)', () => {
     const [d2, d1] = s.get().devis;
 
     s.a.updateDevisStage(d1.id, 'perdu');
-    expect(s.get().leads[0].stage).toBe('proposition'); // d2 est encore ouvert
+    expect(s.get().leads[0].stage).toBe('nouveau'); // d2 est encore ouvert, à « nouveau »
     s.a.updateDevisStage(d2.id, 'perdu');
     expect(s.get().leads[0].stage).toBe('perdu');
   });
