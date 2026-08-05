@@ -7,6 +7,7 @@ import { createLeadActions } from './actions/leads';
 import { createPartnerActions } from './actions/partners';
 import { createCatalogueActions } from './actions/catalogue';
 import { createKitActions } from './actions/kits';
+import { createPayoutActions } from './actions/payouts';
 import { createDevisActions } from './actions/devis';
 import { createFormationActions } from './actions/formations';
 import { createProActions } from './actions/pro';
@@ -20,6 +21,7 @@ export function createActions(setState) {
     ...createPartnerActions(setState),
     ...createCatalogueActions(setState),
     ...createKitActions(setState),
+    ...createPayoutActions(setState),
     ...createDevisActions(setState),
     ...createFormationActions(setState),
     ...createProActions(setState),

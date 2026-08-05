@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Check, CheckCircle, Copy, MessageCircle, MousePointerClick, Network, Users, Save, UserPlus, Crown, Wallet, Trophy, FileText, Share2 } from 'lucide-react';
+import { ChevronLeft, Check, CheckCircle, Copy, MessageCircle, MousePointerClick, Network, Users, Save, UserPlus, Crown, Wallet, Trophy, FileText, Share2, Banknote, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, formatTaux } from '../../utils/format';
@@ -8,6 +8,12 @@ import { isSupabaseConfigured } from '../../lib/supabase';
 import { fetchMyReferredOrgs } from '../../lib/remoteSync';
 import StageBadge from '../../components/StageBadge';
 import Accordion from '../../components/Accordion';
+import Sheet from '../../components/Sheet';
+import Field from '../../components/Field';
+import {
+  RETRAIT_MIN, MODES_RETRAIT, STATUTS_RETRAIT,
+  commissionsMobilisables, soldeMobilisable, montantDemande, erreurDemande, demandeEnCours,
+} from '../../utils/payouts';
 import { useToast } from '../../components/Toast';
 
 const REFERRAL_TYPE_LABELS = {
@@ -19,9 +25,14 @@ const REFERRAL_TYPE_LABELS = {
 export default function MyPartnerDashboard({ onBack }) {
   const { user } = useAuth();
   const {
-    partners, leads, commissions, referrals, stages, lostStage, devis,
+    partners, leads, commissions, referrals, stages, lostStage, devis, payoutRequests,
     ensurePartnerForUser, updatePartner, getPartnerById, getLeadById,
+    requestPayout, cancelPayout,
   } = useData();
+  // Demande de paiement : fiche ouverte, commissions cochées, coordonnées.
+  const [retraitOuvert, setRetraitOuvert] = useState(false);
+  const [choisies, setChoisies] = useState([]);
+  const [formRetrait, setFormRetrait] = useState({ methode: 'momo', telephone: '', note: '' });
   const [copied, setCopied] = useState(false);
   const [momo, setMomo] = useState(null); // null = non édité
   const toast = useToast();
@@ -70,6 +81,37 @@ export default function MyPartnerDashboard({ onBack }) {
   const sponsor = me.sponsorId ? getPartnerById(me.sponsorId) : null;
   const filleuls = partners.filter((p) => p.sponsorId === me.id);
   const stageInfo = (lead) => (lead.stage === 'perdu' ? lostStage : stages.find((s) => s.id === lead.stage));
+
+  // ---- Demande de paiement des commissions ----
+  const demandes = (payoutRequests || []).filter((d) => d.partnerId === me.id);
+  const enCours = demandeEnCours(payoutRequests || [], me.id);
+  const mobilisables = commissionsMobilisables(commissions, me.id, payoutRequests || []);
+  const solde = soldeMobilisable(commissions, me.id, payoutRequests || []);
+  const montantChoisi = montantDemande(commissions, choisies);
+
+  const ouvrirRetrait = () => {
+    // Tout est coché d'emblée : le cas courant est « versez-moi tout ce que
+    // vous me devez ». Décocher sert à ne demander qu'une partie.
+    setChoisies(mobilisables.map((c) => c.id));
+    setFormRetrait({ methode: 'momo', telephone: me.momoNumber || me.phone || '', note: '' });
+    setRetraitOuvert(true);
+  };
+
+  const envoyerRetrait = (e) => {
+    e.preventDefault();
+    const erreur = erreurDemande({
+      commissionIds: choisies, montant: montantChoisi,
+      telephone: formRetrait.telephone, dejaEnCours: !!enCours,
+    });
+    if (erreur) { toast(erreur, { type: 'error' }); return; }
+    requestPayout({ partnerId: me.id, commissionIds: choisies, ...formRetrait, requestedBy: user.id });
+    // Le numéro saisi devient celui du profil : la prochaine demande le reprend.
+    if (formRetrait.methode === 'momo' && formRetrait.telephone !== me.momoNumber) {
+      updatePartner(me.id, { momoNumber: formRetrait.telephone.trim() });
+    }
+    setRetraitOuvert(false);
+    toast('Demande envoyée. Le gérant la validera depuis son espace.');
+  };
 
   const copyLink = async () => {
     try {
@@ -142,6 +184,38 @@ export default function MyPartnerDashboard({ onBack }) {
         </div>
       </div>
 
+      {/* DEMANDER SON PAIEMENT — l'action principale de l'espace partenaire.
+          Elle vit juste sous les montants qu'elle concerne. */}
+      <div className="retrait-bar">
+        {enCours ? (
+          <>
+            <span className="retrait-bar-text">
+              <Banknote size={16} /> Demande de <strong>{formatCFA(enCours.amount)}</strong> envoyée
+              le {formatDate(enCours.requestedAt)} — en attente de validation.
+            </span>
+            <button className="btn btn-sm btn-outline" onClick={() => { cancelPayout(enCours.id); toast('Demande retirée.'); }}>
+              <X size={14} /> Retirer
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="retrait-bar-text">
+              <Banknote size={16} /> {solde > 0
+                ? <>Vous pouvez demander le règlement de <strong>{formatCFA(solde)}</strong>.</>
+                : <>Aucune commission à faire régler pour le moment.</>}
+            </span>
+            <button className="btn btn-sm btn-primary" onClick={ouvrirRetrait} disabled={solde < RETRAIT_MIN}>
+              <Banknote size={15} /> Demander un paiement
+            </button>
+          </>
+        )}
+      </div>
+      {!enCours && solde > 0 && solde < RETRAIT_MIN && (
+        <div className="field-hint retrait-min-note">
+          Minimum {formatCFA(RETRAIT_MIN)} par demande — cumulez encore quelques commissions.
+        </div>
+      )}
+
       {/* Le détail vit dans des sections repliables : la page tient sur un
           écran, chaque en-tête annonce son compte et son montant, et on
           n'ouvre que ce qu'on vient chercher. */}
@@ -180,6 +254,32 @@ export default function MyPartnerDashboard({ onBack }) {
           <div className="text-sm text-secondary">
             Aucune commission pour le moment. Chaque affaire que vous apportez et
             qui est déclarée gagnée vous en crée une automatiquement.
+          </div>
+        )}
+      </Accordion>
+
+      <Accordion icon={Banknote} title="Mes demandes de paiement" count={demandes.length}
+        resume={enCours ? `${formatCFA(enCours.amount)} en attente` : null}>
+        {demandes.length ? demandes.map((d) => (
+          <div key={d.id} className="sheet-row">
+            <span className="sheet-label">
+              {formatCFA(d.amount)}
+              <span className="text-secondary">
+                {' · '}{(d.commissionIds || []).length} commission{(d.commissionIds || []).length > 1 ? 's' : ''}
+                {' · '}{MODES_RETRAIT[d.methode] || d.methode}
+                {' · '}demandé le {formatDate(d.requestedAt)}
+                {d.status === 'paye' && d.payRef ? ` · réf. ${d.payRef}` : ''}
+                {d.status === 'refuse' && d.motif ? ` · motif : ${d.motif}` : ''}
+              </span>
+            </span>
+            <span className="sheet-value">
+              <span className="badge badge-muted">{STATUTS_RETRAIT[d.status] || d.status}</span>
+            </span>
+          </div>
+        )) : (
+          <div className="text-sm text-secondary">
+            Aucune demande. Quand vos commissions atteignent {formatCFA(RETRAIT_MIN)},
+            demandez leur règlement — le gérant reçoit la demande et la valide.
           </div>
         )}
       </Accordion>
@@ -321,6 +421,66 @@ export default function MyPartnerDashboard({ onBack }) {
           </div>
         </div>
       </Accordion>
+
+      {/* Fiche de demande : on choisit CE QU'ON FAIT RÉGLER, pas un montant en
+          l'air — chaque franc demandé se rattache à une affaire précise. */}
+      <Sheet
+        open={retraitOuvert}
+        onClose={() => setRetraitOuvert(false)}
+        title="Demander un paiement"
+        subtitle={`${formatCFA(montantChoisi)} sur ${formatCFA(solde)} disponibles`}
+      >
+        <form onSubmit={envoyerRetrait}>
+          <div className="sheet-section-title">Commissions à faire régler</div>
+          <div className="retrait-choix">
+            {mobilisables.map((c) => {
+              const cochee = choisies.includes(c.id);
+              return (
+                <label key={c.id} className={`retrait-ligne ${cochee ? 'is-on' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={cochee}
+                    onChange={(e) => setChoisies((ids) => (e.target.checked
+                      ? [...ids, c.id]
+                      : ids.filter((x) => x !== c.id)))}
+                  />
+                  <span className="retrait-ligne-info">
+                    <span className={`chip-level n${c.level}`}>N{c.level}</span>
+                    {' '}{getLeadById(c.leadId)?.name || c.leadName || 'Commission manuelle'}
+                    <span className="text-secondary"> · {formatDate(c.createdAt)}</span>
+                  </span>
+                  <span className="retrait-ligne-montant">{formatCFA(c.amount)}</span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="retrait-total">
+            <span>Total demandé</span>
+            <strong>{formatCFA(montantChoisi)}</strong>
+          </div>
+
+          <Field label="Mode de réception">
+            <select className="input" value={formRetrait.methode}
+              onChange={(e) => setFormRetrait({ ...formRetrait, methode: e.target.value })}>
+              {Object.entries(MODES_RETRAIT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </Field>
+          <Field label={formRetrait.methode === 'momo' ? 'Numéro Mobile Money *' : 'Coordonnées de règlement *'}>
+            <input className="input" value={formRetrait.telephone} required
+              onChange={(e) => setFormRetrait({ ...formRetrait, telephone: e.target.value })}
+              placeholder="+229 ..." />
+          </Field>
+          <Field label="Message (facultatif)">
+            <input className="input" value={formRetrait.note}
+              onChange={(e) => setFormRetrait({ ...formRetrait, note: e.target.value })}
+              placeholder="Ex : à régler avant vendredi" />
+          </Field>
+          <button type="submit" className="btn btn-primary btn-block"
+            disabled={montantChoisi < RETRAIT_MIN}>
+            <CheckCircle size={18} /> Envoyer la demande{montantChoisi > 0 ? ` — ${formatCFA(montantChoisi)}` : ''}
+          </button>
+        </form>
+      </Sheet>
     </>
   );
 }

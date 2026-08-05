@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -28,6 +28,7 @@ import KitsSection from './plus/KitsSection';
 import { SyncStatusRow } from '../components/SyncStatus';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
 import { reconcileMissingCommissions } from '../utils/commissionSync';
+import { MODES_RETRAIT } from '../utils/payouts';
 
 export default function Plus() {
   const { user, logout, refreshOrg } = useAuth();
@@ -37,9 +38,9 @@ export default function Plus() {
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
-    partners, commissions, leads, orders, devis, referrals, kits, team, teamChargee,
+    partners, commissions, leads, orders, devis, referrals, kits, payoutRequests, team, teamChargee,
     getPartnerById, getLeadById,
-    payCommission, addCommission, syncCommissions,
+    payCommission, addCommission, syncCommissions, approvePayout, rejectPayout,
     getSubscriptionForUser, requestSubscription, importData,
   } = data;
 
@@ -84,6 +85,11 @@ export default function Plus() {
   const [subForm, setSubForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
   const [subSent, setSubSent] = useState(false);
   const [pendingRestore, setPendingRestore] = useState(null); // sauvegarde lue, en attente de confirmation
+  // Demandes de paiement des partenaires : décision en cours (validation ou refus).
+  const [retraitAValider, setRetraitAValider] = useState(null);
+  const [retraitForm, setRetraitForm] = useState({ mode: 'momo', reference: '', note: '' });
+  const [retraitARefuser, setRetraitARefuser] = useState(null);
+  const [motifRefus, setMotifRefus] = useState('');
   const fileRef = useRef(null);
   const toast = useToast();
 
@@ -164,6 +170,27 @@ export default function Plus() {
   // sinon — c'est lui qui rattache la commission à une affaire précise.
   const numeroDevis = (c) =>
     c.devisNumber || (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber : null);
+
+  // ---- Demandes de paiement (retraits) ----
+  const retraitsEnAttente = (payoutRequests || []).filter((d) => d.status === 'en_attente');
+  const ouvrirValidation = (d) => {
+    setRetraitForm({ mode: d.methode || 'momo', reference: '', note: '' });
+    setRetraitAValider(d);
+  };
+  const validerRetrait = (e) => {
+    e.preventDefault();
+    approvePayout(retraitAValider.id, { ...retraitForm, decidedBy: user.id });
+    setRetraitAValider(null);
+    toast('Paiement enregistré : les commissions couvertes passent « payées ».');
+  };
+  const refuserRetrait = (e) => {
+    e.preventDefault();
+    if (!motifRefus.trim()) { toast('Indiquez le motif du refus.', { type: 'error' }); return; }
+    rejectPayout(retraitARefuser.id, { motif: motifRefus, decidedBy: user.id });
+    setRetraitARefuser(null);
+    setMotifRefus('');
+    toast('Demande refusée — le partenaire en est informé dans son espace.');
+  };
 
   const handlePay = (commission) => {
     setPayForm({ mode: 'momo', reference: '', note: '' });
@@ -293,6 +320,43 @@ export default function Plus() {
         </div>
       </div>
       {syncMsg && <div className="sync-result-note">{syncMsg}</div>}
+
+      {/* DEMANDES DE PAIEMENT — ce que des partenaires attendent de vous.
+          En tête d'écran : c'est la seule chose ici qui exige une décision. */}
+      {retraitsEnAttente.length > 0 && (
+        <div className="validation-bar">
+          <div className="validation-bar-title">
+            <Banknote size={15} /> {retraitsEnAttente.length > 1
+              ? `${retraitsEnAttente.length} demandes de paiement`
+              : '1 demande de paiement'}
+          </div>
+          {retraitsEnAttente.map((d) => (
+            <div key={d.id} className="validation-row">
+              <div className="validation-info">
+                <span className="validation-lead">
+                  {d.partnerName || getPartnerById(d.partnerId)?.name || 'Partenaire'} — {formatCFA(d.amount)}
+                </span>
+                <span className="validation-move">
+                  {(d.commissionIds || []).length} commission{(d.commissionIds || []).length > 1 ? 's' : ''}
+                  {' · '}{MODES_RETRAIT[d.methode] || d.methode}
+                  {d.telephone ? ` · ${d.telephone}` : ''}
+                </span>
+                <span className="validation-by">
+                  demandé le {formatDate(d.requestedAt)}{d.note ? ` · « ${d.note} »` : ''}
+                </span>
+              </div>
+              <div className="validation-actions">
+                <button className="btn btn-sm btn-primary" onClick={() => ouvrirValidation(d)}>
+                  <CheckCircle size={14} /> Payer
+                </button>
+                <button className="btn btn-sm btn-lost" onClick={() => { setRetraitARefuser(d); setMotifRefus(''); }}>
+                  <X size={14} /> Refuser
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="commission-totals">
         <div className="commission-total-card pending">
           <div className="commission-total-value">{formatCFA(pendingTotal)}</div>
@@ -645,8 +709,62 @@ export default function Plus() {
             <Field label="Note (facultatif)">
               <input className="input" value={payForm.note} onChange={(e) => setPayForm({ ...payForm, note: e.target.value })} />
             </Field>
-            <button type="submit" className="btn btn-won btn-block"><CheckCircle size={17} /> Confirmer le paiement</button>
+            <button type="submit" className="btn btn-primary btn-block"><CheckCircle size={17} /> Confirmer le paiement</button>
             <p className="field-hint">Le reçu imprimable reprendra le mode et la référence saisis.</p>
+          </form>
+        )}
+      </Sheet>
+
+      {/* Régler une demande de partenaire : la référence de transaction est ce
+          qui rend le versement traçable — elle part sur le reçu. */}
+      <Sheet open={!!retraitAValider} onClose={() => setRetraitAValider(null)} title="Régler la demande">
+        {retraitAValider && (
+          <form onSubmit={validerRetrait}>
+            <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{retraitAValider.partnerName || '—'}</span></div>
+            <div className="sheet-row"><span className="sheet-label">Montant demandé</span><span className="sheet-value amount">{formatCFA(retraitAValider.amount)}</span></div>
+            <div className="sheet-row">
+              <span className="sheet-label">Commissions couvertes</span>
+              <span className="sheet-value">{(retraitAValider.commissionIds || []).length}</span>
+            </div>
+            {retraitAValider.telephone && (
+              <div className="sheet-row"><span className="sheet-label">À verser sur</span><span className="sheet-value">{retraitAValider.telephone}</span></div>
+            )}
+            <Field label="Mode de règlement">
+              <select className="input" value={retraitForm.mode} onChange={(e) => setRetraitForm({ ...retraitForm, mode: e.target.value })}>
+                {Object.entries(MODES_RETRAIT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </Field>
+            <Field label="Référence de la transaction">
+              <input className="input" value={retraitForm.reference}
+                onChange={(e) => setRetraitForm({ ...retraitForm, reference: e.target.value })}
+                placeholder="N° de transaction MoMo, réf. virement…" />
+            </Field>
+            <button type="submit" className="btn btn-primary btn-block">
+              <CheckCircle size={17} /> Confirmer le paiement de {formatCFA(retraitAValider.amount)}
+            </button>
+            <p className="field-hint">
+              Les {(retraitAValider.commissionIds || []).length} commissions couvertes passeront « payées » —
+              elles ne pourront plus être demandées ni réglées une seconde fois.
+            </p>
+          </form>
+        )}
+      </Sheet>
+
+      {/* Refus : le motif est obligatoire. Un partenaire qui compte sur cet
+          argent doit savoir pourquoi il ne l'a pas. */}
+      <Sheet open={!!retraitARefuser} onClose={() => setRetraitARefuser(null)} title="Refuser la demande">
+        {retraitARefuser && (
+          <form onSubmit={refuserRetrait}>
+            <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{retraitARefuser.partnerName || '—'}</span></div>
+            <div className="sheet-row"><span className="sheet-label">Montant</span><span className="sheet-value amount">{formatCFA(retraitARefuser.amount)}</span></div>
+            <Field label="Motif du refus *">
+              <input className="input" required value={motifRefus} onChange={(e) => setMotifRefus(e.target.value)}
+                placeholder="Ex : affaire encore non encaissée par le client" />
+            </Field>
+            <button type="submit" className="btn btn-lost btn-block"><X size={17} /> Refuser la demande</button>
+            <p className="field-hint">
+              Les commissions redeviennent disponibles : le partenaire pourra en refaire la demande.
+            </p>
           </form>
         )}
       </Sheet>

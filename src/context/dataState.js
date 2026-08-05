@@ -40,6 +40,9 @@ export const buildInitialState = () => ({
   companies: [],
   factures: [],
   proClients: [],
+  // Demandes de paiement des commissions : vide au départ, alimentée par
+  // les partenaires eux-mêmes.
+  payoutRequests: [],
   devisCounter: 0,
   orderCounter: 0,
 });
@@ -73,6 +76,7 @@ export const loadState = (scope = null) => {
       // jamais réinjecter ensuite, sinon un kit supprimé par le gérant
       // reviendrait à chaque ouverture de l'application.
       if (!Array.isArray(saved.kits)) saved.kits = SOLAR_KITS;
+      if (!saved.payoutRequests) saved.payoutRequests = [];
       if (!saved.formations) saved.formations = seed.formations;
       if (!saved.formationProgress) saved.formationProgress = [];
       // Migration formation : structure « école » (cours → modules → leçons).

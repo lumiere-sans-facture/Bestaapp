@@ -78,6 +78,13 @@ create table if not exists public.kits (
 );
 alter table public.kits enable row level security;
 
+-- Demandes de paiement des commissions (« retraits ») : même génération.
+create table if not exists public."payoutRequests" (
+  id text primary key, data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public."payoutRequests" enable row level security;
+
 -- 4. org_id sur chaque collection + tombstones : ajout, back-fill, NOT NULL
 do $$
 declare t text;
@@ -85,7 +92,7 @@ begin
   foreach t in array array[
     'products','kits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
-    'companies','factures','proClients','tombstones'
+    'companies','factures','proClients','payoutRequests','tombstones'
   ] loop
     execute format('alter table public.%I add column if not exists org_id text', t);
     execute format('update public.%I set org_id = ''org-bestasolar'' where org_id is null', t);
@@ -100,7 +107,7 @@ begin
   foreach t in array array[
     'products','kits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
-    'companies','factures','proClients'
+    'companies','factures','proClients','payoutRequests'
   ] loop
     execute format('create index if not exists idx_%s_org_updated on public.%I (org_id, updated_at)', t, t);
   end loop;
@@ -118,7 +125,7 @@ begin
   foreach t in array array[
     'products','kits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
-    'companies','factures','proClients'
+    'companies','factures','proClients','payoutRequests'
   ] loop
     if not exists (
       select 1 from pg_constraint c
@@ -149,7 +156,7 @@ begin
   foreach t in array array[
     'products','kits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
-    'companies','factures','proClients','tombstones'
+    'companies','factures','proClients','payoutRequests','tombstones'
   ] loop
     execute format('drop policy if exists "team full access" on public.%I', t);
     execute format('drop policy if exists "org isolation" on public.%I', t);

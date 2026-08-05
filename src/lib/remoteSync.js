@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 // Chaque entité est une ligne { id, data } ; la logique métier reste
 // dans DataContext, ce module ne fait que répliquer l'état.
 
-export const SYNCED_COLLECTIONS = ['products', 'kits', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'factures', 'proClients'];
+export const SYNCED_COLLECTIONS = ['products', 'kits', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'factures', 'proClients', 'payoutRequests'];
 
 // Organisation courante (schéma multi-entreprise). Renseignée par AuthContext
 // au chargement du profil ; absente (null) sur l'ancien schéma mono-équipe —
