@@ -12,6 +12,7 @@ import { peutValiderProgression } from '../utils/roles';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
+import ClientIdentityFields, { contactEffectif } from '../components/ClientIdentityFields';
 
 const STALE_DAYS = 5;
 
@@ -182,6 +183,8 @@ export default function Pipeline() {
     e.preventDefault();
     addLead({
       ...newLead,
+      // Un particulier EST son propre contact : pas de second champ à saisir.
+      contact: contactEffectif(newLead),
       estimatedValue: 0, // déduite automatiquement des devis du client
       assignedTo: user.id,
       parrainL1: null, // attribution automatique (lien d'affiliation) gérée par le store
@@ -654,39 +657,21 @@ export default function Pipeline() {
       {/* Formulaire nouvelle piste */}
       <Sheet open={showAddForm} onClose={() => setShowAddForm(false)} title="Nouvelle piste">
         <form onSubmit={handleAddLead} className="form-grid">
-          <Field label="Entreprise / Client *">
-            <input className="input" required value={newLead.name} onChange={(e) => setNewLead({ ...newLead, name: e.target.value })} placeholder="Ex : Hôtel du Parc" />
-          </Field>
-          <Field label="Personne de contact *">
-            <input className="input" required value={newLead.contact} onChange={(e) => setNewLead({ ...newLead, contact: e.target.value })} placeholder="Ex : M. Kossi Agboka" />
-          </Field>
+          <ClientIdentityFields
+            idPrefix="pipeline"
+            clientType={newLead.clientType}
+            onTypeChange={(clientType) => setNewLead({ ...newLead, clientType })}
+            name={newLead.name}
+            onNameChange={(name) => setNewLead({ ...newLead, name })}
+            contact={newLead.contact}
+            onContactChange={(contact) => setNewLead({ ...newLead, contact })}
+          />
           <Field label="Téléphone">
             <input className="input" type="tel" value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+229 ..." />
           </Field>
           <Field label="Adresse">
             <input className="input" value={newLead.address} onChange={(e) => setNewLead({ ...newLead, address: e.target.value })} placeholder="Quartier, ville" />
           </Field>
-          <div className="input-group">
-            <span className="input-label" id="pipeline-clienttype-label">Type de client</span>
-            <div className="client-type-toggle" role="group" aria-labelledby="pipeline-clienttype-label">
-              <button
-                type="button"
-                className={`client-type-btn ${newLead.clientType === 'particulier' ? 'active' : ''}`}
-                aria-pressed={newLead.clientType === 'particulier'}
-                onClick={() => setNewLead({ ...newLead, clientType: 'particulier' })}
-              >
-                <User size={16} /> Particulier
-              </button>
-              <button
-                type="button"
-                className={`client-type-btn ${newLead.clientType === 'entreprise' ? 'active' : ''}`}
-                aria-pressed={newLead.clientType === 'entreprise'}
-                onClick={() => setNewLead({ ...newLead, clientType: 'entreprise' })}
-              >
-                <Building2 size={16} /> Entreprise
-              </button>
-            </div>
-          </div>
           <Field label="Notes">
             <textarea className="input" rows="3" value={newLead.notes} onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })} placeholder="Détails du besoin…" />
           </Field>

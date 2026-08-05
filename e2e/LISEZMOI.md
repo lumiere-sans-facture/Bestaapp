@@ -20,6 +20,7 @@ node e2e/espace-partenaire.mjs
 node e2e/acces-sections.mjs
 node e2e/mes-kits.mjs
 node e2e/demande-paiement.mjs
+node e2e/formulaire-client.mjs
 ```
 
 Chaque scénario prépare son propre jeu de données (mode local, sans backend)
@@ -35,6 +36,7 @@ puis vérifie ce que l'utilisateur voit réellement à l'écran.
 | `acces-sections.mjs` | Un simple utilisateur ne peut atteindre AUCUNE section d'administration (`partners`, `commissions`, `orders`, `team`, `backup`, `subsadmin`), même en tapant l'adresse : renvoi au menu, aucun montant ni bouton d'action affiché, aucun lien dans la barre latérale. Ses propres sections restent ouvertes, et le gérant garde tout. |
 | `demande-paiement.mjs` | Le partenaire voit son solde mobilisable (hors commissions déjà payées), demande le règlement de commissions précises — tout ou partie — et ne peut pas en lancer une seconde sur le même argent ; rien n'est payé tant que le gérant n'a pas tranché ; le gérant reçoit la demande dans l'écran Commissions avec le numéro à créditer, la règle avec sa référence de transaction (les commissions couvertes passent « payées », référence reportée) ou la refuse avec motif — le refus libère les commissions. |
 | `mes-kits.mjs` | Les kits solaires sont récupérés dans les données (5), affichés et chiffrés ; modifier un prix se recalcule à la saisie, s'enregistre et ne change ni l'identifiant ni le nombre de kits ; création, duplication et suppression ; un kit d'origine supprimé est signalé et peut être remis **sans écraser** les prix ajustés ; la section est fermée à un simple utilisateur. |
+| `formulaire-client.mjs` | Le formulaire « Nouveau client » (Clients et Suivi clients) adapte ses champs au type choisi : « Nom complet » seul pour un particulier (son contact reprend automatiquement son nom, aucune ligne redondante dans sa fiche) ; « Nom de l'entreprise » **et** « Personne de contact » distincts pour une entreprise. |
 | `espace-partenaire.mjs` | Le profil ne parle plus d'argent (ni tuiles de commissions, ni Mobile Money, ni affaires gagnées, ni le mot « commission ») ; l'espace partenaire porte tout : affaires gagnées, historique complet des commissions (niveau et taux, devis d'origine, date de paiement, à encaisser d'abord) et Mobile Money. Ses sections sont repliées à l'ouverture — la page tient sur un écran, chaque en-tête annonce son compte et son montant, et chacune s'ouvre au clic. |
 
 Les scénarios tournent en mode local (sans backend) : ils couvrent le circuit
