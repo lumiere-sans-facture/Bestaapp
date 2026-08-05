@@ -159,6 +159,10 @@ export default function Plus() {
   // dans l'autre organisation, la vue plateforme les fournit déjà enrichis.
   const nomPartenaire = (c) => getPartnerById(c.partnerId)?.name || c.partnerName || c.beneficiaire?.name || '—';
   const nomClient = (c) => getLeadById(c.leadId)?.name || c.leadName || 'Commission manuelle';
+  // Devis d'origine : déjà fourni par la vue plateforme, à retrouver localement
+  // sinon — c'est lui qui rattache la commission à une affaire précise.
+  const numeroDevis = (c) =>
+    c.devisNumber || (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber : null);
 
   const handlePay = (commission) => {
     setPayForm({ mode: 'momo', reference: '', note: '' });
@@ -319,31 +323,47 @@ export default function Plus() {
       </div>
       <div className="commissions-list">
         {filteredCommissions.map((commission) => (
-          <div key={`${commission.orgId || 'moi'}-${commission.id}`} className="card commission-card">
-            <div className="commission-header">
-              <div>
+          <div
+            key={`${commission.orgId || 'moi'}-${commission.id}`}
+            className={`card commission-card ${commission.status === 'payée' ? 'is-paid' : 'is-pending'}`}
+          >
+            <div className="commission-top">
+              <div className="commission-ident">
                 <div className="commission-lead">{nomClient(commission)}</div>
-                <div className="text-sm text-secondary">
-                  {nomPartenaire(commission)} — Niveau {commission.level}
-                  {commission.externe && commission.orgName ? ` · ${commission.orgName}` : ''}
+                <div className="commission-sub">
+                  <span className="chip-level">
+                    N{commission.level} · {formatTaux(COMMISSION_RATES[commission.level])}
+                  </span>
+                  <span className="commission-partner">{nomPartenaire(commission)}</span>
+                  {numeroDevis(commission) && <span className="commission-ref">{numeroDevis(commission)}</span>}
+                  {commission.externe && commission.orgName && (
+                    <span className="commission-ref">{commission.orgName}</span>
+                  )}
                 </div>
               </div>
-              <div className="commission-amount">{formatCFA(commission.amount)}</div>
+              <div className="commission-right">
+                <div className="commission-amount">{formatCFA(commission.amount)}</div>
+                <span className={`badge ${commission.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>
+                  {commission.status === 'payée' ? 'Payée' : 'À payer'}
+                </span>
+              </div>
             </div>
-            <div className="commission-meta">
-              <span>
+            {/* Pied de carte : la date reste discrète, l'action se tient à
+                droite et garde sa largeur naturelle — étirée sur toute la
+                carte, elle se lisait comme un champ de saisie vide. */}
+            <div className="commission-foot">
+              <span className="commission-date">
                 {commission.status === 'payée'
                   ? `Payée le ${formatDate(commission.paidAt)} · ${PAY_MODE_LABEL[commission.payMode] || 'Mobile Money'}${commission.payRef ? ` · réf. ${commission.payRef}` : ''}`
-                  : `Créée le ${formatDate(commission.createdAt)}${commission.devisNumber ? ` · ${commission.devisNumber}` : ''}`}
+                  : `Créée le ${formatDate(commission.createdAt)}`}
               </span>
-              {commission.status === 'payée' && <span className="badge badge-success">Payée</span>}
-            </div>
-            <div className="commission-actions">
               {commission.status === 'payée' ? (
-                <button className="btn btn-sm btn-outline" onClick={() => openRecu(commission)}><Download size={14} /> Reçu</button>
+                <button className="btn btn-sm btn-outline" onClick={() => openRecu(commission)}>
+                  <Download size={14} /> Reçu
+                </button>
               ) : (
-                <button className="btn btn-won btn-sm" onClick={() => handlePay(commission)}>
-                  <CheckCircle size={15} /> Payer…
+                <button className="btn btn-sm btn-success" onClick={() => handlePay(commission)}>
+                  <CheckCircle size={15} /> Payer {formatCFA(commission.amount)}
                 </button>
               )}
             </div>

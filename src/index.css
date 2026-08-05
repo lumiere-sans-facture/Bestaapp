@@ -197,6 +197,11 @@ img { max-width: 100%; }
 .btn-primary:hover { background: var(--primary-light); }
 .btn-accent { background: var(--accent); color: var(--primary-dark); font-weight: 600; }
 .btn-accent:hover { background: var(--accent-light); }
+/* Action d'encaissement (payer une commission) : vert PLEIN, pas un contour —
+   c'est un mouvement d'argent, il doit se voir. Le fond reprend le vert foncé
+   du texte de succès : le vert clair ne passerait pas le contraste sur blanc. */
+.btn-success { background: var(--success-text); color: white; }
+.btn-success:hover { background: #036048; }
 .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text-primary); }
 .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
 .btn-outline-light { background: transparent; border: 1.5px solid rgba(255,255,255,0.4); color: white; }
@@ -1610,9 +1615,35 @@ form .login-link { width: 100%; margin-top: 4px; }
 .commission-lead { font-weight: 600; }
 .commission-amount { font-size: 1.125rem; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
 .commission-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); }
-/* L'action de paiement sort de la ligne de métadonnées : pied de carte dédié. */
-.commission-actions { display: flex; gap: 8px; margin-top: 10px; }
-.commission-actions .btn { flex: 1; justify-content: center; }
+
+/* Carte de commission — un liseré dit l'état avant même de lire : ambre tant
+   qu'elle est due, vert une fois réglée. */
+.commission-card { padding: 14px 16px; border-left: 3px solid var(--warning); }
+.commission-card.is-paid { border-left-color: var(--success); }
+.commission-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.commission-ident { min-width: 0; }
+.commission-sub {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-top: 4px; font-size: 0.8125rem; color: var(--text-secondary);
+}
+.chip-level {
+  flex-shrink: 0; padding: 1px 8px; border-radius: var(--radius-pill);
+  background: rgba(10, 36, 114, 0.08); color: var(--primary);
+  font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em;
+}
+.commission-ref { font-size: 0.75rem; color: var(--text-muted); }
+.commission-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.commission-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.commission-date { font-size: 0.75rem; color: var(--text-secondary); min-width: 0; }
+.commission-foot .btn { flex-shrink: 0; }
+/* Écran étroit : l'action passe en pleine largeur, sous la date. */
+@media (max-width: 430px) {
+  .commission-foot { flex-direction: column; align-items: stretch; gap: 8px; }
+  .commission-foot .btn { width: 100%; }
+}
 
 .commissions-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .com-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
