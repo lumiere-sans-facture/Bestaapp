@@ -28,7 +28,7 @@ import KitsSection from './plus/KitsSection';
 import { SyncStatusRow } from '../components/SyncStatus';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
 import { reconcileMissingCommissions } from '../utils/commissionSync';
-import { MODES_RETRAIT } from '../utils/payouts';
+import { MODES_RETRAIT, ETATS_COMMISSION, commissionsEngagees, etatCommission } from '../utils/payouts';
 
 export default function Plus() {
   const { user, logout, refreshOrg } = useAuth();
@@ -166,8 +166,14 @@ export default function Plus() {
   }, [isAdminPlateforme, comRafraichir]);
 
   const toutesCommissions = [...commissions, ...comExternes];
-  const pendingCommissions = toutesCommissions.filter((c) => c.status === 'en_attente');
+  // Une commission engagée dans une demande n'est plus « à payer » : elle
+  // attend une DÉCISION, pas un virement. La laisser dans le lot payable
+  // permettrait de la régler à côté de la demande — donc deux fois.
+  const engagees = commissionsEngagees([...(payoutRequests || []), ...retraitsExternes]);
+  const etatDe = (c) => etatCommission(c, engagees);
+  const pendingCommissions = toutesCommissions.filter((c) => etatDe(c) === 'attente');
   const pendingTotal = pendingCommissions.reduce((sum, c) => sum + c.amount, 0);
+  const demandeesTotal = toutesCommissions.filter((c) => etatDe(c) === 'demandee').reduce((sum, c) => sum + c.amount, 0);
   const paidTotal = toutesCommissions.filter((c) => c.status === 'payée').reduce((sum, c) => sum + c.amount, 0);
   // Nom du bénéficiaire / du client : le profil partenaire et la piste vivent
   // dans l'autre organisation, la vue plateforme les fournit déjà enrichis.
@@ -325,10 +331,12 @@ export default function Plus() {
     }, []),
   ];
 
+  const ORDRE_ETAT = { attente: 0, demandee: 1, payee: 2 };
   const filteredCommissions = toutesCommissions
-    .filter((c) => comFilter === 'all' || c.status === comFilter)
+    .filter((c) => comFilter === 'all' || etatDe(c) === comFilter)
     .filter((c) => comPartner === 'all' || c.partnerId === comPartner)
-    .sort((a, b) => (a.status === 'en_attente' ? -1 : 1) - (b.status === 'en_attente' ? -1 : 1) || new Date(b.createdAt) - new Date(a.createdAt));
+    // À payer d'abord, puis les demandées, puis les réglées.
+    .sort((a, b) => ORDRE_ETAT[etatDe(a)] - ORDRE_ETAT[etatDe(b)] || new Date(b.createdAt) - new Date(a.createdAt));
 
   const renderCommissions = () => (
     <>
@@ -385,8 +393,14 @@ export default function Plus() {
       <div className="commission-totals">
         <div className="commission-total-card pending">
           <div className="commission-total-value">{formatCFA(pendingTotal)}</div>
-          <div className="commission-total-label">{pendingCommissions.length} en attente</div>
+          <div className="commission-total-label">{pendingCommissions.length} à payer</div>
         </div>
+        {demandeesTotal > 0 && (
+          <div className="commission-total-card asked">
+            <div className="commission-total-value">{formatCFA(demandeesTotal)}</div>
+            <div className="commission-total-label">Demandées, à trancher</div>
+          </div>
+        )}
         <div className="commission-total-card paid">
           <div className="commission-total-value">{formatCFA(paidTotal)}</div>
           <div className="commission-total-label">Total payé</div>
@@ -394,7 +408,7 @@ export default function Plus() {
       </div>
       <div className="com-toolbar">
         <div className="categories-scroll">
-          {[['all', 'Toutes'], ['en_attente', 'En attente'], ['payée', 'Payées']].map(([id, label]) => (
+          {[['all', 'Toutes'], ['attente', 'À payer'], ['demandee', 'Demandées'], ['payee', 'Payées']].map(([id, label]) => (
             <button key={id} className={`category-chip ${comFilter === id ? 'active' : ''}`} aria-pressed={comFilter === id} onClick={() => setComFilter(id)}>{label}</button>
           ))}
         </div>
@@ -415,7 +429,7 @@ export default function Plus() {
         {filteredCommissions.map((commission) => (
           <div
             key={`${commission.orgId || 'moi'}-${commission.id}`}
-            className={`card commission-card niveau-${commission.level} ${commission.status === 'payée' ? 'is-paid' : 'is-pending'}`}
+            className={`card commission-card niveau-${commission.level} is-${etatDe(commission)}`}
           >
             <div className="commission-top">
               <div className="commission-ident">
@@ -435,8 +449,11 @@ export default function Plus() {
                 <div className="commission-amount">{formatCFA(commission.amount)}</div>
                 {/* Statut en NEUTRE : l'ambre et le vert sont réservés au
                     niveau. Ce qui reste à payer se voit à son bouton plein. */}
-                {commission.status === 'payée' && (
-                  <span className="badge badge-muted"><Check size={11} /> Payée</span>
+                {etatDe(commission) !== 'attente' && (
+                  <span className="badge badge-muted">
+                    {etatDe(commission) === 'payee' ? <Check size={11} /> : <Clock size={11} />}
+                    {ETATS_COMMISSION[etatDe(commission)]}
+                  </span>
                 )}
               </div>
             </div>
@@ -449,11 +466,17 @@ export default function Plus() {
                   ? `Payée le ${formatDate(commission.paidAt)} · ${PAY_MODE_LABEL[commission.payMode] || 'Mobile Money'}${commission.payRef ? ` · réf. ${commission.payRef}` : ''}`
                   : `Créée le ${formatDate(commission.createdAt)}`}
               </span>
-              {commission.status === 'payée' ? (
+              {etatDe(commission) === 'payee' && (
                 <button className="btn btn-sm btn-outline" onClick={() => openRecu(commission)}>
                   <Download size={14} /> Reçu
                 </button>
-              ) : (
+              )}
+              {/* Engagée dans une demande : plus de règlement à l'unité. Elle
+                  se règle avec sa demande, sinon elle serait payée deux fois. */}
+              {etatDe(commission) === 'demandee' && (
+                <span className="commission-date">Incluse dans une demande de paiement</span>
+              )}
+              {etatDe(commission) === 'attente' && (
                 <button className="btn btn-sm btn-primary" onClick={() => handlePay(commission)}>
                   <CheckCircle size={15} /> Payer {formatCFA(commission.amount)}
                 </button>

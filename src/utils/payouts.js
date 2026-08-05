@@ -22,6 +22,29 @@ export const STATUTS_RETRAIT = {
   refuse: 'Refusée',
 };
 
+/**
+ * Trois états VISIBLES d'une commission. Le troisième — « demandée » — n'est
+ * pas stocké : il se DÉDUIT de l'existence d'une demande en cours qui la
+ * couvre. C'est volontaire. Un statut enregistré en base devrait être remis à
+ * jour à chaque refus, chaque annulation, chaque demande retirée : la moindre
+ * omission laisserait une commission bloquée « demandée » pour toujours.
+ * Déduit, l'état suit la demande sans qu'on ait rien à faire.
+ */
+export const ETATS_COMMISSION = { attente: 'À payer', demandee: 'Demandée', payee: 'Payée' };
+
+/** Identifiants des commissions engagées dans une demande encore en examen. */
+export const commissionsEngagees = (demandes = []) => new Set(
+  demandes
+    .filter((d) => d.status === 'en_attente')
+    .flatMap((d) => d.commissionIds || [])
+);
+
+/** État visible d'une commission, dans l'ordre de priorité qui compte. */
+export const etatCommission = (commission, engagees = new Set()) => {
+  if (commission?.status === 'payée') return 'payee';
+  return engagees.has(commission?.id) ? 'demandee' : 'attente';
+};
+
 /** Demande encore en cours d'examen pour ce partenaire, s'il y en a une. */
 export const demandeEnCours = (demandes = [], partnerId) =>
   demandes.find((d) => d.partnerId === partnerId && d.status === 'en_attente') || null;
@@ -32,11 +55,7 @@ export const demandeEnCours = (demandes = [], partnerId) =>
  * demanderait deux fois le même argent et le gérant le paierait deux fois.
  */
 export const commissionsMobilisables = (commissions = [], partnerId, demandes = []) => {
-  const engagees = new Set(
-    demandes
-      .filter((d) => d.status === 'en_attente')
-      .flatMap((d) => d.commissionIds || [])
-  );
+  const engagees = commissionsEngagees(demandes);
   return commissions
     .filter((c) => c.partnerId === partnerId && c.status !== 'payée' && !engagees.has(c.id))
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); // les plus anciennes d'abord

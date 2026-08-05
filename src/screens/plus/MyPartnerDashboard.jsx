@@ -11,8 +11,9 @@ import Accordion from '../../components/Accordion';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
 import {
-  RETRAIT_MIN, MODES_RETRAIT, STATUTS_RETRAIT,
+  RETRAIT_MIN, MODES_RETRAIT, STATUTS_RETRAIT, ETATS_COMMISSION,
   commissionsMobilisables, soldeMobilisable, montantDemande, erreurDemande, demandeEnCours,
+  commissionsEngagees, etatCommission,
 } from '../../utils/payouts';
 import { useToast } from '../../components/Toast';
 
@@ -59,11 +60,18 @@ export default function MyPartnerDashboard({ onBack }) {
   const l2Leads = leads.filter((l) => l.parrainL2 === me.id);
   const wonLeads = l1Leads.filter((l) => l.stage === 'gagne');
   const myComs = commissions.filter((c) => c.partnerId === me.id);
-  const paid = myComs.filter((c) => c.status === 'payée').reduce((s, c) => s + c.amount, 0);
-  const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
-  // Les commissions à encaisser d'abord, puis de la plus récente à la plus ancienne.
+  // Une commission engagée dans une demande quitte « en attente » : elle
+  // n'attend plus un versement mais une décision. La confondre avec le reste
+  // laisserait croire qu'on peut la redemander.
+  const engagees = commissionsEngagees(payoutRequests || []);
+  const etatDe = (c) => etatCommission(c, engagees);
+  const paid = myComs.filter((c) => etatDe(c) === 'payee').reduce((s, c) => s + c.amount, 0);
+  const pending = myComs.filter((c) => etatDe(c) === 'attente').reduce((s, c) => s + c.amount, 0);
+  const demandees = myComs.filter((c) => etatDe(c) === 'demandee').reduce((s, c) => s + c.amount, 0);
+  // À encaisser d'abord, puis les demandées, puis les réglées.
+  const ORDRE_ETAT = { attente: 0, demandee: 1, payee: 2 };
   const historiqueComs = [...myComs].sort(
-    (a, b) => (a.status === 'en_attente' ? -1 : 1) - (b.status === 'en_attente' ? -1 : 1)
+    (a, b) => ORDRE_ETAT[etatDe(a)] - ORDRE_ETAT[etatDe(b)]
       || new Date(b.createdAt) - new Date(a.createdAt)
   );
   const numeroDevis = (c) => (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber : null);
@@ -165,8 +173,15 @@ export default function MyPartnerDashboard({ onBack }) {
         <div className="kpi-card is-highlight">
           <span className="kpi-icon"><Wallet size={18} /></span>
           <span className="kpi-value">{formatCFA(pending)}</span>
-          <span className="kpi-label">Commissions en attente</span>
+          <span className="kpi-label">À réclamer</span>
         </div>
+        {demandees > 0 && (
+          <div className="kpi-card is-primary">
+            <span className="kpi-icon"><Banknote size={18} /></span>
+            <span className="kpi-value">{formatCFA(demandees)}</span>
+            <span className="kpi-label">Demandées, en attente de validation</span>
+          </div>
+        )}
         <div className="kpi-card is-success">
           <span className="kpi-icon"><CheckCircle size={18} /></span>
           <span className="kpi-value">{formatCFA(paid)}</span>
@@ -221,7 +236,7 @@ export default function MyPartnerDashboard({ onBack }) {
           n'ouvre que ce qu'on vient chercher. */}
 
       <Accordion icon={Wallet} title="Historique de mes commissions" count={myComs.length}
-        resume={pending > 0 ? `${formatCFA(pending)} à venir` : null}>
+        resume={pending > 0 ? `${formatCFA(pending)} à réclamer` : (demandees > 0 ? `${formatCFA(demandees)} demandés` : null)}>
         {myComs.length ? historiqueComs.map((c) => (
           <div key={c.id} className="sheet-row">
             <span className="sheet-label">
@@ -245,9 +260,7 @@ export default function MyPartnerDashboard({ onBack }) {
                   (pastille de gauche). Les commissions dues passent de toute
                   façon en tête de liste, et le total « à venir » est annoncé
                   sur l'en-tête de la section. */}
-              <span className="badge badge-muted">
-                {c.status === 'payée' ? 'Payée' : 'En attente'}
-              </span>
+              <span className="badge badge-muted">{ETATS_COMMISSION[etatDe(c)]}</span>
             </span>
           </div>
         )) : (

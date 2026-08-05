@@ -106,6 +106,18 @@ ok(/en attente de validation/.test(barre2), 'partenaire : sa demande en cours es
 ok(await page.locator('button:has-text("Demander un paiement")').count() === 0,
    'partenaire : impossible d’en lancer une seconde sur le même argent');
 
+// ---- 3 bis. LA COMMISSION DEMANDÉE QUITTE « À RÉCLAMER » ----
+const kpis = await page.locator('.partner-kpis').innerText();
+ok(/0 F\nÀ réclamer/.test(kpis) || /0 F[\s\S]{0,20}À réclamer/.test(kpis),
+   `partenaire : plus rien « à réclamer » [${kpis.split('\n').slice(0, 4).join(' / ')}]`);
+ok(/22 500 F[\s\S]{0,60}Demandées/.test(kpis),
+   'partenaire : le montant bascule dans « Demandées, en attente de validation »');
+for (const h of await page.locator('.accordion-head').all()) await h.click();
+await page.waitForTimeout(500);
+const histo = await page.locator('.accordion:has-text("Historique de mes commissions")').innerText();
+ok((histo.match(/Demandée/g) || []).length === 2,
+   'partenaire : les 2 commissions portent l’état « Demandée »');
+
 // ---- 4. LE GÉRANT REÇOIT LA DEMANDE ----
 await session(GERANT, '/plus/commissions', null);
 ok(await page.locator('.validation-bar').count() === 1, 'gérant : la demande apparaît en tête de l’écran Commissions');
@@ -113,6 +125,21 @@ const bloc = await page.locator('.validation-bar').innerText();
 ok(/Fatou Boko/.test(bloc) && /22 500 F/.test(bloc), `gérant : partenaire et montant sont lisibles`);
 ok(/\+229 97 55 44 33/.test(bloc), 'gérant : le numéro à créditer est affiché');
 ok(/2 commissions/.test(bloc), 'gérant : le nombre de commissions couvertes est indiqué');
+
+// Les commissions demandées sortent du lot payable — sinon elles pourraient
+// être réglées à côté de la demande, donc deux fois.
+const totaux = await page.locator('.commission-totals').innerText();
+ok(/0 F[\s\S]{0,30}à payer/.test(totaux), `gérant : plus rien « à payer » à l’unité [${totaux.split('\n').join(' / ')}]`);
+ok(/22 500 F[\s\S]{0,40}Demandées/.test(totaux), 'gérant : le montant apparaît en « Demandées, à trancher »');
+ok(await page.locator('.commission-card button:has-text("Payer ")').count() === 0,
+   'gérant : aucune commission demandée ne garde son bouton « Payer » individuel');
+ok((await page.locator('.commissions-list').innerText()).includes('Incluse dans une demande'),
+   'gérant : la carte explique pourquoi elle n’est plus payable seule');
+await page.locator('.category-chip:has-text("Demandées")').click();
+await page.waitForTimeout(500);
+ok(await page.locator('.commission-card').count() === 2, 'gérant : le filtre « Demandées » isole les deux commissions');
+await page.locator('.category-chip:has-text("Toutes")').click();
+await page.waitForTimeout(400);
 
 // ---- 5. IL RÈGLE, ET LES COMMISSIONS SUIVENT ----
 await page.locator('.validation-bar button:has-text("Payer")').click();
@@ -161,6 +188,10 @@ ok(etat.commissions.filter((c) => c.status === 'payée').length === 1,
 await session(PARTENAIRE, '/plus/mypartner', null);
 const barre4 = await page.locator('.retrait-bar').innerText();
 ok(/22 500 F/.test(barre4), 'refus : les commissions redeviennent demandables');
+const kpis4 = await page.locator('.partner-kpis').innerText();
+ok(/22 500 F[\s\S]{0,30}À réclamer/.test(kpis4),
+   'refus : le montant revient dans « À réclamer »');
+ok(!/Demandées/.test(kpis4), 'refus : la tuile « Demandées » disparaît');
 
 console.log('\n' + R.join('\n'));
 console.log(jsErr.length ? `\n❌ erreurs JS : ${jsErr.slice(0, 2).join(' | ')}` : '\naucune erreur JS');

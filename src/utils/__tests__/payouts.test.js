@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   RETRAIT_MIN, commissionsMobilisables, soldeMobilisable, montantDemande,
   erreurDemande, demandeEnCours, resumeRetraits,
+  commissionsEngagees, etatCommission,
 } from '../payouts';
 
 const COM = [
@@ -112,5 +113,49 @@ describe('resumeRetraits', () => {
   });
   it('totalise toute la plateforme sans partenaire précisé', () => {
     expect(resumeRetraits(demandes)).toEqual({ enAttente: 31500, paye: 40000, nbEnAttente: 2 });
+  });
+});
+
+describe('etatCommission — les trois états visibles d’une commission', () => {
+  const enAttente = { id: 'c1', status: 'en_attente' };
+  const payee = { id: 'c3', status: 'payée' };
+
+  it('impayée et libre : « à payer »', () => {
+    expect(etatCommission(enAttente, commissionsEngagees([]))).toBe('attente');
+  });
+
+  it('engagée dans une demande EN COURS : « demandée » — elle quitte le lot à payer', () => {
+    const engagees = commissionsEngagees([{ status: 'en_attente', commissionIds: ['c1'] }]);
+    expect(etatCommission(enAttente, engagees)).toBe('demandee');
+  });
+
+  it('payée : « payée », même si une vieille demande la mentionne encore', () => {
+    const engagees = commissionsEngagees([{ status: 'en_attente', commissionIds: ['c3'] }]);
+    expect(etatCommission(payee, engagees)).toBe('payee');
+  });
+
+  it('demande REFUSÉE : la commission redevient « à payer », sans rien réécrire', () => {
+    const engagees = commissionsEngagees([{ status: 'refuse', commissionIds: ['c1'] }]);
+    expect(etatCommission(enAttente, engagees)).toBe('attente');
+  });
+
+  it('demande PAYÉE : elle ne bloque plus rien (le statut de la commission a suivi)', () => {
+    const engagees = commissionsEngagees([{ status: 'paye', commissionIds: ['c1'] }]);
+    expect(etatCommission(enAttente, engagees)).toBe('attente');
+  });
+});
+
+describe('commissionsEngagees', () => {
+  it('ne retient que les demandes encore en examen', () => {
+    const set = commissionsEngagees([
+      { status: 'en_attente', commissionIds: ['a', 'b'] },
+      { status: 'paye', commissionIds: ['c'] },
+      { status: 'refuse', commissionIds: ['d'] },
+    ]);
+    expect([...set].sort()).toEqual(['a', 'b']);
+  });
+
+  it('tolère une demande sans commission rattachée', () => {
+    expect(commissionsEngagees([{ status: 'en_attente' }]).size).toBe(0);
   });
 });

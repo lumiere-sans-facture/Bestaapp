@@ -1677,9 +1677,12 @@ form .login-link { width: 100%; margin-top: 4px; }
    paiement, seulement son reçu. */
 .commission-card { padding: 14px 16px; border-left: 3px solid var(--accent); }
 .commission-card.niveau-2 { border-left-color: var(--success); }
-.commission-card.is-paid { background: var(--bg); box-shadow: none; }
-.commission-card.is-paid .commission-lead,
-.commission-card.is-paid .commission-amount { color: var(--text-secondary); }
+.commission-card.is-payee { background: var(--bg); box-shadow: none; }
+.commission-card.is-payee .commission-lead,
+.commission-card.is-payee .commission-amount { color: var(--text-secondary); }
+/* Demandée : la carte reste lisible (l'argent est encore dû) mais son pied
+   n'offre plus d'action — le règlement passe par la demande. */
+.commission-card.is-demandee { border-style: dashed; }
 .commission-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .commission-ident { min-width: 0; }
 .commission-sub {
@@ -1719,10 +1722,14 @@ form .login-link { width: 100%; margin-top: 4px; }
   border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
   font-size: 0.875rem; font-weight: 500;
 }
-.commission-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.commission-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .commission-total-card { border-radius: var(--radius); padding: 14px 16px; }
 .commission-total-card.pending { background: var(--warning-light); }
 .commission-total-card.paid { background: var(--success-light); }
+/* Demandées : ni à payer, ni payées — en attente d'une DÉCISION. Teinte
+   neutre, volontairement à l'écart de l'ambre et du vert. */
+.commission-total-card.asked { background: var(--bg); border: 1px solid var(--border); }
+.commission-total-card.asked .commission-total-value { color: var(--primary); }
 .commission-total-value { font-size: 1.125rem; font-weight: 700; }
 .commission-total-card.pending .commission-total-value { color: var(--warning-dark); }
 .commission-total-card.paid .commission-total-value { color: var(--success-text); }

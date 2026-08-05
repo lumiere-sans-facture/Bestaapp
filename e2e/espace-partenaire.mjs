@@ -84,8 +84,8 @@ ok(hReplie < 1000, `espace partenaire : page repliée courte (${hReplie} px)`);
 
 // Les en-têtes annoncent le contenu sans qu'on ouvre.
 const entetes = await page.locator('.accordion-head').allInnerTexts();
-ok(entetes.some((t) => /Historique de mes commissions/.test(t) && /15 000 F à venir/.test(t)),
-   'espace partenaire : l’en-tête annonce le montant à encaisser sans ouvrir');
+ok(entetes.some((t) => /Historique de mes commissions/.test(t) && /15 000 F à réclamer/.test(t)),
+   'espace partenaire : l’en-tête annonce le montant à réclamer sans ouvrir');
 ok(entetes.some((t) => /Mes affaires gagnées/.test(t) && /500 000 F/.test(t)),
    'espace partenaire : l’en-tête des affaires gagnées annonce le total');
 
@@ -118,7 +118,7 @@ ok(/15 000 F/.test(espace) && /7 500 F/.test(espace),
    'espace partenaire : les deux montants sont listés');
 // L'ordre : à encaisser d'abord
 const lignes = await page.locator('.accordion:has-text("Historique de mes commissions") .sheet-row').allInnerTexts();
-ok(/En attente/.test(lignes[0] || '') && /Payée/.test(lignes[1] || ''),
+ok(/À payer/.test(lignes[0] || '') && /Payée/.test(lignes[1] || ''),
    'espace partenaire : les commissions à encaisser passent en premier');
 
 console.log('\n' + R.join('\n'));
