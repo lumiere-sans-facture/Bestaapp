@@ -1,5 +1,5 @@
-import { lazy, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
@@ -53,6 +53,20 @@ function usePreloadScreens() {
 
 function AppRoutes() {
   const { user, isLoading, recovery } = useAuth();
+  const navigate = useNavigate();
+
+  // Une session neuve repart de l'accueil. L'app est une PAGE UNIQUE : sans
+  // cela, l'adresse ouverte par un compte survit à sa déconnexion et le compte
+  // suivant atterrit sur l'écran du précédent — un simple utilisateur se
+  // retrouvait sur une page d'administration du gérant.
+  const dernierCompte = useRef(null);
+  useEffect(() => {
+    const id = user?.id || null;
+    if (dernierCompte.current !== null && dernierCompte.current !== id) {
+      navigate('/', { replace: true });
+    }
+    dernierCompte.current = id;
+  }, [user?.id, navigate]);
 
   if (isLoading) {
     return <div className="splash-screen">Chargement…</div>;

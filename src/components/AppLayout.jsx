@@ -6,6 +6,7 @@ import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, 
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { initials } from '../utils/format';
 import { SyncDot } from './SyncStatus';
 
@@ -31,13 +32,16 @@ const proNavItems = [
 
 // Sous-sections de « Plus » remontées dans la barre latérale (desktop), par rôle.
 // « Mon profil » est rendu à part, en dernier, après le bouton « Passer en mode Pro ».
-const plusSections = (role) => [
-  ...(role === 'gerant' ? [
+// L'administration du SaaS n'est ouverte qu'à BestaSolar : le gérant d'une
+// autre entreprise verrait sinon un lien que l'écran lui refuse.
+const plusSections = (user) => [
+  ...(user.role === 'gerant' ? [
     { path: '/plus/team', label: 'Équipe', icon: Users },
     { path: '/plus/partners', label: 'Partenaires', icon: Share2 },
     { path: '/plus/orders', label: 'Commandes en ligne', icon: ShoppingCart },
     { path: '/plus/commissions', label: 'Commissions', icon: DollarSign },
-    { path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown },
+    ...(!isSupabaseConfigured || user.is_platform_admin
+      ? [{ path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown }] : []),
     { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },
   ] : []),
   { path: '/plus/formation', label: 'Formation', icon: GraduationCap },
@@ -96,7 +100,7 @@ export default function AppLayout() {
           ))}
           {!isPro && (
             <>
-              {plusSections(user.role).map((item) => (
+              {plusSections(user).map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}

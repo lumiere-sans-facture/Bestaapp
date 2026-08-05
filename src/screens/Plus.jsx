@@ -48,9 +48,29 @@ export default function Plus() {
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
   const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
+  // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
+  // est une page unique : se reconnecter ne change pas l'URL affichée). Un
+  // simple utilisateur restait ainsi sur l'écran des commissions du gérant,
+  // boutons « Payer » et « Commission manuelle » compris. L'autorisation se
+  // décide donc ici, à la section, pas au bouton.
+  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'backup'];
+  const sectionAutorisee = (tab) => {
+    if (!KNOWN_TABS.includes(tab)) return false;
+    if (tab === 'subsadmin') {
+      return user.role === 'gerant' && (!isSupabaseConfigured || !!user.is_platform_admin);
+    }
+    return !SECTIONS_GERANT.includes(tab) || user.role === 'gerant';
+  };
   const { section } = useParams();
   const navigate = useNavigate();
-  const activeTab = KNOWN_TABS.includes(section) ? section : 'menu';
+  // Repli immédiat sur le menu : aucun écran d'administration ne doit
+  // s'afficher, même le temps d'une redirection.
+  const activeTab = section && sectionAutorisee(section) ? section : 'menu';
+  // …et l'adresse est corrigée, pour ne pas laisser croire à un droit d'accès.
+  useEffect(() => {
+    if (section && !sectionAutorisee(section)) navigate('/plus', { replace: true });
+  }, [section, user.role, user.is_platform_admin]); // eslint-disable-line react-hooks/exhaustive-deps
   const setActiveTab = (x) => navigate(x === 'menu' ? '/plus' : `/plus/${x}`);
   const [comFilter, setComFilter] = useState('all');
   const [comPartner, setComPartner] = useState('all');
