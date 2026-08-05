@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -24,6 +24,7 @@ import MyProfile from './plus/MyProfile';
 import TeamSection from './plus/TeamSection';
 import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
+import KitsSection from './plus/KitsSection';
 import { SyncStatusRow } from '../components/SyncStatus';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
 import { reconcileMissingCommissions } from '../utils/commissionSync';
@@ -36,7 +37,7 @@ export default function Plus() {
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
-    partners, commissions, leads, orders, devis, referrals, team, teamChargee,
+    partners, commissions, leads, orders, devis, referrals, kits, team, teamChargee,
     getPartnerById, getLeadById,
     payCommission, addCommission, syncCommissions,
     getSubscriptionForUser, requestSubscription, importData,
@@ -47,14 +48,14 @@ export default function Plus() {
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'kits', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
   // simple utilisateur restait ainsi sur l'écran des commissions du gérant,
   // boutons « Payer » et « Commission manuelle » compris. L'autorisation se
   // décide donc ici, à la section, pas au bouton.
-  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'backup'];
+  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'backup'];
   const sectionAutorisee = (tab) => {
     if (!KNOWN_TABS.includes(tab)) return false;
     if (tab === 'subsadmin') {
@@ -486,6 +487,7 @@ export default function Plus() {
               <MenuItem icon={Users} title="Partenaires" subtitle={`${partners.length} partenaires · réseau 2 niveaux`} onClick={() => setActiveTab('partners')} />
               <MenuItem icon={DollarSign} title="Commandes en ligne" subtitle={`${(orders || []).filter((o) => o.status === 'initie').length} à confirmer`} onClick={() => setActiveTab('orders')} />
               <MenuItem icon={DollarSign} title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
+              <MenuItem icon={Package} title="Mes kits" subtitle={`${(kits || []).length} kits proposés par l'assistant de devis`} onClick={() => setActiveTab('kits')} />
               {/* Administration du SaaS : en mode backend, réservée à l'admin
                   plateforme (le serveur refuse de toute façon l'activation
                   d'un abonnement à quiconque d'autre). */}
@@ -530,7 +532,7 @@ export default function Plus() {
   const TAB_TITLES = {
     menu: 'Plus', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
-    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire',
+    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits',
     profile: 'Mon profil', backup: 'Sauvegarde',
   };
 
@@ -547,6 +549,7 @@ export default function Plus() {
         {activeTab === 'commissions' && renderCommissions()}
         {activeTab === 'orders' && <OrdersSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'team' && <TeamSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'kits' && <KitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'subsadmin' && <SubscriptionsAdmin onBack={() => setActiveTab('menu')} />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}

@@ -1,6 +1,7 @@
 // État applicatif : forme initiale, chargement depuis localStorage (avec
 // migrations de seed) et persistance. Aucune dépendance React — logique pure.
 import * as seed from '../data/seed';
+import { SOLAR_KITS } from '../data/kits';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
 
@@ -27,6 +28,11 @@ export const buildInitialState = () => ({
   devis: [],
   referrals: [],
   orders: [],
+  // Les kits sont dotés partout, y compris en SaaS — contrairement au
+  // catalogue boutique. L'assistant de devis solaire ne propose QUE des kits :
+  // démarrer à zéro le rendrait inutilisable. Ils appartiennent ensuite à
+  // l'entreprise, qui les modifie depuis « Mes kits ».
+  kits: SOLAR_KITS,
   formations: seed.formations,
   formationProgress: [],
   subscriptions: [],
@@ -62,6 +68,11 @@ export const loadState = (scope = null) => {
       // et le registre des parrainages est remappé vers les nouveaux codes.
       if (!saved.referrals) saved.referrals = [];
       if (!saved.orders) saved.orders = [];
+      // Migration « Mes kits » : les kits vivaient dans le code, ils passent
+      // dans l'état pour devenir modifiables. Dotation UNE SEULE FOIS — ne
+      // jamais réinjecter ensuite, sinon un kit supprimé par le gérant
+      // reviendrait à chaque ouverture de l'application.
+      if (!Array.isArray(saved.kits)) saved.kits = SOLAR_KITS;
       if (!saved.formations) saved.formations = seed.formations;
       if (!saved.formationProgress) saved.formationProgress = [];
       // Migration formation : structure « école » (cours → modules → leçons).

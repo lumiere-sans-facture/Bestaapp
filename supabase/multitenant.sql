@@ -70,12 +70,20 @@ create or replace function public.auth_org_id()
   select org_id from public.profiles where lower(email) = lower(auth.jwt() ->> 'email')
 $$;
 
+-- 3 bis. Kits solaires : collection née après le schéma initial. Créée ici
+-- aussi, pour que ce fichier reste exécutable seul sur une base déjà en place.
+create table if not exists public.kits (
+  id text primary key, data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.kits enable row level security;
+
 -- 4. org_id sur chaque collection + tombstones : ajout, back-fill, NOT NULL
 do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','tombstones'
   ] loop
@@ -90,7 +98,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients'
   ] loop
@@ -108,7 +116,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients'
   ] loop
@@ -139,7 +147,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','tombstones'
   ] loop

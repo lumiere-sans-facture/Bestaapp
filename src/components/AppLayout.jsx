@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -40,6 +40,7 @@ const plusSections = (user) => [
     { path: '/plus/partners', label: 'Partenaires', icon: Share2 },
     { path: '/plus/orders', label: 'Commandes en ligne', icon: ShoppingCart },
     { path: '/plus/commissions', label: 'Commissions', icon: DollarSign },
+    { path: '/plus/kits', label: 'Mes kits', icon: Package },
     ...(!isSupabaseConfigured || user.is_platform_admin
       ? [{ path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown }] : []),
     { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },

@@ -1541,6 +1541,36 @@ form .login-link { width: 100%; margin-top: 4px; }
 .momo-input-row .input { flex: 1; }
 .momo-input-row .btn { flex-shrink: 0; }
 
+/* « Mes kits » : compositions solaires modifiables par le gérant. */
+.kits-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.kit-card { padding: 14px 16px; }
+.kit-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.kit-card-ident { min-width: 0; }
+.kit-card-name { display: flex; align-items: center; gap: 7px; font-weight: 600; }
+.kit-card-meta { margin-top: 3px; font-size: 0.8125rem; color: var(--text-secondary); }
+.kit-card-price { flex-shrink: 0; font-size: 1.125rem; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
+.kit-card-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.kit-card-lines { font-size: 0.75rem; color: var(--text-secondary); }
+.kit-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+/* La case « prestation » range la ligne du bon côté du devis : cible large. */
+.kit-line-labor {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  font-size: 0.8125rem; color: var(--text-secondary); cursor: pointer;
+}
+.kit-line-labor input { width: 18px; height: 18px; flex-shrink: 0; }
+.kit-form-total {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 16px 0 12px; padding: 12px 14px;
+  background: var(--bg); border-radius: var(--radius); font-size: 1rem;
+}
+@media (max-width: 430px) {
+  .kit-card-foot { flex-direction: column; align-items: stretch; }
+  .kit-card-actions { justify-content: flex-end; }
+}
+
 /* Sections repliables (details/summary) : évitent la page sans fin quand
    chaque rubrique est vide ou très longue. */
 .accordion { margin-top: 12px; padding: 0; }
@@ -1952,8 +1982,16 @@ form .login-link { width: 100%; margin-top: 4px; }
 }
 .doc-line-designation { margin-bottom: 10px; }
 .doc-line-designation .input { padding-right: 44px; }
-.doc-line-remove { position: absolute; top: 12px; right: 8px; }
+/* Sélecteur descendant volontaire : la règle d'élargissement des zones de
+   contact (« .cart-row-remove { position: relative } », plus bas dans le
+   fichier) l'emportait à égalité de spécificité et renvoyait ce bouton dans
+   le flux — il s'intercalait alors entre la désignation et les quantités,
+   dans TOUS les éditeurs de lignes (factures, devis Pro, kits). */
+.doc-line .doc-line-remove { position: absolute; top: 12px; right: 8px; }
 .doc-line-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Ligne à trois champs (kits : quantité, unité, prix) : le prix, seul sur
+   sa rangée, prend toute la largeur plutôt que de flotter à moitié. */
+.doc-line-field.is-wide { grid-column: 1 / -1; }
 .doc-line-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--text-secondary); }
 .doc-line-subtotal { font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px; text-align: right; }
 

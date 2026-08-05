@@ -5,7 +5,6 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
 import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
-import { SOLAR_KITS } from '../../data/kits';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -21,7 +20,10 @@ const STEP_NAMES = ['Client', 'Consommation', 'Type de système', 'Résultat'];
 
 export default function SolarWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
-  const { addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
+  // Les kits viennent de l'état : ils se modifient dans « Mes kits », l'assistant
+  // reflète immédiatement les prix du gérant sans mise à jour de l'application.
+  const { addDevis, leadsForUser, partners, ensurePartnerForUser, kits } = useData();
+  const SOLAR_KITS = useMemo(() => kits || [], [kits]);
   // Client déjà choisi (fiche client) : l'étape de sélection est sautée.
   const [step, setStep] = useState(initialLeadId ? 2 : 1);
   const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);
@@ -135,18 +137,23 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
 
   // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
   // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit.
-  const kitQuotations = useMemo(() => Object.fromEntries(SOLAR_KITS.map((k) => [k.id, buildKitQuotation(k)])), []);
+  const kitQuotations = useMemo(
+    () => Object.fromEntries(SOLAR_KITS.map((k) => [k.id, buildKitQuotation(k)])),
+    [SOLAR_KITS]
+  );
   // Kit suggéré : capacité de batterie la plus proche du besoin calculé.
   const suggestedKitId = useMemo(() => {
-    if (!sizing) return null;
+    if (!sizing || !SOLAR_KITS.length) return null;
     const need = sizing.batteryCapacity || 0;
     return [...SOLAR_KITS].sort((a, b) => Math.abs(a.battery - need) - Math.abs(b.battery - need))[0].id;
-  }, [sizing]);
+  }, [sizing, SOLAR_KITS]);
   // null = sélection auto (kit suggéré), sinon le kit explicitement choisi.
   const [selectedKitId, setSelectedKitId] = useState(null);
-  const effectiveKitId = selectedKitId || suggestedKitId || SOLAR_KITS[0].id;
-  const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0];
-  const displayQuotation = kitQuotations[effectiveKitId];
+  // La liste est modifiable depuis « Mes kits » : elle peut être vide, ou le
+  // kit retenu avoir été supprimé entre-temps. Tout est optionnel à partir d'ici.
+  const effectiveKitId = selectedKitId || suggestedKitId || SOLAR_KITS[0]?.id || null;
+  const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0] || null;
+  const displayQuotation = selectedKit ? kitQuotations[selectedKit.id] : null;
 
   // Fiche de dimensionnement — étude technique du BESOIN du client.
   // Elle ne reprend rien du kit proposé au devis : nombre de panneaux, calibre
@@ -178,6 +185,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   };
 
   const handleSubmit = (statut = 'finalise') => {
+    if (!selectedKit || !displayQuotation) return; // aucun kit disponible
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const submitSizing = {
       numberOfPanels: selectedKit.panels,
@@ -444,7 +452,18 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
         )}
 
         {/* Étape 4 : résultat */}
-        {step === 4 && sizing && (
+        {step === 4 && sizing && !selectedKit && (
+          <div>
+            <div className="wizard-step-title">Choix du kit et devis</div>
+            <EmptyState card>
+              Aucun kit n'est disponible. Composez vos kits dans
+              <strong> Plus › Mes kits </strong> — l'assistant s'appuie
+              uniquement sur eux pour chiffrer un devis.
+            </EmptyState>
+          </div>
+        )}
+
+        {step === 4 && sizing && selectedKit && (
           <div>
             <div className="wizard-step-title">Choix du kit et devis</div>
 
@@ -523,10 +542,10 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
             </button>
           ) : (
             <>
-              <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => handleSubmit('brouillon')}>
+              <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => handleSubmit('brouillon')} disabled={!selectedKit}>
                 Brouillon
               </button>
-              <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')}>
+              <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')} disabled={!selectedKit}>
                 <Check size={18} /> Créer le devis{selectedLead ? ` pour ${selectedLead.name}` : ''}
               </button>
             </>

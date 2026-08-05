@@ -6,6 +6,7 @@ import { COMMISSION_RATES, newReferral } from './actions/shared';
 import { createLeadActions } from './actions/leads';
 import { createPartnerActions } from './actions/partners';
 import { createCatalogueActions } from './actions/catalogue';
+import { createKitActions } from './actions/kits';
 import { createDevisActions } from './actions/devis';
 import { createFormationActions } from './actions/formations';
 import { createProActions } from './actions/pro';
@@ -18,6 +19,7 @@ export function createActions(setState) {
     ...createLeadActions(setState),
     ...createPartnerActions(setState),
     ...createCatalogueActions(setState),
+    ...createKitActions(setState),
     ...createDevisActions(setState),
     ...createFormationActions(setState),
     ...createProActions(setState),
