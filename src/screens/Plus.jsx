@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission } from '../lib/remoteSync';
+import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchPlatformPayouts, decidePlatformPayout } from '../lib/remoteSync';
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
 import { estProprietaireEspace } from '../utils/roles';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
@@ -151,10 +151,17 @@ export default function Plus() {
   const isAdminPlateforme = isSupabaseConfigured && !!user.is_platform_admin;
   const [comExternes, setComExternes] = useState([]);
   const [comRafraichir, setComRafraichir] = useState(0);
+  // Demandes de paiement des partenaires des AUTRES comptes : elles naissent
+  // dans leur organisation, la RLS les cache ici. Sans cette remontée, un
+  // commercial de la plateforme réclamerait son argent dans le vide.
+  const [retraitsExternes, setRetraitsExternes] = useState([]);
   useEffect(() => {
     if (!isAdminPlateforme) return;
     fetchPlatformCommissions()
       .then((list) => setComExternes((list || []).map((c) => ({ ...c, externe: true }))))
+      .catch(() => {});
+    fetchPlatformPayouts()
+      .then((list) => setRetraitsExternes((list || []).map((d) => ({ ...d, externe: true }))))
       .catch(() => {});
   }, [isAdminPlateforme, comRafraichir]);
 
@@ -172,21 +179,38 @@ export default function Plus() {
     c.devisNumber || (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber : null);
 
   // ---- Demandes de paiement (retraits) ----
-  const retraitsEnAttente = (payoutRequests || []).filter((d) => d.status === 'en_attente');
+  const retraitsEnAttente = [
+    ...(payoutRequests || []).filter((d) => d.status === 'en_attente'),
+    ...retraitsExternes,
+  ];
   const ouvrirValidation = (d) => {
     setRetraitForm({ mode: d.methode || 'momo', reference: '', note: '' });
     setRetraitAValider(d);
   };
   const validerRetrait = (e) => {
     e.preventDefault();
-    approvePayout(retraitAValider.id, { ...retraitForm, decidedBy: user.id });
+    const d = retraitAValider;
+    if (d.externe) {
+      decidePlatformPayout({ orgId: d.orgId, id: d.id, approuver: true, ...retraitForm })
+        .catch((err) => toast(`Règlement impossible : ${err.message}`, { type: 'error' }))
+        .finally(() => setComRafraichir((n) => n + 1));
+    } else {
+      approvePayout(d.id, { ...retraitForm, decidedBy: user.id });
+    }
     setRetraitAValider(null);
     toast('Paiement enregistré : les commissions couvertes passent « payées ».');
   };
   const refuserRetrait = (e) => {
     e.preventDefault();
     if (!motifRefus.trim()) { toast('Indiquez le motif du refus.', { type: 'error' }); return; }
-    rejectPayout(retraitARefuser.id, { motif: motifRefus, decidedBy: user.id });
+    const d = retraitARefuser;
+    if (d.externe) {
+      decidePlatformPayout({ orgId: d.orgId, id: d.id, approuver: false, motif: motifRefus })
+        .catch((err) => toast(`Refus impossible : ${err.message}`, { type: 'error' }))
+        .finally(() => setComRafraichir((n) => n + 1));
+    } else {
+      rejectPayout(d.id, { motif: motifRefus, decidedBy: user.id });
+    }
     setRetraitARefuser(null);
     setMotifRefus('');
     toast('Demande refusée — le partenaire en est informé dans son espace.');
@@ -331,15 +355,16 @@ export default function Plus() {
               : '1 demande de paiement'}
           </div>
           {retraitsEnAttente.map((d) => (
-            <div key={d.id} className="validation-row">
+            <div key={`${d.orgId || 'moi'}-${d.id}`} className="validation-row">
               <div className="validation-info">
                 <span className="validation-lead">
                   {d.partnerName || getPartnerById(d.partnerId)?.name || 'Partenaire'} — {formatCFA(d.amount)}
+                  {d.externe && d.orgName ? <span className="text-secondary"> · {d.orgName}</span> : null}
                 </span>
                 <span className="validation-move">
                   {(d.commissionIds || []).length} commission{(d.commissionIds || []).length > 1 ? 's' : ''}
                   {' · '}{MODES_RETRAIT[d.methode] || d.methode}
-                  {d.telephone ? ` · ${d.telephone}` : ''}
+                  {(d.telephone || d.partnerPhone) ? ` · ${d.telephone || d.partnerPhone}` : ''}
                 </span>
                 <span className="validation-by">
                   demandé le {formatDate(d.requestedAt)}{d.note ? ` · « ${d.note} »` : ''}
@@ -726,8 +751,11 @@ export default function Plus() {
               <span className="sheet-label">Commissions couvertes</span>
               <span className="sheet-value">{(retraitAValider.commissionIds || []).length}</span>
             </div>
-            {retraitAValider.telephone && (
-              <div className="sheet-row"><span className="sheet-label">À verser sur</span><span className="sheet-value">{retraitAValider.telephone}</span></div>
+            {(retraitAValider.telephone || retraitAValider.partnerPhone) && (
+              <div className="sheet-row"><span className="sheet-label">À verser sur</span><span className="sheet-value">{retraitAValider.telephone || retraitAValider.partnerPhone}</span></div>
+            )}
+            {retraitAValider.externe && retraitAValider.orgName && (
+              <div className="sheet-row"><span className="sheet-label">Entreprise</span><span className="sheet-value">{retraitAValider.orgName}</span></div>
             )}
             <Field label="Mode de règlement">
               <select className="input" value={retraitForm.mode} onChange={(e) => setRetraitForm({ ...retraitForm, mode: e.target.value })}>

@@ -36,3 +36,8 @@ puis vérifie ce que l'utilisateur voit réellement à l'écran.
 | `demande-paiement.mjs` | Le partenaire voit son solde mobilisable (hors commissions déjà payées), demande le règlement de commissions précises — tout ou partie — et ne peut pas en lancer une seconde sur le même argent ; rien n'est payé tant que le gérant n'a pas tranché ; le gérant reçoit la demande dans l'écran Commissions avec le numéro à créditer, la règle avec sa référence de transaction (les commissions couvertes passent « payées », référence reportée) ou la refuse avec motif — le refus libère les commissions. |
 | `mes-kits.mjs` | Les kits solaires sont récupérés dans les données (5), affichés et chiffrés ; modifier un prix se recalcule à la saisie, s'enregistre et ne change ni l'identifiant ni le nombre de kits ; création, duplication et suppression ; un kit d'origine supprimé est signalé et peut être remis **sans écraser** les prix ajustés ; la section est fermée à un simple utilisateur. |
 | `espace-partenaire.mjs` | Le profil ne parle plus d'argent (ni tuiles de commissions, ni Mobile Money, ni affaires gagnées, ni le mot « commission ») ; l'espace partenaire porte tout : affaires gagnées, historique complet des commissions (niveau et taux, devis d'origine, date de paiement, à encaisser d'abord) et Mobile Money. Ses sections sont repliées à l'ouverture — la page tient sur un écran, chaque en-tête annonce son compte et son montant, et chacune s'ouvre au clic. |
+
+Les scénarios tournent en mode local (sans backend) : ils couvrent le circuit
+à l'intérieur d'une organisation. La remontée des demandes et commissions des
+AUTRES organisations passe par des fonctions serveur, éprouvées à part sur une
+base PostgreSQL locale.

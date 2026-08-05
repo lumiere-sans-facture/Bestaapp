@@ -23,6 +23,15 @@ export const setSyncOrg = (orgId, kind = null) => {
 };
 const withOrg = (row) => (currentOrgId ? { ...row, org_id: currentOrgId } : row);
 
+// Tables absentes du schéma distant : une collection ajoutée par une mise à
+// jour de l'application existe côté client AVANT que le SQL ne soit rejoué.
+// Sans ce filet, sa lecture faisait échouer TOUTE la synchronisation — plus
+// rien ne montait ni ne descendait, pour une seule table manquante.
+const tablesAbsentes = new Set();
+const tableManquante = (error) =>
+  error?.code === '42P01' || error?.code === 'PGRST205'
+  || /does not exist|schema cache/i.test(error?.message || '');
+
 /** Récupère toutes les collections + les tombstones. { empty, collections, tombstones } */
 export async function pullAll() {
   // Lecture des collections en parallèle (au lieu de 15 allers-retours séquentiels).
@@ -32,8 +41,12 @@ export async function pullAll() {
       // produits BestaSolar. Une entreprise ayant reçu une copie historique
       // verrait des doublons — on garde la ligne BestaSolar (source de vérité).
       const dedupe = table === 'products' && currentOrgId;
+      if (tablesAbsentes.has(table)) return [table, []];
       const { data, error } = await supabase.from(table).select(dedupe ? 'id, data, org_id' : 'id, data');
-      if (error) throw error;
+      if (error) {
+        if (tableManquante(error)) { tablesAbsentes.add(table); return [table, []]; }
+        throw error;
+      }
       let rows = data || [];
       if (dedupe) {
         const shared = new Set(rows.filter((r) => r.org_id === SHARED_ORG_ID).map((r) => r.id));
@@ -133,6 +146,9 @@ export async function pushCollections(collections) {
     if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items0)) continue;
     // Le catalogue n'est poussé que par l'organisation interne BestaSolar.
     if (table === 'products' && !pushesProducts()) continue;
+    // Table pas encore créée côté serveur : on n'envoie rien plutôt que de
+    // faire remonter une erreur de synchronisation à l'utilisateur.
+    if (tablesAbsentes.has(table)) continue;
     let items = items0;
     // Vérité serveur : un abonnement « actif » et un paiement « confirme »
     // ne s'écrivent que côté serveur (RPC admin). L'app ne les repousse
@@ -145,6 +161,7 @@ export async function pushCollections(collections) {
       for (const lot of decouperEnLots(rows)) await envoyerLot(table, lot);
       reussies.push(table);
     } catch (e) {
+      if (tableManquante(e)) { tablesAbsentes.add(table); continue; }
       erreurs.push(`${table} : ${e.message}`);
     }
   }
@@ -308,6 +325,26 @@ export async function payPlatformCommission({ orgId, id, mode, reference, note }
   const { error } = await supabase.rpc('admin_pay_commission', {
     p_org_id: orgId, p_id: id, p_mode: mode || 'momo',
     p_ref: reference || null, p_note: note || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Demandes de paiement en attente sur TOUTE la plateforme (hors sa propre
+ * organisation, déjà dans l'état local). Réservé à l'admin plateforme.
+ */
+export async function fetchPlatformPayouts() {
+  const { data, error } = await supabase.rpc('admin_platform_payouts');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/** Règle ou refuse la demande d'un partenaire d'une autre organisation. La
+ *  validation marque aussi les commissions couvertes — côté serveur. */
+export async function decidePlatformPayout({ orgId, id, approuver, mode, reference, motif }) {
+  const { error } = await supabase.rpc('admin_decide_payout', {
+    p_org_id: orgId, p_id: id, p_approuver: approuver,
+    p_mode: mode || 'momo', p_ref: reference || null, p_motif: motif || null,
   });
   if (error) throw new Error(error.message);
 }

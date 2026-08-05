@@ -905,6 +905,90 @@ begin
   return v;
 end $$;
 
+
+-- Vue GÉRANT : les DEMANDES DE PAIEMENT de toute la plateforme. Une demande
+-- naît dans l'organisation du partenaire ; sans cette remontée, un commercial
+-- inscrit sur la plateforme réclamerait son argent dans le vide — BestaSolar
+-- ne verrait jamais rien arriver.
+create or replace function public.admin_platform_payouts()
+  returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select coalesce(jsonb_agg(x.doc order by x.tri asc), '[]'::jsonb) into v
+  from (
+    select r.updated_at as tri, r.data || jsonb_build_object(
+      'orgId', r.org_id, 'orgName', o.name,
+      -- Nom et coordonnées relus sur le profil : ils peuvent avoir changé
+      -- depuis la demande, et c'est le numéro À JOUR qu'il faut créditer.
+      'partnerName',  coalesce(p.data ->> 'name', r.data ->> 'partnerName'),
+      'partnerCode',  coalesce(p.data ->> 'code', r.data ->> 'partnerCode'),
+      'partnerPhone', coalesce(nullif(r.data ->> 'telephone', ''), p.data ->> 'momoNumber')
+    ) as doc
+    from public."payoutRequests" r
+    join public.orgs o on o.id = r.org_id
+    left join public.partners p on p.org_id = r.org_id and p.id = r.data ->> 'partnerId'
+    where r.org_id <> public.auth_org_id()
+      and r.data ->> 'status' = 'en_attente'
+  ) x;
+  return v;
+end $$;
+
+-- Décision de BestaSolar sur la demande d'un autre compte.
+--   p_approuver = true  : la demande est réglée ET les commissions qu'elle
+--                         couvre passent « payées » dans la foulée — sans quoi
+--                         le même argent pourrait être redemandé ;
+--              = false  : refus motivé, les commissions restent disponibles.
+create or replace function public.admin_decide_payout(
+  p_org_id text, p_id text, p_approuver boolean,
+  p_mode text default 'momo', p_ref text default null, p_motif text default null)
+  returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_data jsonb; v_now timestamptz := now(); v_jour text; v_ids text[];
+begin
+  if not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
+  select data into v_data from public."payoutRequests" where org_id = p_org_id and id = p_id;
+  if v_data is null then raise exception 'demande introuvable'; end if;
+  if coalesce(v_data ->> 'status', '') <> 'en_attente' then
+    raise exception 'demande déjà traitée';
+  end if;
+  v_jour := to_char(v_now at time zone 'utc', 'YYYY-MM-DD');
+
+  if not p_approuver then
+    update public."payoutRequests"
+      set data = data || jsonb_build_object(
+        'status', 'refuse', 'motif', p_motif,
+        'decidedBy', auth.uid()::text,
+        'decidedAt', to_char(v_now at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')),
+        updated_at = v_now
+      where org_id = p_org_id and id = p_id;
+    return;
+  end if;
+
+  select array(select jsonb_array_elements_text(coalesce(v_data -> 'commissionIds', '[]'::jsonb)))
+    into v_ids;
+  update public.commissions
+    set data = data || jsonb_build_object(
+      'status', 'payée', 'paidAt', v_jour, 'payMode', coalesce(nullif(p_mode, ''), 'momo'),
+      'payRef', p_ref, 'paidBy', auth.uid()::text, 'payoutId', p_id),
+      updated_at = v_now
+    where org_id = p_org_id and id = any (v_ids)
+      and coalesce(data ->> 'status', '') <> 'payée';
+
+  update public."payoutRequests"
+    set data = data || jsonb_build_object(
+      'status', 'paye', 'payMode', coalesce(nullif(p_mode, ''), 'momo'),
+      'payRef', p_ref, 'paidAt', v_jour,
+      'decidedBy', auth.uid()::text,
+      'decidedAt', to_char(v_now at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')),
+      updated_at = v_now
+    where org_id = p_org_id and id = p_id;
+end $$;
+
 -- Paiement par BestaSolar d'une commission qui vit dans une autre organisation.
 -- Idempotent : une commission déjà payée est refusée, jamais repayée.
 create or replace function public.admin_pay_commission(
