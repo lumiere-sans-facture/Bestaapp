@@ -332,7 +332,7 @@ export default function Plus() {
               <div className="commission-ident">
                 <div className="commission-lead">{nomClient(commission)}</div>
                 <div className="commission-sub">
-                  <span className="chip-level">
+                  <span className={`chip-level n${commission.level}`}>
                     N{commission.level} · {formatTaux(COMMISSION_RATES[commission.level])}
                   </span>
                   <span className="commission-partner">{nomPartenaire(commission)}</span>

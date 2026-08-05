@@ -99,7 +99,16 @@ ok(/CLINIQUE SAINT JEAN/.test(espace), 'espace partenaire : les affaires gagnée
 ok(/gagnée le 2 août 2026/.test(espace), 'espace partenaire : la date du gain est affichée');
 const lignesCom = await page.locator('.accordion:has-text("Historique de mes commissions") .sheet-row').count();
 ok(lignesCom === 2, `espace partenaire : l’historique des commissions liste ${lignesCom} ligne(s) [attendu 2]`);
-ok(/Niveau 1 \(3\s*%\)/.test(espace), 'espace partenaire : le niveau et son taux sont affichés');
+ok(/N1\s*·\s*3\s*%/.test(espace) && /N2\s*·\s*1,5\s*%/.test(espace),
+   'espace partenaire : le niveau et son taux sont affichés');
+// Le niveau se lit à la COULEUR de sa pastille, et jamais dans l'ambre/vert
+// réservés à l'état de paiement — c'est ce qui prêtait à confusion.
+const pastilles = await page.locator('.accordion:has-text("Historique de mes commissions") .chip-level').evaluateAll(
+  (els) => els.map((e) => [e.className, getComputedStyle(e).color]));
+ok(pastilles.some(([c]) => /\bn1\b/.test(c)) && pastilles.some(([c]) => /\bn2\b/.test(c)),
+   'espace partenaire : les pastilles portent leur niveau (n1 / n2)');
+ok(new Set(pastilles.map(([, col]) => col)).size === 2,
+   'espace partenaire : N1 et N2 ont deux couleurs distinctes');
 ok(/BS-20260801-0001/.test(espace), 'espace partenaire : le devis d’origine est rappelé');
 ok(/payée le 3 août 2026/.test(espace), 'espace partenaire : la date de paiement est affichée');
 ok(await page.locator('#mpd-momo').inputValue() === '+229 97 11 22 33',

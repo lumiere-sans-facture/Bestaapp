@@ -154,9 +154,13 @@ export default function MyPartnerDashboard({ onBack }) {
               {/* Une commission de niveau 2 porte sur le client d'un FILLEUL :
                   sa piste vit dans une autre organisation, d'où le nom copié
                   sur la commission. */}
+              {/* Même pastille que l'écran Commissions : le niveau se lit à la
+                  couleur, sans jamais emprunter l'ambre et le vert de l'état. */}
+              <span className={`chip-level n${c.level}`}>
+                N{c.level} · {formatTaux(COMMISSION_RATES[c.level])}
+              </span>{' '}
               {getLeadById(c.leadId)?.name || c.leadName || 'Commission manuelle'}
               <span className="text-secondary">
-                {' · '}Niveau {c.level} ({formatTaux(COMMISSION_RATES[c.level])})
                 {numeroDevis(c) ? ` · ${numeroDevis(c)}` : ''}
                 {' · '}{c.status === 'payée' ? `payée le ${formatDate(c.paidAt)}` : `créée le ${formatDate(c.createdAt)}`}
               </span>
