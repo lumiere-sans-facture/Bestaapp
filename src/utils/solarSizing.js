@@ -105,6 +105,16 @@ export const SYSTEM_TYPES = [
   { id: 'on-grid', label: 'Raccordé réseau (on-grid)', help: 'Injection réseau, sans batterie' },
 ];
 
+// Nombre de nuits sans soleil que le parc batterie doit couvrir. 1 nuit =
+// hypothèse standard ; 1,5 et 2 nuits ajoutent une marge pour les journées
+// nuageuses consécutives (le parc batterie grandit d'autant).
+export const DEFAULT_AUTONOMY_NIGHTS = 1;
+export const AUTONOMY_OPTIONS = [
+  { value: 1, label: '1 nuit' },
+  { value: 1.5, label: '1,5 nuit' },
+  { value: 2, label: '2 nuits' },
+];
+
 export const INSTALLATION_COST_PER_PANEL = 10000;
 export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
@@ -174,15 +184,19 @@ const groupBatteries = (batteries) => {
  * @param {number} panelWc  puissance crête du panneau de référence (défaut :
  *   PANEL_REFERENCE_WC). L'espace Pro passe la puissance du panneau réellement
  *   vendu, pour que le devis livre bien la puissance calculée.
+ * @param {number} autonomyNights  nombre de nuits sans soleil couvertes par le
+ *   parc batterie (défaut : DEFAULT_AUTONOMY_NIGHTS, soit 1 nuit).
  */
 export const calculateSystemSize = (
   consumption,
   systemType,
   peakSunHours = DEFAULT_PEAK_SUN_HOURS,
   panelWc = PANEL_REFERENCE_WC,
+  autonomyNights = DEFAULT_AUTONOMY_NIGHTS,
 ) => {
   const { panelEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio } = SIZING_PARAMS;
   const panelPower = Number(panelWc) > 0 ? Number(panelWc) : PANEL_REFERENCE_WC;
+  const nights = Number(autonomyNights) > 0 ? Number(autonomyNights) : DEFAULT_AUTONOMY_NIGHTS;
 
   const totalDaily = consumption.day + consumption.night; // kWh
   const requiredDailyEnergy = totalDaily / panelEfficiency; // kWh
@@ -191,13 +205,14 @@ export const calculateSystemSize = (
 
   const selectedInverter = findInverterForPower(requiredPanelPower);
 
+  const nightlyEnergy = consumption.night * nights; // kWh — couvre l'autonomie choisie
   let batteryCapacity = 0;
   let batteries = [];
   if (systemType === 'off-grid') {
-    batteryCapacity = consumption.night / batteryEfficiency / depthOfDischarge;
+    batteryCapacity = nightlyEnergy / batteryEfficiency / depthOfDischarge;
     batteries = findOptimalBatteryCombination(batteryCapacity);
   } else if (systemType === 'hybrid') {
-    batteryCapacity = (consumption.night / batteryEfficiency / depthOfDischarge) * hybridBatteryRatio;
+    batteryCapacity = (nightlyEnergy / batteryEfficiency / depthOfDischarge) * hybridBatteryRatio;
     batteries = findOptimalBatteryCombination(batteryCapacity);
   }
 
@@ -212,6 +227,7 @@ export const calculateSystemSize = (
     estimatedProduction: (numberOfPanels * panelPower * peakSunHours * 365) / 1000, // kWh/an
     systemType,
     peakSunHours,
+    autonomyNights: nights,
   };
 };
 

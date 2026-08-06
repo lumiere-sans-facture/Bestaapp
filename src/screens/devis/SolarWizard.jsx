@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
-import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS } from '../../utils/solarSizing';
+import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS } from '../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -49,6 +49,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const [manual, setManual] = useState({ day: '', night: '' });
   // Off-grid par défaut : cas majoritaire sur le terrain.
   const [systemType, setSystemType] = useState('off-grid');
+  // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
+  const [autonomyNights, setAutonomyNights] = useState(DEFAULT_AUTONOMY_NIGHTS);
   // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
   // ou recherche de ville ; repli en saisie manuelle des heures de pic.
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
@@ -131,8 +133,10 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const peakLoad = useMemo(() => rows.reduce((s, r) => s + r.power * r.quantity, 0), [rows]);
 
   const sizing = useMemo(
-    () => (totalConsumption > 0 ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS) : null),
-    [consumption, systemType, sunHours, totalConsumption]
+    () => (totalConsumption > 0
+      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, undefined, autonomyNights)
+      : null),
+    [consumption, systemType, sunHours, totalConsumption, autonomyNights]
   );
 
   // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
@@ -359,6 +363,28 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
                 </button>
               ))}
             </div>
+
+            {systemType !== 'on-grid' && (
+              <div className="kit-selector">
+                <div className="kit-selector-title">Autonomie batterie</div>
+                <div className="payment-options">
+                  {AUTONOMY_OPTIONS.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      className={`payment-option ${autonomyNights === o.value ? 'selected' : ''}`}
+                      onClick={() => setAutonomyNights(o.value)}
+                    >
+                      <div className="payment-option-header">
+                        <div className="payment-option-icon"><Battery size={18} /></div>
+                        <div className="payment-option-label">{o.label}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="geo-locator">
               <div className="geo-locator-head">
                 <span className="card-title">Localisation</span>

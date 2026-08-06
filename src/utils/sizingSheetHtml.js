@@ -78,11 +78,13 @@ export function buildSizingSheetHtml(d) {
   const batterieKwh = d.sizing.batteryCapacity;          // kWh (0 en on-grid)
   const batterieWh = Math.round(batterieKwh * 1000);
   const batterieAh = batterieKwh > 0 ? Math.round(batterieWh / SYSTEM_VOLTAGE) : 0;
+  const autonomyNights = d.sizing.autonomyNights || 1;
+  const nuitsLabel = `${nf(autonomyNights, autonomyNights % 1 ? 1 : 0)} nuit${autonomyNights > 1 ? 's' : ''}`;
 
   const autonomie = d.systemType === 'off-grid'
-    ? 'Consommation nocturne complète (1 nuit)'
+    ? `Consommation nocturne complète (${nuitsLabel})`
     : d.systemType === 'hybrid'
-      ? `${pct(hybridBatteryRatio)} de la consommation nocturne (appoint réseau)`
+      ? `${pct(hybridBatteryRatio)} de la consommation nocturne (${nuitsLabel}, appoint réseau)`
       : 'Sans batterie (injection réseau)';
 
   // --- Charges ---
@@ -173,9 +175,9 @@ export function buildSizingSheetHtml(d) {
     ...(d.systemType === 'on-grid' ? [] : [resultat(
       'Capacité batterie nécessaire',
       `${nf(batterieKwh, 2)} kWh`,
-      `soit ${nf(batterieWh)} Wh ≈ ${nf(batterieAh)} Ah sous ${SYSTEM_VOLTAGE} V`,
-      `C = Conso. nocturne ÷ rendement batterie ÷ DoD${d.systemType === 'hybrid' ? ' × ratio hybride' : ''}`,
-      `C = ${nf(conso.night, 2)} kWh ÷ ${nf(batteryEfficiency, 2)} ÷ ${nf(depthOfDischarge, 2)}${d.systemType === 'hybrid' ? ` × ${nf(hybridBatteryRatio, 2)}` : ''}`,
+      `soit ${nf(batterieWh)} Wh ≈ ${nf(batterieAh)} Ah sous ${SYSTEM_VOLTAGE} V · autonomie ${nuitsLabel}`,
+      `C = (Conso. nocturne × nuits d'autonomie) ÷ rendement batterie ÷ DoD${d.systemType === 'hybrid' ? ' × ratio hybride' : ''}`,
+      `C = (${nf(conso.night, 2)} kWh × ${nf(autonomyNights, autonomyNights % 1 ? 1 : 0)}) ÷ ${nf(batteryEfficiency, 2)} ÷ ${nf(depthOfDischarge, 2)}${d.systemType === 'hybrid' ? ` × ${nf(hybridBatteryRatio, 2)}` : ''}`,
     )]),
     ...(d.inverter ? [resultat(
       'Onduleur hybride recommandé',
