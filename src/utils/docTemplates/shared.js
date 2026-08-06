@@ -4,6 +4,7 @@
 // rendus partagent la même grille, la même typographie et les mêmes nombres.
 import { COMPANY } from '../../config/company';
 import { LOGO_BESTASOLAR } from '../../assets/logoBestaSolar';
+import { prixPublic } from '../price';
 
 // ---------------------------------------------------------------------------
 // Formatage
@@ -127,7 +128,7 @@ export function lignesDeDevis(devis = {}, products = []) {
     return {
       designation: produit?.name || 'Article',
       qty: Number(qty) || 0,
-      pu: Number((devis.unitPrices || {})[productId] ?? produit?.basePrice ?? 0),
+      pu: Number((devis.unitPrices || {})[productId] ?? (produit ? prixPublic(produit.basePrice) : 0)),
     };
   });
 }

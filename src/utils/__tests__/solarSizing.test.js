@@ -111,9 +111,9 @@ describe('buildQuotation', () => {
     expect(sans.prestations).toHaveLength(1);
   });
 
-  it('privilégie le prix du catalogue produits quand fourni', () => {
+  it('privilégie le prix PUBLIC du catalogue produits quand fourni (jamais le prix technicien)', () => {
     const products = [{ category: 'panneaux', name: 'Panneau 550Wc', basePrice: 80000 }];
     const panneau = buildQuotation(sizing, { products }).components.find((c) => c.type === 'panneau');
-    expect(panneau.unitPrice).toBe(80000);
+    expect(panneau.unitPrice).toBe(Math.round(80000 * 1.1));
   });
 });

@@ -40,7 +40,9 @@ export default function ManualWizard({ onDone, initialItems, initialLeadId = nul
   const myLeads = leadsForUser(user);
   const selectedLead = myLeads.find((l) => l.id === selectedLeadId);
 
-  const getPrice = (basePrice) => (user.role === 'gerant' ? prixPublic(basePrice) : basePrice);
+  // Prix PUBLIC toujours — un devis remis au client ne doit jamais montrer
+  // le prix technicien (coût de gros BestaSolar), peu importe qui le crée.
+  const getPrice = (basePrice) => prixPublic(basePrice);
 
   const toggleProduct = (productId) => {
     setItems((prev) => {

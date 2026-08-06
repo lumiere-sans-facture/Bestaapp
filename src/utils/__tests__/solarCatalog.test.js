@@ -40,19 +40,21 @@ describe('parseKva / parseKwh', () => {
 });
 
 describe('inverterOptionsFromCatalog', () => {
-  it('ne garde que les onduleurs parsables, triés par capacité, avec marque et prix', () => {
+  it('ne garde que les onduleurs parsables, triés par capacité, avec marque et prix PUBLIC', () => {
     const opts = inverterOptionsFromCatalog(products);
     expect(opts.map((o) => o.capacity)).toEqual([3, 4.2, 6]);
-    expect(opts[2]).toMatchObject({ id: 'i1', brand: 'Growatt', capacity: 6, maxPower: 4800, price: 360000 });
+    // price = prix public (basePrice × 1,1), jamais le prix technicien —
+    // un devis client ne doit jamais montrer le prix de gros BestaSolar.
+    expect(opts[2]).toMatchObject({ id: 'i1', brand: 'Growatt', capacity: 6, maxPower: 4800, price: Math.round(360000 * 1.1) });
     expect(brandsOf(opts)).toEqual(['Felicity', 'Luxsun', 'Growatt']);
   });
 });
 
 describe('batteryOptionsFromCatalog', () => {
-  it('mappe capacité/prix depuis le catalogue', () => {
+  it('mappe capacité/prix PUBLIC depuis le catalogue', () => {
     const opts = batteryOptionsFromCatalog(products);
     expect(opts.map((o) => o.capacity)).toEqual([2.56, 5, 15]);
-    expect(opts.find((o) => o.id === 'b1')).toMatchObject({ brand: 'Taico', capacity: 5, price: 480000 });
+    expect(opts.find((o) => o.id === 'b1')).toMatchObject({ brand: 'Taico', capacity: 5, price: Math.round(480000 * 1.1) });
   });
 });
 

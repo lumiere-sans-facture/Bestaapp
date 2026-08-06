@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { TVA_PCT } from '../config/company';
+import { prixPublic } from './price';
 
 // Module Devis Pro : documents (devis / factures) à l'identité de l'entreprise
 // du technicien, en 2 modèles : « couleur » (bandeau aux couleurs de
@@ -275,7 +276,7 @@ export function devisToLignes(devisDoc, products = []) {
   }
   return (devisDoc.items || []).map(({ productId, qty }) => {
     const product = products.find((p) => p.id === productId);
-    const pu = (devisDoc.unitPrices || {})[productId] ?? product?.basePrice ?? 0;
+    const pu = (devisDoc.unitPrices || {})[productId] ?? (product ? prixPublic(product.basePrice) : 0);
     return { designation: product?.name || 'Article', qty, pu };
   });
 }

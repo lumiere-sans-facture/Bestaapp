@@ -48,7 +48,8 @@ export default function Boutique() {
   // à l'organisation interne (en SaaS, les comptes externes consultent et
   // créent leur devis ; la commande cross-entreprise viendra plus tard).
   const canPayOnline = !user.org || user.org.kind === 'interne';
-  const getPrice = (basePrice) => (isManager ? prixPublic(basePrice) : basePrice);
+  // Prix PUBLIC toujours — même prix que sur un devis, peu importe le rôle.
+  const getPrice = (basePrice) => prixPublic(basePrice);
   const categoryLabel = (id) => productCategories.find((c) => c.id === id)?.label || '';
 
   const handleAddToCart = (product) => {
@@ -134,9 +135,9 @@ export default function Boutique() {
         return w !== null && w >= powerFilter.min && w < powerFilter.max;
       })
       .sort((a, b) => (a.stock === 0) - (b.stock === 0));
-  // getPrice n'est pas listé : il ne dépend que de `isManager` (déjà en
-  // dépendance) et serait recréé à chaque rendu, invalidant le mémo en vain.
-  }, [products, selectedCategory, search, priceRange, powerRange, isManager]); // eslint-disable-line react-hooks/exhaustive-deps
+  // getPrice n'est pas listé : il est stable (ne dépend d'aucun état) et
+  // serait recréé à chaque rendu, invalidant le mémo en vain.
+  }, [products, selectedCategory, search, priceRange, powerRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePayOnline = () => {
     setPayForm({ operator: 'MTN MoMo', phone: user.phone || '' });
@@ -163,7 +164,7 @@ export default function Boutique() {
     <div className="page">
       <PageHeader
         title="Boutique"
-        subtitle={isManager ? 'Prix public affiché' : 'Prix technicien affiché'}
+        subtitle="Prix public affiché"
         actions={
           <>
             <div className="search-box">

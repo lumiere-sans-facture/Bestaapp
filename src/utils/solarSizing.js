@@ -1,6 +1,7 @@
 // Dimensionnement et chiffrage d'une installation solaire.
 // Logique portée depuis l'application besta-solar (calculations + pricing).
 // Toutes les valeurs monétaires sont en F CFA (XOF).
+import { prixPublic } from './price';
 
 // ---- Catalogue matériel ----
 
@@ -58,24 +59,30 @@ export const parseKwh = (name = '') => { const m = name.match(/(\d+(?:[.,]\d+)?)
 /** Puissance crête d'un panneau depuis sa désignation : « … 580W » → 580. */
 export const parsePanelWc = (name = '') => { const m = String(name).match(/(\d{3,4})\s*w(?:c|atts?)?\b/i); return m ? Number(m[1]) : null; };
 
-/** Onduleurs boutique → { id, brand, model, capacity (kVA), maxPower (W), price }. */
+/**
+ * Onduleurs boutique → { id, brand, model, capacity (kVA), maxPower (W), price }.
+ * price = prix PUBLIC (jamais le prix technicien sur un devis client).
+ */
 export const inverterOptionsFromCatalog = (products = []) =>
   products
     .filter((p) => p.category === 'onduleurs')
     .map((p) => {
       const capacity = parseKva(p.name);
-      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, maxPower: Math.round(capacity * 800), price: p.basePrice } : null;
+      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, maxPower: Math.round(capacity * 800), price: prixPublic(p.basePrice) } : null;
     })
     .filter(Boolean)
     .sort((a, b) => a.capacity - b.capacity);
 
-/** Batteries boutique → { id, brand, model, capacity (kWh), price }. */
+/**
+ * Batteries boutique → { id, brand, model, capacity (kWh), price }.
+ * price = prix PUBLIC (jamais le prix technicien sur un devis client).
+ */
 export const batteryOptionsFromCatalog = (products = []) =>
   products
     .filter((p) => p.category === 'batteries')
     .map((p) => {
       const capacity = parseKwh(p.name);
-      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, price: p.basePrice } : null;
+      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, price: prixPublic(p.basePrice) } : null;
     })
     .filter(Boolean)
     .sort((a, b) => a.capacity - b.capacity);
@@ -257,13 +264,14 @@ export const calculateSystemSize = (
 import { TVA_RATE } from '../config/company';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
-// Retourne le prix du premier panneau trouvé, ou PANEL_SPEC.price par défaut.
+// Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
+// sur un devis client), ou PANEL_SPEC.price par défaut si aucun produit.
 const panelPriceFromCatalog = (products = []) => {
   const p = products.find((pr) => pr.category === 'panneaux');
-  return p ? p.basePrice : PANEL_SPEC.price;
+  return p ? prixPublic(p.basePrice) : PANEL_SPEC.price;
 };
 
-// Extrait le prix d'un onduleur depuis le catalogue par capacité (kVA).
+// Extrait le prix PUBLIC d'un onduleur depuis le catalogue par capacité (kVA).
 // Recherche la capacité (ex. "5kva") dans le nom du produit, prend le plus proche.
 const inverterPriceFromCatalog = (products = [], capacityKva) => {
   const inverters = products.filter((p) => p.category === 'onduleurs');
@@ -276,10 +284,10 @@ const inverterPriceFromCatalog = (products = [], capacityKva) => {
   if (!withCap.length) return null;
   withCap.sort((a, b) => a.cap - b.cap);
   const match = withCap.find((p) => p.cap >= capacityKva) || withCap[withCap.length - 1];
-  return match.basePrice;
+  return prixPublic(match.basePrice);
 };
 
-// Extrait le prix d'une batterie depuis le catalogue par capacité (kWh).
+// Extrait le prix PUBLIC d'une batterie depuis le catalogue par capacité (kWh).
 // Retourne le prix unitaire de la batterie la plus proche en capacité.
 const batteryPriceFromCatalog = (products = [], capacityKwh) => {
   const bats = products.filter((p) => p.category === 'batteries');
@@ -290,7 +298,7 @@ const batteryPriceFromCatalog = (products = [], capacityKwh) => {
   }).filter(Boolean);
   if (!withCap.length) return null;
   withCap.sort((a, b) => Math.abs(a.cap - capacityKwh) - Math.abs(b.cap - capacityKwh));
-  return withCap[0].basePrice;
+  return prixPublic(withCap[0].basePrice);
 };
 
 /**

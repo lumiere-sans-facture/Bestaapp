@@ -11,6 +11,7 @@ import {
 } from '../../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
+import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
 import TvaToggle from '../../../components/TvaToggle';
 
@@ -49,7 +50,8 @@ export default function ProSolarWizard({ onDone }) {
   const brands = useMemo(() => brandsOf(inverterOptions), [inverterOptions]);
   const panelProduct = useMemo(() => products.find((p) => p.category === 'panneaux'), [products]);
   const panelName = panelProduct?.name || `Panneau ${PANEL_SPEC.brand} ${PANEL_SPEC.model} ${PANEL_SPEC.power}W ${PANEL_SPEC.type}`;
-  const panelPrice = panelProduct?.basePrice ?? PANEL_SPEC.price;
+  // Prix PUBLIC, jamais le prix technicien sur un devis remis au client.
+  const panelPrice = panelProduct ? prixPublic(panelProduct.basePrice) : PANEL_SPEC.price;
 
   const [step, setStep] = useState(1);
 

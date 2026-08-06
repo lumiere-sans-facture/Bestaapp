@@ -3,6 +3,7 @@ import { Plus, Check, User, Building2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
+import { prixPublic } from '../../../utils/price';
 import { computeFactureTotals } from '../../../utils/facture';
 import Field from '../../../components/Field';
 import EmptyState from '../../../components/EmptyState';
@@ -37,7 +38,7 @@ export default function ProDevisBuilder({ onDone }) {
   const addFromCatalogue = () => {
     const p = products.find((x) => x.id === pickerId);
     if (!p) return;
-    setLignes((ls) => [...ls, { productId: p.id, designation: p.name, qty: 1, pu: p.basePrice }]);
+    setLignes((ls) => [...ls, { productId: p.id, designation: p.name, qty: 1, pu: prixPublic(p.basePrice) }]);
     setPickerId('');
   };
   const addCustom = () => setLignes((ls) => [...ls, { designation: '', qty: 1, pu: '' }]);
@@ -142,7 +143,7 @@ export default function ProDevisBuilder({ onDone }) {
         <select className="input" value={pickerId} onChange={(e) => setPickerId(e.target.value)}>
           <option value="">Ajouter depuis la boutique…</option>
           {products.map((p) => (
-            <option key={p.id} value={p.id}>{p.name} ({formatCFA(p.basePrice)})</option>
+            <option key={p.id} value={p.id}>{p.name} ({formatCFA(prixPublic(p.basePrice))})</option>
           ))}
         </select>
         <button type="button" className="btn btn-primary" onClick={addFromCatalogue} disabled={!pickerId}>
