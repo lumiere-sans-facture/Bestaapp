@@ -98,6 +98,40 @@ describe('buildKitQuotation', () => {
     const kit = byId('kit-20kwh');
     expect(buildKitQuotation(kit, 'tole', false).total).toBe(buildKitQuotation(kit, 'tole', true).total);
   });
+
+  it('complète automatiquement les panneaux si le besoin calculé en exige plus que le kit', () => {
+    const kit = byId('kit-20kwh'); // 12 panneaux, 620 Wc, sans ligne de montage
+    const sizing = { requiredPanelPower: 16 * kit.panelW }; // besoin = 16 panneaux
+    const q = buildKitQuotation(kit, 'tole', true, sizing);
+    const lignePanneaux = q.components.find((c) => /panneau/i.test(c.name));
+    expect(q.panelsIncluded).toBe(16);
+    expect(lignePanneaux.quantity).toBe(16);
+    expect(lignePanneaux.totalPrice).toBe(16 * lignePanneaux.unitPrice);
+    // Le total du devis intègre le surcoût des panneaux ajoutés.
+    const sansSizing = buildKitQuotation(kit, 'tole', true);
+    expect(q.total).toBe(sansSizing.total + 4 * lignePanneaux.unitPrice);
+  });
+
+  it('ne réduit jamais les panneaux du kit si le besoin calculé en exige moins', () => {
+    const kit = byId('kit-20kwh'); // 12 panneaux
+    const sizing = { requiredPanelPower: 5 * kit.panelW }; // besoin ne demande que 5 panneaux
+    const q = buildKitQuotation(kit, 'tole', true, sizing);
+    expect(q.panelsIncluded).toBe(kit.panels);
+  });
+
+  it('la complétion des panneaux fait aussi grandir la structure de montage (au panneau)', () => {
+    const kit = byId('kit-5kwh'); // 4 panneaux, 590 Wc
+    const sizing = { requiredPanelPower: 6 * kit.panelW }; // besoin = 6 panneaux
+    const q = buildKitQuotation(kit, 'tole', true, sizing);
+    const montage = q.components.find((c) => /structure de montage/i.test(c.name));
+    expect(montage.quantity).toBe(6);
+    expect(montage.totalPrice).toBe(6 * 10000);
+  });
+
+  it('sans sizing, le nombre de panneaux du kit est inchangé', () => {
+    const kit = byId('kit-5kwh');
+    expect(buildKitQuotation(kit).panelsIncluded).toBe(kit.panels);
+  });
 });
 
 describe('suggestKitForBattery', () => {

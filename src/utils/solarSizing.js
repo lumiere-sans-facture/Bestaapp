@@ -402,6 +402,8 @@ export const suggestKitForBattery = (kits = [], batteryNeed = 0) => {
   return [...pool].sort((a, b) => Math.abs(a.battery - need) - Math.abs(b.battery - need))[0];
 };
 
+const PANEL_LINE_RE = /panneau/i;
+
 /**
  * Devis à partir d'un kit préconfiguré : toutes les lignes du kit, sans calcul
  * de composition. « Main d'œuvre » → prestation, le reste → équipements.
@@ -409,18 +411,33 @@ export const suggestKitForBattery = (kits = [], batteryNeed = 0) => {
  * Format aligné sur buildQuotation pour réutiliser l'affichage et le PDF.
  *
  * La ligne « Structure de montage » du kit est recalculée sur le type de
- * support choisi (tôle / dalle / au sol) × le nombre de panneaux du kit —
- * son prix fixe dans data/kits.js n'est qu'un repli si le kit n'en a pas.
+ * support choisi (tôle / dalle / au sol) × le nombre de panneaux réellement
+ * posés — son prix fixe dans data/kits.js n'est qu'un repli si le kit n'en a pas.
  * @param {boolean} includeMounting  si false, la ligne « Structure de
  *   montage » est retirée du devis (client qui a déjà son support, ou pose
  *   sans structure) plutôt que recalculée.
+ * @param {object|null} sizing  résultat de calculateSystemSize() du besoin
+ *   client. Si le kit suggéré (choisi sur sa batterie) a moins de panneaux
+ *   que ce que le besoin exige à SA puissance crête, la quantité de panneaux
+ *   du devis est complétée automatiquement (jamais réduite en dessous du
+ *   nombre de panneaux du kit).
  */
-export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true) => {
+export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null) => {
   const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
-  const lines = (includeMounting ? kit.lines : kit.lines.filter((l) => !MOUNTING_LINE_RE.test(l.designation)))
+  // Nombre de panneaux réellement nécessaires, à la puissance crête DU KIT —
+  // le kit est choisi sur sa batterie, pas sur son nombre de panneaux, donc
+  // il peut en manquer pour couvrir le besoin réel (ex. besoin 16 panneaux,
+  // kit à batterie suffisante mais composé pour 12).
+  const neededPanels = sizing?.requiredPanelPower && kit.panelW
+    ? Math.max(kit.panels, Math.ceil(sizing.requiredPanelPower / kit.panelW))
+    : kit.panels;
+  const withPanels = kit.lines.map((l) => (
+    PANEL_LINE_RE.test(l.designation) && neededPanels > l.qty ? { ...l, qty: neededPanels } : l
+  ));
+  const lines = (includeMounting ? withPanels : withPanels.filter((l) => !MOUNTING_LINE_RE.test(l.designation)))
     .map((l) => (
       includeMounting && MOUNTING_LINE_RE.test(l.designation)
-        ? { ...l, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: kit.panels, unit: 'pcs', pu: mounting.pricePerPanel }
+        ? { ...l, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: neededPanels, unit: 'pcs', pu: mounting.pricePerPanel }
         : l
     ));
   const toItem = (l, type) => ({
@@ -438,6 +455,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     subtotalHT: total,
     tva: 0,
     mountingType: mounting.id,
+    panelsIncluded: neededPanels,
     total,
     roi: 0,
     kitId: kit.id,

@@ -156,13 +156,18 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const effectiveKitId = suggestedKitId || SOLAR_KITS[0]?.id || null;
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0] || null;
   // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
-  // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit.
-  // Seule la ligne « Structure de montage » varie ensuite, selon le support
-  // choisi — ou disparaît si le client a déjà le sien (includeMounting).
+  // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit
+  // — dont le nombre de panneaux est ensuite complété si le besoin réel en
+  // exige plus (le kit est choisi sur sa batterie, pas sur ses panneaux).
+  // La ligne « Structure de montage » varie aussi selon le support choisi —
+  // ou disparaît si le client a le sien (includeMounting).
   const displayQuotation = useMemo(
-    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting) : null),
-    [selectedKit, mountingType, includeMounting]
+    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing) : null),
+    [selectedKit, mountingType, includeMounting, sizing]
   );
+  // Panneaux réellement inclus au devis : ceux du kit, complétés si le besoin
+  // calculé en exige plus (kit choisi sur sa batterie, pas ses panneaux).
+  const installedPanels = displayQuotation?.panelsIncluded || selectedKit?.panels || 0;
 
   // Fiche de dimensionnement — étude technique du BESOIN du client.
   // Elle ne reprend rien du kit proposé au devis : nombre de panneaux, calibre
@@ -197,12 +202,12 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     if (!selectedKit || !displayQuotation) return; // aucun kit disponible
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const submitSizing = {
-      numberOfPanels: selectedKit.panels,
-      panelCapacity: (selectedKit.panels * selectedKit.panelW) / 1000,
+      numberOfPanels: installedPanels,
+      panelCapacity: (installedPanels * selectedKit.panelW) / 1000,
       inverter: { model: `Onduleur hybride ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter },
       batteries: [],
       batteryCapacity: selectedKit.battery,
-      estimatedProduction: Math.round((selectedKit.panels * selectedKit.panelW * psh * 365) / 1000),
+      estimatedProduction: Math.round((installedPanels * selectedKit.panelW * psh * 365) / 1000),
       systemType,
       peakSunHours: psh,
       city: location?.name || null,
@@ -513,7 +518,11 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
 
             <div className="kit-summary">
               <Package size={16} />
-              <span>{selectedKit.name} — {selectedKit.panels} panneaux {selectedKit.panelW}Wc · batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA</span>
+              <span>
+                {selectedKit.name} — {installedPanels} panneaux {selectedKit.panelW}Wc
+                {installedPanels > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
+                {' '}· batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA
+              </span>
             </div>
 
             {/* Structure de montage PV rails galvanisé : le prix suit le
