@@ -365,20 +365,17 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
             </div>
 
             {systemType !== 'on-grid' && (
-              <div className="kit-selector">
-                <div className="kit-selector-title">Autonomie batterie</div>
-                <div className="payment-options">
+              <div className="autonomy-selector">
+                <span className="autonomy-selector-label"><Battery size={13} /> Autonomie batterie</span>
+                <div className="categories-scroll" style={{ marginBottom: 0 }}>
                   {AUTONOMY_OPTIONS.map((o) => (
                     <button
                       key={o.value}
                       type="button"
-                      className={`payment-option ${autonomyNights === o.value ? 'selected' : ''}`}
+                      className={`category-chip ${autonomyNights === o.value ? 'active' : ''}`}
                       onClick={() => setAutonomyNights(o.value)}
                     >
-                      <div className="payment-option-header">
-                        <div className="payment-option-icon"><Battery size={18} /></div>
-                        <div className="payment-option-label">{o.label}</div>
-                      </div>
+                      {o.label}
                     </button>
                   ))}
                 </div>
