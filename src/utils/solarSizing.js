@@ -385,6 +385,24 @@ export const buildQuotation = (sizing, { products = [], includeMaintenance = tru
 };
 
 /**
+ * Kit suggéré parmi une liste : le plus petit dont la batterie COUVRE le
+ * besoin calculé (jamais moins — un client sous-équipé se retrouve à sec).
+ * Ex. besoin 11 kWh → kit 12 ou 15 kWh, jamais un kit 10 kWh même plus proche
+ * en valeur absolue. Si aucun kit n'atteint le besoin, repli sur le plus
+ * proche disponible (mieux vaut le plus proche que rien).
+ * @param {Array} kits  liste de kits ({ id, battery, ... })
+ * @param {number} batteryNeed  capacité batterie requise (kWh)
+ * @returns {object|null}  le kit suggéré, ou null si la liste est vide
+ */
+export const suggestKitForBattery = (kits = [], batteryNeed = 0) => {
+  if (!kits.length) return null;
+  const need = Number(batteryNeed) || 0;
+  const suffisants = kits.filter((k) => k.battery >= need);
+  const pool = suffisants.length ? suffisants : kits;
+  return [...pool].sort((a, b) => Math.abs(a.battery - need) - Math.abs(b.battery - need))[0];
+};
+
+/**
  * Devis à partir d'un kit préconfiguré : toutes les lignes du kit, sans calcul
  * de composition. « Main d'œuvre » → prestation, le reste → équipements.
  * Prix tout compris (sans TVA) : HT = TTC, comme les devis kit de référence.

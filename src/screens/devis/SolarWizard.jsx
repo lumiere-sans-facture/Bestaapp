@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
-import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE } from '../../utils/solarSizing';
+import { calculateSystemSize, buildKitQuotation, suggestKitForBattery, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE } from '../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -141,14 +141,14 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     [consumption, systemType, sunHours, totalConsumption, autonomyNights]
   );
 
-  // Kit suggéré : capacité de batterie la plus proche du besoin calculé.
-  // C'est toujours ce kit — et lui seul — qui est proposé au devis : pas de
-  // choix manuel d'un kit sous- ou sur-dimensionné par rapport au besoin.
-  const suggestedKitId = useMemo(() => {
-    if (!sizing || !SOLAR_KITS.length) return null;
-    const need = sizing.batteryCapacity || 0;
-    return [...SOLAR_KITS].sort((a, b) => Math.abs(a.battery - need) - Math.abs(b.battery - need))[0].id;
-  }, [sizing, SOLAR_KITS]);
+  // Kit suggéré : le plus petit kit dont la batterie COUVRE le besoin calculé
+  // (jamais moins — un client sous-équipé se retrouve à sec). C'est toujours
+  // ce kit — et lui seul — qui est proposé au devis : pas de choix manuel
+  // d'un kit sous- ou sur-dimensionné par rapport au besoin.
+  const suggestedKitId = useMemo(
+    () => (sizing ? suggestKitForBattery(SOLAR_KITS, sizing.batteryCapacity)?.id || null : null),
+    [sizing, SOLAR_KITS]
+  );
   // La liste est modifiable depuis « Mes kits » : elle peut être vide, ou le
   // kit retenu avoir été supprimé entre-temps. Tout est optionnel à partir d'ici.
   const effectiveKitId = suggestedKitId || SOLAR_KITS[0]?.id || null;

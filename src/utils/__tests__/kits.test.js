@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
-import { buildKitQuotation, MOUNTING_TYPES } from '../solarSizing';
+import { buildKitQuotation, suggestKitForBattery, MOUNTING_TYPES } from '../solarSizing';
 
 const byId = (id) => SOLAR_KITS.find((k) => k.id === id);
 
@@ -80,5 +80,45 @@ describe('buildKitQuotation', () => {
     const tole = buildKitQuotation(kit, 'tole').total;
     const sol = buildKitQuotation(kit, 'sol').total;
     expect(tole).toBe(sol);
+  });
+});
+
+describe('suggestKitForBattery', () => {
+  // Kits de test : batteries 5, 10, 12, 15, 20 kWh.
+  const kits = [
+    { id: 'k5', battery: 5 },
+    { id: 'k10', battery: 10 },
+    { id: 'k12', battery: 12 },
+    { id: 'k15', battery: 15 },
+    { id: 'k20', battery: 20 },
+  ];
+
+  it('ne suggère jamais un kit dont la batterie est inférieure au besoin', () => {
+    // Besoin 11 kWh : 10 kWh est plus proche en valeur absolue, mais
+    // insuffisant. Le kit 12 kWh doit être retenu, jamais le 10 kWh.
+    expect(suggestKitForBattery(kits, 11).id).toBe('k12');
+  });
+
+  it('retient le plus petit kit qui couvre exactement le besoin', () => {
+    expect(suggestKitForBattery(kits, 5).id).toBe('k5');
+    expect(suggestKitForBattery(kits, 12).id).toBe('k12');
+  });
+
+  it('retombe sur le kit le plus proche si aucun ne couvre le besoin', () => {
+    // Besoin 25 kWh : aucun kit n'atteint 25 kWh, on retombe sur le plus gros (20 kWh).
+    expect(suggestKitForBattery(kits, 25).id).toBe('k20');
+  });
+
+  it('gère une liste vide ou un besoin nul', () => {
+    expect(suggestKitForBattery([], 10)).toBeNull();
+    expect(suggestKitForBattery(kits, 0).id).toBe('k5');
+  });
+
+  it('sur les kits officiels : suggère toujours une batterie ≥ besoin quand c\'est possible', () => {
+    for (const need of [1, 2.5, 4, 5, 10, 19, 20, 25, 32]) {
+      const suggestion = suggestKitForBattery(SOLAR_KITS, need);
+      const couverts = SOLAR_KITS.filter((k) => k.battery >= need);
+      if (couverts.length) expect(suggestion.battery).toBeGreaterThanOrEqual(need);
+    }
   });
 });
