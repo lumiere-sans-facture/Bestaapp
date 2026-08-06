@@ -536,7 +536,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
               </div>
               <label className="checkbox-row" style={{ paddingTop: 2 }}>
                 <input type="checkbox" checked={!includeMounting} onChange={(e) => setIncludeMounting(!e.target.checked)} />
-                Client déjà équipé — ne pas inclure la structure au devis
+                Client a son propre soudeur — ne pas inclure la structure au devis
               </label>
             </div>
 
