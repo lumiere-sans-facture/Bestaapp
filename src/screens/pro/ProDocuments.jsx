@@ -21,7 +21,7 @@ export default function ProDocuments() {
     <div className="page">
       <PageHeader title="Devis & Factures" />
       {/* Pleine largeur, comme l'écran Devis public : le wizard de
-          dimensionnement (920 px) et les listes s'affichent à l'identique. */}
+          dimensionnement et les listes s'affichent à l'identique. */}
       <div className="page-content">
         {needsRenewalAlert(sub) && (
           <div className="pro-alert">
