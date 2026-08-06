@@ -403,6 +403,26 @@ export const suggestKitForBattery = (kits = [], batteryNeed = 0) => {
 };
 
 const PANEL_LINE_RE = /panneau/i;
+const ONDULEUR_LINE_RE = /onduleur/i;
+
+/**
+ * Onduleur suggéré parmi une liste configurée (Plus › Onduleurs) : le plus
+ * petit dont la puissance PV max COUVRE le besoin calculé + marge de
+ * sécurité (jamais moins — un onduleur qui écrête les panneaux réduit la
+ * production). Si aucun n'atteint le besoin, repli sur le plus grand
+ * disponible (mieux vaut le moins insuffisant que rien).
+ * @param {Array} inverters  liste d'onduleurs ({ id, maxPvPower, ... })
+ * @param {number} requiredPanelPower  puissance crête panneaux requise (W)
+ * @param {number} margin  marge de sécurité (défaut SIZING_PARAMS.inverterMargin)
+ * @returns {object|null}
+ */
+export const suggestInverterForPower = (inverters = [], requiredPanelPower = 0, margin = SIZING_PARAMS.inverterMargin) => {
+  if (!inverters.length) return null;
+  const need = (Number(requiredPanelPower) || 0) * margin;
+  const suffisants = inverters.filter((o) => o.maxPvPower >= need);
+  if (suffisants.length) return [...suffisants].sort((a, b) => a.maxPvPower - b.maxPvPower)[0];
+  return [...inverters].sort((a, b) => b.maxPvPower - a.maxPvPower)[0];
+};
 
 /**
  * Devis à partir d'un kit préconfiguré : toutes les lignes du kit, sans calcul
@@ -421,8 +441,14 @@ const PANEL_LINE_RE = /panneau/i;
  *   que ce que le besoin exige à SA puissance crête, la quantité de panneaux
  *   du devis est complétée automatiquement (jamais réduite en dessous du
  *   nombre de panneaux du kit).
+ * @param {Array} inverters  liste d'onduleurs configurés (Plus › Onduleurs).
+ *   Si l'onduleur du kit (sa capacité kVA, cherchée dans cette liste) n'a pas
+ *   une puissance PV max suffisante pour le besoin, la ligne « Onduleur » est
+ *   remplacée par le plus petit onduleur configuré qui convient — jamais un
+ *   plus faible. Sans correspondance dans la liste (capacité inconnue), la
+ *   ligne du kit reste inchangée : impossible de vérifier sans donnée.
  */
-export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null) => {
+export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = []) => {
   const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
   // Nombre de panneaux réellement nécessaires, à la puissance crête DU KIT —
   // le kit est choisi sur sa batterie, pas sur son nombre de panneaux, donc
@@ -434,7 +460,24 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const withPanels = kit.lines.map((l) => (
     PANEL_LINE_RE.test(l.designation) && neededPanels > l.qty ? { ...l, qty: neededPanels } : l
   ));
-  const lines = (includeMounting ? withPanels : withPanels.filter((l) => !MOUNTING_LINE_RE.test(l.designation)))
+
+  // Onduleur : celui du kit ne suffit peut-être pas pour les panneaux
+  // désormais complétés — on ne le sait que si sa capacité kVA correspond à
+  // un onduleur configuré (donc avec une puissance PV max connue).
+  const currentSpec = inverters.find((o) => o.capacity === kit.inverter);
+  const inverterSuggested = currentSpec && sizing?.requiredPanelPower
+    && currentSpec.maxPvPower < sizing.requiredPanelPower * SIZING_PARAMS.inverterMargin
+    ? suggestInverterForPower(inverters, sizing.requiredPanelPower)
+    : null;
+  const withInverter = inverterSuggested
+    ? withPanels.map((l) => (
+        ONDULEUR_LINE_RE.test(l.designation)
+          ? { ...l, designation: `Onduleur hybride ${inverterSuggested.capacity}kVA ${inverterSuggested.brand} ${inverterSuggested.model}`, qty: 1, unit: 'pcs', pu: inverterSuggested.price }
+          : l
+      ))
+    : withPanels;
+
+  const lines = (includeMounting ? withInverter : withInverter.filter((l) => !MOUNTING_LINE_RE.test(l.designation)))
     .map((l) => (
       includeMounting && MOUNTING_LINE_RE.test(l.designation)
         ? { ...l, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: neededPanels, unit: 'pcs', pu: mounting.pricePerPanel }
@@ -456,6 +499,9 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     tva: 0,
     mountingType: mounting.id,
     panelsIncluded: neededPanels,
+    inverterSuggested: inverterSuggested
+      ? { id: inverterSuggested.id, brand: inverterSuggested.brand, model: inverterSuggested.model, capacity: inverterSuggested.capacity }
+      : null,
     total,
     roi: 0,
     kitId: kit.id,

@@ -2,6 +2,7 @@
 // migrations de seed) et persistance. Aucune dépendance React — logique pure.
 import * as seed from '../data/seed';
 import { SOLAR_KITS } from '../data/kits';
+import { INVERTER_MODELS } from '../data/inverters';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
 
@@ -33,6 +34,9 @@ export const buildInitialState = () => ({
   // démarrer à zéro le rendrait inutilisable. Ils appartiennent ensuite à
   // l'entreprise, qui les modifie depuis « Mes kits ».
   kits: SOLAR_KITS,
+  // Onduleurs proposés en alternative quand celui d'un kit ne prend pas assez
+  // de panneaux pour le besoin calculé — même logique de dotation que les kits.
+  inverters: INVERTER_MODELS,
   formations: seed.formations,
   formationProgress: [],
   subscriptions: [],
@@ -76,6 +80,8 @@ export const loadState = (scope = null) => {
       // jamais réinjecter ensuite, sinon un kit supprimé par le gérant
       // reviendrait à chaque ouverture de l'application.
       if (!Array.isArray(saved.kits)) saved.kits = SOLAR_KITS;
+      // Migration « Onduleurs » : même principe, dotation une seule fois.
+      if (!Array.isArray(saved.inverters)) saved.inverters = INVERTER_MODELS;
       if (!saved.payoutRequests) saved.payoutRequests = [];
       if (!saved.formations) saved.formations = seed.formations;
       if (!saved.formationProgress) saved.formationProgress = [];

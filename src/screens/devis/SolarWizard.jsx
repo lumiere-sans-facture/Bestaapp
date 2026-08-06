@@ -22,8 +22,9 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
   // Les kits viennent de l'état : ils se modifient dans « Mes kits », l'assistant
   // reflète immédiatement les prix du gérant sans mise à jour de l'application.
-  const { addDevis, leadsForUser, partners, ensurePartnerForUser, kits } = useData();
+  const { addDevis, leadsForUser, partners, ensurePartnerForUser, kits, inverters } = useData();
   const SOLAR_KITS = useMemo(() => kits || [], [kits]);
+  const INVERTERS = useMemo(() => inverters || [], [inverters]);
   // Client déjà choisi (fiche client) : l'étape de sélection est sautée.
   const [step, setStep] = useState(initialLeadId ? 2 : 1);
   const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);
@@ -162,8 +163,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   // La ligne « Structure de montage » varie aussi selon le support choisi —
   // ou disparaît si le client a le sien (includeMounting).
   const displayQuotation = useMemo(
-    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing) : null),
-    [selectedKit, mountingType, includeMounting, sizing]
+    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS) : null),
+    [selectedKit, mountingType, includeMounting, sizing, INVERTERS]
   );
   // Panneaux réellement inclus au devis : ceux du kit, complétés si le besoin
   // calculé en exige plus (kit choisi sur sa batterie, pas ses panneaux).
@@ -201,10 +202,15 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const handleSubmit = (statut = 'finalise') => {
     if (!selectedKit || !displayQuotation) return; // aucun kit disponible
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
+    // Onduleur réellement retenu : celui du kit, ou celui suggéré en
+    // remplacement si le premier ne suffisait pas pour les panneaux calculés.
+    const inv = displayQuotation.inverterSuggested;
     const submitSizing = {
       numberOfPanels: installedPanels,
       panelCapacity: (installedPanels * selectedKit.panelW) / 1000,
-      inverter: { model: `Onduleur hybride ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter },
+      inverter: inv
+        ? { model: `Onduleur hybride ${inv.capacity}kVA ${inv.brand} ${inv.model}`, capacity: inv.capacity }
+        : { model: `Onduleur hybride ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter },
       batteries: [],
       batteryCapacity: selectedKit.battery,
       estimatedProduction: Math.round((installedPanels * selectedKit.panelW * psh * 365) / 1000),
@@ -521,9 +527,20 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
               <span>
                 {selectedKit.name} — {installedPanels} panneaux {selectedKit.panelW}Wc
                 {installedPanels > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
-                {' '}· batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA
+                {' '}· batterie {selectedKit.battery} kWh · onduleur{' '}
+                {displayQuotation.inverterSuggested
+                  ? `${displayQuotation.inverterSuggested.capacity} kVA ${displayQuotation.inverterSuggested.brand}`
+                  : `${selectedKit.inverter} kVA`}
               </span>
             </div>
+            {displayQuotation.inverterSuggested && (
+              <div className="field-hint" role="status" style={{ marginTop: -6, marginBottom: 12 }}>
+                <Cpu size={13} style={{ verticalAlign: -2 }} /> Onduleur remplacé automatiquement : celui du kit
+                ({selectedKit.inverter} kVA) ne prend pas assez de panneaux pour ce besoin —{' '}
+                {displayQuotation.inverterSuggested.capacity} kVA {displayQuotation.inverterSuggested.brand}{' '}
+                {displayQuotation.inverterSuggested.model} suggéré à la place.
+              </div>
+            )}
 
             {/* Structure de montage PV rails galvanisé : le prix suit le
                 type de support, calculé au panneau (terrain différent = coût différent).

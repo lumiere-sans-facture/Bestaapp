@@ -78,6 +78,13 @@ create table if not exists public.kits (
 );
 alter table public.kits enable row level security;
 
+-- 3 ter. Onduleurs : suggérés en remplacement de celui d'un kit, même génération.
+create table if not exists public.inverters (
+  id text primary key, data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.inverters enable row level security;
+
 -- Demandes de paiement des commissions (« retraits ») : même génération.
 create table if not exists public."payoutRequests" (
   id text primary key, data jsonb not null,
@@ -90,7 +97,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests','tombstones'
   ] loop
@@ -105,7 +112,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests'
   ] loop
@@ -123,7 +130,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests'
   ] loop
@@ -154,7 +161,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests','tombstones'
   ] loop
