@@ -1111,8 +1111,12 @@ form .login-link { width: 100%; margin-top: 4px; }
   .appliance-fields { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* 2×2 à toutes les largeurs, jamais étiré. */
-.consumption-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg); border-radius: 10px; padding: 14px 12px; }
+/* Une seule ligne quel que soit le nombre de statistiques (3 ou 4 avec
+   le pic) ; le mobile étroit garde son repli 2×2. */
+.consumption-summary { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; background: var(--bg); border-radius: 10px; padding: 14px 12px; }
+@media (max-width: 430px) {
+  .consumption-summary { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+}
 .consumption-summary .consumption-stat { min-width: 0; }
 .consumption-summary svg { flex-shrink: 0; }
 .consumption-stat { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
