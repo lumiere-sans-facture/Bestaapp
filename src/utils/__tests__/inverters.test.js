@@ -67,7 +67,7 @@ describe('suggestInverterForPower', () => {
 
 describe('buildKitQuotation — remplacement automatique de l’onduleur', () => {
   it('remplace la ligne « Onduleur » si celui du kit ne prend pas assez de panneaux', () => {
-    // Kit 2,5 kWh Eco : onduleur 3 kVA (INVERTER_MODELS: growatt-3k, PV max 3900 W).
+    // Kit 2,5 kWh Eco : onduleur 3 kVA (INVERTER_MODELS: hz-3kva, PV max 3900 W).
     const kit = SOLAR_KITS.find((k) => k.id === 'kit-2.5kwh-eco');
     expect(kit.inverter).toBe(3);
     // Besoin bien au-delà de ce que 3 kVA (3900 W PV max) encaisse même avec marge.
@@ -92,10 +92,9 @@ describe('buildKitQuotation — remplacement automatique de l’onduleur', () =>
   });
 
   it('ne touche à rien si la capacité du kit ne correspond à aucun onduleur configuré', () => {
-    // kit-5kwh a un onduleur 6 kVA — absent d'INVERTER_MODELS (1/2/3/5/8/10 kVA) :
-    // impossible de vérifier, donc la ligne du kit reste inchangée.
-    const kit = SOLAR_KITS.find((k) => k.id === 'kit-5kwh');
-    expect(kit.inverter).toBe(6);
+    // Onduleur 10 kVA — absent d'INVERTER_MODELS (3 et 6 kVA seulement, repris
+    // des kits officiels) : impossible de vérifier, la ligne du kit reste inchangée.
+    const kit = { ...SOLAR_KITS.find((k) => k.id === 'kit-5kwh'), inverter: 10 };
     const sizing = { requiredPanelPower: 50000 }; // besoin énorme, sans effet ici
     const q = buildKitQuotation(kit, 'tole', true, sizing, INVERTER_MODELS);
     expect(q.inverterSuggested).toBeNull();

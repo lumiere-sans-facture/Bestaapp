@@ -3,20 +3,22 @@
 // une fois chargée dans l'état, elle appartient à l'entreprise, qui la
 // modifie depuis « Plus › Onduleurs ».
 //
+// Repris des onduleurs RÉELLEMENT utilisés dans les kits officiels
+// (data/kits.js) — ceux effectivement posés sur le terrain, pas une gamme
+// générique. Prix identiques aux lignes « Onduleur … » des kits.
+//
 // maxPvPower (Wc) : puissance PV maximale que l'onduleur peut recevoir en
 // entrée — PAS sa puissance de sortie (capacity, en kVA). C'est ce chiffre
 // qui sert à vérifier qu'un onduleur encaisse le nombre de panneaux calculé,
 // et à en suggérer un plus grand sinon.
 //
-// ⚠️ Les valeurs ci-dessous sont ESTIMÉES (capacité kVA × 1,3, une marge de
-// survolt réseau usuelle pour un onduleur hybride) — PAS des chiffres de
-// fiche technique vérifiés. Corrigez-les depuis « Plus › Onduleurs » avec les
-// vraies valeurs « Max. PV Input Power » de chaque modèle avant de vous y fier.
+// ⚠️ maxPvPower est ESTIMÉ (capacité kVA × 1,3, une marge de survolt réseau
+// usuelle pour un onduleur hybride) — PAS un chiffre de fiche technique
+// vérifié. Corrigez-le depuis « Plus › Onduleurs » avec la vraie valeur
+// « Max. PV Input Power » de chaque modèle avant de vous y fier.
 export const INVERTER_MODELS = [
-  { id: 'growatt-1k', brand: 'Growatt', model: 'SPF 1000TL', capacity: 1, maxPvPower: 1300, price: 180000, efficiency: 95 },
-  { id: 'growatt-2k', brand: 'Growatt', model: 'SPF 2000TL', capacity: 2, maxPvPower: 2600, price: 280000, efficiency: 95 },
-  { id: 'growatt-3k', brand: 'Growatt', model: 'SPF 3000TL', capacity: 3, maxPvPower: 3900, price: 380000, efficiency: 95 },
-  { id: 'growatt-5k', brand: 'Growatt', model: 'SPF 5000TL', capacity: 5, maxPvPower: 6500, price: 580000, efficiency: 96 },
-  { id: 'growatt-8k', brand: 'Growatt', model: 'SPF 8000TL', capacity: 8, maxPvPower: 10400, price: 980000, efficiency: 96 },
-  { id: 'growatt-10k', brand: 'Growatt', model: 'SPF 10000TL', capacity: 10, maxPvPower: 13000, price: 1300000, efficiency: 96 },
+  { id: 'hz-3kva', brand: 'HZ', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 160000, efficiency: 95 },
+  { id: 'itel-3kva', brand: 'Itel', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 190000, efficiency: 95 },
+  { id: 'hz-6kva', brand: 'HZ', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 250000, efficiency: 95 },
+  { id: 'deye-6kva', brand: 'Deye', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 390000, efficiency: 96 },
 ];

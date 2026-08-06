@@ -28,7 +28,11 @@ export const BATTERY_MODELS = [
   { id: 'bat-15.0', capacity: 15.0, voltage: 48, price: 5250000, brand: 'Pylontech', model: 'Force L3' },
 ];
 
-export const INVERTER_MODELS = [
+// Onduleur RECOMMANDÉ sur la fiche de dimensionnement (étude technique du
+// besoin, indépendante du kit facturé) — pas la liste configurable « Plus ›
+// Onduleurs » (data/inverters.js), qui sert elle à remplacer l'onduleur d'un
+// kit dans le DEVIS. Gamme générique, non liée aux kits/marques réels.
+const SIZING_SHEET_INVERTERS = [
   { id: 'growatt-1k', brand: 'Growatt', model: 'SPF 1000TL', capacity: 1, maxPower: 800, price: 180000, efficiency: 95 },
   { id: 'growatt-2k', brand: 'Growatt', model: 'SPF 2000TL', capacity: 2, maxPower: 1600, price: 280000, efficiency: 95 },
   { id: 'growatt-3k', brand: 'Growatt', model: 'SPF 3000TL', capacity: 3, maxPower: 2400, price: 380000, efficiency: 95 },
@@ -153,7 +157,7 @@ export const SYSTEM_VOLTAGE = BATTERY_MODELS[0].voltage;
 
 const findInverterForPower = (requiredPower) => {
   const powerWithMargin = requiredPower * SIZING_PARAMS.inverterMargin;
-  return INVERTER_MODELS.find((inv) => inv.maxPower >= powerWithMargin) || INVERTER_MODELS[INVERTER_MODELS.length - 1];
+  return SIZING_SHEET_INVERTERS.find((inv) => inv.maxPower >= powerWithMargin) || SIZING_SHEET_INVERTERS[SIZING_SHEET_INVERTERS.length - 1];
 };
 
 // Combinaison optimale de batteries (du plus grand au plus petit module)
