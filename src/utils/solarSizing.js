@@ -2,6 +2,7 @@
 // Logique portée depuis l'application besta-solar (calculations + pricing).
 // Toutes les valeurs monétaires sont en F CFA (XOF).
 import { prixPublic } from './price';
+import { resolveLignePrice } from './kits';
 
 // ---- Catalogue matériel ----
 
@@ -459,8 +460,12 @@ export const suggestInverterForPower = (inverters = [], requiredPanelPower = 0, 
  *   remplacée par le plus petit onduleur configuré qui convient — jamais un
  *   plus faible. Sans correspondance dans la liste (capacité inconnue), la
  *   ligne du kit reste inchangée : impossible de vérifier sans donnée.
+ * @param {Array} products  catalogue boutique. Une ligne de kit LIÉE à un
+ *   produit (productId, réglé depuis « Mes kits ») suit son prix public
+ *   ACTUEL plutôt que le prix figé à la composition du kit — modifier le prix
+ *   en Boutique se répercute alors automatiquement, ici et sur les devis.
  */
-export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = []) => {
+export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = []) => {
   const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
   // Nombre de panneaux réellement nécessaires, à la puissance crête DU KIT —
   // le kit est choisi sur sa batterie, pas sur son nombre de panneaux, donc
@@ -481,10 +486,12 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     && currentSpec.maxPvPower < sizing.requiredPanelPower * SIZING_PARAMS.inverterMargin
     ? suggestInverterForPower(inverters, sizing.requiredPanelPower)
     : null;
+  // productId retiré sur les lignes remplacées : elles ne représentent plus
+  // le produit boutique éventuellement lié, `pu` (fixé ci-dessous) prime.
   const withInverter = inverterSuggested
     ? withPanels.map((l) => (
         ONDULEUR_LINE_RE.test(l.designation)
-          ? { ...l, designation: `Onduleur hybride ${inverterSuggested.capacity}kVA ${inverterSuggested.brand} ${inverterSuggested.model}`, qty: 1, unit: 'pcs', pu: inverterSuggested.price }
+          ? { ...l, productId: null, designation: `Onduleur hybride ${inverterSuggested.capacity}kVA ${inverterSuggested.brand} ${inverterSuggested.model}`, qty: 1, unit: 'pcs', pu: inverterSuggested.price }
           : l
       ))
     : withPanels;
@@ -492,16 +499,18 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const lines = (includeMounting ? withInverter : withInverter.filter((l) => !MOUNTING_LINE_RE.test(l.designation)))
     .map((l) => (
       includeMounting && MOUNTING_LINE_RE.test(l.designation)
-        ? { ...l, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: neededPanels, unit: 'pcs', pu: mounting.pricePerPanel }
+        ? { ...l, productId: null, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: neededPanels, unit: 'pcs', pu: mounting.pricePerPanel }
         : l
     ));
-  const toItem = (l, type) => ({
-    type, name: l.designation, quantity: l.qty, unit: l.unit,
-    unitPrice: l.pu, totalPrice: l.qty * l.pu,
-  });
+  // Prix résolu ligne par ligne : celui du produit boutique lié s'il existe
+  // encore (suit ses changements de prix), sinon le prix figé de la ligne.
+  const toItem = (l, type) => {
+    const unitPrice = resolveLignePrice(l, products);
+    return { type, name: l.designation, quantity: l.qty, unit: l.unit, unitPrice, totalPrice: l.qty * unitPrice };
+  };
   const components = lines.filter((l) => !l.labor).map((l) => toItem(l, 'kit'));
   const prestations = lines.filter((l) => l.labor).map((l) => toItem(l, 'prestation'));
-  const total = lines.reduce((s, l) => s + l.qty * l.pu, 0);
+  const total = lines.reduce((s, l) => s + l.qty * resolveLignePrice(l, products), 0);
   return {
     components, prestations,
     equipmentCost: components.reduce((s, c) => s + c.totalPrice, 0),

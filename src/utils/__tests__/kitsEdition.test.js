@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
-import { normaliserKit, kitTotal, kitEstValide, resumeKit, dupliquerKit, nouveauKit, UNITES_KIT } from '../kits';
+import { normaliserKit, kitTotal, kitEstValide, resumeKit, dupliquerKit, nouveauKit, resolveLignePrice, UNITES_KIT } from '../kits';
 
 const brouillon = (patch = {}) => ({
   id: 'k1', name: '  Kit test  ', battery: '5', panels: '4', panelW: '590', inverter: '6',
@@ -61,6 +61,39 @@ describe('normaliserKit — un brouillon de formulaire devient un kit exploitabl
     const k = normaliserKit(brouillon({ batteryModules: [{ capacity: 16, qty: 2 }] }));
     expect(k.batteryModules).toEqual([{ capacity: 16, qty: 2 }]);
   });
+
+  it('conserve le produit boutique lié (productId), null par défaut', () => {
+    const sansLien = normaliserKit(brouillon());
+    expect(sansLien.lines[0].productId).toBeNull();
+    const avecLien = normaliserKit(brouillon({
+      lines: [{ designation: 'Batterie', qty: '1', unit: 'pcs', pu: '460000', labor: false, productId: 'prod-1' }],
+    }));
+    expect(avecLien.lines[0].productId).toBe('prod-1');
+  });
+});
+
+describe('resolveLignePrice — synchronisation avec la Boutique', () => {
+  const products = [{ id: 'prod-1', basePrice: 100000 }];
+
+  it('sans productId : le prix figé de la ligne (pu) fait foi', () => {
+    expect(resolveLignePrice({ pu: 50000, productId: null }, products)).toBe(50000);
+  });
+
+  it('avec productId connu : le prix PUBLIC actuel du produit prime sur pu', () => {
+    // 100 000 × 1,1 (PUBLIC_MARKUP) = 110 000 — même si la ligne dit pu: 99999.
+    expect(resolveLignePrice({ pu: 99999, productId: 'prod-1' }, products)).toBe(110000);
+  });
+
+  it('produit lié mais supprimé du catalogue : repli sur pu (mieux vaut un prix figé que 0)', () => {
+    expect(resolveLignePrice({ pu: 75000, productId: 'produit-disparu' }, products)).toBe(75000);
+  });
+
+  it('un changement de prix du produit se répercute immédiatement (sans ressaisie)', () => {
+    const ligne = { pu: 0, productId: 'prod-1' };
+    expect(resolveLignePrice(ligne, products)).toBe(110000);
+    const produitsMisAJour = [{ id: 'prod-1', basePrice: 200000 }];
+    expect(resolveLignePrice(ligne, produitsMisAJour)).toBe(220000);
+  });
 });
 
 describe('kitTotal', () => {
@@ -76,6 +109,16 @@ describe('kitTotal', () => {
   it('donne le même total que la liste officielle', () => {
     const kit5 = SOLAR_KITS.find((k) => k.id === 'kit-5kwh');
     expect(kitTotal(kit5)).toBe(1200000);
+  });
+
+  it('une ligne liée à un produit boutique suit son prix public actuel, pas le pu figé', () => {
+    const kit = normaliserKit(brouillon({
+      lines: [{ designation: 'Batterie', qty: '1', unit: 'pcs', pu: '460000', labor: false, productId: 'prod-1' }],
+    }));
+    // Sans le produit (pas encore chargé) : repli sur le pu figé.
+    expect(kitTotal(kit)).toBe(460000);
+    // Avec le produit, prix public (basePrice × 1,1) — pas le pu figé de 460 000.
+    expect(kitTotal(kit, [{ id: 'prod-1', basePrice: 500000 }])).toBe(550000);
   });
 });
 

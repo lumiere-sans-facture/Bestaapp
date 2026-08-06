@@ -132,6 +132,23 @@ describe('buildKitQuotation', () => {
     const kit = byId('kit-5kwh');
     expect(buildKitQuotation(kit).panelsIncluded).toBe(kit.panels);
   });
+
+  it('une ligne liée à un produit boutique suit son prix public actuel dans le devis', () => {
+    const kitBase = byId('kit-5kwh');
+    const ligneBatterie = kitBase.lines.find((l) => /batterie/i.test(l.designation));
+    const kit = { ...kitBase, lines: kitBase.lines.map((l) => (l === ligneBatterie ? { ...l, productId: 'prod-batterie' } : l)) };
+
+    const sansProduits = buildKitQuotation(kit, 'tole', true);
+    const ligneSansProduits = sansProduits.components.find((c) => /batterie/i.test(c.name));
+    expect(ligneSansProduits.unitPrice).toBe(ligneBatterie.pu); // repli : produit pas (encore) chargé
+
+    // Le produit boutique change de prix : la ligne du kit suit, sans y retoucher.
+    const produits = [{ id: 'prod-batterie', basePrice: 500000 }];
+    const q = buildKitQuotation(kit, 'tole', true, null, [], produits);
+    const ligne = q.components.find((c) => /batterie/i.test(c.name));
+    expect(ligne.unitPrice).toBe(Math.round(500000 * 1.1));
+    expect(ligne.unitPrice).not.toBe(ligneBatterie.pu);
+  });
 });
 
 describe('suggestKitForBattery', () => {

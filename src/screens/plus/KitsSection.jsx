@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ChevronLeft, Plus, Pencil, Copy, Trash2, Check, Package, RotateCcw, Wrench } from 'lucide-react';
+import { ChevronLeft, Plus, Pencil, Copy, Trash2, Check, Package, RotateCcw, Wrench, Link2 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { SOLAR_KITS } from '../../data/kits';
 import { formatCFA } from '../../utils/format';
-import { nouveauKit, nouvelleLigneKit, kitTotal, kitEstValide, resumeKit, UNITES_KIT } from '../../utils/kits';
+import { prixPublic } from '../../utils/price';
+import { nouveauKit, nouvelleLigneKit, kitTotal, kitEstValide, resumeKit, resolveLignePrice, UNITES_KIT } from '../../utils/kits';
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import Field from '../../components/Field';
@@ -17,7 +18,7 @@ import { useToast } from '../../components/Toast';
  * en garde la main — prix, matériel, intitulés.
  */
 export default function KitsSection({ onBack }) {
-  const { kits, addKit, updateKit, deleteKit, duplicateKit, restoreKits } = useData();
+  const { kits, products, addKit, updateKit, deleteKit, duplicateKit, restoreKits } = useData();
   const [edition, setEdition] = useState(null); // { kit, estNouveau }
   const [aSupprimer, setASupprimer] = useState(null);
   const toast = useToast();
@@ -36,10 +37,20 @@ export default function KitsSection({ onBack }) {
   const retirerLigne = (i) =>
     setEdition((e) => ({ ...e, kit: { ...e.kit, lines: e.kit.lines.filter((_, j) => j !== i) } }));
 
+  // Lier une ligne à un produit boutique : son prix public ACTUEL prime dès
+  // lors, sur cette ligne comme sur les devis — un changement de prix en
+  // Boutique se répercute automatiquement, sans repasser par « Mes kits ».
+  const lierProduit = (i, productId) => {
+    if (!productId) { majLigne(i, { productId: null }); return; }
+    const p = products.find((pr) => pr.id === productId);
+    if (!p) return;
+    majLigne(i, { productId: p.id, designation: p.name, pu: prixPublic(p.basePrice) });
+  };
+
   const enregistrer = (e) => {
     e.preventDefault();
     const { kit, estNouveau } = edition;
-    if (!kitEstValide(kit)) {
+    if (!kitEstValide(kit, products)) {
       toast('Il faut un nom et au moins une ligne chiffrée.', { type: 'error' });
       return;
     }
@@ -61,7 +72,8 @@ export default function KitsSection({ onBack }) {
       <div className="section-title">Mes kits ({liste.length})</div>
       <p className="text-sm text-secondary" style={{ marginBottom: 12 }}>
         Ce sont ces kits — et eux seuls — que propose l'assistant de devis solaire.
-        Modifier un prix ici change immédiatement les devis à venir.
+        Modifier un prix ici change immédiatement les devis à venir. Liez une ligne
+        à un produit boutique pour que son prix suive automatiquement celui de la Boutique.
       </p>
 
       {/* Rattrapage : ne réapparaît que si un kit d'origine a été supprimé. */}
@@ -95,7 +107,7 @@ export default function KitsSection({ onBack }) {
                 <div className="kit-card-name"><Package size={15} /> {kit.name}</div>
                 <div className="kit-card-meta">{resumeKit(kit) || 'Caractéristiques à renseigner'}</div>
               </div>
-              <div className="kit-card-price">{formatCFA(kitTotal(kit))}</div>
+              <div className="kit-card-price">{formatCFA(kitTotal(kit, products))}</div>
             </div>
             <div className="kit-card-foot">
               <span className="kit-card-lines">
@@ -123,7 +135,7 @@ export default function KitsSection({ onBack }) {
         open={!!edition}
         onClose={() => setEdition(null)}
         title={edition?.estNouveau ? 'Nouveau kit' : 'Modifier le kit'}
-        subtitle={edition ? formatCFA(kitTotal(edition.kit)) : undefined}
+        subtitle={edition ? formatCFA(kitTotal(edition.kit, products)) : undefined}
       >
         {edition && (
           <form onSubmit={enregistrer}>
@@ -183,10 +195,28 @@ export default function KitsSection({ onBack }) {
                   </label>
                   <label className="doc-line-field is-wide">
                     Prix unitaire (F CFA)
-                    <input className="input" type="number" min="0" value={l.pu}
+                    <input className="input" type="number" min="0"
+                      value={l.productId ? resolveLignePrice(l, products) : l.pu}
+                      disabled={!!l.productId}
                       onChange={(e) => majLigne(i, { pu: e.target.value })} />
                   </label>
                 </div>
+                {/* Lier la ligne à un produit boutique : son prix public suit
+                    alors automatiquement les changements de prix faits en
+                    Boutique, ici comme sur les devis — plus de ressaisie. */}
+                <Field label="Produit boutique lié (optionnel)">
+                  <select className="input" value={l.productId || ''} onChange={(e) => lierProduit(i, e.target.value)}>
+                    <option value="">— Prix fixe, non lié —</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} ({formatCFA(prixPublic(p.basePrice))})</option>
+                    ))}
+                  </select>
+                </Field>
+                {l.productId && (
+                  <div className="field-hint">
+                    <Link2 size={12} style={{ verticalAlign: -1 }} /> Prix synchronisé avec la Boutique.
+                  </div>
+                )}
                 {/* Le devis sépare équipements et prestations : c'est cette
                     case qui range la ligne du bon côté. */}
                 <label className="kit-line-labor">
@@ -194,9 +224,9 @@ export default function KitsSection({ onBack }) {
                     onChange={(e) => majLigne(i, { labor: e.target.checked })} />
                   <span>Prestation (main d'œuvre), pas du matériel</span>
                 </label>
-                {Number(l.pu) > 0 && (
+                {resolveLignePrice(l, products) > 0 && (
                   <div className="doc-line-subtotal">
-                    Sous-total : {formatCFA(Math.max(1, Number(l.qty) || 1) * Number(l.pu))}
+                    Sous-total : {formatCFA(Math.max(1, Number(l.qty) || 1) * resolveLignePrice(l, products))}
                   </div>
                 )}
               </div>
@@ -207,7 +237,7 @@ export default function KitsSection({ onBack }) {
 
             <div className="kit-form-total">
               <span>Total du kit</span>
-              <strong>{formatCFA(kitTotal(edition.kit))}</strong>
+              <strong>{formatCFA(kitTotal(edition.kit, products))}</strong>
             </div>
             <button type="submit" className="btn btn-primary btn-block">
               <Check size={18} /> {edition.estNouveau ? 'Ajouter le kit' : 'Enregistrer'}

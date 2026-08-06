@@ -22,7 +22,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
   // Les kits viennent de l'état : ils se modifient dans « Mes kits », l'assistant
   // reflète immédiatement les prix du gérant sans mise à jour de l'application.
-  const { addDevis, leadsForUser, partners, ensurePartnerForUser, kits, inverters } = useData();
+  const { addDevis, leadsForUser, partners, ensurePartnerForUser, kits, inverters, products } = useData();
   const SOLAR_KITS = useMemo(() => kits || [], [kits]);
   const INVERTERS = useMemo(() => inverters || [], [inverters]);
   // Client déjà choisi (fiche client) : l'étape de sélection est sautée.
@@ -163,8 +163,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   // La ligne « Structure de montage » varie aussi selon le support choisi —
   // ou disparaît si le client a le sien (includeMounting).
   const displayQuotation = useMemo(
-    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS) : null),
-    [selectedKit, mountingType, includeMounting, sizing, INVERTERS]
+    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS, products) : null),
+    [selectedKit, mountingType, includeMounting, sizing, INVERTERS, products]
   );
   // Panneaux réellement inclus au devis : ceux du kit, complétés si le besoin
   // calculé en exige plus (kit choisi sur sa batterie, pas ses panneaux).
