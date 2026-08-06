@@ -73,13 +73,19 @@ export function buildSizingSheetHtml(d) {
   const reference = `FD-${maintenant.getFullYear()}${String(maintenant.getMonth() + 1).padStart(2, '0')}${String(maintenant.getDate()).padStart(2, '0')}-${initiales}`;
 
   // --- Détail des calculs (mêmes formules que calculateSystemSize) ---
-  const energieNecessaire = totalKwh / panelEfficiency; // kWh/j à produire
   const puissanceRequise = d.sizing.requiredPanelPower;  // W crête
   const batterieKwh = d.sizing.batteryCapacity;          // kWh (0 en on-grid)
   const batterieWh = Math.round(batterieKwh * 1000);
   const batterieAh = batterieKwh > 0 ? Math.round(batterieWh / SYSTEM_VOLTAGE) : 0;
   const autonomyNights = d.sizing.autonomyNights || 1;
   const nuitsLabel = `${nf(autonomyNights, autonomyNights % 1 ? 1 : 0)} nuit${autonomyNights > 1 ? 's' : ''}`;
+  // Énergie que les panneaux doivent produire chaque jour : la conso de jour,
+  // plus la conso de nuit multipliée par l'autonomie (recharge complète du
+  // parc batterie possible en une journée, même après une nuit blanche).
+  // Sans batterie (on-grid), l'autonomie ne joue pas.
+  const nightEnergyForPanels = d.systemType === 'on-grid' ? conso.night : conso.night * autonomyNights;
+  const totalKwhPanels = conso.day + nightEnergyForPanels;
+  const energieNecessaire = totalKwhPanels / panelEfficiency; // kWh/j à produire
 
   const autonomie = d.systemType === 'off-grid'
     ? `Consommation nocturne complète (${nuitsLabel})`
@@ -161,9 +167,9 @@ export function buildSizingSheetHtml(d) {
     resultat(
       'Énergie journalière à produire',
       `${nf(energieNecessaire, 2)} kWh/jour`,
-      '',
-      'E = Consommation totale ÷ rendement des panneaux',
-      `E = ${nf(totalKwh, 2)} kWh ÷ ${nf(panelEfficiency, 2)}`,
+      d.systemType === 'on-grid' ? '' : `dont recharge batterie sur ${nuitsLabel}`,
+      `E = (Jour + Nuit${d.systemType === 'on-grid' ? '' : ' × nuits d\'autonomie'}) ÷ rendement des panneaux`,
+      `E = (${nf(conso.day, 2)} + ${nf(conso.night, 2)}${d.systemType === 'on-grid' ? '' : ` × ${nf(autonomyNights, autonomyNights % 1 ? 1 : 0)}`}) kWh ÷ ${nf(panelEfficiency, 2)}`,
     ),
     resultat(
       'Puissance panneaux nécessaire',

@@ -198,14 +198,21 @@ export const calculateSystemSize = (
   const panelPower = Number(panelWc) > 0 ? Number(panelWc) : PANEL_REFERENCE_WC;
   const nights = Number(autonomyNights) > 0 ? Number(autonomyNights) : DEFAULT_AUTONOMY_NIGHTS;
 
-  const totalDaily = consumption.day + consumption.night; // kWh
+  // Énergie nocturne à recharger : sur un système avec batterie, le parc doit
+  // pouvoir être rechargé en une journée même après une nuit blanche — les
+  // panneaux sont donc dimensionnés sur l'autonomie choisie (nuit × nombre de
+  // nuits), pas seulement sur la conso d'une nuit. Sans batterie (on-grid),
+  // l'autonomie n'a pas de sens : on garde la conso nocturne telle quelle.
+  const nightlyEnergy = consumption.night * nights; // kWh — couvre l'autonomie choisie
+  const nightEnergyForPanels = systemType === 'on-grid' ? consumption.night : nightlyEnergy;
+
+  const totalDaily = consumption.day + nightEnergyForPanels; // kWh à produire / jour
   const requiredDailyEnergy = totalDaily / panelEfficiency; // kWh
   const requiredPanelPower = (requiredDailyEnergy / peakSunHours) * 1000; // W
   const numberOfPanels = Math.max(1, Math.ceil(requiredPanelPower / panelPower));
 
   const selectedInverter = findInverterForPower(requiredPanelPower);
 
-  const nightlyEnergy = consumption.night * nights; // kWh — couvre l'autonomie choisie
   let batteryCapacity = 0;
   let batteries = [];
   if (systemType === 'off-grid') {

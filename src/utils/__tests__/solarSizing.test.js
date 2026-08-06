@@ -63,6 +63,26 @@ describe('calculateSystemSize', () => {
   it('garde au moins un panneau pour une conso minime', () => {
     expect(calculateSystemSize({ day: 0, night: 0.1 }, 'on-grid', 5.5).numberOfPanels).toBe(1);
   });
+
+  it('autonomie batterie : les panneaux grandissent avec les nuits couvertes (off-grid/hybride)', () => {
+    // Un parc batterie taillé pour 2 nuits doit pouvoir se recharger en une
+    // journée même après une nuit blanche : les panneaux sont donc dimensionnés
+    // sur (jour + nuit × nuits d'autonomie), pas seulement sur jour + nuit.
+    const uneNuit = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, undefined, 1);
+    const deuxNuits = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, undefined, 2);
+    expect(deuxNuits.requiredPanelPower).toBeCloseTo(uneNuit.requiredPanelPower + (5 / SIZING_PARAMS.panelEfficiency / 5.5) * 1000, 5);
+    expect(deuxNuits.numberOfPanels).toBeGreaterThan(uneNuit.numberOfPanels);
+    expect(deuxNuits.batteryCapacity).toBeCloseTo(uneNuit.batteryCapacity * 2, 5);
+
+    const hybride2 = calculateSystemSize({ day: 5, night: 5 }, 'hybrid', 5.5, undefined, 2);
+    const hybride1 = calculateSystemSize({ day: 5, night: 5 }, 'hybrid', 5.5, undefined, 1);
+    expect(hybride2.requiredPanelPower).toBeGreaterThan(hybride1.requiredPanelPower);
+
+    // Sans batterie, l'autonomie n'a pas de sens : les panneaux ne bougent pas.
+    const onGrid1 = calculateSystemSize({ day: 5, night: 5 }, 'on-grid', 5.5, undefined, 1);
+    const onGrid2 = calculateSystemSize({ day: 5, night: 5 }, 'on-grid', 5.5, undefined, 2);
+    expect(onGrid2.requiredPanelPower).toBeCloseTo(onGrid1.requiredPanelPower, 5);
+  });
 });
 
 describe('buildQuotation', () => {
