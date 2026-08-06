@@ -411,14 +411,18 @@ export const suggestKitForBattery = (kits = [], batteryNeed = 0) => {
  * La ligne « Structure de montage » du kit est recalculée sur le type de
  * support choisi (tôle / dalle / au sol) × le nombre de panneaux du kit —
  * son prix fixe dans data/kits.js n'est qu'un repli si le kit n'en a pas.
+ * @param {boolean} includeMounting  si false, la ligne « Structure de
+ *   montage » est retirée du devis (client qui a déjà son support, ou pose
+ *   sans structure) plutôt que recalculée.
  */
-export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE) => {
+export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true) => {
   const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
-  const lines = kit.lines.map((l) => (
-    MOUNTING_LINE_RE.test(l.designation)
-      ? { ...l, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: kit.panels, unit: 'pcs', pu: mounting.pricePerPanel }
-      : l
-  ));
+  const lines = (includeMounting ? kit.lines : kit.lines.filter((l) => !MOUNTING_LINE_RE.test(l.designation)))
+    .map((l) => (
+      includeMounting && MOUNTING_LINE_RE.test(l.designation)
+        ? { ...l, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: kit.panels, unit: 'pcs', pu: mounting.pricePerPanel }
+        : l
+    ));
   const toItem = (l, type) => ({
     type, name: l.designation, quantity: l.qty, unit: l.unit,
     unitPrice: l.pu, totalPrice: l.qty * l.pu,

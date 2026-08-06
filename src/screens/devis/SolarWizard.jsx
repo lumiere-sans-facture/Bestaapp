@@ -53,6 +53,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const [autonomyNights, setAutonomyNights] = useState(DEFAULT_AUTONOMY_NIGHTS);
   // Type de support des panneaux : tôle par défaut (cas le plus courant).
   const [mountingType, setMountingType] = useState(DEFAULT_MOUNTING_TYPE);
+  // Inclure ou non la structure de montage au devis (client qui a déjà le sien).
+  const [includeMounting, setIncludeMounting] = useState(true);
   // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
   // ou recherche de ville ; repli en saisie manuelle des heures de pic.
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
@@ -155,10 +157,11 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0] || null;
   // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
   // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit.
-  // Seule la ligne « Structure de montage » varie ensuite, selon le support choisi.
+  // Seule la ligne « Structure de montage » varie ensuite, selon le support
+  // choisi — ou disparaît si le client a déjà le sien (includeMounting).
   const displayQuotation = useMemo(
-    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType) : null),
-    [selectedKit, mountingType]
+    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting) : null),
+    [selectedKit, mountingType, includeMounting]
   );
 
   // Fiche de dimensionnement — étude technique du BESOIN du client.
@@ -514,21 +517,27 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
             </div>
 
             {/* Structure de montage PV rails galvanisé : le prix suit le
-                type de support, calculé au panneau (terrain différent = coût différent). */}
+                type de support, calculé au panneau (terrain différent = coût différent).
+                Le client qui a déjà son support peut l'exclure du devis. */}
             <div className="chip-selector">
               <span className="chip-selector-label"><PanelTop size={13} /> Type de support</span>
-              <div className="categories-scroll" style={{ marginBottom: 0 }}>
+              <div className="categories-scroll" style={{ marginBottom: 0, opacity: includeMounting ? 1 : 0.5 }}>
                 {MOUNTING_TYPES.map((m) => (
                   <button
                     key={m.id}
                     type="button"
                     className={`category-chip ${mountingType === m.id ? 'active' : ''}`}
                     onClick={() => setMountingType(m.id)}
+                    disabled={!includeMounting}
                   >
                     {m.label}
                   </button>
                 ))}
               </div>
+              <label className="checkbox-row" style={{ paddingTop: 2 }}>
+                <input type="checkbox" checked={!includeMounting} onChange={(e) => setIncludeMounting(!e.target.checked)} />
+                Client déjà équipé — ne pas inclure la structure au devis
+              </label>
             </div>
 
             <div className="bom">

@@ -81,6 +81,23 @@ describe('buildKitQuotation', () => {
     const sol = buildKitQuotation(kit, 'sol').total;
     expect(tole).toBe(sol);
   });
+
+  it('includeMounting=false retire la ligne « Structure de montage » du devis', () => {
+    const kit = byId('kit-5kwh');
+    const avec = buildKitQuotation(kit, 'tole', true);
+    const sans = buildKitQuotation(kit, 'tole', false);
+    const ligneMontage = (q) => q.components.find((c) => /structure de montage/i.test(c.name));
+    expect(ligneMontage(avec)).toBeDefined();
+    expect(ligneMontage(sans)).toBeUndefined();
+    expect(sans.components).toHaveLength(avec.components.length - 1);
+    const montagePrice = ligneMontage(avec).totalPrice;
+    expect(sans.total).toBe(avec.total - montagePrice);
+  });
+
+  it('includeMounting=false sur un kit sans structure ne change rien', () => {
+    const kit = byId('kit-20kwh');
+    expect(buildKitQuotation(kit, 'tole', false).total).toBe(buildKitQuotation(kit, 'tole', true).total);
+  });
 });
 
 describe('suggestKitForBattery', () => {
