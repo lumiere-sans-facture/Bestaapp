@@ -1275,6 +1275,29 @@ form .login-link { width: 100%; margin-top: 4px; }
 .lead-select-name { font-size: 0.875rem; font-weight: 500; }
 .lead-select-value { font-size: 0.75rem; color: var(--text-secondary); }
 
+/* Lien produit boutique ↔ ligne de kit, avec recherche (Mes kits). */
+.product-link-row { display: flex; gap: 8px; align-items: center; }
+.product-link-trigger {
+  flex: 1; min-width: 0; text-align: left; padding: 10px 12px;
+  border: 1.5px solid var(--border); border-radius: 10px; background: white;
+  font-size: 0.875rem; color: var(--text-primary); transition: border-color 0.15s ease;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.product-link-trigger:hover { border-color: var(--primary); }
+.product-link-search { max-width: none; margin-bottom: 8px; }
+.product-link-search .search-input { border: 1.5px solid var(--border); }
+.product-link-results { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+.product-link-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 10px 12px; text-align: left; font-size: 0.875rem;
+  border-bottom: 1px solid var(--border); transition: background 0.15s ease;
+}
+.product-link-option:last-child { border-bottom: none; }
+.product-link-option:hover { background: var(--bg); }
+.product-link-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.product-link-option-price { flex-shrink: 0; font-size: 0.8125rem; color: var(--text-secondary); }
+.product-link-empty { padding: 14px; font-size: 0.8125rem; color: var(--text-secondary); text-align: center; }
+
 .product-select-item {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 14px; border-bottom: 1px solid var(--border);

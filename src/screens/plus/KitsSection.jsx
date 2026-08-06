@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, Plus, Pencil, Copy, Trash2, Check, Package, RotateCcw, Wrench, Link2 } from 'lucide-react';
+import { ChevronLeft, Plus, Pencil, Copy, Trash2, Check, Package, RotateCcw, Wrench, Link2, Search, X } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { SOLAR_KITS } from '../../data/kits';
 import { formatCFA } from '../../utils/format';
@@ -204,19 +204,7 @@ export default function KitsSection({ onBack }) {
                 {/* Lier la ligne à un produit boutique : son prix public suit
                     alors automatiquement les changements de prix faits en
                     Boutique, ici comme sur les devis — plus de ressaisie. */}
-                <Field label="Produit boutique lié (optionnel)">
-                  <select className="input" value={l.productId || ''} onChange={(e) => lierProduit(i, e.target.value)}>
-                    <option value="">— Prix fixe, non lié —</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({formatCFA(prixPublic(p.basePrice))})</option>
-                    ))}
-                  </select>
-                </Field>
-                {l.productId && (
-                  <div className="field-hint">
-                    <Link2 size={12} style={{ verticalAlign: -1 }} /> Prix synchronisé avec la Boutique.
-                  </div>
-                )}
+                <ProductLinkField ligne={l} products={products} onLink={(productId) => lierProduit(i, productId)} />
                 {/* Le devis sépare équipements et prestations : c'est cette
                     case qui range la ligne du bon côté. */}
                 <label className="kit-line-labor">
@@ -258,5 +246,73 @@ export default function KitsSection({ onBack }) {
         danger
       />
     </>
+  );
+}
+
+/**
+ * Lien d'une ligne de kit vers un produit boutique, avec recherche — un
+ * <select> classique devient vite inutilisable avec des dizaines de produits.
+ * Fermé : bouton montrant le produit lié (ou « non lié »). Ouvert : champ de
+ * recherche + résultats filtrés par nom, sélection au clic.
+ */
+function ProductLinkField({ ligne, products, onLink }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const linked = products.find((p) => p.id === ligne.productId);
+  const q = query.trim().toLowerCase();
+  const resultats = (q ? products.filter((p) => p.name.toLowerCase().includes(q)) : products).slice(0, 40);
+
+  if (!open) {
+    return (
+      <Field label="Produit boutique lié (optionnel)">
+        <div className="product-link-row">
+          <button type="button" className="product-link-trigger" onClick={() => { setQuery(''); setOpen(true); }}>
+            {linked
+              ? <span>{linked.name} <span className="product-link-option-price">({formatCFA(prixPublic(linked.basePrice))})</span></span>
+              : <span className="text-secondary">— Prix fixe, non lié —</span>}
+          </button>
+          {ligne.productId && (
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => onLink(null)} aria-label="Délier le produit">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        {ligne.productId && (
+          <div className="field-hint">
+            <Link2 size={12} style={{ verticalAlign: -1 }} /> Prix synchronisé avec la Boutique.
+          </div>
+        )}
+      </Field>
+    );
+  }
+
+  return (
+    <Field label="Rechercher un produit boutique…">
+      <div className="search-box product-link-search">
+        <Search size={14} className="search-icon" />
+        <input
+          className="input search-input" autoFocus
+          placeholder="Nom du produit…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+        />
+      </div>
+      <div className="product-link-results">
+        {resultats.map((p) => (
+          <button
+            type="button" key={p.id} className="product-link-option"
+            onMouseDown={() => { onLink(p.id); setOpen(false); }}
+          >
+            <span className="product-link-option-name">{p.name}</span>
+            <span className="product-link-option-price">{formatCFA(prixPublic(p.basePrice))}</span>
+          </button>
+        ))}
+        {resultats.length === 0 && (
+          <div className="product-link-empty">Aucun produit ne correspond à cette recherche.</div>
+        )}
+      </div>
+    </Field>
   );
 }
