@@ -7,6 +7,7 @@ import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAp
 import {
   calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, recommendInverterOption, suggestBatteryCombo,
+  AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS,
 } from '../../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
@@ -61,6 +62,8 @@ export default function ProSolarWizard({ onDone }) {
   // --- Système --- (off-grid par défaut : cas majoritaire sur le terrain)
   const [systemType, setSystemType] = useState('off-grid');
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
+  // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
+  const [autonomyNights, setAutonomyNights] = useState(DEFAULT_AUTONOMY_NIGHTS);
 
   // --- Localisation / ensoleillement (PVGIS / NASA) ---
   const [query, setQuery] = useState('');
@@ -143,9 +146,9 @@ export default function ProSolarWizard({ onDone }) {
   const panelWcCatalogue = useMemo(() => parsePanelWc(panelName) || PANEL_SPEC.power, [panelName]);
   const sizing = useMemo(
     () => (totalConsumption > 0
-      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, panelWcCatalogue)
+      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, panelWcCatalogue, autonomyNights)
       : null),
-    [consumption, systemType, sunHours, totalConsumption, panelWcCatalogue]
+    [consumption, systemType, sunHours, totalConsumption, panelWcCatalogue, autonomyNights]
   );
 
   // Nouveau dimensionnement → on repart des sélections conseillées.
@@ -257,6 +260,7 @@ export default function ProSolarWizard({ onDone }) {
         inverter: { brand: inverter.brand, model: inverter.model, capacity: inverter.capacity },
         batteryCapacity: totalBatteryCapacity,
         systemType,
+        autonomyNights,
         peakSunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
         estimatedProduction: sizing.estimatedProduction,
         city: location?.name || null,
@@ -397,6 +401,25 @@ export default function ProSolarWizard({ onDone }) {
                 </button>
               ))}
             </div>
+
+            {systemType !== 'on-grid' && (
+              <div className="autonomy-selector">
+                <span className="autonomy-selector-label"><Battery size={13} /> Autonomie batterie</span>
+                <div className="categories-scroll" style={{ marginBottom: 0 }}>
+                  {AUTONOMY_OPTIONS.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      className={`category-chip ${autonomyNights === o.value ? 'active' : ''}`}
+                      onClick={() => setAutonomyNights(o.value)}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="geo-locator">
               <div className="geo-locator-head">
                 <span className="card-title">Localisation</span>
