@@ -99,6 +99,16 @@ export const suggestBatteryCombo = (options = [], requiredCapacity = 0) => {
   return combo;
 };
 
+// Type de support des panneaux (structure de montage rails galvanisé).
+// Prix calculé au panneau, pas en forfait fixe — il dépend du terrain.
+export const MOUNTING_TYPES = [
+  { id: 'tole', label: 'Tôle', pricePerPanel: 10000 },
+  { id: 'dalle', label: 'Dalle', pricePerPanel: 27000 },
+  { id: 'sol', label: 'Au sol', pricePerPanel: 32000 },
+];
+export const DEFAULT_MOUNTING_TYPE = 'tole';
+const MOUNTING_LINE_RE = /structure de montage/i;
+
 export const SYSTEM_TYPES = [
   { id: 'off-grid', label: 'Autonome (off-grid)', help: 'Sans raccordement réseau, batteries pour toute la nuit' },
   { id: 'hybrid', label: 'Hybride', help: 'Réseau + batteries (80% des besoins nuit stockés)' },
@@ -379,15 +389,25 @@ export const buildQuotation = (sizing, { products = [], includeMaintenance = tru
  * de composition. « Main d'œuvre » → prestation, le reste → équipements.
  * Prix tout compris (sans TVA) : HT = TTC, comme les devis kit de référence.
  * Format aligné sur buildQuotation pour réutiliser l'affichage et le PDF.
+ *
+ * La ligne « Structure de montage » du kit est recalculée sur le type de
+ * support choisi (tôle / dalle / au sol) × le nombre de panneaux du kit —
+ * son prix fixe dans data/kits.js n'est qu'un repli si le kit n'en a pas.
  */
-export const buildKitQuotation = (kit) => {
+export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE) => {
+  const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
+  const lines = kit.lines.map((l) => (
+    MOUNTING_LINE_RE.test(l.designation)
+      ? { ...l, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: kit.panels, unit: 'pcs', pu: mounting.pricePerPanel }
+      : l
+  ));
   const toItem = (l, type) => ({
     type, name: l.designation, quantity: l.qty, unit: l.unit,
     unitPrice: l.pu, totalPrice: l.qty * l.pu,
   });
-  const components = kit.lines.filter((l) => !l.labor).map((l) => toItem(l, 'kit'));
-  const prestations = kit.lines.filter((l) => l.labor).map((l) => toItem(l, 'prestation'));
-  const total = kit.lines.reduce((s, l) => s + l.qty * l.pu, 0);
+  const components = lines.filter((l) => !l.labor).map((l) => toItem(l, 'kit'));
+  const prestations = lines.filter((l) => l.labor).map((l) => toItem(l, 'prestation'));
+  const total = lines.reduce((s, l) => s + l.qty * l.pu, 0);
   return {
     components, prestations,
     equipmentCost: components.reduce((s, c) => s + c.totalPrice, 0),
@@ -395,6 +415,7 @@ export const buildKitQuotation = (kit) => {
     maintenanceCost: 0,
     subtotalHT: total,
     tva: 0,
+    mountingType: mounting.id,
     total,
     roi: 0,
     kitId: kit.id,

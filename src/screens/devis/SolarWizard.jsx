@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
-import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS } from '../../utils/solarSizing';
+import { calculateSystemSize, buildKitQuotation, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE } from '../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -51,6 +51,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const [systemType, setSystemType] = useState('off-grid');
   // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
   const [autonomyNights, setAutonomyNights] = useState(DEFAULT_AUTONOMY_NIGHTS);
+  // Type de support des panneaux : tôle par défaut (cas le plus courant).
+  const [mountingType, setMountingType] = useState(DEFAULT_MOUNTING_TYPE);
   // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
   // ou recherche de ville ; repli en saisie manuelle des heures de pic.
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
@@ -139,12 +141,6 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     [consumption, systemType, sunHours, totalConsumption, autonomyNights]
   );
 
-  // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
-  // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit.
-  const kitQuotations = useMemo(
-    () => Object.fromEntries(SOLAR_KITS.map((k) => [k.id, buildKitQuotation(k)])),
-    [SOLAR_KITS]
-  );
   // Kit suggéré : capacité de batterie la plus proche du besoin calculé.
   // C'est toujours ce kit — et lui seul — qui est proposé au devis : pas de
   // choix manuel d'un kit sous- ou sur-dimensionné par rapport au besoin.
@@ -157,7 +153,13 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   // kit retenu avoir été supprimé entre-temps. Tout est optionnel à partir d'ici.
   const effectiveKitId = suggestedKitId || SOLAR_KITS[0]?.id || null;
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0] || null;
-  const displayQuotation = selectedKit ? kitQuotations[selectedKit.id] : null;
+  // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
+  // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit.
+  // Seule la ligne « Structure de montage » varie ensuite, selon le support choisi.
+  const displayQuotation = useMemo(
+    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType) : null),
+    [selectedKit, mountingType]
+  );
 
   // Fiche de dimensionnement — étude technique du BESOIN du client.
   // Elle ne reprend rien du kit proposé au devis : nombre de panneaux, calibre
@@ -365,8 +367,8 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
             </div>
 
             {systemType !== 'on-grid' && (
-              <div className="autonomy-selector">
-                <span className="autonomy-selector-label"><Battery size={13} /> Autonomie batterie</span>
+              <div className="chip-selector">
+                <span className="chip-selector-label"><Battery size={13} /> Autonomie batterie</span>
                 <div className="categories-scroll" style={{ marginBottom: 0 }}>
                   {AUTONOMY_OPTIONS.map((o) => (
                     <button
@@ -509,6 +511,24 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
             <div className="kit-summary">
               <Package size={16} />
               <span>{selectedKit.name} — {selectedKit.panels} panneaux {selectedKit.panelW}Wc · batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA</span>
+            </div>
+
+            {/* Structure de montage PV rails galvanisé : le prix suit le
+                type de support, calculé au panneau (terrain différent = coût différent). */}
+            <div className="chip-selector">
+              <span className="chip-selector-label"><PanelTop size={13} /> Type de support</span>
+              <div className="categories-scroll" style={{ marginBottom: 0 }}>
+                {MOUNTING_TYPES.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`category-chip ${mountingType === m.id ? 'active' : ''}`}
+                    onClick={() => setMountingType(m.id)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="bom">

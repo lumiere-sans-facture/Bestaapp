@@ -765,8 +765,8 @@ form .login-link { width: 100%; margin-top: 4px; }
 .category-chip:hover { border-color: var(--primary); color: var(--primary); }
 .category-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-.autonomy-selector { margin-top: 16px; }
-.autonomy-selector-label {
+.chip-selector { margin-top: 16px; }
+.chip-selector-label {
   display: flex; align-items: center; gap: 6px;
   font-size: 0.8125rem; font-weight: 500; color: var(--text-secondary);
   margin-bottom: 8px;

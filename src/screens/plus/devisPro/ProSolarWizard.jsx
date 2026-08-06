@@ -403,8 +403,8 @@ export default function ProSolarWizard({ onDone }) {
             </div>
 
             {systemType !== 'on-grid' && (
-              <div className="autonomy-selector">
-                <span className="autonomy-selector-label"><Battery size={13} /> Autonomie batterie</span>
+              <div className="chip-selector">
+                <span className="chip-selector-label"><Battery size={13} /> Autonomie batterie</span>
                 <div className="categories-scroll" style={{ marginBottom: 0 }}>
                   {AUTONOMY_OPTIONS.map((o) => (
                     <button
