@@ -146,16 +146,16 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     [SOLAR_KITS]
   );
   // Kit suggéré : capacité de batterie la plus proche du besoin calculé.
+  // C'est toujours ce kit — et lui seul — qui est proposé au devis : pas de
+  // choix manuel d'un kit sous- ou sur-dimensionné par rapport au besoin.
   const suggestedKitId = useMemo(() => {
     if (!sizing || !SOLAR_KITS.length) return null;
     const need = sizing.batteryCapacity || 0;
     return [...SOLAR_KITS].sort((a, b) => Math.abs(a.battery - need) - Math.abs(b.battery - need))[0].id;
   }, [sizing, SOLAR_KITS]);
-  // null = sélection auto (kit suggéré), sinon le kit explicitement choisi.
-  const [selectedKitId, setSelectedKitId] = useState(null);
   // La liste est modifiable depuis « Mes kits » : elle peut être vide, ou le
   // kit retenu avoir été supprimé entre-temps. Tout est optionnel à partir d'ici.
-  const effectiveKitId = selectedKitId || suggestedKitId || SOLAR_KITS[0]?.id || null;
+  const effectiveKitId = suggestedKitId || SOLAR_KITS[0]?.id || null;
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0] || null;
   const displayQuotation = selectedKit ? kitQuotations[selectedKit.id] : null;
 
@@ -490,19 +490,19 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
           <div>
             <div className="wizard-step-title">Choix du kit et devis</div>
 
-            {/* Sélection d'un kit préconfiguré */}
+            {/* Kit suggéré par le dimensionnement : seul celui dont la batterie
+                colle le mieux au besoin calculé est proposé, pas de choix
+                manuel d'un kit sous- ou sur-dimensionné. */}
             <div className="kit-selector">
-              <div className="kit-selector-title">Kit préconfiguré</div>
+              <div className="kit-selector-title">Kit suggéré</div>
               <div className="kit-options">
-                {SOLAR_KITS.map((k) => (
-                  <button type="button" key={k.id} className={`kit-option ${effectiveKitId === k.id ? 'selected' : ''}`} onClick={() => setSelectedKitId(k.id)}>
-                    <span className="kit-option-name">
-                      {k.name}
-                      {k.id === suggestedKitId && <span className="kit-badge">Suggéré</span>}
-                    </span>
-                    <span className="kit-option-meta">{formatCFA(kitQuotations[k.id].total)}</span>
-                  </button>
-                ))}
+                <div className="kit-option selected">
+                  <span className="kit-option-name">
+                    {selectedKit.name}
+                    <span className="kit-badge">Suggéré</span>
+                  </span>
+                  <span className="kit-option-meta">{formatCFA(displayQuotation.total)}</span>
+                </div>
               </div>
             </div>
 
