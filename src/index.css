@@ -1013,7 +1013,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 /* Une colonne partout ; les paires courtes et jumelles utilisent .form-pair. */
 .form-row-2 { display: block; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.wizard-form, .sheet-body form, .pro-company-form { max-width: var(--form-max); }
+.sheet-body form, .pro-company-form { max-width: var(--form-max); }
 .delete-product-btn { margin-top: 10px; }
 .product-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
 /* Rupture : on grise par les couleurs, pas par l'opacité — le badge et le
@@ -1107,7 +1107,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 .appliance-row-consumption span { display: inline-flex; align-items: center; gap: 4px; }
 
 /* 2×2 à toutes les largeurs, jamais étiré. */
-.consumption-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg); border-radius: 10px; padding: 14px 12px; max-width: var(--form-max); }
+.consumption-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg); border-radius: 10px; padding: 14px 12px; }
 .consumption-summary .consumption-stat { min-width: 0; }
 .consumption-summary svg { flex-shrink: 0; }
 .consumption-stat { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
