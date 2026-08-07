@@ -34,7 +34,14 @@ alter table public.orgs enable row level security;
 -- Les inscriptions self-service créent toujours des orgs 'pro'.
 alter table public.orgs add column if not exists kind text not null default 'pro'
   check (kind in ('interne', 'pro'));
-update public.orgs set kind = 'interne' where id = 'org-bestasolar';
+-- Bootstrap SEULEMENT : si une autre organisation a été promue interne depuis
+-- (cas d'un gérant inscrit en self-service, promu via partage-formation.sql),
+-- rejouer ce script ne doit pas créer une DEUXIÈME source interne — deux
+-- copies des mêmes cours partiraient vers les affiliés, dans un ordre
+-- indéterminé.
+update public.orgs set kind = 'interne'
+ where id = 'org-bestasolar'
+   and not exists (select 1 from public.orgs where kind = 'interne' and id <> 'org-bestasolar');
 
 -- Code d'invitation d'équipe : colonne + DÉFAUT défini AVANT toute insertion
 -- (la vérification NOT NULL précède la résolution ON CONFLICT — sans défaut,
@@ -196,14 +203,20 @@ create policy "catalogue ecriture org" on public.products
 -- identifiant en dur : le partage suit l'organisation interne, quelle qu'elle
 -- soit. L'avancement (formationProgress) n'est PAS partagé — la progression
 -- de chacun reste dans son organisation.
+-- SECURITY DEFINER indispensable : la RLS de `orgs` (policy « own org ») ne
+-- laisse chacun lire QUE sa propre organisation. Une sous-requête directe
+-- dans la policy s'exécuterait avec les droits de l'appelant et ne verrait
+-- jamais l'org interne — le partage serait mort pour tout le monde. Même
+-- mécanisme que auth_org_id / auth_is_platform_admin.
+create or replace function public.org_est_interne(p_org text)
+  returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.orgs where id = p_org and kind = 'interne')
+$$;
 drop policy if exists "org isolation" on public.formations;
 drop policy if exists "formations lecture partagee" on public.formations;
 drop policy if exists "formations ecriture org" on public.formations;
 create policy "formations lecture partagee" on public.formations for select to authenticated
-  using (
-    org_id = public.auth_org_id()
-    or org_id in (select id from public.orgs where kind = 'interne')
-  );
+  using (org_id = public.auth_org_id() or public.org_est_interne(org_id));
 create policy "formations ecriture org" on public.formations
   for all to authenticated
   using (org_id = public.auth_org_id())
