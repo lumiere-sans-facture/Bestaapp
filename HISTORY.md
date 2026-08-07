@@ -6,6 +6,8 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Formation : catalogue enrichi (2 nouveaux cours) + dotation des mises à jour
+- Sync : un échec de tombstone ne bloque plus toute la réplication
 - Mes kits : moteur de recherche pour lier une ligne à un produit boutique
 - Mes kits : lier une ligne à un produit boutique synchronise son prix
 - Cohérence des prix : Boutique et devis affichent toujours le prix public
