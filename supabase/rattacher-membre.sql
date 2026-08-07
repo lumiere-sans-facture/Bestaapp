@@ -25,6 +25,15 @@
 --   • Le membre devra se déconnecter puis se reconnecter : l'organisation est
 --     lue à la connexion, et le cache local est rangé par organisation.
 
+-- 0. Inventaire : tous les comptes et leur entreprise. Les membres d'une même
+--    équipe partagent le MÊME org_id ; deux entreprises peuvent porter le même
+--    nom sans rien partager. Utile pour repérer d'un coup tous les comptes
+--    inscrits hors du lien d'invitation.
+select o.name as entreprise, p.org_id, p.email, p.name, p.role
+  from public.profiles p
+  left join public.orgs o on o.id = p.org_id
+ order by o.name nulls first, p.email;
+
 -- 1. Vérification : qui est où ? (à lire AVANT de modifier)
 select p.email, p.name, p.role, p.org_id, o.name as entreprise
   from public.profiles p
