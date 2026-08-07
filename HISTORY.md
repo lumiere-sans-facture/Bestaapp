@@ -6,6 +6,8 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Sync bloquée : les abonnements des autres organisations ne polluent plus l'état local
+- Statut de synchronisation : le motif de l'échec devient lisible et copiable
 - Formation : catalogue enrichi (2 nouveaux cours) + dotation des mises à jour
 - Sync : un échec de tombstone ne bloque plus toute la réplication
 - Mes kits : moteur de recherche pour lier une ligne à un produit boutique

@@ -3,12 +3,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Double minimal de Supabase : on choisit quelles tables échouent ou manquent.
-const state = { echoue: new Set(), absentes: new Set(), pushes: [], deletes: [], avantUpsert: null };
+const state = { echoue: new Set(), absentes: new Set(), pushes: [], deletes: [], rows: {}, avantUpsert: null };
 vi.mock('../../lib/supabase', () => ({
   isSupabaseConfigured: true,
   supabase: {
     from: (table) => ({
-      select: () => Promise.resolve({ data: [], error: null }),
+      select: () => Promise.resolve({ data: state.rows[table] || [], error: null }),
       upsert: (rows) => {
         if (state.avantUpsert && state.avantUpsert(table)) return Promise.reject(new TypeError('Failed to fetch'));
         if (state.absentes.has(table)) return Promise.resolve({ error: { code: '42P01', message: `relation "public.${table}" does not exist` } });
@@ -24,9 +24,13 @@ vi.mock('../../lib/supabase', () => ({
   },
 }));
 
-const { pushCollections, pushTombstone, decouperEnLots } = await import('../../lib/remoteSync');
+const { pushCollections, pushTombstone, pullAll, setSyncOrg, decouperEnLots } = await import('../../lib/remoteSync');
 
-beforeEach(() => { state.echoue.clear(); state.absentes.clear(); state.pushes = []; state.deletes = []; state.avantUpsert = null; });
+beforeEach(() => {
+  state.echoue.clear(); state.absentes.clear();
+  state.pushes = []; state.deletes = []; state.rows = {}; state.avantUpsert = null;
+  setSyncOrg(null); // mode mono-équipe par défaut
+});
 
 describe('pushCollections signale les échecs au lieu de les avaler', () => {
   it('rejette quand le serveur refuse une écriture', async () => {
@@ -103,6 +107,66 @@ describe('pushTombstone — une table tombstones manquante ne bloque plus tout',
     await pushTombstone('leads', 'l2');
     expect(state.pushes.filter((p) => p.table === 'tombstones')).toHaveLength(0);
     expect(state.deletes).toContainEqual({ table: 'leads', id: 'l2' });
+  });
+});
+
+// Régression : l'admin plateforme LIT les abonnements de toutes les
+// organisations (policies « subs read » / « subpay read »). Ces lignes
+// entraient dans son état local, repartaient sous SON org_id, puis revenaient
+// en double au pull suivant — la clé primaire étant (org_id, id). Deux lignes
+// de même clé dans un envoi = lot rejeté en bloc par Postgres, en boucle.
+describe('pullAll — les lignes des autres organisations restent dehors', () => {
+  it('ne garde que les lignes de MON organisation', async () => {
+    setSyncOrg('org-moi', 'pro');
+    state.rows.subscriptionPayments = [
+      { id: 'pay1', org_id: 'org-moi', data: { statut: 'initie' } },
+      { id: 'pay2', org_id: 'org-autre', data: { statut: 'initie' } },
+    ];
+    const { collections } = await pullAll();
+    expect(collections.subscriptionPayments.map((p) => p.id)).toEqual(['pay1']);
+  });
+
+  it('une ligne déjà dupliquée entre organisations n’arrive qu’une fois', async () => {
+    setSyncOrg('org-moi', 'pro');
+    state.rows.subscriptionPayments = [
+      { id: 'pay1', org_id: 'org-autre', data: { statut: 'initie' } },
+      { id: 'pay1', org_id: 'org-moi', data: { statut: 'initie' } },
+    ];
+    const { collections } = await pullAll();
+    expect(collections.subscriptionPayments).toHaveLength(1);
+  });
+
+  it('le catalogue partagé BestaSolar reste lisible malgré le filtrage', async () => {
+    setSyncOrg('org-moi', 'pro');
+    state.rows.products = [
+      { id: 'cat1', org_id: 'org-bestasolar', data: { name: 'Panneau officiel' } },
+      { id: 'cat1', org_id: 'org-moi', data: { name: 'Copie historique' } },
+      { id: 'perso1', org_id: 'org-moi', data: { name: 'Mon produit' } },
+    ];
+    const { collections } = await pullAll();
+    const ids = collections.products.map((p) => p.id);
+    expect(ids).toEqual(expect.arrayContaining(['cat1', 'perso1']));
+    // La ligne BestaSolar prime sur la copie locale (source de vérité).
+    expect(collections.products.find((p) => p.id === 'cat1').name).toBe('Panneau officiel');
+  });
+
+  it('mode mono-équipe (sans organisation) : aucun filtrage, rien n’est perdu', async () => {
+    state.rows.leads = [{ id: 'l1', data: { name: 'A' } }, { id: 'l2', data: { name: 'B' } }];
+    const { collections } = await pullAll();
+    expect(collections.leads.map((l) => l.id)).toEqual(['l1', 'l2']);
+  });
+});
+
+describe('pushCollections — un doublon local ne bloque plus l’envoi', () => {
+  it('n’envoie qu’une seule ligne par id', async () => {
+    await pushCollections({
+      subscriptionPayments: [
+        { id: 'pay1', statut: 'initie', montant: 5000 },
+        { id: 'pay1', statut: 'initie', montant: 5000 },
+      ],
+    });
+    const envoi = state.pushes.find((p) => p.table === 'subscriptionPayments');
+    expect(envoi.rows).toHaveLength(1);
   });
 });
 

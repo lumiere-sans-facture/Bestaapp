@@ -32,27 +32,52 @@ const tableManquante = (error) =>
   error?.code === '42P01' || error?.code === 'PGRST205'
   || /does not exist|schema cache/i.test(error?.message || '');
 
+/** Première occurrence par clé, ordre d'entrée préservé. Les collections sont
+ *  rangées du plus récent au plus ancien : la première est donc la bonne. */
+export const dedupePar = (items, cle) => {
+  const vus = new Map();
+  for (const item of items) {
+    const k = cle(item);
+    if (!vus.has(k)) vus.set(k, item);
+  }
+  return [...vus.values()];
+};
+
 /** Récupère toutes les collections + les tombstones. { empty, collections, tombstones } */
 export async function pullAll() {
   // Lecture des collections en parallèle (au lieu de 15 allers-retours séquentiels).
   const fetched = await Promise.all(
     SYNCED_COLLECTIONS.map(async (table) => {
-      // Catalogue partagé : en multi-entreprise, la lecture renvoie aussi les
-      // produits BestaSolar. Une entreprise ayant reçu une copie historique
-      // verrait des doublons — on garde la ligne BestaSolar (source de vérité).
-      const dedupe = table === 'products' && currentOrgId;
+      // En multi-entreprise, org_id est lu pour TOUTES les tables. Certaines
+      // policies (abonnements, paiements) autorisent l'admin plateforme à lire
+      // les lignes des AUTRES organisations : sans filtrage, elles entraient
+      // dans l'état local, repartaient estampillées de NOTRE org_id, puis
+      // revenaient en double au pull suivant (l'originale + notre copie, même
+      // id — la clé primaire est (org_id, id)). Deux lignes de même clé dans
+      // un envoi font rejeter TOUT le lot (« ON CONFLICT DO UPDATE command
+      // cannot affect row a second time ») : synchronisation bloquée en
+      // boucle. La vue inter-organisations de l'admin passe par des RPC
+      // dédiées (adminSubscriptionsOverview…), jamais par cette réplication.
+      const multiOrg = !!currentOrgId;
       if (tablesAbsentes.has(table)) return [table, []];
-      const { data, error } = await supabase.from(table).select(dedupe ? 'id, data, org_id' : 'id, data');
+      const { data, error } = await supabase.from(table).select(multiOrg ? 'id, data, org_id' : 'id, data');
       if (error) {
         if (tableManquante(error)) { tablesAbsentes.add(table); return [table, []]; }
         throw error;
       }
       let rows = data || [];
-      if (dedupe) {
-        const shared = new Set(rows.filter((r) => r.org_id === SHARED_ORG_ID).map((r) => r.id));
-        rows = rows.filter((r) => r.org_id === SHARED_ORG_ID || !shared.has(r.id));
+      if (multiOrg) {
+        if (table === 'products') {
+          // Catalogue partagé : la lecture renvoie aussi les produits
+          // BestaSolar. Une entreprise ayant reçu une copie historique verrait
+          // des doublons — on garde la ligne BestaSolar (source de vérité).
+          const shared = new Set(rows.filter((r) => r.org_id === SHARED_ORG_ID).map((r) => r.id));
+          rows = rows.filter((r) => r.org_id === SHARED_ORG_ID || !shared.has(r.id));
+        } else {
+          rows = rows.filter((r) => r.org_id === currentOrgId);
+        }
       }
-      return [table, rows.map((row) => ({ ...row.data, id: row.id }))];
+      return [table, dedupePar(rows, (r) => r.id).map((row) => ({ ...row.data, id: row.id }))];
     })
   );
   const collections = {};
@@ -157,7 +182,12 @@ export async function pushCollections(collections) {
     // jamais — la RLS les rejetterait et bloquerait toute la réplication.
     if (currentOrgId && table === 'subscriptions') items = items.filter((i) => i.status !== 'actif');
     if (currentOrgId && table === 'subscriptionPayments') items = items.filter((i) => i.statut !== 'confirme');
-    const rows = items.map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
+    // Filet : deux lignes de même id dans un même envoi font rejeter TOUT le
+    // lot par Postgres (« ON CONFLICT DO UPDATE command cannot affect row a
+    // second time »), donc toute la synchronisation. Un doublon local — quelle
+    // qu'en soit l'origine — ne doit jamais avoir ce pouvoir.
+    const rows = dedupePar(items, (i) => i.id)
+      .map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
     if (!rows.length) { reussies.push(table); continue; }
     try {
       for (const lot of decouperEnLots(rows)) await envoyerLot(table, lot);
