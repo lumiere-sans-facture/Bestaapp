@@ -1138,6 +1138,9 @@ form .login-link { width: 100%; margin-top: 4px; }
 .sun-hours-field { margin-top: 16px; margin-bottom: 0; }
 .sun-hours-manual { margin-top: 8px; }
 .field-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; }
+/* Identifiant d'entreprise : long et sans espaces, il doit pouvoir se couper
+   plutôt que déborder de la carte (comparaison entre deux comptes). */
+.profile-org-id { overflow-wrap: anywhere; }
 
 /* Localisation (dimensionnement solaire) — géoloc + recherche + données NASA/PVGIS */
 .geo-locator { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
