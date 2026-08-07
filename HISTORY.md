@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Masquage réparé : plus de copies des cours chez les affiliés (source unique)
 - Formation : cours réservés aux membres Pro et cours masqués sans suppression
 - Formation : le catalogue BestaSolar est partagé à toutes les entreprises inscrites
 - Mon profil affiche l'entreprise de rattachement (+ script SQL de rattachement)
