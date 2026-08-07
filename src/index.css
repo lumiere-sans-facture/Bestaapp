@@ -1941,6 +1941,10 @@ form .login-link { width: 100%; margin-top: 4px; }
 .flat-badge.muted { background: var(--bg); color: var(--text-secondary); }
 .flat-badge.info { background: rgba(26, 58, 140, 0.12); color: var(--primary-light); }
 .flat-badge.danger { background: var(--error-light); color: var(--error-text); }
+/* Badges d'accès des cours de formation. L'icône s'aligne sur le texte. */
+.badge-cours-pro { background: var(--warning-light); color: var(--warning-dark); }
+.badge-cours-masque { background: var(--bg); color: var(--text-secondary); }
+.badge-cours-pro svg, .badge-cours-masque svg { vertical-align: -1.5px; margin-right: 3px; }
 .flat-row-amount { flex-shrink: 0; font-size: 1rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; text-align: right; }
 .flat-amount-unit { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-left: 4px; }
 

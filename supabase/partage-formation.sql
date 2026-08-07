@@ -22,8 +22,13 @@ $$;
 drop policy if exists "org isolation" on public.formations;
 drop policy if exists "formations lecture partagee" on public.formations;
 drop policy if exists "formations ecriture org" on public.formations;
+--    Un cours MASQUÉ (brouillon) ne quitte jamais son organisation : il n'est
+--    même pas transmis aux affiliés.
 create policy "formations lecture partagee" on public.formations for select to authenticated
-  using (org_id = public.auth_org_id() or public.org_est_interne(org_id));
+  using (
+    org_id = public.auth_org_id()
+    or (public.org_est_interne(org_id) and coalesce(data ->> 'masque', 'false') <> 'true')
+  );
 create policy "formations ecriture org" on public.formations
   for all to authenticated
   using (org_id = public.auth_org_id())

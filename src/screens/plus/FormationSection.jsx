@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Pencil, Check, PlayCircle, FileText, AlignLeft,
-  Clock, ExternalLink, GraduationCap, CheckCircle2, Circle, BookOpen, Layers,
+  Clock, ExternalLink, GraduationCap, CheckCircle2, Circle, BookOpen, Layers, Crown, Lock, EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useMode } from '../../context/ModeContext';
 import { toEmbed } from '../../utils/video';
 import {
   allLecons, isLeconDone, courseProgress, resumeLecon, nextLecon, prevLecon,
   courseDuration, courseCounts, parseChaptersText, chaptersToText, formatTimecode,
+  coursVisible, coursVerrouille,
 } from '../../utils/formation';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
@@ -17,7 +19,7 @@ import DangerZone from '../../components/DangerZone';
 
 const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText };
 const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document' };
-const EMPTY_COURSE = { title: '', description: '', author: '' };
+const EMPTY_COURSE = { title: '', description: '', author: '', acces: 'tous', masque: false };
 const EMPTY_LECON = { title: '', type: 'video', url: '', content: '', duration: '', chaptersText: '' };
 
 /** Contenu d'une leçon texte : paragraphes + listes (« - … »), sans dépendance. */
@@ -47,6 +49,7 @@ function TexteContent({ content }) {
  */
 export default function FormationSection({ onBack }) {
   const { user } = useAuth();
+  const { proActive } = useMode();
   const {
     formations, formationProgress,
     addFormation, updateFormation, deleteFormation,
@@ -61,6 +64,9 @@ export default function FormationSection({ onBack }) {
   // pas (le serveur refuserait l'écriture, et l'édition serait perdue au
   // rechargement). Ses propres cours, eux, restent pleinement modifiables.
   const peutGerer = (c) => isManager && !c?.partage;
+  // Verrou Pro : un cours `acces: 'pro'` se voit mais ne s'ouvre pas sans
+  // abonnement actif. Le gestionnaire du cours n'est jamais verrouillé.
+  const verrouille = (c) => coursVerrouille(c, { proActif: proActive, gere: peutGerer(c) });
 
   const [courseId, setCourseId] = useState(null);
   const [leconId, setLeconId] = useState(null);
@@ -84,6 +90,7 @@ export default function FormationSection({ onBack }) {
   const done = (id) => isLeconDone(formationProgress, user.id, id);
 
   const openCourse = (c) => {
+    if (verrouille(c)) return; // bouton désactivé, mais on ne compte pas dessus
     setCourseId(c.id);
     const resume = resumeLecon(c, formationProgress, user.id);
     setLeconId(resume?.id || null);
@@ -110,7 +117,13 @@ export default function FormationSection({ onBack }) {
   // ---------- Gérant : formulaires ----------
   const saveCourse = (e) => {
     e.preventDefault();
-    const data = { title: courseForm.title.trim(), description: courseForm.description.trim(), author: courseForm.author.trim() };
+    const data = {
+      title: courseForm.title.trim(),
+      description: courseForm.description.trim(),
+      author: courseForm.author.trim(),
+      acces: courseForm.acces === 'pro' ? 'pro' : 'tous',
+      masque: !!courseForm.masque,
+    };
     if (!data.title) return;
     if (courseEdit === 'new') addFormation(data);
     else updateFormation(courseEdit, data);
@@ -160,8 +173,13 @@ export default function FormationSection({ onBack }) {
 
   // ================= Vue catalogue =================
   if (!course) {
-    const totalDone = courses.reduce((s, c) => s + courseProgress(c, formationProgress, user.id).done, 0);
-    const totalLecons = courses.reduce((s, c) => s + allLecons(c).length, 0);
+    // Cours masqués : visibles de leurs seuls gestionnaires (brouillons).
+    const visibles = courses.filter((c) => coursVisible(c, peutGerer(c)));
+    // La jauge globale ne compte que les cours réellement ouvrables : un cours
+    // verrouillé (Pro) ou masqué ne doit pas plomber la progression affichée.
+    const ouvrables = visibles.filter((c) => !verrouille(c));
+    const totalDone = ouvrables.reduce((s, c) => s + courseProgress(c, formationProgress, user.id).done, 0);
+    const totalLecons = ouvrables.reduce((s, c) => s + allLecons(c).length, 0);
     return (
       <>
         <div className="partners-toolbar">
@@ -187,10 +205,11 @@ export default function FormationSection({ onBack }) {
         </div>
 
         <div className="course-grid">
-          {courses.map((c) => {
+          {visibles.map((c) => {
             const p = courseProgress(c, formationProgress, user.id);
             const counts = courseCounts(c);
             const duration = courseDuration(c);
+            const verrou = verrouille(c);
             return (
               <div key={c.id} className="card course-card">
                 <div className="course-card-cover">
@@ -198,7 +217,7 @@ export default function FormationSection({ onBack }) {
                   {duration && <span className="course-cover-duration"><Clock size={12} /> {duration}</span>}
                   {peutGerer(c) && (
                     <button className="course-cover-edit" aria-label="Modifier le cours"
-                      onClick={() => { setCourseForm({ title: c.title, description: c.description || '', author: c.author || '' }); setCourseEdit(c.id); }}>
+                      onClick={() => { setCourseForm({ title: c.title, description: c.description || '', author: c.author || '', acces: c.acces === 'pro' ? 'pro' : 'tous', masque: !!c.masque }); setCourseEdit(c.id); }}>
                       <Pencil size={14} />
                     </button>
                   )}
@@ -214,6 +233,10 @@ export default function FormationSection({ onBack }) {
                         là-bas. Sans repère, l'absence de bouton « modifier »
                         passerait pour une panne. */}
                     {c.partage && <span className="flat-badge">Catalogue BestaSolar</span>}
+                    {c.acces === 'pro' && <span className="flat-badge badge-cours-pro"><Crown size={11} /> Pro</span>}
+                    {/* Badge réservé au gestionnaire : les autres ne voient
+                        simplement pas le cours. */}
+                    {c.masque && <span className="flat-badge badge-cours-masque"><EyeOff size={11} /> Masqué</span>}
                   </div>
                   <div className="course-card-progress">
                     <div className="funnel-track">
@@ -221,14 +244,20 @@ export default function FormationSection({ onBack }) {
                     </div>
                     <span className="course-card-pct">{p.pct}%</span>
                   </div>
-                  <button className="btn btn-primary btn-block" onClick={() => openCourse(c)} disabled={!counts.lecons}>
-                    {p.pct === 100 ? 'Revoir le cours' : p.done > 0 ? 'Continuer' : 'Commencer'}
-                  </button>
+                  {verrou ? (
+                    <button className="btn btn-outline btn-block" disabled>
+                      <Lock size={15} /> Réservé aux membres Pro
+                    </button>
+                  ) : (
+                    <button className="btn btn-primary btn-block" onClick={() => openCourse(c)} disabled={!counts.lecons}>
+                      {p.pct === 100 ? 'Revoir le cours' : p.done > 0 ? 'Continuer' : 'Commencer'}
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
-          {courses.length === 0 && <EmptyState card>Aucun cours pour le moment.</EmptyState>}
+          {visibles.length === 0 && <EmptyState card>Aucun cours pour le moment.</EmptyState>}
         </div>
 
         <CourseFormSheet open={!!courseEdit} isNew={courseEdit === 'new'} form={courseForm} setForm={setCourseForm}
@@ -489,6 +518,25 @@ function CourseFormSheet({ open, isNew, form, setForm, onClose, onSubmit, onDele
         <Field label="Description">
           <textarea className="input" rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
+        <div className="form-row-2">
+          <Field label="Accès">
+            <select className="input" value={form.acces === 'pro' ? 'pro' : 'tous'} onChange={(e) => setForm({ ...form, acces: e.target.value })}>
+              <option value="tous">Tous les membres</option>
+              <option value="pro">Membres Pro uniquement</option>
+            </select>
+          </Field>
+          <Field label="Visibilité">
+            <select className="input" value={form.masque ? 'masque' : 'visible'} onChange={(e) => setForm({ ...form, masque: e.target.value === 'masque' })}>
+              <option value="visible">Visible</option>
+              <option value="masque">Masqué (brouillon)</option>
+            </select>
+          </Field>
+        </div>
+        <div className="field-hint">
+          « Membres Pro uniquement » : les autres voient la carte du cours, verrouillée, avec la mention
+          Réservé aux membres Pro. « Masqué » : le cours n'apparaît que pour vous — la progression des
+          membres est conservée si vous le réaffichez plus tard.
+        </div>
         <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer</button>
       </form>
       {!isNew && (

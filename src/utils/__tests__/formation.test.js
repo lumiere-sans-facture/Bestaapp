@@ -3,6 +3,7 @@ import {
   allLecons, isLeconDone, courseProgress, resumeLecon, nextLecon, prevLecon,
   parseMinutes, courseDuration, courseCounts,
   parseTimecode, formatTimecode, parseChaptersText, chaptersToText,
+  coursVisible, coursVerrouille,
 } from '../formation';
 
 const course = {
@@ -96,5 +97,34 @@ describe('sommaire minuté des vidéos', () => {
   it('fait l’aller-retour chapitres ⇄ texte', () => {
     const chapters = [{ t: 0, label: 'Intro' }, { t: 151, label: 'Suite' }];
     expect(parseChaptersText(chaptersToText(chapters))).toEqual(chapters);
+  });
+});
+
+describe('garde-fous d’accès aux cours (masqué / réservé Pro)', () => {
+  it('un cours sans réglage reste visible et ouvert à tous (existant inchangé)', () => {
+    expect(coursVisible({ id: 'c1' })).toBe(true);
+    expect(coursVerrouille({ id: 'c1' })).toBe(false);
+    expect(coursVerrouille({ id: 'c1' }, { proActif: false })).toBe(false);
+  });
+
+  it('un cours masqué disparaît pour les membres, pas pour son gestionnaire', () => {
+    const brouillon = { id: 'c1', masque: true };
+    expect(coursVisible(brouillon)).toBe(false);
+    expect(coursVisible(brouillon, true)).toBe(true);
+  });
+
+  it('un cours Pro se verrouille sans abonnement actif', () => {
+    const pro = { id: 'c1', acces: 'pro' };
+    expect(coursVerrouille(pro, { proActif: false })).toBe(true);
+    expect(coursVerrouille(pro, { proActif: true })).toBe(false);
+  });
+
+  it('le gestionnaire du cours n’est jamais verrouillé, même sans abonnement', () => {
+    const pro = { id: 'c1', acces: 'pro' };
+    expect(coursVerrouille(pro, { proActif: false, gere: true })).toBe(false);
+  });
+
+  it('accès « tous » explicite : jamais verrouillé', () => {
+    expect(coursVerrouille({ id: 'c1', acces: 'tous' }, { proActif: false })).toBe(false);
   });
 });
