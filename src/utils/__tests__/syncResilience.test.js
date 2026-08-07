@@ -2,8 +2,8 @@
 // être considérée comme synchronisée — sinon elle est perdue en silence.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Double minimal de Supabase : on choisit quelles tables échouent.
-const state = { echoue: new Set(), pushes: [], avantUpsert: null };
+// Double minimal de Supabase : on choisit quelles tables échouent ou manquent.
+const state = { echoue: new Set(), absentes: new Set(), pushes: [], deletes: [], avantUpsert: null };
 vi.mock('../../lib/supabase', () => ({
   isSupabaseConfigured: true,
   supabase: {
@@ -11,11 +11,12 @@ vi.mock('../../lib/supabase', () => ({
       select: () => Promise.resolve({ data: [], error: null }),
       upsert: (rows) => {
         if (state.avantUpsert && state.avantUpsert(table)) return Promise.reject(new TypeError('Failed to fetch'));
+        if (state.absentes.has(table)) return Promise.resolve({ error: { code: '42P01', message: `relation "public.${table}" does not exist` } });
         if (state.echoue.has(table)) return Promise.resolve({ error: { message: 'réseau' } });
         state.pushes.push({ table, rows });
         return Promise.resolve({ error: null });
       },
-      delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      delete: () => ({ eq: (_col, val) => { state.deletes.push({ table, id: val }); return Promise.resolve({ error: null }); } }),
     }),
     channel: () => ({ on: () => ({ subscribe: () => ({}) }) }),
     removeChannel: () => {},
@@ -23,9 +24,9 @@ vi.mock('../../lib/supabase', () => ({
   },
 }));
 
-const { pushCollections, decouperEnLots } = await import('../../lib/remoteSync');
+const { pushCollections, pushTombstone, decouperEnLots } = await import('../../lib/remoteSync');
 
-beforeEach(() => { state.echoue.clear(); state.pushes = []; state.avantUpsert = null; });
+beforeEach(() => { state.echoue.clear(); state.absentes.clear(); state.pushes = []; state.deletes = []; state.avantUpsert = null; });
 
 describe('pushCollections signale les échecs au lieu de les avaler', () => {
   it('rejette quand le serveur refuse une écriture', async () => {
@@ -67,6 +68,41 @@ describe('pushCollections signale les échecs au lieu de les avaler', () => {
     await expect(pushCollections({ leads: [{ id: 'l1' }] })).resolves.toEqual(['leads']);
     expect(n).toBeGreaterThanOrEqual(3);
     state.avantUpsert = null;
+  });
+
+  it('une table absente du schéma distant est sautée ET comptée traitée', async () => {
+    // Schéma distant en retard d'une mise à jour : la collection existe côté
+    // client mais pas côté serveur. Ni erreur, ni renvoi en boucle.
+    state.absentes.add('factures');
+    await expect(pushCollections({ factures: [{ id: 'f1' }], proClients: [{ id: 'c1' }] }))
+      .resolves.toEqual(expect.arrayContaining(['factures', 'proClients']));
+    // Mémorisée absente : plus aucune tentative d'envoi ensuite.
+    state.absentes.delete('factures');
+    state.pushes = [];
+    await pushCollections({ factures: [{ id: 'f1' }] });
+    expect(state.pushes).toHaveLength(0);
+  });
+});
+
+describe('pushTombstone — une table tombstones manquante ne bloque plus tout', () => {
+  it('erreur réseau sur tombstones : signalée, la suppression n’est pas perdue en silence', async () => {
+    state.echoue.add('tombstones');
+    await expect(pushTombstone('leads', 'l9')).rejects.toBeTruthy();
+  });
+
+  it('table tombstones absente : pas d’erreur, la ligne source est quand même supprimée', async () => {
+    // C'est le scénario « bloc tombstones de schema.sql jamais exécuté » :
+    // avant, la première suppression locale rendait la réplication rouge
+    // en permanence — plus rien ne montait, sur cet appareil uniquement.
+    state.absentes.add('tombstones');
+    await expect(pushTombstone('leads', 'l1')).resolves.toBeUndefined();
+    expect(state.deletes).toContainEqual({ table: 'leads', id: 'l1' });
+  });
+
+  it('…et les suppressions suivantes n’essaient même plus l’upsert tombstones', async () => {
+    await pushTombstone('leads', 'l2');
+    expect(state.pushes.filter((p) => p.table === 'tombstones')).toHaveLength(0);
+    expect(state.deletes).toContainEqual({ table: 'leads', id: 'l2' });
   });
 });
 

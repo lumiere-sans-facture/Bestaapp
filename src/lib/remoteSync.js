@@ -121,6 +121,7 @@ async function envoyerLot(table, lot) {
       const { error } = await supabase.from(table).upsert(lot);
       if (!error) return;
       derniere = new Error(error.message);
+      derniere.code = error.code; // conservé pour la détection « table manquante »
     } catch (e) {
       derniere = e; // requête avortée : le client lève au lieu de retourner error
     }
@@ -147,8 +148,9 @@ export async function pushCollections(collections) {
     // Le catalogue n'est poussé que par l'organisation interne BestaSolar.
     if (table === 'products' && !pushesProducts()) continue;
     // Table pas encore créée côté serveur : on n'envoie rien plutôt que de
-    // faire remonter une erreur de synchronisation à l'utilisateur.
-    if (tablesAbsentes.has(table)) continue;
+    // faire remonter une erreur de synchronisation à l'utilisateur. Elle est
+    // comptée « traitée » pour que l'appelant cesse de la représenter.
+    if (tablesAbsentes.has(table)) { reussies.push(table); continue; }
     let items = items0;
     // Vérité serveur : un abonnement « actif » et un paiement « confirme »
     // ne s'écrivent que côté serveur (RPC admin). L'app ne les repousse
@@ -161,7 +163,7 @@ export async function pushCollections(collections) {
       for (const lot of decouperEnLots(rows)) await envoyerLot(table, lot);
       reussies.push(table);
     } catch (e) {
-      if (tableManquante(e)) { tablesAbsentes.add(table); continue; }
+      if (tableManquante(e)) { tablesAbsentes.add(table); reussies.push(table); continue; }
       erreurs.push(`${table} : ${e.message}`);
     }
   }
@@ -178,10 +180,21 @@ export async function pushTombstone(table, id) {
   // Une entreprise externe ne supprime jamais le catalogue partagé (un
   // tombstone local masquerait les produits BestaSolar à la réception).
   if (table === 'products' && !pushesProducts()) return;
-  const { error } = await supabase
-    .from('tombstones')
-    .upsert(withOrg({ id, collection: table, deleted_at: new Date().toISOString() }));
-  if (error) throw error;
+  // Même filet que les collections : si la table tombstones n'existe pas
+  // encore côté serveur (bloc « tombstones » de schema.sql jamais exécuté),
+  // échouer ici bloquait TOUTE la réplication en boucle — la première
+  // suppression locale rendait la synchronisation rouge en permanence,
+  // et plus rien ne montait. On saute l'upsert (le pull tolère déjà son
+  // absence) et la suppression est quand même appliquée à la table source.
+  if (!tablesAbsentes.has('tombstones')) {
+    const { error } = await supabase
+      .from('tombstones')
+      .upsert(withOrg({ id, collection: table, deleted_at: new Date().toISOString() }));
+    if (error) {
+      if (tableManquante(error)) tablesAbsentes.add('tombstones');
+      else throw error;
+    }
+  }
   // Supprimer aussi la ligne de la table source (cohérence distante)
   await supabase.from(table).delete().eq('id', id);
 }
