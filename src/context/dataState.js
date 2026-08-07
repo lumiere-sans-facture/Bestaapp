@@ -38,6 +38,9 @@ export const buildInitialState = () => ({
   // de panneaux pour le besoin calculé — même logique de dotation que les kits.
   inverters: INVERTER_MODELS,
   formations: seed.formations,
+  // Cours du seed déjà dotés : mémorisé pour ne doter chaque cours qu'UNE
+  // FOIS (un cours supprimé par le gérant ne doit jamais réapparaître).
+  formationsDotees: seed.formations.map((f) => f.id),
   formationProgress: [],
   subscriptions: [],
   subscriptionPayments: [],
@@ -104,6 +107,19 @@ export const loadState = (scope = null) => {
         // L'avancement par module n'a pas d'équivalent leçon : on ne garde que les lignes par leçon.
         saved.formationProgress = (saved.formationProgress || []).filter((p) => p.leconId);
       }
+      // Dotation des NOUVEAUX cours ajoutés au catalogue de formation par une
+      // mise à jour de l'application. UNE SEULE FOIS par cours (comme les
+      // kits) : re-doter à chaque ouverture ressusciterait un cours supprimé
+      // par le gérant. Les cours déjà présents ne sont JAMAIS modifiés — leur
+      // contenu appartient à l'organisation (et le serveur en garde sa
+      // version). Sans le registre (états antérieurs), les cours présents
+      // sont considérés déjà dotés.
+      const cursDotes = new Set(saved.formationsDotees || (saved.formations || []).map((f) => f.id));
+      const nouveauxCours = seed.formations.filter(
+        (f) => !cursDotes.has(f.id) && !(saved.formations || []).some((x) => x.id === f.id)
+      );
+      if (nouveauxCours.length) saved.formations = [...(saved.formations || []), ...nouveauxCours];
+      saved.formationsDotees = [...new Set([...cursDotes, ...seed.formations.map((f) => f.id)])];
       if (!saved.subscriptions) saved.subscriptions = [];
       if (!saved.subscriptionPayments) saved.subscriptionPayments = [];
       if (!saved.companies) saved.companies = [];
