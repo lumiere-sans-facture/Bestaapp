@@ -1679,19 +1679,28 @@ form .login-link { width: 100%; margin-top: 4px; }
 .sync-error { background: var(--error); }
 .sync-local { background: var(--text-muted); }
 @keyframes sync-pulse { 50% { opacity: 0.35; } }
+/* Colonne, et non ligne : le motif de l'échec se place SOUS l'état. En
+   inline-flex centré, il partait à droite de la pastille, comprimé dans la
+   pilule — donc illisible, alors que c'est le seul diagnostic dont dispose
+   l'utilisateur. max-width : un message serveur verbeux ne doit pas non plus
+   étirer la page. */
 .sync-status-row {
-  display: inline-flex; align-items: center; gap: 7px;
-  margin-top: 10px; padding: 5px 12px;
+  display: inline-flex; flex-direction: column; align-items: flex-start;
+  margin-top: 10px; padding: 5px 12px; max-width: 100%;
   background: var(--bg); border-radius: 14px;
   font-size: 0.75rem; color: var(--text-secondary);
 }
 /* Motif de l'échec de synchronisation, lisible sans ouvrir la console. */
 .sync-status-line { display: flex; align-items: center; gap: 8px; }
 .sync-status-detail {
-  margin-top: 4px; padding-left: 16px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 4px; padding-left: 16px; max-width: 100%;
   font-size: 0.72rem; line-height: 1.35; color: var(--danger);
   overflow-wrap: anywhere;
 }
+.sync-status-detail-text { flex: 1; min-width: 0; }
+/* Cible tactile confortable malgré la petite taille de texte du bloc. */
+.sync-status-copy { flex-shrink: 0; min-height: 32px; }
 .sync-status-row .sync-dot { margin-left: 0; }
 .partner-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .partner-avatar {
