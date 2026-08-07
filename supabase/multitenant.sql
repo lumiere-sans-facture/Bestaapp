@@ -185,6 +185,30 @@ create policy "catalogue ecriture org" on public.products
   using (org_id = public.auth_org_id())
   with check (org_id = public.auth_org_id());
 
+-- FORMATION : les cours BestaSolar sont, comme le catalogue, un actif interne
+-- PARTAGÉ EN LECTURE avec toutes les organisations — y compris celles nées
+-- d'une inscription par code partenaire. Sans cela, chaque entreprise ne
+-- voyait que sa propre copie des cours livrés avec l'application, et le
+-- contenu ajouté par BestaSolar ne lui parvenait jamais.
+-- L'écriture reste limitée à sa propre organisation : une entreprise crée ses
+-- cours à elle, elle ne modifie pas ceux de BestaSolar.
+-- L'org source est désignée par son TYPE (kind = 'interne') et non par un
+-- identifiant en dur : le partage suit l'organisation interne, quelle qu'elle
+-- soit. L'avancement (formationProgress) n'est PAS partagé — la progression
+-- de chacun reste dans son organisation.
+drop policy if exists "org isolation" on public.formations;
+drop policy if exists "formations lecture partagee" on public.formations;
+drop policy if exists "formations ecriture org" on public.formations;
+create policy "formations lecture partagee" on public.formations for select to authenticated
+  using (
+    org_id = public.auth_org_id()
+    or org_id in (select id from public.orgs where kind = 'interne')
+  );
+create policy "formations ecriture org" on public.formations
+  for all to authenticated
+  using (org_id = public.auth_org_id())
+  with check (org_id = public.auth_org_id());
+
 -- profiles : chacun ne lit que les profils de sa propre org
 drop policy if exists "team read" on public.profiles;
 drop policy if exists "org read" on public.profiles;

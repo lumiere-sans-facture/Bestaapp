@@ -157,6 +157,66 @@ describe('pullAll — les lignes des autres organisations restent dehors', () =>
   });
 });
 
+// Catalogue de formation BestaSolar : partagé EN LECTURE à toutes les
+// entreprises, y compris celles nées d'une inscription par code partenaire.
+describe('cours partagés — reçus de l’organisation interne, jamais réémis', () => {
+  it('les cours de l’org interne arrivent marqués « partage »', async () => {
+    setSyncOrg('org-affilie', 'pro');
+    state.rows.formations = [
+      { id: 'f1', org_id: 'org-bestasolar', data: { title: 'Devenir installateur' } },
+      { id: 'perso', org_id: 'org-affilie', data: { title: 'Mon cours maison' } },
+    ];
+    const { collections } = await pullAll();
+    const partage = collections.formations.find((f) => f.id === 'f1');
+    const mien = collections.formations.find((f) => f.id === 'perso');
+    expect(partage.partage).toBe(true);
+    expect(mien.partage).toBeUndefined();
+  });
+
+  it('la version BestaSolar prime sur une copie locale de même id', async () => {
+    // Chaque entreprise est dotée des mêmes cours au départ (mêmes ids) :
+    // sans arbitrage, le contenu enrichi par BestaSolar n'arriverait jamais.
+    setSyncOrg('org-affilie', 'pro');
+    state.rows.formations = [
+      { id: 'f1', org_id: 'org-affilie', data: { title: 'Copie de départ' } },
+      { id: 'f1', org_id: 'org-bestasolar', data: { title: 'Version enrichie' } },
+    ];
+    const { collections } = await pullAll();
+    expect(collections.formations).toHaveLength(1);
+    expect(collections.formations[0].title).toBe('Version enrichie');
+  });
+
+  it('un cours partagé n’est jamais repoussé sous notre organisation', async () => {
+    setSyncOrg('org-affilie', 'pro');
+    await pushCollections({
+      formations: [
+        { id: 'f1', title: 'Version BestaSolar', partage: true },
+        { id: 'perso', title: 'Mon cours maison' },
+      ],
+    });
+    const envoi = state.pushes.find((p) => p.table === 'formations');
+    expect(envoi.rows).toHaveLength(1);
+    expect(envoi.rows[0].id).toBe('perso');
+  });
+
+  it('l’organisation interne, elle, reste propriétaire de ses cours', async () => {
+    setSyncOrg('org-bestasolar', 'interne');
+    state.rows.formations = [{ id: 'f1', org_id: 'org-bestasolar', data: { title: 'Mon catalogue' } }];
+    const { collections } = await pullAll();
+    expect(collections.formations[0].partage).toBeUndefined();
+  });
+
+  it('les autres tables ne partagent rien : l’isolation reste stricte', async () => {
+    setSyncOrg('org-affilie', 'pro');
+    state.rows.leads = [
+      { id: 'l1', org_id: 'org-affilie', data: { name: 'Mon client' } },
+      { id: 'l2', org_id: 'org-bestasolar', data: { name: 'Client d’une autre entreprise' } },
+    ];
+    const { collections } = await pullAll();
+    expect(collections.leads.map((l) => l.id)).toEqual(['l1']);
+  });
+});
+
 describe('pushCollections — un doublon local ne bloque plus l’envoi', () => {
   it('n’envoie qu’une seule ligne par id', async () => {
     await pushCollections({

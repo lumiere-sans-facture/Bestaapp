@@ -15,8 +15,13 @@ let currentOrgId = null;
 // seule l'organisation interne le pousse. Tant que le type est inconnu, on
 // s'abstient de pousser les produits (prudence : jamais de copie).
 let currentOrgKind = null;
-const SHARED_ORG_ID = 'org-bestasolar';
 const pushesProducts = () => !currentOrgId || currentOrgKind === 'interne';
+// Collections dont l'organisation INTERNE est propriétaire et qu'elle partage
+// en lecture avec toutes les autres (policies « lecture partagee ») : le
+// catalogue produits et les cours de formation. Pour ces tables seulement, la
+// réception peut légitimement contenir des lignes d'une AUTRE organisation ;
+// elles sont marquées `partage` et traitées en lecture seule.
+const TABLES_PARTAGEES = new Set(['products', 'formations']);
 export const setSyncOrg = (orgId, kind = null) => {
   currentOrgId = orgId || null;
   currentOrgKind = kind || null;
@@ -67,17 +72,22 @@ export async function pullAll() {
       }
       let rows = data || [];
       if (multiOrg) {
-        if (table === 'products') {
-          // Catalogue partagé : la lecture renvoie aussi les produits
-          // BestaSolar. Une entreprise ayant reçu une copie historique verrait
-          // des doublons — on garde la ligne BestaSolar (source de vérité).
-          const shared = new Set(rows.filter((r) => r.org_id === SHARED_ORG_ID).map((r) => r.id));
-          rows = rows.filter((r) => r.org_id === SHARED_ORG_ID || !shared.has(r.id));
+        if (TABLES_PARTAGEES.has(table)) {
+          // Une ligne venue d'une AUTRE organisation ne peut être ici que
+          // l'actif partagé de l'org interne (la policy ne renvoie rien
+          // d'autre). Une entreprise ayant reçu une copie historique verrait
+          // des doublons — la ligne partagée prime, c'est la source de vérité.
+          const partages = new Set(rows.filter((r) => r.org_id !== currentOrgId).map((r) => r.id));
+          rows = rows.filter((r) => r.org_id !== currentOrgId || !partages.has(r.id));
         } else {
           rows = rows.filter((r) => r.org_id === currentOrgId);
         }
       }
-      return [table, dedupePar(rows, (r) => r.id).map((row) => ({ ...row.data, id: row.id }))];
+      return [table, dedupePar(rows, (r) => r.id).map((row) => (
+        multiOrg && row.org_id !== currentOrgId
+          ? { ...row.data, id: row.id, partage: true }
+          : { ...row.data, id: row.id }
+      ))];
     })
   );
   const collections = {};
@@ -176,7 +186,10 @@ export async function pushCollections(collections) {
     // faire remonter une erreur de synchronisation à l'utilisateur. Elle est
     // comptée « traitée » pour que l'appelant cesse de la représenter.
     if (tablesAbsentes.has(table)) { reussies.push(table); continue; }
-    let items = items0;
+    // Un élément PARTAGÉ appartient à l'organisation interne : le repousser
+    // le recopierait sous notre org_id (et la RLS refuserait l'écriture chez
+    // son propriétaire). Il est lu, jamais réémis.
+    let items = items0.filter((i) => !i.partage);
     // Vérité serveur : un abonnement « actif » et un paiement « confirme »
     // ne s'écrivent que côté serveur (RPC admin). L'app ne les repousse
     // jamais — la RLS les rejetterait et bloquerait toute la réplication.

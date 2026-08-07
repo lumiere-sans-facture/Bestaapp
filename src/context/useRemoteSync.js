@@ -31,7 +31,12 @@ export function useRemoteSync(state, setState, stateRef) {
         const localItems = stateRef.current[table] || [];
         const remoteMap = new Map(remoteItems.map((i) => [i.id, i]));
         const deletedIds = tombstones.get(table) || new Set();
-        const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id));
+        // `partage` : élément appartenant à l'organisation interne, reçu en
+        // lecture (catalogue, cours de formation). Absent de la réception, il
+        // a été retiré à la source — le conserver comme « créé hors-ligne »
+        // le figerait ici pour toujours, sans propriétaire pour le mettre à
+        // jour ni le supprimer.
+        const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id) && !i.partage);
         // Rien à ajouter localement : on garde la RÉFÉRENCE reçue du serveur.
         // Créer un nouveau tableau ferait croire à une modification locale, et
         // l'app renverrait l'intégralité des 14 tables au serveur à CHAQUE
@@ -110,8 +115,11 @@ export function useRemoteSync(state, setState, stateRef) {
     for (const table of SYNCED_COLLECTIONS) {
       if (state[table] === syncedRef.current[table]) continue;
       changed[table] = state[table] || [];
-      // Détection des suppressions locales
-      const prevIds = new Set((syncedRef.current[table] || []).map((i) => i.id));
+      // Détection des suppressions locales. Les éléments PARTAGÉS en sont
+      // exclus : ils ne nous appartiennent pas, et un tombstone porte sur un
+      // id — il masquerait la ligne de l'organisation interne à la réception
+      // suivante, faisant disparaître un cours partagé pour tout le monde ici.
+      const prevIds = new Set((syncedRef.current[table] || []).filter((i) => !i.partage).map((i) => i.id));
       const nextIds = new Set((state[table] || []).map((i) => i.id));
       const deleted = [...prevIds].filter((id) => !nextIds.has(id));
       if (deleted.length) deletedByTable[table] = deleted;

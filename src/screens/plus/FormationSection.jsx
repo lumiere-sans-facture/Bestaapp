@@ -56,6 +56,11 @@ export default function FormationSection({ onBack }) {
 
   const isManager = user.role === 'gerant';
   const courses = formations || [];
+  // Un cours `partage` appartient au catalogue de formation BestaSolar, reçu
+  // en lecture : le gérant d'une autre entreprise le suit, mais ne le modifie
+  // pas (le serveur refuserait l'écriture, et l'édition serait perdue au
+  // rechargement). Ses propres cours, eux, restent pleinement modifiables.
+  const peutGerer = (c) => isManager && !c?.partage;
 
   const [courseId, setCourseId] = useState(null);
   const [leconId, setLeconId] = useState(null);
@@ -191,7 +196,7 @@ export default function FormationSection({ onBack }) {
                 <div className="course-card-cover">
                   <BookOpen size={36} strokeWidth={1.6} />
                   {duration && <span className="course-cover-duration"><Clock size={12} /> {duration}</span>}
-                  {isManager && (
+                  {peutGerer(c) && (
                     <button className="course-cover-edit" aria-label="Modifier le cours"
                       onClick={() => { setCourseForm({ title: c.title, description: c.description || '', author: c.author || '' }); setCourseEdit(c.id); }}>
                       <Pencil size={14} />
@@ -205,6 +210,10 @@ export default function FormationSection({ onBack }) {
                   <div className="course-card-meta">
                     <span><Layers size={13} /> {counts.modules} module{counts.modules > 1 ? 's' : ''}</span>
                     <span><PlayCircle size={13} /> {counts.lecons} leçon{counts.lecons > 1 ? 's' : ''}</span>
+                    {/* Cours du catalogue BestaSolar : suivi ici, entretenu
+                        là-bas. Sans repère, l'absence de bouton « modifier »
+                        passerait pour une panne. */}
+                    {c.partage && <span className="flat-badge">Catalogue BestaSolar</span>}
                   </div>
                   <div className="course-card-progress">
                     <div className="funnel-track">
@@ -233,6 +242,7 @@ export default function FormationSection({ onBack }) {
   const prev = lecon ? prevLecon(course, lecon.id) : null;
   const next = lecon ? nextLecon(course, lecon.id) : null;
   const courseFini = progress.total > 0 && progress.done === progress.total;
+  const gereCeCours = peutGerer(course);
 
   return (
     <>
@@ -268,7 +278,7 @@ export default function FormationSection({ onBack }) {
                 <span className="school-module-label">Module {mi + 1}</span>
                 <span className="school-module-title">{m.title}</span>
                 <span className="school-module-count">{done_m}/{(m.lecons || []).length}</span>
-                {isManager && (
+                {gereCeCours && (
                   <button className="school-edit-btn" aria-label="Modifier le module"
                     onClick={(e) => { e.stopPropagation(); setModuleTitle(m.title); setModuleEdit({ id: m.id }); }}>
                     <Pencil size={13} />
@@ -286,7 +296,7 @@ export default function FormationSection({ onBack }) {
                     {done(l.id) ? <CheckCircle2 size={17} className="school-lecon-check ok" /> : <Circle size={17} className="school-lecon-check" />}
                     <span className="school-lecon-title">{l.title}</span>
                     <span className="school-lecon-meta"><Icon size={13} /> {LECON_TYPE_LABEL[l.type] || 'Leçon'}{l.duration ? ` · ${l.duration}` : ''}</span>
-                    {isManager && (
+                    {gereCeCours && (
                       <button className="school-edit-btn" aria-label="Modifier la leçon"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -299,7 +309,7 @@ export default function FormationSection({ onBack }) {
                   </div>
                 );
               })}
-              {ouvert && isManager && (
+              {ouvert && gereCeCours && (
                 <button className="school-add-lecon" onClick={() => { setLeconForm(EMPTY_LECON); setLeconEdit({ moduleId: m.id, id: 'new' }); }}>
                   <Plus size={14} /> Ajouter une leçon
                 </button>
@@ -307,7 +317,7 @@ export default function FormationSection({ onBack }) {
             </div>
             );
           })}
-          {isManager && (
+          {gereCeCours && (
             <button className="btn btn-outline btn-sm btn-block" onClick={() => { setModuleTitle(''); setModuleEdit({ id: 'new' }); }}>
               <Plus size={15} /> Ajouter un module
             </button>
@@ -388,7 +398,7 @@ export default function FormationSection({ onBack }) {
               )}
             </div>
           ) : (
-            <EmptyState card>Choisissez une leçon dans le programme{isManager ? ' — ou ajoutez un module pour commencer.' : '.'}</EmptyState>
+            <EmptyState card>Choisissez une leçon dans le programme{gereCeCours ? ' — ou ajoutez un module pour commencer.' : '.'}</EmptyState>
           )}
         </div>
       </div>

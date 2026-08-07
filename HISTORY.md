@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Formation : le catalogue BestaSolar est partagé à toutes les entreprises inscrites
 - Mon profil affiche l'entreprise de rattachement (+ script SQL de rattachement)
 - Sync bloquée : les abonnements des autres organisations ne polluent plus l'état local
 - Statut de synchronisation : le motif de l'échec devient lisible et copiable
