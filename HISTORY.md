@@ -1,78 +1,198 @@
-# Historique des changements
+# Historique des modifications
 
-> Journal des évolutions notables du dépôt, par session de travail. Les détails
-> complets restent dans les messages de commit (`git log`) ; ce fichier sert de
-> vue d'ensemble rapide, groupée par thème plutôt que par ordre chronologique brut.
+Journal des changements de **BestaSolar Pro**, du plus récent au plus ancien,
+généré à partir de l'historique Git (une entrée par commit sur `main` ou sur
+la branche de travail en cours). Les numéros entre parenthèses renvoient aux
+pull requests correspondantes sur GitHub.
 
----
+## 2026-08-07
+- Mes kits : moteur de recherche pour lier une ligne à un produit boutique
+- Mes kits : lier une ligne à un produit boutique synchronise son prix
+- Cohérence des prix : Boutique et devis affichent toujours le prix public
+- Marge prix public : 15 % → 10 %
+- Onduleurs : la liste de départ reprend ceux des kits, pas une gamme générique
+- Ajoute Onduleurs à la barre latérale desktop (oublié)
+- Onglet Onduleurs : suggère automatiquement une alternative au kit
+- Complète automatiquement les panneaux si le kit suggéré en a moins que le besoin
+- Ajuste le libellé de l'exclusion structure de montage
+- Devis solaire : option pour ne pas inclure la structure de montage
+- Suggestion de kit : batterie toujours ≥ besoin calculé, jamais moins
+- Type de support des panneaux (page 4 devis solaire) — prix au panneau
+- Devis solaire : seul le kit suggéré est proposé, plus de choix manuel
+- Sélecteur d'autonomie batterie dans l'assistant Pro (devis solaire)
+- Les panneaux grandissent avec l'autonomie batterie choisie
+- Sélecteur d'autonomie batterie discret (chips au lieu de grandes cartes)
+- Ajout d'un sélecteur d'autonomie batterie à l'étape 3 du devis solaire
 
-## Session du 7 août 2026 — branche `claude/kit-selection-preconfigured-ixj6o0`
+## 2026-08-06
+- Dimensionnement solaire : les totaux de consommation sur une seule ligne
+- Dimensionnement solaire : champs sur une ligne, page pleine largeur
+- Dimensionnement solaire : le wizard reprend toute sa largeur
 
-### Dimensionnement solaire — autonomie batterie
+## 2026-08-05
+- Un devis naît à l'étape du client, jamais directement à « Proposition »
+- Le formulaire client demande les informations du bon type
+- Règlement d'une demande d'un autre compte : plus de faux succès
+- Une commission demandée quitte « à payer » jusqu'à la décision
+- Les demandes de paiement des autres comptes remontent au gérant
+- Demande de paiement des commissions : le partenaire demande, le gérant règle
+- Niveau 1 en orange, niveau 2 en vert — et rien d'autre
+- Le niveau de parrainage se lit à la couleur de sa pastille
+- Mes kits : les compositions solaires deviennent modifiables
+- Commissions : l'action de paiement redevient un bouton
+- Fermer les écrans d'administration à un simple utilisateur
 
-- Ajout d'un sélecteur **autonomie batterie** (1 / 1,5 / 2 nuits, 1 par défaut)
-  à l'étape 3 du devis solaire (public et Pro), sous forme de chips discrets.
-- Les **panneaux grandissent avec l'autonomie choisie** : le dimensionnement
-  panneaux se base sur jour + nuit × nuits d'autonomie (pas seulement jour +
-  nuit), pour qu'un parc batterie plus gros puisse se recharger en une journée
-  même après une nuit blanche. Comportement par défaut inchangé (1 nuit).
-- `src/utils/solarSizing.js` (`calculateSystemSize`, `AUTONOMY_OPTIONS`),
-  `SolarWizard.jsx`, `ProSolarWizard.jsx`.
+## 2026-08-04
+- Parrainage et commissions de niveau 2 : attribution rétablie
+- Espace partenaire : sections repliables et tuiles lisibles
+- Les affaires gagnées rejoignent l'espace partenaire
+- Profil : zéro mention de commission, bouton de renvoi compris
+- Les commissions quittent le profil pour l'espace partenaire
 
-### Devis solaire — kit suggéré, panneaux, support, onduleur
+## 2026-08-03
+- Les commissions de la plateforme remontent dans le compte gérant
+- Suivi partagé : BestaSolar valide les progressions de TOUS les comptes
+- Validation : un commercial ne s'octroie plus les droits pendant le chargement
+- Progression : retour au circuit demande → validation par le gérant
+- Vérifications en navigateur réel : suivi par devis et commissions automatiques
+- Saisie : les champs des panneaux ne perdent plus le focus à chaque caractère
+- Synchronisation réparée : l'app ne renvoyait pas ses données, elle les renvoyait TOUTES
+- Synchronisation : envoi par lots, un gros catalogue ne bloque plus tout
+- Synchronisation : le motif de l'échec est affiché, plus seulement le voyant rouge
+- Déploiement réparé : versions d'ESLint incompatibles entre elles
+- L'app s'ouvre désormais sans réseau, et rappelle l'IFU obligatoire
+- Boutique : aucun libellé ne laisse croire à un paiement, numéros de commande fiables
+- Profil personnel modifiable, sans jamais ouvrir la porte aux privilèges
+- Barème de commission : les libellés suivent la source, plus de « 3 % » en dur
+- Abonnement et restauration : l'utilisateur voit ce qui l'engage
+- Numérotation : plus de doublons entre appareils sur les devis et les factures
+- Fiabilité des données : plus de perte silencieuse (réplication et stockage local)
+- Ajout d'ESLint : le filet qui manquait avant le lancement commercial
+- Correctifs de la revue : crash du kanban, commission affichée, étape du client
+- Suivi clients : une carte par devis, progression directe par le vendeur, commission automatique
+- Commissions : création automatique débloquée (chaîne de 4 causes) et fin des doublons
+- Validation des progressions : rien n'échappe au gérant, le commercial suit ses clients
+- Suivi clients : l'admin retrouve la progression sur SES propres clients
+- Suivi clients : le kanban redevient un tableau par client, comme sur main
+- Commissions : attribution automatique garantie et bénéficiaire dans toute l'équipe
+- Le suivi commercial de toute la plateforme remonte dans le kanban du gérant
+- Écran de connexion : l'environnement (test / production) est affiché avec la version
+- Déclencheur de déploiement : projet Vercel de test branché sur la branche de travail
+- Suivi commercial par affaire : chaque devis a sa propre étape dans le pipeline
 
-- **Suggestion de kit** : ne considère plus que les kits dont la batterie
-  **couvre** le besoin calculé (jamais un kit sous-dimensionné même si plus
-  proche en valeur absolue). Plus de choix manuel d'un autre kit — un seul
-  kit, toujours le bon, est proposé à l'étape 4.
-- **Complétion automatique des panneaux** : si le kit suggéré (choisi sur sa
-  batterie) a moins de panneaux que ce que le besoin exige à sa puissance
-  crête, la quantité est complétée dans le devis — jamais réduite en dessous
-  du nombre de panneaux du kit.
-- **Type de support des panneaux** (page 4) : tôle (10 000 F/panneau, défaut),
-  dalle (27 000 F/panneau), au sol (32 000 F/panneau) — recalcule la ligne
-  « Structure de montage » au panneau. Option pour **ne pas inclure** la
-  structure (client qui fait fabriquer chez son soudeur).
-- `src/utils/solarSizing.js` (`suggestKitForBattery`, `buildKitQuotation`,
-  `MOUNTING_TYPES`), `data/kits.js`.
+## 2026-08-02
+- Inscription : le champ « Code partenaire » est toujours proposé (facultatif)
+- Les devis publics de tous les comptes remontent dans l'écran Devis du gérant
+- Affiliation multi-entreprise : attribution, suivi des filleuls et commissions
+- Catalogue interne BestaSolar partagé en lecture seule : aucune copie aux inscrits
+- Clés primaires par organisation : la synchronisation des nouvelles entreprises ne peut plus entrer en collision
+- Inscription : numéro de téléphone demandé et enregistré sur le profil
+- Inscription en une seule page simple ; l'inscrit est un utilisateur classique, pas un gérant
+- Version visible sur l'écran de connexion + purge du tiroir local hérité en mode SaaS
+- Cache local séparé par organisation : fin de la fuite de données entre comptes d'un même appareil
+- Parrainage attribuable une seule fois après l'inscription, verrouillé côté serveur
+- Lien partenaire → inscription directe avec code de parrainage prérempli
 
-### Onduleurs — nouvel onglet et suggestion automatique
+## 2026-08-01
+- Connexion : une inscription interrompue se termine à la connexion (plus de faux « mot de passe incorrect »)
+- Un seul parcours pour tous les inscrits : la partie publique gratuite, l'espace Pro payant
+- Espace Devis Pro léger : les inscriptions externes n'ouvrent que l'espace Pro (offre 5 000 F/mois)
+- multitenant.sql : invite_code fourni explicitement dans les insertions d'org
+- multitenant.sql : le bloc invite_code (défaut compris) passe AVANT le bootstrap de l'org
+- multitenant.sql : invite_code avec valeur par défaut — script rejouable et inscription réparée
+- schema.sql ré-exécutable après multitenant.sql : le seed de profils démo est ignoré si org_id existe
+- multitenant.sql : la règle des paiements d'abonnement vérifie le bon champ (statut, pas status)
 
-- Nouvel écran **Plus › Onduleurs** (gérant), même modèle que « Mes kits » :
-  marque, modèle, capacité (kVA), **puissance PV max (Wc)**, prix, rendement.
-- Si l'onduleur prévu dans un kit n'a pas une puissance PV max suffisante pour
-  le nombre de panneaux calculé (+ marge de sécurité), le devis le remplace
-  automatiquement par le plus petit onduleur configuré qui convient — jamais
-  un plus faible.
-- Liste de départ reprise des onduleurs **réellement utilisés** dans les kits
-  officiels (HZ 3/6 kVA, Itel 3 kVA, Deye 6 kVA), pas une gamme générique.
-  ⚠️ Puissance PV max **estimée** (capacité × 1,3) — à corriger avec les vraies
-  fiches techniques depuis l'écran.
-- `src/data/inverters.js`, `src/utils/inverters.js`,
-  `src/context/actions/inverters.js`, `src/screens/plus/InvertersSection.jsx`,
-  `AppLayout.jsx` (barre latérale desktop), `solarSizing.js`
-  (`suggestInverterForPower`), sync Supabase (`schema.sql`, `multitenant.sql`).
+## 2026-07-31
+- Guide de déploiement : section nom de domaine app.bestasolar.com
+- Étape commerciale 1 : comptes réels, multi-entreprise et abonnement Pro vérifié serveur
+- Connexion : accès démo réservé au développement, sortie de secours, dégradé dans les tokens (bloc 02)
+- Hygiène du système : CSS orphelin retiré, miroir design-system synchronisé
+- Fin des correctifs de la revue (hors documents imprimables) : Pro, dialogues, écrans publics et Plus
+- Mon entreprise : aperçu en direct, logo visible, couleurs annulables, TVA en segmented (bloc 08)
+- Kanban utilisable au doigt : sélecteur d'étape sans glisser (bloc 04)
+- Primitives transverses : segmented, callout, toast, ConfirmSheet, DangerZone, tokens manquants
+- Fin de l'étape 2 : wayfinding Pro, tab bar à 5 entrées, marge prix centralisée (#125)
 
-### Cohérence des prix — marge publique, Boutique, devis, kits
+## 2026-07-30
+- Annulation du dernier déploiement — revert du complément desktop (#124)
+- Complément desktop : les 8 règles issues de l'audit des 19 blocs (#123)
+- Mise en page uniforme : la version mobile devient la seule version (#122)
+- Pack de correctifs design — contraste AA, focus, cibles tactiles, wayfinding (#121)
 
-- Marge prix public (`PUBLIC_MARKUP`, `utils/price.js`) ramenée de **15 % à
-  10 %**.
-- **Boutique et tous les devis** (manuel, Pro, Pro solaire, kit) affichent
-  désormais **toujours le prix public**, peu importe le rôle du créateur —
-  avant, un technicien pouvait voir/facturer le prix technicien brut (coût de
-  gros BestaSolar) sur un document remis à son propre client.
-- **Synchronisation Mes kits ↔ Boutique** : une ligne de kit peut être liée à
-  un produit boutique (nouveau champ, avec **moteur de recherche** par nom).
-  Son prix suit alors le prix public **actuel** du produit — changer un prix
-  en Boutique se répercute automatiquement dans « Mes kits » et sur tout
-  nouveau devis, sans ressaisie.
-- `src/utils/price.js`, `src/utils/kits.js` (`resolveLignePrice`),
-  `src/utils/solarSizing.js` (`buildKitQuotation` + catalogue),
-  `Boutique.jsx`, `ManualWizard.jsx`, `ProDevisBuilder.jsx`,
-  `ProSolarWizard.jsx`, `KitsSection.jsx`.
+## 2026-07-29
+- Détection automatique des couleurs du logo importé (#120)
+- Documents Pro aux couleurs de l'abonné (#119)
+- Trois modèles de document imprimables pour devis et factures (#118)
+- Fiche de dimensionnement : refonte en document deux pages A4 (#117)
 
----
+## 2026-07-28
+- Batterie : profondeur de décharge maintenue à 80 % (#116)
+- Dimensionnement batterie : valeurs lithium au lieu de valeurs plomb (#115)
+- Fiche de dimensionnement : le besoin calculé, sans le kit (#114)
 
-*Convention : un paragraphe par lot de changements liés, fichiers clés en fin
-de paragraphe. Le détail exact (avant/après, tests touchés) reste dans les
-commits — `git log --oneline <base>..<branche>`.*
+## 2026-07-26
+- Devis public : résumé des besoins à l'étape du type de système (#113)
+- Revert "Dimensionnement v2 : méthodologie corrigée, du référentiel à la fiche client (#111)" (#112)
+- Dimensionnement v2 : méthodologie corrigée, du référentiel à la fiche client (#111)
+- Fiche de dimensionnement : mention de l'apporteur d'affaires (#110)
+- Dimensionnement : ajout d'un appareil hors catalogue (#109)
+- Devis depuis la fiche client : étape de sélection sautée (#108)
+- Clients : suppression de la saisie « valeur estimée » (déduite des devis) (#107)
+- Clients : modification, devis direct depuis la fiche et sélecteur complet (#106)
+- Clients : page répertoire dans la barre latérale (ajout + recherche) (#105)
+- Devis : l'apporteur est impérativement attribué (créateur en repli) (#104)
+- Commissions : synchronisation complète des attributions d'apporteur (#103)
+- Devis : apporteur d'affaires en lecture seule (profil rattaché à la piste) (#102)
+
+## 2026-07-25
+- Commissions : suivi conforme aux normes (paiement tracé, reçu, relevé) (#101)
+- Suivi clients : validation des progressions par le gérant (#100)
+- Retour à la barre latérale (annule la barre horizontale style Zervant) (#99)
+- Navigation desktop : barre horizontale style Zervant (#98)
+- Lecteur vidéo « nu » : impossible de deviner l'hébergeur (façon systeme.io) (#97)
+- Vidéos Vimeo : lecture des vidéos non répertoriées (code h=) et liens manage (#96)
+- Formation : catalogue pleine largeur avec couvertures (#95)
+- Formation : lecture vidéo façon systeme.io (sommaire minuté, modules repliables) (#94)
+- Barre latérale : navigation à plat, « Passer en mode Pro » au-dessus de « Mon profil » (#93)
+- Menu « Plus » : suppression des entrées en double sur desktop (#92)
+- Menu « Plus » : réorganisation professionnelle en sections (#91)
+- Wizard Pro : même largeur que le public (pleine page) (#90)
+- Devis & Factures Pro : ouverture sur l'onglet Devis par défaut (#89)
+- Wizards : ville affichée pour « Ma position » + off-grid par défaut (#88)
+- Espace Pro : logo et nom de l'entreprise de l'abonné dans la barre latérale (#87)
+
+## 2026-07-13
+- Version 1.1.0 — redéploiement Vercel (#86)
+
+## 2026-07-12
+- Kits publics : les 5 kits officiels (2,5 Éco/Premium, 5, 20, 32 kWh) (#85)
+
+## 2026-07-06
+- Wizard public : fiche de dimensionnement (imprimable) à l'étape 4 (#84)
+- Résumé de consommation : les 4 statistiques sur une seule ligne (#83)
+- Wizards solaires : pic de charge (W) devant le total de consommation (#82)
+- Fiche de dimensionnement : matériel en désignations techniques, sans marques (#81)
+- Fiche de dimensionnement : « rendement des panneaux » au lieu de « rendement global » (#80)
+- Fiche de dimensionnement : heures jour / nuit séparées dans les charges (#79)
+- Wizard Pro : fiche de dimensionnement complète (HTML imprimable) en étape 4 (#78)
+
+## 2026-07-05
+- Formation : plateforme « école » (cours → modules → leçons) (#77)
+- Espace Pro : clients unifiés avec les documents + fiche client (#76)
+
+## 2026-07-03
+- Tableau de bord Pro : trésorerie réelle (encaissements, retards, échéances) (#75)
+- Factures Pro : suivi des paiements & relances (#74)
+- Public : sous-sections de « Plus » remontées dans la barre latérale (desktop) (#73)
+- Écran Devis public : liste plate + menu d'actions (#72)
+- Listes devis / factures / clients : présentation en liste plate (#71)
+
+## 2026-07-02
+- Devis & Factures : édition des devis (Pro + public) et des factures (Pro) (#70)
+- Devis mode public : enregistrement en brouillon (#69)
+- Devis & Factures Pro : enregistrement en brouillon (#68)
+- Dimensionnement Pro : fiche de dimensionnement (PDF) (#67)
+- Devis/Factures Pro : 2 modèles (Couleur / N&B) + aperçu + « Mon entreprise » réorganisée (#66)
+- Dimensionnement Pro : étape « Matériel » unifiée (onduleur + batteries) (#65)
+- Dimensionnement Pro : géolocalisation + mise en avant de l'outil (#64)
