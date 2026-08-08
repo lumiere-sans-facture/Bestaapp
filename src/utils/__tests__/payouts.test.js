@@ -78,7 +78,7 @@ describe('demandeEnCours — une seule demande ouverte à la fois', () => {
 });
 
 describe('erreurDemande — ce qui bloque un envoi', () => {
-  const base = { commissionIds: ['c1'], montant: 15000, telephone: '+229 97', dejaEnCours: false };
+  const base = { commissionIds: ['c1'], montant: 15000, telephone: '+228 97', dejaEnCours: false };
 
   it('laisse passer une demande complète', () => {
     expect(erreurDemande(base)).toBeNull();

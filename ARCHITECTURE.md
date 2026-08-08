@@ -1,6 +1,6 @@
 # Architecture — BestaSolar Pro
 
-> CRM solaire local-first (React 18 + Vite 5 + Supabase) pour BestaSolar, Parakou (Bénin).
+> CRM solaire local-first (React 18 + Vite 5 + Supabase) pour BestaSolar, Lomé (Togo).
 > Web responsive + applications natives Android/iOS (Capacitor) à partir d'une base de code unique.
 >
 > Ce document décrit l'architecture **réelle** du dépôt (pas une cible théorique) et trace le
@@ -52,7 +52,7 @@
 
 ### Pourquoi cette architecture pour ce marché
 
-Le contexte (PME au Bénin, connectivité intermittente, équipe terrain) impose le **local-first** :
+Le contexte (PME au Togo, connectivité intermittente, équipe terrain) impose le **local-first** :
 les techniciens créent pistes et devis en clientèle sans réseau, la synchronisation se fait
 quand la connexion revient. C'est le choix structurant dont découlent la table `tombstones`,
 le *merge* à la réception et le repli automatique en mode local.
@@ -382,5 +382,5 @@ npm run preview    # prévisualiser le build
 # puis exécuter supabase/schema.sql dans le SQL Editor Supabase.
 ```
 
-Comptes de démonstration (mode local) : `adam@bestasolar.bj` (gérant),
-`fatou@bestasolar.bj` / `ibrahim@bestasolar.bj` (techniciens) — mot de passe `demo123`.
+Comptes de démonstration (mode local) : `adam@bestasolar.tg` (gérant),
+`fatou@bestasolar.tg` / `ibrahim@bestasolar.tg` (techniciens) — mot de passe `demo123`.

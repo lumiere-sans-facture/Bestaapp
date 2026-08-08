@@ -667,7 +667,7 @@ export default function Pipeline() {
             onContactChange={(contact) => setNewLead({ ...newLead, contact })}
           />
           <Field label="Téléphone">
-            <input className="input" type="tel" value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+229 ..." />
+            <input className="input" type="tel" value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+228 ..." />
           </Field>
           <Field label="Adresse">
             <input className="input" value={newLead.address} onChange={(e) => setNewLead({ ...newLead, address: e.target.value })} placeholder="Quartier, ville" />

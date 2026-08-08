@@ -4,9 +4,9 @@ import { catalogueProducts } from './catalogue';
 export const SEED_VERSION = 5;
 
 export const users = [
-  { id: 'u1', email: 'adam@bestasolar.bj', password: 'demo123', name: 'Adam Adébiyi', role: 'gerant', phone: '+229 97 12 34 56', avatar: 'AA' },
-  { id: 'u2', email: 'fatou@bestasolar.bj', password: 'demo123', name: 'Fatou Boko', role: 'technicien', phone: '+229 96 78 90 12', avatar: 'FB' },
-  { id: 'u3', email: 'ibrahim@bestasolar.bj', password: 'demo123', name: 'Ibrahim Dan Djido', role: 'technicien', phone: '+229 95 55 66 77', avatar: 'ID' },
+  { id: 'u1', email: 'adam@bestasolar.tg', password: 'demo123', name: 'Adam Adébiyi', role: 'gerant', phone: '+228 97 12 34 56', avatar: 'AA' },
+  { id: 'u2', email: 'fatou@bestasolar.tg', password: 'demo123', name: 'Fatou Boko', role: 'technicien', phone: '+228 96 78 90 12', avatar: 'FB' },
+  { id: 'u3', email: 'ibrahim@bestasolar.tg', password: 'demo123', name: 'Ibrahim Dan Djido', role: 'technicien', phone: '+228 95 55 66 77', avatar: 'ID' },
 ];
 
 // Étapes ouvertes du pipeline (affichées en colonnes et dans le stepper).
@@ -26,21 +26,21 @@ export const LOST_STAGE = { id: 'perdu', label: 'Perdu', color: '#ef4444' };
 // Quand un partenaire apporte une affaire (niveau 1, 3 %), son parrain
 // touche automatiquement la commission de niveau 2 (1,5 %).
 export const partners = [
-  { id: 'p1', name: 'Mamadou Balogun', phone: '+229 97 11 22 33', sponsorId: null, registeredAt: '2025-01-15', status: 'actif', code: 'BESTA-MAMADOU', momoNumber: '+229 97 11 22 33' },
-  { id: 'p2', name: 'Aminata Kesso', phone: '+229 96 44 55 66', sponsorId: 'p1', registeredAt: '2025-02-20', status: 'actif', code: 'BESTA-AMINATA', momoNumber: '+229 96 44 55 66' },
-  { id: 'p3', name: 'Toffa Gname', phone: '+229 95 77 88 99', sponsorId: 'p2', registeredAt: '2025-03-10', status: 'actif', code: 'BESTA-TOFFA', momoNumber: '' },
-  { id: 'p4', name: 'Balogoun Alassane', phone: '+229 94 33 22 11', sponsorId: 'p1', registeredAt: '2025-04-05', status: 'inactif', code: 'BESTA-BALOGOUN', momoNumber: '' },
+  { id: 'p1', name: 'Mamadou Balogun', phone: '+228 97 11 22 33', sponsorId: null, registeredAt: '2025-01-15', status: 'actif', code: 'BESTA-MAMADOU', momoNumber: '+228 97 11 22 33' },
+  { id: 'p2', name: 'Aminata Kesso', phone: '+228 96 44 55 66', sponsorId: 'p1', registeredAt: '2025-02-20', status: 'actif', code: 'BESTA-AMINATA', momoNumber: '+228 96 44 55 66' },
+  { id: 'p3', name: 'Toffa Gname', phone: '+228 95 77 88 99', sponsorId: 'p2', registeredAt: '2025-03-10', status: 'actif', code: 'BESTA-TOFFA', momoNumber: '' },
+  { id: 'p4', name: 'Balogoun Alassane', phone: '+228 94 33 22 11', sponsorId: 'p1', registeredAt: '2025-04-05', status: 'inactif', code: 'BESTA-BALOGOUN', momoNumber: '' },
 ];
 
 export const leads = [
-  { id: 'l1', clientType: 'entreprise', name: 'Clinique Notre Dame', contact: 'Dr. Honoré Ganse', phone: '+229 97 88 99 00', address: 'Quartier Commercial, Parakou', stage: 'negociation', estimatedValue: 2450000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: null, createdAt: '2025-05-10', notes: 'Besoin urgent - panne fréquente', lastActivity: '2025-06-08', activities: [{ id: 'a1', date: '2025-06-08T10:30:00', text: 'Visite technique effectuée, dimensionnement validé pour 3kVA', by: 'u2' }, { id: 'a2', date: '2025-05-12T09:00:00', text: 'Premier appel : pannes SBEE fréquentes, besoin urgent', by: 'u2' }] },
-  { id: 'l2', clientType: 'entreprise', name: 'Hôtel du Parc', contact: 'M. Kossi Agboka', phone: '+229 96 11 22 33', address: 'Avenue de la Liberté, Parakou', stage: 'proposition', estimatedValue: 1850000, assignedTo: 'u2', parrainL1: 'p2', parrainL2: 'p1', createdAt: '2025-05-15', notes: 'Économie carburant générateur', lastActivity: '2025-06-05' },
-  { id: 'l3', clientType: 'entreprise', name: 'Pharmacie Alafia', contact: 'Mme. Françoude Akpaki', phone: '+229 95 44 55 66', address: 'Marché Central, Parakou', stage: 'gagne', estimatedValue: 980000, assignedTo: 'u3', parrainL1: 'p1', parrainL2: null, createdAt: '2025-04-20', notes: 'Devis signé', lastActivity: '2025-06-09', wonAt: '2025-06-09' },
-  { id: 'l4', clientType: 'entreprise', name: 'Boulangerie Tcha-Tcha', contact: 'Honoré Tcha-Tcha', phone: '+229 94 77 88 99', address: 'Quartier Zongo, Parakou', stage: 'visite', estimatedValue: 650000, assignedTo: 'u3', parrainL1: 'p3', parrainL2: 'p2', createdAt: '2025-05-25', notes: 'Petite boulangerie', lastActivity: '2025-06-07' },
-  { id: 'l5', clientType: 'entreprise', name: 'École Privée Bethanie', contact: 'Directeur Toussaint Hinnou', phone: '+229 97 33 44 55', address: 'Quartier A, Parakou', stage: 'qualifie', estimatedValue: 3200000, assignedTo: 'u2', parrainL1: null, parrainL2: null, createdAt: '2025-06-01', notes: 'École 200 élèves', lastActivity: '2025-06-08' },
-  { id: 'l6', clientType: 'entreprise', name: 'Station Service Avion', contact: 'Amidou Nima', phone: '+229 96 66 77 88', address: 'Route de Cotonou, Parakou', stage: 'nouveau', estimatedValue: 4500000, assignedTo: 'u2', parrainL1: 'p2', parrainL2: null, createdAt: '2025-06-09', notes: 'Nouveau lead', lastActivity: '2025-06-09' },
-  { id: 'l7', clientType: 'entreprise', name: "Grain d'Or", contact: 'Bienvenu Ykpè', phone: '+229 95 99 00 11', address: 'Marché Arzeke, Parakou', stage: 'nouveau', estimatedValue: 320000, assignedTo: 'u3', parrainL1: 'p3', parrainL2: null, createdAt: '2025-06-10', notes: 'Petit commerce', lastActivity: '2025-06-10' },
-  { id: 'l8', clientType: 'entreprise', name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+229 94 22 33 44', address: 'Centre-Ville, Parakou', stage: 'gagne', estimatedValue: 890000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: null, createdAt: '2025-03-15', notes: 'Studio radio', lastActivity: '2025-05-20', wonAt: '2025-05-20' },
+  { id: 'l1', clientType: 'entreprise', name: 'Clinique Notre Dame', contact: 'Dr. Honoré Ganse', phone: '+228 97 88 99 00', address: 'Quartier Commercial, Lomé', stage: 'negociation', estimatedValue: 2450000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: null, createdAt: '2025-05-10', notes: 'Besoin urgent - panne fréquente', lastActivity: '2025-06-08', activities: [{ id: 'a1', date: '2025-06-08T10:30:00', text: 'Visite technique effectuée, dimensionnement validé pour 3kVA', by: 'u2' }, { id: 'a2', date: '2025-05-12T09:00:00', text: 'Premier appel : pannes CEET fréquentes, besoin urgent', by: 'u2' }] },
+  { id: 'l2', clientType: 'entreprise', name: 'Hôtel du Parc', contact: 'M. Kossi Agboka', phone: '+228 96 11 22 33', address: 'Avenue de la Liberté, Lomé', stage: 'proposition', estimatedValue: 1850000, assignedTo: 'u2', parrainL1: 'p2', parrainL2: 'p1', createdAt: '2025-05-15', notes: 'Économie carburant générateur', lastActivity: '2025-06-05' },
+  { id: 'l3', clientType: 'entreprise', name: 'Pharmacie Alafia', contact: 'Mme. Françoude Akpaki', phone: '+228 95 44 55 66', address: 'Marché Central, Lomé', stage: 'gagne', estimatedValue: 980000, assignedTo: 'u3', parrainL1: 'p1', parrainL2: null, createdAt: '2025-04-20', notes: 'Devis signé', lastActivity: '2025-06-09', wonAt: '2025-06-09' },
+  { id: 'l4', clientType: 'entreprise', name: 'Boulangerie Tcha-Tcha', contact: 'Honoré Tcha-Tcha', phone: '+228 94 77 88 99', address: 'Quartier Zongo, Lomé', stage: 'visite', estimatedValue: 650000, assignedTo: 'u3', parrainL1: 'p3', parrainL2: 'p2', createdAt: '2025-05-25', notes: 'Petite boulangerie', lastActivity: '2025-06-07' },
+  { id: 'l5', clientType: 'entreprise', name: 'École Privée Bethanie', contact: 'Directeur Toussaint Hinnou', phone: '+228 97 33 44 55', address: 'Quartier A, Lomé', stage: 'qualifie', estimatedValue: 3200000, assignedTo: 'u2', parrainL1: null, parrainL2: null, createdAt: '2025-06-01', notes: 'École 200 élèves', lastActivity: '2025-06-08' },
+  { id: 'l6', clientType: 'entreprise', name: 'Station Service Avion', contact: 'Amidou Nima', phone: '+228 96 66 77 88', address: 'Route de Lomé, Kara', stage: 'nouveau', estimatedValue: 4500000, assignedTo: 'u2', parrainL1: 'p2', parrainL2: null, createdAt: '2025-06-09', notes: 'Nouveau lead', lastActivity: '2025-06-09' },
+  { id: 'l7', clientType: 'entreprise', name: "Grain d'Or", contact: 'Bienvenu Ykpè', phone: '+228 95 99 00 11', address: 'Grand Marché, Lomé', stage: 'nouveau', estimatedValue: 320000, assignedTo: 'u3', parrainL1: 'p3', parrainL2: null, createdAt: '2025-06-10', notes: 'Petit commerce', lastActivity: '2025-06-10' },
+  { id: 'l8', clientType: 'entreprise', name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+228 94 22 33 44', address: 'Centre-Ville, Lomé', stage: 'gagne', estimatedValue: 890000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: null, createdAt: '2025-03-15', notes: 'Studio radio', lastActivity: '2025-05-20', wonAt: '2025-05-20' },
 ];
 
 export const products = catalogueProducts;
@@ -114,7 +114,7 @@ export const formations = [
         lecons: [
           {
             id: 'f2m1l1', title: 'Watts, ampères et volts sans douleur', type: 'texte', duration: '10 min',
-            content: 'Trois grandeurs suffisent pour raisonner : la tension (volts), le courant (ampères) et la puissance (watts). Puissance = tension × courant.\n\nUn client qui branche un téléviseur de 100 W pendant 5 heures consomme 500 Wh, soit 0,5 kWh. C’est cette énergie journalière (kWh/jour) qui dimensionne toute l’installation.\n\nÀ retenir :\n- La puissance (W) dimensionne l’onduleur.\n- L’énergie (Wh/jour) dimensionne les panneaux et les batteries.\n- Au Bénin, comptez environ 5 heures d’ensoleillement utile par jour.',
+            content: 'Trois grandeurs suffisent pour raisonner : la tension (volts), le courant (ampères) et la puissance (watts). Puissance = tension × courant.\n\nUn client qui branche un téléviseur de 100 W pendant 5 heures consomme 500 Wh, soit 0,5 kWh. C’est cette énergie journalière (kWh/jour) qui dimensionne toute l’installation.\n\nÀ retenir :\n- La puissance (W) dimensionne l’onduleur.\n- L’énergie (Wh/jour) dimensionne les panneaux et les batteries.\n- Au Togo, comptez environ 5 heures d’ensoleillement utile par jour.',
           },
           { id: 'f2m1l2', title: 'Les composants d’une installation', type: 'video', url: YT, duration: '15 min' },
         ],

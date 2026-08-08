@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Togolisation complète : villes, ensoleillement, indicatifs +228, NIF, opérateurs Mobile Money
 - Purge des vieux caches affiliés : les cours masqués ne ressuscitent plus
 - Masquage réparé : plus de copies des cours chez les affiliés (source unique)
 - Formation : cours réservés aux membres Pro et cours masqués sans suppression

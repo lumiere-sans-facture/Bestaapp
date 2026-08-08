@@ -2,18 +2,23 @@
 export const COMPANY = {
   name: 'BESTA SOLAR',
   slogan: 'Énergie lumineuse sans facture',
-  phone: '+229 016 173 2956',
+  // ⚠ Numéro togolais à confirmer : valeur provisoire issue de l'ancien
+  // numéro béninois — à remplacer par la vraie ligne (+228) avant lancement.
+  phone: '+228 90 00 00 00',
   email: 'contact@bestasolar.com',
   website: 'www.bestasolar.com',
-  address: 'Cotonou Saint Rita, République du Bénin',
-  addressShort: 'Cotonou Saint Rita, Bénin',
-  // Mentions légales portées en pied des documents techniques
-  rccm: 'RB/PKO/23 A 19308',
-  ifu: '0202274882317',
+  address: 'Lomé, République Togolaise',
+  addressShort: 'Lomé, Togo',
+  // Mentions légales portées en pied des documents techniques.
+  // ⚠ VALEURS PROVISOIRES : renseigner le RCCM togolais (format
+  // TG-LOM-01-AAAA-…) et le NIF délivrés par l'OTR avant lancement.
+  rccm: 'TG-LOM-01-0000-A-00000',
+  ifu: '0000000000000', // NIF (clé `ifu` conservée : données existantes)
   bank: {
-    name: 'Bank of Africa Bénin',
-    account: 'BJ66 BJ01 1000 0000 0123 4567 890',
-    swift: 'AFRIBJBJ',
+    // ⚠ Coordonnées bancaires togolaises à renseigner avant lancement.
+    name: 'Bank of Africa Togo',
+    account: 'TG00 0000 0000 0000 0000 0000 000',
+    swift: 'AFRITGTG',
   },
   // Conditions générales : la clause de validité ne vaut que pour un devis.
   termsDevis:
@@ -27,7 +32,9 @@ COMPANY.terms = COMPANY.termsDevis;
 
 // Numéro Mobile Money encaissant les abonnements Devis Pro (paywall public
 // et écran Abonnement des installateurs inscrits).
-export const PAY_NUMBER = '+229 016 173 2956';
+// ⚠ À remplacer par le VRAI numéro T-Money/Flooz togolais avant lancement :
+// c'est lui que les clients voient pour payer.
+export const PAY_NUMBER = '+228 90 00 00 00';
 
 export const TVA_RATE = 0.18;
 // Libellé du taux pour l'UI (« 18 ») — toujours dérivé, jamais recopié.

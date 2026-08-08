@@ -127,7 +127,7 @@ export default function ProDevisBuilder({ onDone }) {
           </div>
           <div className="form-row-2">
             <Field label="Téléphone">
-              <input className="input" type="tel" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} placeholder="+229 ..." />
+              <input className="input" type="tel" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} placeholder="+228 ..." />
             </Field>
             <Field label="Ville">
               <input className="input" value={newClient.ville} onChange={(e) => setNewClient({ ...newClient, ville: e.target.value })} />

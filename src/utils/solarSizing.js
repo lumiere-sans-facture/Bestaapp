@@ -140,7 +140,7 @@ export const AUTONOMY_OPTIONS = [
 export const INSTALLATION_COST_PER_PANEL = 10000;
 export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
-export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PVGIS indisponibles
+export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Togo) si données NASA/PVGIS indisponibles
 
 // Hypothèses de dimensionnement — exportées pour être affichées telles quelles
 // sur la fiche de dimensionnement (ne pas dupliquer ces valeurs ailleurs).

@@ -103,9 +103,9 @@ begin
     where table_schema = 'public' and table_name = 'profiles' and column_name = 'org_id'
   ) then
     insert into public.profiles (id, email, name, role, phone, avatar) values
-      ('u1', 'adam@bestasolar.bj',   'Adam Adébiyi',     'gerant',     '+229 97 12 34 56', 'AA'),
-      ('u2', 'fatou@bestasolar.bj',  'Fatou Boko',       'technicien', '+229 96 78 90 12', 'FB'),
-      ('u3', 'ibrahim@bestasolar.bj','Ibrahim Dan Djido','technicien', '+229 95 55 66 77', 'ID')
+      ('u1', 'adam@bestasolar.tg',   'Adam Adébiyi',     'gerant',     '+228 97 12 34 56', 'AA'),
+      ('u2', 'fatou@bestasolar.tg',  'Fatou Boko',       'technicien', '+228 96 78 90 12', 'FB'),
+      ('u3', 'ibrahim@bestasolar.tg','Ibrahim Dan Djido','technicien', '+228 95 55 66 77', 'ID')
     on conflict (id) do nothing;
   end if;
 end $$;

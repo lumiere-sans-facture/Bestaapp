@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { nasaToSolar, pvgisToSolar, combineSolar } from '../solarData';
 
 describe('nasaToSolar', () => {
-  it('mappe l’irradiation NASA en modèle solaire (Cotonou)', () => {
+  it('mappe l’irradiation NASA en modèle solaire (Lomé)', () => {
     const s = nasaToSolar(4.8, 6.37);
     expect(s.peakSunHours).toBe(4.8);
     expect(s.yearlyYield).toBe(1752); // 4.8 × 365

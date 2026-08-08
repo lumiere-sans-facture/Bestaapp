@@ -54,12 +54,12 @@ export default function SubscriptionTab({ sub }) {
           <div className="form-row-2">
             <Field label="Opérateur">
               <select className="input" value={form.methode} onChange={(e) => setForm({ ...form, methode: e.target.value })}>
-                <option value="momo">MTN MoMo</option>
-                <option value="moov">Moov Money</option>
+                <option value="momo">T-Money (Yas)</option>
+                <option value="moov">Flooz (Moov)</option>
               </select>
             </Field>
             <Field label="Votre numéro">
-              <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+              <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
             </Field>
           </div>
           <p className="text-sm">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} par Mobile Money à ce numéro, puis validez :</p>
@@ -126,7 +126,7 @@ function Historique({ paiements }) {
       <div className="card-title my-partner-subtitle">Historique des paiements</div>
       {paiements.length ? paiements.map((p) => (
         <div key={p.id} className="sheet-row">
-          <span className="sheet-label">{formatDate(p.date)} · {p.methode === 'momo' ? 'MTN MoMo' : 'Moov Money'}{p.referenceTransaction ? ` · ${p.referenceTransaction}` : ''}</span>
+          <span className="sheet-label">{formatDate(p.date)} · {p.methode === 'momo' ? 'T-Money (Yas)' : 'Flooz (Moov)'}{p.referenceTransaction ? ` · ${p.referenceTransaction}` : ''}</span>
           <span className="sheet-value">
             {formatCFA(p.montant)}{' '}
             <span className={`badge ${p.statut === 'confirme' ? 'badge-success' : p.statut === 'initie' ? 'badge-warning' : 'badge-muted'}`}>

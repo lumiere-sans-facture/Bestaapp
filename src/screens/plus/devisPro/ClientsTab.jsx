@@ -257,7 +257,7 @@ export default function ClientsTab({ company }) {
           </div>
           <div className="form-row-2">
             <Field label={<><Phone size={13} /> Téléphone</>}>
-              <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+              <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
             </Field>
             <Field label={<><MapPin size={13} /> Ville</>}>
               <input className="input" value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })} />

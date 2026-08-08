@@ -891,12 +891,12 @@ export default function Plus() {
             <div className="form-row-2">
               <Field label="Opérateur">
                 <select className="input" value={subForm.methode} onChange={(e) => setSubForm({ ...subForm, methode: e.target.value })}>
-                  <option value="momo">MTN MoMo</option>
-                  <option value="moov">Moov Money</option>
+                  <option value="momo">T-Money (Yas)</option>
+                  <option value="moov">Flooz (Moov)</option>
                 </select>
               </Field>
               <Field label="Votre numéro">
-                <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+229 ..." />
+                <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+228 ..." />
               </Field>
             </div>
             <p className="text-sm">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} par Mobile Money à ce numéro, puis validez :</p>

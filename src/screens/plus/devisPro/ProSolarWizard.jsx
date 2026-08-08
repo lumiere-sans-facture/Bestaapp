@@ -309,7 +309,7 @@ export default function ProSolarWizard({ onDone }) {
                   <button type="button" className={`client-type-btn ${newClient.type === 'entreprise' ? 'active' : ''}`} onClick={() => setNewClient({ ...newClient, type: 'entreprise' })}><Building2 size={16} /> Entreprise</button>
                 </div>
                 <div className="form-row-2">
-                  <Field label="Téléphone"><input className="input" type="tel" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} placeholder="+229 ..." /></Field>
+                  <Field label="Téléphone"><input className="input" type="tel" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} placeholder="+228 ..." /></Field>
                   <Field label="Ville"><input className="input" value={newClient.ville} onChange={(e) => setNewClient({ ...newClient, ville: e.target.value })} /></Field>
                 </div>
                 <div className="field-hint" style={{ marginBottom: 8 }}>Ce client sera ajouté à votre carnet.</div>
@@ -430,7 +430,7 @@ export default function ProSolarWizard({ onDone }) {
                 </button>
               </div>
               <form className="geo-search" onSubmit={handleSearch}>
-                <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher une ville (ex : Cotonou, Parakou…)" aria-label="Rechercher une ville" />
+                <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher une ville (ex : Lomé, Kara…)" aria-label="Rechercher une ville" />
                 <button type="submit" className="btn btn-outline" disabled={geoLoading} aria-label="Rechercher la ville"><Search size={16} /></button>
               </form>
               {geoLoading && <div className="geo-loading">Récupération des données solaires…</div>}

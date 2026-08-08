@@ -6,7 +6,7 @@ import { formatNombre as nf } from './format';
 // « partiel » et « en retard » sont DÉRIVÉS ici (montant encaissé + échéance),
 // jamais stockés — invariant sync non-destructive préservé.
 
-// Modes d'encaissement acceptés (Mobile Money majoritaire au Bénin).
+// Modes d'encaissement acceptés (Mobile Money majoritaire au Togo).
 export const PAIEMENT_MODES = [
   ['momo', 'Mobile Money'],
   ['especes', 'Espèces'],

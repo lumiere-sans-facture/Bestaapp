@@ -85,7 +85,7 @@ export default function AppLayout() {
           </div>
           <div>
             <div className="sidebar-title">{isPro ? (company?.nomEntreprise || 'Espace Pro') : 'BestaSolar Pro'}</div>
-            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Parakou, Bénin'}</div>
+            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Lomé, Togo'}</div>
           </div>
         </div>
         <nav className="sidebar-nav" aria-label="Navigation principale">

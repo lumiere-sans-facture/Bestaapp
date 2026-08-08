@@ -59,7 +59,7 @@ export default function FacturePreview({ company = {}, modele }) {
         <div>
           <div className="fp-label">FACTURÉ À</div>
           <div className="fp-client">Client exemple</div>
-          <div className="fp-muted">Cotonou</div>
+          <div className="fp-muted">Lomé</div>
         </div>
         <div className="fp-meta">
           <div><span className="fp-muted">Numéro</span> <strong>FAC-2026-001</strong></div>
