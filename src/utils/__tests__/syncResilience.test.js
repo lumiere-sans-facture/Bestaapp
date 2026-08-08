@@ -206,6 +206,24 @@ describe('cours partagés — reçus de l’organisation interne, jamais réémi
     expect(collections.formations[0].partage).toBeUndefined();
   });
 
+  it('un tombstone local ne masque JAMAIS un cours partagé — mais purge bien une copie locale', async () => {
+    // Purge des doublons : chaque org non interne reçoit un tombstone par
+    // cours interne. Il doit jeter la vieille copie de l'org… sans toucher
+    // à la version partagée qui porte le même id.
+    setSyncOrg('org-affilie', 'pro');
+    state.rows.formations = [
+      { id: 'f1', org_id: 'org-bestasolar', data: { title: 'Version partagée' } },
+      { id: 'vieux', org_id: 'org-affilie', data: { title: 'Vieille copie à purger' } },
+    ];
+    state.rows.tombstones = [
+      { id: 'f1', collection: 'formations' },
+      { id: 'vieux', collection: 'formations' },
+    ];
+    const { collections } = await pullAll();
+    expect(collections.formations.map((f) => f.id)).toEqual(['f1']);
+    expect(collections.formations[0].title).toBe('Version partagée');
+  });
+
   it('les autres tables ne partagent rien : l’isolation reste stricte', async () => {
     setSyncOrg('org-affilie', 'pro');
     state.rows.leads = [

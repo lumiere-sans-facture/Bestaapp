@@ -109,7 +109,11 @@ export async function pullAll() {
     for (const table of SYNCED_COLLECTIONS) {
       const deleted = tombstones.get(table);
       if (deleted?.size) {
-        collections[table] = collections[table].filter((item) => !deleted.has(item.id));
+        // Les éléments PARTAGÉS sont immunisés : un tombstone de NOTRE
+        // organisation (ex. : purge d'une vieille copie locale d'un cours)
+        // ne doit jamais masquer l'actif de l'organisation interne — sinon
+        // un cours partagé disparaîtrait ici définitivement.
+        collections[table] = collections[table].filter((item) => item.partage || !deleted.has(item.id));
       }
     }
   } catch {
