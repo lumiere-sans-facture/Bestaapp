@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, User, Building2, MapPin, Search, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, FileText } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
@@ -13,10 +13,11 @@ import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarD
 import { computeFactureTotals } from '../../../utils/facture';
 import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
+import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
 import TvaToggle from '../../../components/TvaToggle';
 
 let rowSeq = 0;
-const EMPTY_CLIENT = { name: '', phone: '', ville: '', type: 'particulier' };
+const EMPTY_CLIENT = { name: '', contact: '', phone: '', ville: '', type: 'particulier' };
 
 // Même ordre d'étapes que l'assistant public (client d'abord) : un technicien
 // qui utilise les deux modes garde le même parcours.
@@ -235,7 +236,7 @@ export default function ProSolarWizard({ onDone }) {
     let client;
     if (clientMode === 'new') {
       if (!newClient.name.trim()) return;
-      client = addProClient({ userId: user.id, name: newClient.name.trim(), phone: newClient.phone.trim(), ville: newClient.ville.trim(), type: newClient.type });
+      client = addProClient({ userId: user.id, name: newClient.name.trim(), contact: contactEffectif(newClient).trim(), phone: newClient.phone.trim(), ville: newClient.ville.trim(), type: newClient.type });
     } else {
       client = myClients.find((c) => c.id === clientId);
       if (!client) return;
@@ -303,11 +304,17 @@ export default function ProSolarWizard({ onDone }) {
               </Field>
             ) : (
               <>
-                <Field label="Nom du client *"><input className="input" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Nom / raison sociale" /></Field>
-                <div className="client-type-toggle" role="group" aria-label="Type de client" style={{ marginBottom: 14 }}>
-                  <button type="button" className={`client-type-btn ${newClient.type === 'particulier' ? 'active' : ''}`} onClick={() => setNewClient({ ...newClient, type: 'particulier' })}><User size={16} /> Particulier</button>
-                  <button type="button" className={`client-type-btn ${newClient.type === 'entreprise' ? 'active' : ''}`} onClick={() => setNewClient({ ...newClient, type: 'entreprise' })}><Building2 size={16} /> Entreprise</button>
-                </div>
+                {/* Identité adaptée au type : une entreprise a un nom ET une
+                    personne de contact (le champ manquait ici). */}
+                <ClientIdentityFields
+                  idPrefix="solar-client"
+                  clientType={newClient.type}
+                  onTypeChange={(type) => setNewClient({ ...newClient, type })}
+                  name={newClient.name}
+                  onNameChange={(name) => setNewClient({ ...newClient, name })}
+                  contact={newClient.contact}
+                  onContactChange={(contact) => setNewClient({ ...newClient, contact })}
+                />
                 <div className="form-row-2">
                   <Field label="Téléphone"><input className="input" type="tel" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} placeholder="+228 ..." /></Field>
                   <Field label="Ville"><input className="input" value={newClient.ville} onChange={(e) => setNewClient({ ...newClient, ville: e.target.value })} /></Field>
