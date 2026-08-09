@@ -176,7 +176,7 @@ export default function Devis() {
                       <div className="flat-row-sub">
                         <span className={`flat-badge ${bcls}`}>{blabel}</span>
                         <span className="flat-row-date">
-                          {formatDate(d.createdAt)} · {d.type === 'solar' ? 'Solaire' : 'Comptant'}
+                          {formatDate(d.createdAt)} · {d.type === 'solar' ? (d.sousType === 'pompage' ? 'Pompage solaire' : 'Solaire') : 'Comptant'}
                           {d._externe && ` · par ${d.authorName || d.orgName}`}
                         </span>
                       </div>

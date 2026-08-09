@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Deux nouveaux dimensionnements : par facture CEET (F CFA) et pompage solaire (kits suggérés)
 - Clients Pro : une entreprise a un nom ET une personne de contact
 - Togolisation complète : villes, ensoleillement, indicatifs +228, NIF, opérateurs Mobile Money
 - Purge des vieux caches affiliés : les cours masqués ne ressuscitent plus

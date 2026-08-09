@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, Cpu, Battery, MapPin, Search, Package, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, PanelTop, Cpu, Battery, MapPin, Search, Package, FileText, Banknote } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
+import { factureVersConsommation, REPARTITIONS, DEFAULT_REPARTITION, PRIX_KWH_CEET } from '../../utils/factureConso';
 import { calculateSystemSize, buildKitQuotation, suggestKitForBattery, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE } from '../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
@@ -18,7 +19,7 @@ let rowSeq = 0;
 // Noms des étapes, affichés sous les pastilles de progression.
 const STEP_NAMES = ['Client', 'Consommation', 'Type de système', 'Résultat'];
 
-export default function SolarWizard({ onDone, initialLeadId = null }) {
+export default function SolarWizard({ onDone, initialLeadId = null, initialConsoMode = 'appareils' }) {
   const { user } = useAuth();
   // Les kits viennent de l'état : ils se modifient dans « Mes kits », l'assistant
   // reflète immédiatement les prix du gérant sans mise à jour de l'application.
@@ -46,8 +47,13 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   }, [selectedLeadId, partners]);
   const [rows, setRows] = useState([]); // appareils sélectionnés
   const [pickerId, setPickerId] = useState('');
-  const [manualMode, setManualMode] = useState(false);
+  // Trois façons d'estimer la consommation : liste d'appareils (défaut),
+  // saisie directe des kWh, ou FACTURE CEET mensuelle en F CFA — pour le
+  // client qui ne connaît pas ses appareils mais sait ce qu'il paie.
+  const [consoMode, setConsoMode] = useState(initialConsoMode);
+  const manualMode = consoMode !== 'appareils'; // la fiche technique n'a pas de liste d'appareils
   const [manual, setManual] = useState({ day: '', night: '' });
+  const [facture, setFacture] = useState({ montant: '', prixKwh: PRIX_KWH_CEET, repartition: DEFAULT_REPARTITION });
   // Off-grid par défaut : cas majoritaire sur le terrain.
   const [systemType, setSystemType] = useState('off-grid');
   // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
@@ -123,15 +129,18 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
 
   const removeRow = (rowId) => setRows((prev) => prev.filter((r) => r.rowId !== rowId));
 
-  // Consommation jour/nuit en kWh
+  // Consommation jour/nuit en kWh — selon le mode de saisie choisi.
+  const factureConso = useMemo(
+    () => factureVersConsommation(facture.montant, facture.prixKwh, facture.repartition),
+    [facture]
+  );
   const consumption = useMemo(() => {
-    if (manualMode) {
-      return { day: Number(manual.day) || 0, night: Number(manual.night) || 0 };
-    }
+    if (consoMode === 'direct') return { day: Number(manual.day) || 0, night: Number(manual.night) || 0 };
+    if (consoMode === 'facture') return { day: factureConso.day, night: factureConso.night };
     const day = rows.reduce((sum, r) => sum + r.power * r.quantity * r.day, 0) / 1000;
     const night = rows.reduce((sum, r) => sum + r.power * r.quantity * r.night, 0) / 1000;
     return { day: Number(day.toFixed(2)), night: Number(night.toFixed(2)) };
-  }, [rows, manualMode, manual]);
+  }, [rows, consoMode, manual, factureConso]);
 
   const totalConsumption = consumption.day + consumption.night;
   // Pic de charge : toutes les charges branchées en même temps (dimensionne l'onduleur).
@@ -257,14 +266,51 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
         {/* Étape 2 : consommation */}
         {step === 2 && (
           <div>
-            <div className="wizard-step-header">
-              <div className="wizard-step-title">Estimez la consommation</div>
-              <button className="btn btn-sm btn-outline" onClick={() => setManualMode((m) => !m)}>
-                <Calculator size={15} /> {manualMode ? 'Calculateur' : 'Saisie directe'}
-              </button>
+            <div className="wizard-step-title">Estimez la consommation</div>
+            <div className="categories-scroll" style={{ marginBottom: 12 }}>
+              {[['appareils', 'Liste des appareils'], ['facture', 'Facture CEET (F CFA)'], ['direct', 'Saisie directe (kWh)']].map(([id, label]) => (
+                <button key={id} type="button" className={`category-chip ${consoMode === id ? 'active' : ''}`}
+                  aria-pressed={consoMode === id} onClick={() => setConsoMode(id)}>
+                  {id === 'facture' ? <Banknote size={13} style={{ verticalAlign: -2, marginRight: 4 }} /> : id === 'direct' ? <Calculator size={13} style={{ verticalAlign: -2, marginRight: 4 }} /> : null}
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {manualMode ? (
+            {consoMode === 'facture' && (
+              <>
+                <div className="manual-consumption-grid">
+                  <Field label={<><Banknote size={14} /> Facture mensuelle moyenne (F CFA)</>}>
+                    <input className="input" type="number" min="0" step="500" value={facture.montant}
+                      onChange={(e) => setFacture({ ...facture, montant: e.target.value })} placeholder="Ex : 25 000" />
+                  </Field>
+                  <Field label="Prix du kWh (F CFA)">
+                    <input className="input" type="number" min="1" value={facture.prixKwh}
+                      onChange={(e) => setFacture({ ...facture, prixKwh: e.target.value })} />
+                  </Field>
+                </div>
+                <div className="chip-selector">
+                  <span className="chip-selector-label"><Sun size={13} /> Quand consomme-t-il le plus ?</span>
+                  <div className="categories-scroll" style={{ marginBottom: 0 }}>
+                    {REPARTITIONS.map((r) => (
+                      <button key={r.id} type="button" className={`category-chip ${facture.repartition === r.id ? 'active' : ''}`}
+                        onClick={() => setFacture({ ...facture, repartition: r.id })}>
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {factureConso.kwhMois > 0 && (
+                  <div className="field-hint" role="status">
+                    ≈ {factureConso.kwhMois.toLocaleString('fr-FR')} kWh consommés par mois,
+                    soit {(factureConso.day + factureConso.night).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWh
+                    par jour. La part de nuit dimensionne la batterie.
+                  </div>
+                )}
+              </>
+            )}
+
+            {consoMode === 'direct' && (
               <div className="manual-consumption-grid">
                 <Field label={<><Sun size={14} /> Consommation jour (kWh)</>}>
                   <input className="input" type="number" min="0" step="0.1" value={manual.day} onChange={(e) => setManual({ ...manual, day: e.target.value })} placeholder="0" />
@@ -273,7 +319,9 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
                   <input className="input" type="number" min="0" step="0.1" value={manual.night} onChange={(e) => setManual({ ...manual, night: e.target.value })} placeholder="0" />
                 </Field>
               </div>
-            ) : (
+            )}
+
+            {consoMode === 'appareils' && (
               <>
                 <div className="appliance-picker">
                   <select className="input" value={pickerId} onChange={(e) => setPickerId(e.target.value)}>
@@ -352,7 +400,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
               <div className="consumption-stat night">
                 <Moon size={16} /><div><div className="consumption-value">{consumption.night.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWh</div><div className="consumption-label">Nuit</div></div>
               </div>
-              {!manualMode && (
+              {consoMode === 'appareils' && (
                 <div className="consumption-stat peak">
                   <Gauge size={16} /><div><div className="consumption-value">{peakLoad.toLocaleString('fr-FR')} W</div><div className="consumption-label">Pic de charge</div></div>
                 </div>
