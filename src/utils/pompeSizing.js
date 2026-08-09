@@ -42,33 +42,16 @@ export const suggestPompeKit = (kits, { volumeJour, hmt }) => {
     .find((k) => k.maxHmt >= hmt && k.maxDebit >= requis) || null;
 };
 
-// Accessoires du chantier de pompage, chiffrés sur la profondeur réelle.
-const PRIX_CABLE_PAR_M = 1500;   // câble immergé + accessoires électriques
-const PRIX_TUYAU_PAR_M = 2000;   // tuyauterie PEHD + raccords
-const MARGE_LONGUEUR_M = 10;     // mou de câble/tuyau au-dessus de la tête
-const PRIX_SUPPORT_PANNEAUX = 75000;
-const TAUX_INSTALLATION = 0.12;  // pose + mise en service, % du kit
-
 /**
- * Devis complet du pompage : kit + accessoires (longueurs selon la
- * profondeur) + installation. Même forme que les devis solaires
- * ({ components, prestations, subtotalHT, tva, total }) pour que l'affichage
- * et le PDF existants fonctionnent sans rien changer.
- * Le solaire est exonéré de TVA par défaut : tva = 0.
+ * Devis du pompage : LE KIT SEUL. Tuyauterie, câble, support et installation
+ * varient trop d'un chantier à l'autre (profondeur réelle, distance du champ
+ * de panneaux, terrain) — ils se chiffrent sur place, pas dans l'assistant.
+ * Même forme que les devis solaires ({ components, prestations, subtotalHT,
+ * tva, total }) pour que l'affichage et le PDF existants fonctionnent sans
+ * rien changer. Le solaire est exonéré de TVA par défaut : tva = 0.
  */
-export const buildPompeQuotation = (kit, { profondeur = 0 } = {}) => {
+export const buildPompeQuotation = (kit) => {
   if (!kit) return null;
-  const longueur = Math.max(0, Math.round(Number(profondeur) || 0)) + MARGE_LONGUEUR_M;
-  const components = [
-    { name: kit.name, quantity: 1, totalPrice: kit.price },
-    { name: `Tuyauterie PEHD et raccords (${longueur} m)`, quantity: 1, totalPrice: longueur * PRIX_TUYAU_PAR_M },
-    { name: `Câble immergé et accessoires électriques (${longueur} m)`, quantity: 1, totalPrice: longueur * PRIX_CABLE_PAR_M },
-    { name: 'Support panneaux galvanisé', quantity: 1, totalPrice: PRIX_SUPPORT_PANNEAUX },
-  ];
-  const installation = Math.round((kit.price * TAUX_INSTALLATION) / 1000) * 1000;
-  const prestations = [
-    { name: 'Installation et mise en service', quantity: 1, totalPrice: installation },
-  ];
-  const subtotalHT = [...components, ...prestations].reduce((s, c) => s + c.totalPrice, 0);
-  return { components, prestations, subtotalHT, tva: 0, total: subtotalHT };
+  const components = [{ name: kit.name, quantity: 1, totalPrice: kit.price }];
+  return { components, prestations: [], subtotalHT: kit.price, tva: 0, total: kit.price };
 };

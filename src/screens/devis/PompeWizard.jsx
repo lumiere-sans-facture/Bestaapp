@@ -61,10 +61,7 @@ export default function PompeWizard({ onDone, initialLeadId = null }) {
     () => suggestPompeKit(kitsDisponibles, { volumeJour, hmt }),
     [kitsDisponibles, volumeJour, hmt]
   );
-  const quotation = useMemo(
-    () => (kit ? buildPompeQuotation(kit, { profondeur }) : null),
-    [kit, profondeur]
-  );
+  const quotation = useMemo(() => (kit ? buildPompeQuotation(kit) : null), [kit]);
 
   const handleSubmit = (statut = 'finalise') => {
     if (!kit || !quotation) return;
@@ -216,19 +213,17 @@ export default function PompeWizard({ onDone, initialLeadId = null }) {
                   <div className="bom-price">{formatCFA(c.totalPrice)}</div>
                 </div>
               ))}
-              <div className="bom-title">Prestations</div>
-              {quotation.prestations.map((c, i) => (
-                <div key={i} className="bom-row">
-                  <div className="bom-name">{c.name}</div>
-                  <div className="bom-price">{formatCFA(c.totalPrice)}</div>
-                </div>
-              ))}
             </div>
 
             <div className="devis-summary">
               <div className="devis-summary-row"><span>Sous-total HT</span><span>{formatCFA(quotation.subtotalHT)}</span></div>
               <div className="devis-summary-row"><span>TVA</span><span>Exonérée</span></div>
               <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(quotation.total)}</span></div>
+            </div>
+            <div className="field-hint" role="note">
+              Le devis porte le kit seul : tuyauterie, câble immergé, support et
+              installation se chiffrent sur place selon le chantier — ajoutez-les
+              ensuite au devis, ou facturez-les séparément.
             </div>
           </div>
         )}

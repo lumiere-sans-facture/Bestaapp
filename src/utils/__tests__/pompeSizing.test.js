@@ -32,17 +32,16 @@ describe('pompeSizing — du besoin en eau au kit suggéré', () => {
     expect(suggestPompeKit(POMPE_KITS, { volumeJour: 0, hmt: 30 })).toBeNull();
   });
 
-  it('chiffre le devis : kit + longueurs selon la profondeur + installation', () => {
+  it('chiffre le devis : LE KIT SEUL — tuyauterie et installation se chiffrent sur place', () => {
     const kit = POMPE_KITS[1]; // 1 HP, 780 000 F
-    const q = buildPompeQuotation(kit, { profondeur: 40 });
-    // 40 m + 10 m de marge = 50 m de tuyau et de câble.
-    expect(q.components.find((c) => c.name.includes('Tuyauterie')).totalPrice).toBe(50 * 2000);
-    expect(q.components.find((c) => c.name.includes('Câble')).totalPrice).toBe(50 * 1500);
+    const q = buildPompeQuotation(kit);
+    expect(q.components).toHaveLength(1);
+    expect(q.components[0].name).toBe(kit.name);
     expect(q.components[0].totalPrice).toBe(kit.price);
-    // Total = somme exacte de toutes les lignes, TVA exonérée.
-    const somme = [...q.components, ...q.prestations].reduce((s, c) => s + c.totalPrice, 0);
-    expect(q.total).toBe(somme);
+    expect(q.prestations).toHaveLength(0);
+    expect(q.subtotalHT).toBe(kit.price);
+    expect(q.total).toBe(kit.price);
     expect(q.tva).toBe(0);
-    expect(buildPompeQuotation(null, {})).toBeNull();
+    expect(buildPompeQuotation(null)).toBeNull();
   });
 });

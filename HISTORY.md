@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Devis pompage : le kit seul — tuyauterie et installation se chiffrent sur place
 - Kits pompage modifiables dans l'app (comme « Mes kits ») et synchronisés à l'équipe
 - Deux nouveaux dimensionnements : par facture CEET (F CFA) et pompage solaire (kits suggérés)
 - Clients Pro : une entreprise a un nom ET une personne de contact
