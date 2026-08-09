@@ -3,6 +3,7 @@
 import * as seed from '../data/seed';
 import { SOLAR_KITS } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
+import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
 
@@ -36,6 +37,10 @@ export const buildInitialState = () => ({
   // Onduleurs proposés en alternative quand celui d'un kit ne prend pas assez
   // de panneaux pour le besoin calculé — même logique de dotation que les kits.
   inverters: INVERTER_MODELS,
+  // Kits pompage suggérés par l'assistant Pompe solaire — même logique :
+  // dotés partout (l'assistant ne propose QUE des kits), puis modifiables
+  // dans « Kits pompage ». Propres à chaque entreprise, comme les kits.
+  pompeKits: POMPE_KITS,
   // Cours de formation : actif de l'organisation interne, PARTAGÉ en lecture
   // (policy « formations lecture partagee ») — même modèle que le catalogue.
   // En SaaS, AUCUNE copie locale : doter chaque entreprise d'un double des
@@ -89,6 +94,8 @@ export const loadState = (scope = null) => {
       if (!Array.isArray(saved.kits)) saved.kits = SOLAR_KITS;
       // Migration « Onduleurs » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.inverters)) saved.inverters = INVERTER_MODELS;
+      // Migration « Kits pompage » : même principe, dotation une seule fois.
+      if (!Array.isArray(saved.pompeKits)) saved.pompeKits = POMPE_KITS;
       if (!saved.payoutRequests) saved.payoutRequests = [];
       if (!saved.formations) saved.formations = isSupabaseConfigured ? [] : seed.formations;
       if (!saved.formationProgress) saved.formationProgress = [];

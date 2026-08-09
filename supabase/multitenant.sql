@@ -92,6 +92,13 @@ create table if not exists public.inverters (
 );
 alter table public.inverters enable row level security;
 
+-- Kits pompage (assistant Pompe solaire) : même génération.
+create table if not exists public."pompeKits" (
+  id text primary key, data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public."pompeKits" enable row level security;
+
 -- Demandes de paiement des commissions (« retraits ») : même génération.
 create table if not exists public."payoutRequests" (
   id text primary key, data jsonb not null,
@@ -104,7 +111,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests','tombstones'
   ] loop
@@ -119,7 +126,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests'
   ] loop
@@ -137,7 +144,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests'
   ] loop
@@ -168,7 +175,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests','tombstones'
   ] loop

@@ -3,7 +3,6 @@ import { ChevronLeft, ChevronRight, Check, Droplets, Waves, ArrowDown, Building,
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
-import { POMPE_KITS } from '../../data/pompeKits';
 import {
   SOURCES_EAU, HEURES_POMPAGE, debitRequis, hmtEstimee, suggestPompeKit, buildPompeQuotation,
 } from '../../utils/pompeSizing';
@@ -22,7 +21,10 @@ const STEP_NAMES = ['Client', 'Besoin en eau', 'Kit et devis'];
  */
 export default function PompeWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
-  const { addDevis, leadsForUser, partners, ensurePartnerForUser } = useData();
+  // Les kits viennent de l'état : ils se modifient dans « Kits pompage »,
+  // l'assistant reflète immédiatement les réglages du gérant.
+  const { addDevis, leadsForUser, partners, ensurePartnerForUser, pompeKits } = useData();
+  const kitsDisponibles = pompeKits || [];
 
   const [step, setStep] = useState(initialLeadId ? 2 : 1);
   const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);
@@ -56,8 +58,8 @@ export default function PompeWizard({ onDone, initialLeadId = null }) {
   const debit = debitRequis(volumeJour);
 
   const kit = useMemo(
-    () => suggestPompeKit(POMPE_KITS, { volumeJour, hmt }),
-    [volumeJour, hmt]
+    () => suggestPompeKit(kitsDisponibles, { volumeJour, hmt }),
+    [kitsDisponibles, volumeJour, hmt]
   );
   const quotation = useMemo(
     () => (kit ? buildPompeQuotation(kit, { profondeur }) : null),
@@ -169,8 +171,14 @@ export default function PompeWizard({ onDone, initialLeadId = null }) {
           <div>
             <div className="wizard-step-title">Kit pompage et devis</div>
             <EmptyState card>
-              Aucun kit de la gamme ne couvre ce besoin ({Number(volumeJour).toLocaleString('fr-FR')} m³/jour
-              à {hmt} m de HMT). C'est un chantier sur mesure : contactez BestaSolar pour une étude dédiée.
+              {kitsDisponibles.length === 0 ? (
+                <>Aucun kit pompage configuré. Composez votre gamme dans
+                <strong> Plus › Kits pompage </strong> — l'assistant s'appuie
+                uniquement sur elle pour suggérer et chiffrer.</>
+              ) : (
+                <>Aucun kit de la gamme ne couvre ce besoin ({Number(volumeJour).toLocaleString('fr-FR')} m³/jour
+                à {hmt} m de HMT). C'est un chantier sur mesure : contactez BestaSolar pour une étude dédiée.</>
+              )}
             </EmptyState>
           </div>
         )}
