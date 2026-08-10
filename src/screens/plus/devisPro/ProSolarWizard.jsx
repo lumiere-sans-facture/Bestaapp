@@ -456,7 +456,7 @@ export default function ProSolarWizard({ onDone }) {
                     <span className="solar-source">Base de données {solar.source}</span>
                   </div>
                   <div className="solar-stats">
-                    <div className="solar-stat"><div className="solar-stat-value">{solar.peakSunHours}h</div><div className="solar-stat-label">Heures pic / jour</div></div>
+                    <div className="solar-stat"><div className="solar-stat-value">{solar.peakSunHours}h</div><div className="solar-stat-label">Heures pic / jour (pire mois)</div></div>
                     <div className="solar-stat"><div className="solar-stat-value">{solar.yearlyYield.toLocaleString('fr-FR')}</div><div className="solar-stat-label">kWh/kWc/an</div></div>
                     <div className="solar-stat"><div className="solar-stat-value">{solar.optimalAngle}°</div><div className="solar-stat-label">Angle optimal</div></div>
                   </div>

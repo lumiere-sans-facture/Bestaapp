@@ -484,7 +484,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
                   <div className="solar-stats">
                     <div className="solar-stat">
                       <div className="solar-stat-value">{solar.peakSunHours}h</div>
-                      <div className="solar-stat-label">Heures pic / jour</div>
+                      <div className="solar-stat-label">Heures pic / jour (pire mois)</div>
                     </div>
                     <div className="solar-stat">
                       <div className="solar-stat-value">{solar.yearlyYield.toLocaleString('fr-FR')}</div>

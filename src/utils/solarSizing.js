@@ -140,7 +140,10 @@ export const AUTONOMY_OPTIONS = [
 export const INSTALLATION_COST_PER_PANEL = 10000;
 export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
-export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Togo) si données NASA/PVGIS indisponibles
+// Repli (Togo) si données NASA/PVGIS indisponibles — heures de pic du PIRE
+// MOIS (saison des pluies), pas la moyenne annuelle : le système doit tenir
+// toute l'année, juillet-août compris.
+export const DEFAULT_PEAK_SUN_HOURS = 4.0;
 
 // Hypothèses de dimensionnement — exportées pour être affichées telles quelles
 // sur la fiche de dimensionnement (ne pas dupliquer ces valeurs ailleurs).

@@ -6,18 +6,51 @@
 const round1 = (n) => Math.round(n * 10) / 10;
 
 // ---- Transformations pures (testables, sans réseau) ----
+//
+// DIMENSIONNEMENT SUR LE PIRE MOIS : les heures de pic retenues sont celles
+// du mois le moins ensoleillé (saison des pluies), pas la moyenne annuelle.
+// Un système taillé sur la moyenne tombe en panne d'énergie chaque
+// juillet-août ; taillé sur le pire mois, il tient toute l'année. Le
+// productible annuel (yearlyYield), lui, reste un total annuel.
 
-/** ANN = irradiation horizontale moyenne (kWh/m²/jour, NASA) → modèle solaire. */
-export const nasaToSolar = (ann, lat) => ({
-  peakSunHours: round1(ann),
-  yearlyYield: Math.round(ann * 365),
-  optimalAngle: Math.round(Math.abs(lat)),
-  source: 'NASA POWER',
-});
+const MOIS_NASA = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-/** irradiation = H(i)_y au plan optimal (kWh/m²/an, PVGIS) → modèle solaire. */
-export const pvgisToSolar = (irradiation, slope, lat) => ({
-  peakSunHours: round1(irradiation / 365),
+/** Pire mois d'une climatologie NASA { JAN…DEC, ANN } (kWh/m²/jour).
+ *  Les valeurs de remplissage NASA (-999) sont ignorées. */
+export const nasaPireMois = (param) => {
+  const vals = MOIS_NASA.map((m) => Number(param?.[m])).filter((v) => Number.isFinite(v) && v > 0);
+  return vals.length ? Math.min(...vals) : null;
+};
+
+const JOURS_MOIS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** Pire mois du détail mensuel PVGIS (H(i)_m, kWh/m²/mois) → h de pic/jour. */
+export const pvgisPireMoisPsh = (monthly) => {
+  const vals = (monthly || [])
+    .map((m) => {
+      const h = Number(m?.['H(i)_m']);
+      const jours = JOURS_MOIS[(Number(m?.month) || 1) - 1] || 30;
+      return Number.isFinite(h) && h > 0 ? h / jours : null;
+    })
+    .filter((v) => v != null);
+  return vals.length ? Math.min(...vals) : null;
+};
+
+/** Climatologie NASA { JAN…DEC, ANN } → modèle solaire (pire mois). */
+export const nasaToSolar = (param, lat) => {
+  const ann = Number(param?.ANN);
+  return {
+    peakSunHours: round1(nasaPireMois(param) ?? ann),
+    yearlyYield: Math.round(ann * 365),
+    optimalAngle: Math.round(Math.abs(lat)),
+    source: 'NASA POWER',
+  };
+};
+
+/** irradiation = H(i)_y au plan optimal (kWh/m²/an, PVGIS) + détail mensuel
+ *  → modèle solaire (pire mois ; repli moyenne annuelle sans le détail). */
+export const pvgisToSolar = (irradiation, slope, lat, monthly = null) => ({
+  peakSunHours: round1(pvgisPireMoisPsh(monthly) ?? irradiation / 365),
   yearlyYield: Math.round(irradiation),
   optimalAngle: slope != null ? Math.round(slope) : Math.round(Math.abs(lat)),
   source: 'PVGIS',
@@ -69,7 +102,7 @@ async function fromPVGIS(lat, lon) {
   const irradiation = data.outputs?.totals?.fixed?.['H(i)_y'];
   const slope = data.inputs?.mounting_system?.fixed?.slope?.value;
   if (irradiation == null) throw new Error('PVGIS : données incomplètes');
-  return pvgisToSolar(irradiation, slope, lat);
+  return pvgisToSolar(irradiation, slope, lat, data.outputs?.monthly?.fixed);
 }
 
 async function fromNASA(lat, lon) {
@@ -77,9 +110,9 @@ async function fromNASA(lat, lon) {
   const res = await fetch(url);
   if (!res.ok) throw new Error('NASA POWER indisponible');
   const data = await res.json();
-  const ann = data.properties?.parameter?.ALLSKY_SFC_SW_DWN?.ANN;
-  if (ann == null) throw new Error('Données solaires indisponibles');
-  return nasaToSolar(ann, lat);
+  const param = data.properties?.parameter?.ALLSKY_SFC_SW_DWN;
+  if (param?.ANN == null) throw new Error('Données solaires indisponibles');
+  return nasaToSolar(param, lat);
 }
 
 /** Appel direct des deux APIs (apps natives, dev) puis combinaison. */
