@@ -14,11 +14,14 @@ export const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 
 // saison des pluies restant visible (et absorbé par le parc batterie).
 export const RATIO_PRODUCTIBLE_NET = 0.75;
 
-// Profil d'ensoleillement mensuel (h de pic/jour) par ville — la FORME du
-// profil (creux de saison des pluies) compte plus que ses valeurs absolues :
-// il est ensuite NORMALISÉ pour retomber exactement sur le HSP retenu du
-// dossier. Profil côtier golfe de Guinée par défaut (Lomé).
-const PROFIL_COTIER = [5.12, 5.29, 5.12, 4.94, 4.68, 4.25, 3.81, 3.65, 3.99, 4.60, 5.03, 5.03];
+// Profil d'ensoleillement mensuel (h de pic/jour) par ville — seule la FORME
+// compte (creux de saison des pluies) : le profil est ensuite CALÉ pour que
+// son mois le plus faible retombe exactement sur le HSP retenu du dossier,
+// qui est celui du PIRE MOIS. Caler la moyenne dessus (ancienne règle)
+// comptait la pénalité deux fois : le graphique montrait des déficits sur un
+// système pourtant dimensionné pour couvrir le pire mois. Forme côtière
+// Lomé d'après la climatologie NASA (creux juillet-août ≈ −12 % vs moyenne).
+const PROFIL_COTIER = [5.10, 5.28, 5.19, 4.99, 4.69, 4.42, 4.30, 4.32, 4.42, 4.69, 4.99, 4.99];
 export const PROFILS_HSP = {
   'Lomé': PROFIL_COTIER,
   'Aného': PROFIL_COTIER,
@@ -31,11 +34,12 @@ export const profilPourVille = (ville) => PROFILS_HSP[ville] || PROFIL_COTIER;
 export const moyennePonderee = (profil) =>
   profil.reduce((s, v, i) => s + v * JOURS_MOIS[i], 0) / 365;
 
-/** Normalise le profil pour que sa moyenne pondérée retombe sur le HSP retenu. */
-export const normaliserProfil = (profil, hspRetenu) => {
-  const moyenne = moyennePonderee(profil);
-  if (!(moyenne > 0) || !(hspRetenu > 0)) return profil.slice();
-  const k = hspRetenu / moyenne;
+/** Cale le profil pour que son MOIS LE PLUS FAIBLE égale le HSP retenu
+ *  (= pire mois du dimensionnement). Les autres mois sont au-dessus. */
+export const calerProfilSurPireMois = (profil, hspPireMois) => {
+  const pire = Math.min(...profil);
+  if (!(pire > 0) || !(hspPireMois > 0)) return profil.slice();
+  const k = hspPireMois / pire;
   return profil.map((v) => v * k);
 };
 
@@ -45,7 +49,7 @@ export const normaliserProfil = (profil, hspRetenu) => {
  * besoin[m] = consoJour × taux × jours[m].
  */
 export const couvertureMensuelle = ({ kwc, hspRetenu, ville, consoJour, tauxUtilisation }) => {
-  const profil = normaliserProfil(profilPourVille(ville), hspRetenu);
+  const profil = calerProfilSurPireMois(profilPourVille(ville), hspRetenu);
   const mois = profil.map((hsp, i) => {
     const prod = kwc * RATIO_PRODUCTIBLE_NET * hsp * JOURS_MOIS[i];
     const besoin = consoJour * tauxUtilisation * JOURS_MOIS[i];
@@ -56,10 +60,12 @@ export const couvertureMensuelle = ({ kwc, hspRetenu, ville, consoJour, tauxUtil
   return { mois, produitNet, deficitCumule };
 };
 
-/** Productibles annuels : théorique (kWc × HSP × 365) et net (× ratio). */
-export const productibles = (kwc, hspRetenu) => {
-  const theorique = Math.round(kwc * hspRetenu * 365);
-  return { theorique, net: Math.round(theorique * RATIO_PRODUCTIBLE_NET) };
+/** Productibles annuels dérivés du VRAI profil mensuel calé (somme des 12
+ *  mois), pas d'une moyenne : le net affiché est exactement celui que le
+ *  graphique totalise, barre par barre. */
+export const productiblesAnnuels = (kwc, hspPireMois, ville) => {
+  const { produitNet } = couvertureMensuelle({ kwc, hspRetenu: hspPireMois, ville, consoJour: 0, tauxUtilisation: 0 });
+  return { net: Math.round(produitNet), theorique: Math.round(produitNet / RATIO_PRODUCTIBLE_NET) };
 };
 
 // ---- Rentabilité ----
@@ -138,11 +144,12 @@ export const computeSheet = (d) => {
   const panelWc = Number((String(d.panelName || '').match(/(\d{3,4})\s*W/i) || [])[1]) || 550;
   const kwc = (d.sizing.numberOfPanels * panelWc) / 1000;
   const renta = calculerRentabilite(consoJour, d.investissement ?? null, d.rentabilite || {});
-  const prods = productibles(kwc, Number(d.sunHours) || 0);
   const couverture = couvertureMensuelle({
     kwc, hspRetenu: Number(d.sunHours) || 0, ville: d.cityName,
     consoJour, tauxUtilisation: renta.tauxUtilisation,
   });
+  // Le net annuel EST la somme des barres du graphique : une seule vérité.
+  const prods = { net: Math.round(couverture.produitNet), theorique: Math.round(couverture.produitNet / RATIO_PRODUCTIBLE_NET) };
   return {
     consoJour, energieNecessaire, panelWc, kwc, autonomyNights,
     batterieAh: d.sizing.batteryCapacity > 0 ? Math.round((d.sizing.batteryCapacity * 1000) / SYSTEM_VOLTAGE) : 0,

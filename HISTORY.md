@@ -5,6 +5,9 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-10
+- Graphique de couverture calé sur le pire mois : un système bien dimensionné affiche 12 mois orange
+
 ## 2026-08-07
 - Fiche de dimensionnement en 3 pages : rentabilité et couverture mensuelle (graphique)
 - Devis : retour des coordonnées officielles BestaSolar (Bénin) sur les documents

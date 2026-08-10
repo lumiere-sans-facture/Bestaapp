@@ -23,7 +23,9 @@ const data = {
   sizing,
   inverter: { brand: 'Felicity', model: 'Onduleur Felicity 5kVA', capacity: 5, maxPower: 4000 },
   batteries: [{ brand: 'Taico', model: 'Batterie Taico 5kWh', capacity: 5, qty: 1 }],
-  panelName: 'Panneau Jinko Solar 550W',
+  // Même référence 620 Wc que le moteur de dimensionnement : la fiche d'un
+  // système taillé par le moteur doit couvrir le besoin les 12 mois.
+  panelName: 'Panneau photovoltaïque 620W',
   investissement: 2500000,
 };
 
@@ -72,7 +74,10 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(html).toContain('FIGURE');
     expect(html).toContain('Productible mensuel estimé et besoin énergétique retenu');
     expect(html).toContain('id="hachures"');
-    expect(html).toContain('saison des pluies');
+    // Système dimensionné par le moteur : le besoin est couvert les 12 mois —
+    // la SEULE occurrence des hachures est la pastille de légende.
+    expect(html.match(/url\(#hachures\)/g)).toHaveLength(1);
+    expect(html).toContain('couvert sur les 12 mois');
     expect(html).toContain('SARAH-3');
     expect(html).toContain('kWh/mois');
     for (const mois of ['Jan', 'Juil', 'Déc']) expect(html).toContain(`>${mois}</text>`);

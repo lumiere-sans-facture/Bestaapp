@@ -162,8 +162,8 @@ export function renderSheet(d, c) {
       'Productible annuel net',
       u(nf(c.prods.net), 'kWh/an'),
       `théorique ${u(nf(c.prods.theorique), 'kWh/an')} × ${nf(RATIO_PRODUCTIBLE_NET, 2)} de pertes système`,
-      'Net = kWc × HSP × 365 × ratio de pertes',
-      `= ${u(nf(c.kwc, 2), 'kWc')} × ${u(nf(d.sunHours, 1), 'h')} × 365 × ${nf(RATIO_PRODUCTIBLE_NET, 2)}`,
+      `Net = Σ mensuels (kWc × HSP du mois × jours) × ${nf(RATIO_PRODUCTIBLE_NET, 2)}`,
+      `profil mensuel calé sur le pire mois (${u(nf(d.sunHours, 1), 'h/j')})`,
     ),
   ].join('');
 
@@ -377,7 +377,9 @@ export function renderSheet(d, c) {
     ${chart}
     <div class="chart-note">
       Productible net ${u(nf(c.prods.net), 'kWh/an')} (théorique ${u(nf(c.prods.theorique), 'kWh/an')}) ·
-      déficit cumulé de saison des pluies ${u(nf(Math.round(c.couverture.deficitCumule)), 'kWh')}, absorbé par le parc batterie.
+      ${Math.round(c.couverture.deficitCumule) > 0
+        ? `déficit cumulé de saison des pluies ${u(nf(Math.round(c.couverture.deficitCumule)), 'kWh')}, absorbé par le parc batterie.`
+        : 'le besoin est couvert sur les 12 mois de l\'année — aucun déficit saisonnier.'}
     </div>
   </section>
 
