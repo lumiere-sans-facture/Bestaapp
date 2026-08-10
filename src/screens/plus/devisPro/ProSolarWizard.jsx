@@ -209,11 +209,16 @@ export default function ProSolarWizard({ onDone }) {
 
   const totals = useMemo(() => computeFactureTotals(lignes, tvaActive), [lignes, tvaActive]);
 
+  // Paramètres de rentabilité de la fiche (page 3) — vides = défauts
+  // (tarif 145 F/kWh, taux 0,85, maintenance 50 000 F/an, provision 320 000 F,
+  // investissement = total du devis).
+  const [renta, setRenta] = useState({ tarifElec: '', tauxUtilisation: '', maintenanceAnnuelle: '', provisionOnduleur: '', investissement: '' });
+
   // Fiche de dimensionnement — récapitulatif technique complet (HTML imprimable),
   // généré à la dernière étape avec le client et le matériel réellement retenus.
   const openSheet = async () => {
     if (!sizing) return;
-    const { openSizingSheet } = await import('../../../utils/sizingSheetHtml');
+    const { openSizingSheet } = await import('../../../utils/sizingSheet');
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
     openSizingSheet({
       client: { name: client.name || '', phone: client.phone || '', ville: client.ville || '' },
@@ -228,6 +233,15 @@ export default function ProSolarWizard({ onDone }) {
       inverter,
       batteries: batteryList,
       panelName,
+      // Rentabilité (page 3) : total du devis par défaut, surchargeable
+      // champ par champ dans « Paramètres de rentabilité » ci-dessous.
+      investissement: Number(renta.investissement) > 0 ? Number(renta.investissement) : (totals.totalTTC || null),
+      rentabilite: {
+        ...(Number(renta.tarifElec) > 0 ? { tarifElec: Number(renta.tarifElec) } : {}),
+        ...(Number(renta.tauxUtilisation) > 0 ? { tauxUtilisation: Number(renta.tauxUtilisation) } : {}),
+        ...(Number(renta.maintenanceAnnuelle) >= 0 && renta.maintenanceAnnuelle !== '' ? { maintenanceAnnuelle: Number(renta.maintenanceAnnuelle) } : {}),
+        ...(Number(renta.provisionOnduleur) >= 0 && renta.provisionOnduleur !== '' ? { provisionOnduleur: Number(renta.provisionOnduleur) } : {}),
+      },
     });
   };
 
@@ -576,6 +590,34 @@ export default function ProSolarWizard({ onDone }) {
                     </div>
                   ))}
                 </div>
+
+                {/* Rentabilité de la fiche : chaque champ vide garde son défaut. */}
+                <details className="geo-manual" style={{ marginTop: 12 }}>
+                  <summary>Paramètres de rentabilité de la fiche (facultatif)</summary>
+                  <div className="form-row-2">
+                    <Field label="Tarif électricité (F CFA/kWh)">
+                      <input className="input" type="number" min="1" value={renta.tarifElec}
+                        onChange={(e) => setRenta({ ...renta, tarifElec: e.target.value })} placeholder="145" />
+                    </Field>
+                    <Field label="Taux d'utilisation (0–1)">
+                      <input className="input" type="number" min="0.1" max="1" step="0.05" value={renta.tauxUtilisation}
+                        onChange={(e) => setRenta({ ...renta, tauxUtilisation: e.target.value })} placeholder="0,85" />
+                    </Field>
+                    <Field label="Maintenance annuelle (F CFA)">
+                      <input className="input" type="number" min="0" value={renta.maintenanceAnnuelle}
+                        onChange={(e) => setRenta({ ...renta, maintenanceAnnuelle: e.target.value })} placeholder="50 000" />
+                    </Field>
+                    <Field label="Provision onduleur (F CFA)">
+                      <input className="input" type="number" min="0" value={renta.provisionOnduleur}
+                        onChange={(e) => setRenta({ ...renta, provisionOnduleur: e.target.value })} placeholder="320 000" />
+                    </Field>
+                  </div>
+                  <Field label="Investissement estimé (F CFA)">
+                    <input className="input" type="number" min="0" value={renta.investissement}
+                      onChange={(e) => setRenta({ ...renta, investissement: e.target.value })}
+                      placeholder={`Total du devis (${formatCFA(totals.totalTTC)})`} />
+                  </Field>
+                </details>
 
                 <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
                   <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)

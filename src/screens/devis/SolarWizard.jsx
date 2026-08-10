@@ -185,7 +185,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
   // sur le panneau de référence (PANEL_REFERENCE_WC).
   const openSheet = async () => {
     if (!sizing) return;
-    const { openSizingSheet } = await import('../../utils/sizingSheetHtml');
+    const { openSizingSheet } = await import('../../utils/sizingSheet');
     const lead = myLeads.find((l) => l.id === selectedLeadId);
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const apporteur = partnerId ? partners.find((p) => p.id === partnerId) : null;
@@ -205,6 +205,8 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
       inverter: { capacity: sizing.inverter.capacity },
       batteries: sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
       panelName: `Panneau photovoltaïque ${sizing.panelWc}W`,
+      // Rentabilité (page 3) : l'investissement estimé = total du devis kit.
+      investissement: displayQuotation?.total || null,
     });
   };
 

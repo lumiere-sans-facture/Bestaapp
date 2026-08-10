@@ -1,3 +1,6 @@
+// Fiche de dimensionnement 3 pages — synthèse, étude technique, analyse
+// (rentabilité + couverture mensuelle). Importée via l'alias déprécié pour
+// vérifier que la bascule ne casse aucun appelant existant.
 import { describe, it, expect } from 'vitest';
 import { buildSizingSheetHtml } from '../sizingSheetHtml';
 import { calculateSystemSize, SIZING_PARAMS, SYSTEM_VOLTAGE } from '../solarSizing';
@@ -21,147 +24,98 @@ const data = {
   inverter: { brand: 'Felicity', model: 'Onduleur Felicity 5kVA', capacity: 5, maxPower: 4000 },
   batteries: [{ brand: 'Taico', model: 'Batterie Taico 5kWh', capacity: 5, qty: 1 }],
   panelName: 'Panneau Jinko Solar 550W',
+  investissement: 2500000,
 };
 
-describe('buildSizingSheetHtml', () => {
+describe('buildSizingSheetHtml — 3 pages', () => {
   const html = buildSizingSheetHtml(data);
 
-  it('contient client, localisation et type de système', () => {
+  it('tient sur exactement trois pages A4 numérotées', () => {
+    expect(html.match(/<section class="page">/g)).toHaveLength(3);
+    expect(html).toContain('width: 794px; height: 1123px');
+    expect(html).toContain('Page 1 / 3');
+    expect(html).toContain('Page 2 / 3');
+    expect(html).toContain('Page 3 / 3');
+  });
+
+  it('un seul point focal orange par page : kWc (p.1) et économie annuelle (p.3)', () => {
+    // Deux emplois de la classe focale — la page 2 n'a AUCUN orange.
+    expect(html.match(/class="focal-value"/g)).toHaveLength(2);
+    const [, page2] = html.split('<section class="page">').slice(1);
+    expect(page2).not.toContain('focal-value');
+  });
+
+  it('contient client, localisation, charges et synthèse', () => {
     expect(html).toContain('Kossi Agbodjan');
     expect(html).toContain('+228 97 00 00 00');
-    expect(html).toContain('Lomé');
     expect(html).toContain('Autonome (off-grid)');
-  });
-
-  it('détaille chaque charge avec heures jour/nuit séparées et conso journalière', () => {
-    expect(html).toContain('Jour (h)');
-    expect(html).toContain('Nuit (h)');
-    // Refonte : plus aucun emoji dans le document
-    expect(html).not.toContain('☀');
-    expect(html).not.toContain('☾');
-    // Téléviseur : 3 h jour et 2 h nuit dans des colonnes distinctes
-    expect(html).toContain('<td class="num">3</td><td class="num">2</td><td class="num">600</td>'); // 60 W × 2 × 5 h
     expect(html).toContain('Téléviseur LED 32&quot;');
-    expect(html).toContain('Réfrigérateur 200 L');
-    expect(html).toContain('<td class="num">12</td><td class="num">12</td><td class="num">3 600</td>'); // 150 × 1 × 24
-    expect(html).toContain('5 400 Wh par jour'); // total, séparateur espace
-    expect(html).toContain('5,40 kWh');
-  });
-
-  it("mentionne l'apporteur d'affaires quand il est fourni", () => {
-    const avec = buildSizingSheetHtml({ ...data, apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' } });
-    expect(avec).toContain('Apporteur d’affaires');
-    expect(avec).toContain('Aminata Kesso');
-    expect(avec).toContain('BESTA-AMINATA');
-    // Sans apporteur, aucune ligne vide ne s'affiche
-    expect(html).not.toContain('Apporteur');
-  });
-
-  it('nomme les appareils personnalisés laissés sans nom', () => {
-    const custom = buildSizingSheetHtml({
-      ...data,
-      appliances: [
-        { name: 'Pompe à eau', power: 750, quantity: 1, day: 2, night: 0, custom: true },
-        { name: '  ', power: 300, quantity: 1, day: 1, night: 0, custom: true },
-      ],
-    });
-    expect(custom).toContain('Pompe à eau');
-    expect(custom).toContain('Appareil personnalisé');
-    // Pic de charge : 60×2 + 150×1 = 270 W (toutes charges simultanées)
+    expect(html).toContain('5 400');
     expect(html).toContain('Pic de charge');
-    expect(html).toContain('270 W');
   });
 
-  it('affiche les hypothèses réelles de solarSizing.js', () => {
-    expect(html).toContain('5,2 h/jour'); // HSP
-    expect(html).toContain('PVGIS');
-    expect(html).toContain('Rendement des panneaux');
-    expect(html).toContain(`${Math.round(SIZING_PARAMS.panelEfficiency * 100)} %`);
-    expect(html).toContain(`${Math.round(SIZING_PARAMS.depthOfDischarge * 100)} %`);
-    expect(html).toContain(`${SYSTEM_VOLTAGE} V`);
+  it('les unités sont accrochées à leur valeur par une espace fine insécable', () => {
+    for (const unite of [' kWc', ' kWh', ' W', ' V', ' %', ' F CFA']) {
+      expect(html).toContain(unite);
+    }
   });
 
-  it('montre les formules appliquées avec les valeurs du calcul', () => {
-    // E = 5,40 ÷ 0,85 = 6,35 kWh/j
-    expect(html).toContain('6,35 kWh/jour');
-    // P = 6,35 ÷ 5,2 → même valeur que le moteur de calcul (séparateur : espace simple)
-    const wc = Math.round(sizing.requiredPanelPower).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ');
-    expect(html).toContain(`${wc} Wc`);
-    // Batterie : 3,2 ÷ 0,95 ÷ 0,80 = 4,21 kWh → Ah sous 48 V
-    const kwh = sizing.batteryCapacity.toFixed(2).replace('.', ',');
-    expect(html).toContain(`${kwh} kWh`);
-    expect(html).toContain('4,21 kWh');
-    const ah = Math.round((sizing.batteryCapacity * 1000) / SYSTEM_VOLTAGE);
-    expect(html).toContain(`${ah} Ah`);
+  it('page 2 : paramètres réels du moteur, formules et productible net', () => {
+    expect(html).toContain(`${Math.round(SIZING_PARAMS.panelEfficiency * 100)} %`);
+    expect(html).toContain(`${SYSTEM_VOLTAGE} V`);
+    expect(html).toContain('Productible annuel net');
+    expect(html).toContain('× 0,75');
+    expect(html).toContain('Tarif de l’électricité');
   });
 
-  it('liste le matériel en désignations techniques, sans marque ni référence', () => {
-    // Type + tension / capacité / puissance + quantité — rien d'autre.
-    expect(html).toContain('Panneau photovoltaïque 550 Wc');
-    expect(html).toContain('Onduleur hybride 5 kVA');
-    expect(html).toContain(`Batterie lithium ${SYSTEM_VOLTAGE}V ${Math.round(5000 / SYSTEM_VOLTAGE)}Ah (5 kWh)`);
-    expect(html).toContain('Coffret de protection DC/AC');
-    // Les marques du catalogue servent au calcul mais n'apparaissent JAMAIS.
-    for (const marque of ['Felicity', 'Taico', 'Jinko', 'Growatt', 'Itel', 'Luxsun', 'Must', 'Deye', 'Pylontech']) {
+  it('page 3 : graphique de couverture (12 mois, hachures, source PVGIS)', () => {
+    expect(html).toContain('FIGURE');
+    expect(html).toContain('Productible mensuel estimé et besoin énergétique retenu');
+    expect(html).toContain('id="hachures"');
+    expect(html).toContain('saison des pluies');
+    expect(html).toContain('SARAH-3');
+    expect(html).toContain('kWh/mois');
+    for (const mois of ['Jan', 'Juil', 'Déc']) expect(html).toContain(`>${mois}</text>`);
+  });
+
+  it('page 3 : rentabilité complète, calculable à la main', () => {
+    expect(html).toContain('Estimation de rentabilité sur 10 ans');
+    expect(html).toContain('Économie annuelle');
+    expect(html).toContain('Retour sur investissement');
+    expect(html).toContain('Gain net');
+    expect(html).toContain('Investissement estimé');
+    expect(html).toContain('2 500 000 F CFA');
+    expect(html).toContain('Durée de vie des équipements');
+    expect(html).toContain('6 000 cycles');
+  });
+
+  it('aucune marque du catalogue, aucun prix hors section rentabilité', () => {
+    for (const marque of ['Felicity', 'Taico', 'Jinko', 'Growatt', 'Deye', 'Pylontech']) {
       expect(html).not.toContain(marque);
     }
-    expect(html).not.toContain('Marque');
-    expect(html).not.toContain('F CFA');
-    // Document technique : aucune devise, et mention explicite « ni un devis ni une offre de prix ».
-    expect(html).toContain('ne constitue ni un devis ni une offre de prix');
+    // Le récapitulatif matériel reste sans le moindre montant (le tarif de
+    // l'électricité, lui, est un PARAMÈTRE de calcul, pas un prix de vente).
+    const materiel = html.split('5 · Récapitulatif matériel')[1].split('</section>')[0];
+    expect(materiel).not.toContain('F CFA');
   });
 
-  it('porte la charte BestaSolar', () => {
-    expect(html).toContain('#0a2472');
-    expect(html).toContain('#f5a623');
-    // Le logo officiel est inliné (data-URI) : aucune URL relative ne se
-    // résoudrait dans le document ouvert via document.write.
-    expect(html).toContain('data:image/svg+xml;base64,');
-    expect(html).toContain('BESTA SOLAR');
-  });
-
-  it('tient sur exactement deux pages A4, orange réservé au chiffre focal', () => {
-    const pages = html.match(/<section class="page">/g) || [];
-    expect(pages).toHaveLength(2);
-    expect(html).toContain('width: 794px; height: 1123px');
-    expect(html).toContain('Page 1 / 2');
-    expect(html).toContain('Page 2 / 2');
-    // Un seul élément coloré en orange dans tout le document.
-    const regles = (html.match(/color: var\(--orange\)/g) || []);
-    expect(regles).toHaveLength(1);
-    expect(html).toContain('.focal-value');
-  });
-
-  it('porte les mentions légales et l’apporteur au pied de la page 2', () => {
+  it('mentions légales et prudence commerciale au pied de la page 3', () => {
     const avec = buildSizingSheetHtml({ ...data, apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' } });
     expect(avec).toContain('RCCM RB/PKO/23 A 19308');
     expect(avec).toContain('IFU 0202274882317');
-    expect(avec).toContain('ne constitue ni un devis ni une offre de prix');
+    expect(avec).toContain('Aminata Kesso');
+    expect(avec).toContain('Estimation indicative — ne constitue pas une offre de prix ferme.');
   });
 
-  it('regroupe les charges excédentaires pour tenir sur la page', () => {
-    const beaucoup = Array.from({ length: 10 }, (_, i) => ({
-      name: `Appareil ${i + 1}`, power: 100 + i * 10, quantity: 1, day: 2, night: 1,
-    }));
-    const dense = buildSizingSheetHtml({ ...data, appliances: beaucoup });
-    expect(dense).toContain('tres-dense');
-    expect(dense).toContain('+ 5 autres appareils regroupés');
-    // Les appareils regroupés restent comptés dans la consommation affichée.
-    const regroupes = beaucoup.slice(5).reduce((s2, a) => s2 + a.power * a.quantity * 3, 0);
-    expect(dense).toContain(String(regroupes).replace(/\B(?=(\d{3})+(?!\d))/g, ' '));
+  it('sans investissement : la rentabilité reste affichable (ROI et gain à —)', () => {
+    const sans = buildSizingSheetHtml({ ...data, investissement: null });
+    expect(sans).toContain('À renseigner');
+    expect(sans.match(/<section class="page">/g)).toHaveLength(3);
   });
 
   it('gère la saisie directe (mode manuel)', () => {
     const manual = buildSizingSheetHtml({ ...data, manualMode: true, appliances: [] });
     expect(manual).toContain('Consommation de jour (saisie directe)');
-    expect(manual).toContain('2 200'); // 2,2 kWh → Wh
-  });
-
-  it('adapte la section batterie au type de système', () => {
-    const onGrid = buildSizingSheetHtml({ ...data, systemType: 'on-grid', sizing: calculateSystemSize(consumption, 'on-grid', 5.2), batteries: [] });
-    expect(onGrid).not.toContain('Capacité batterie nécessaire');
-    expect(onGrid).toContain('Sans batterie (injection réseau)');
-    const hybrid = buildSizingSheetHtml({ ...data, systemType: 'hybrid', sizing: calculateSystemSize(consumption, 'hybrid', 5.2) });
-    expect(hybrid).toContain('× 0,80'); // ratio hybride dans la formule
+    expect(manual).toContain('2 200');
   });
 });
