@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Ensoleillement : table hors-ligne et repli calés sur les mesures NASA (4,3 h à Lomé)
 - Rendement des panneaux : 75 % → 85 % dans le calcul de dimensionnement
 - Dimensionnement sur le PIRE MOIS d'ensoleillement, plus la moyenne annuelle
 - Devis pompage : le kit seul — tuyauterie et installation se chiffrent sur place

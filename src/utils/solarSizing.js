@@ -142,8 +142,9 @@ export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
 // Repli (Togo) si données NASA/PVGIS indisponibles — heures de pic du PIRE
 // MOIS (saison des pluies), pas la moyenne annuelle : le système doit tenir
-// toute l'année, juillet-août compris.
-export const DEFAULT_PEAK_SUN_HOURS = 4.0;
+// toute l'année, juillet-août compris. 4,3 h = pire mois mesuré (NASA) à
+// Lomé, la zone la moins ensoleillée du pays — prudent partout ailleurs.
+export const DEFAULT_PEAK_SUN_HOURS = 4.3;
 
 // Hypothèses de dimensionnement — exportées pour être affichées telles quelles
 // sur la fiche de dimensionnement (ne pas dupliquer ces valeurs ailleurs).
