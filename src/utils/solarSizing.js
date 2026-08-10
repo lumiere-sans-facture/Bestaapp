@@ -155,7 +155,7 @@ export const DEFAULT_PEAK_SUN_HOURS = 4.0;
 // des ≥ 95 % annoncés : c'est une marge de sécurité maison qui préserve la
 // durée de vie du parc.
 export const SIZING_PARAMS = {
-  panelEfficiency: 0.75,    // rendement des panneaux appliqué au calcul
+  panelEfficiency: 0.85,    // rendement des panneaux appliqué au calcul
   batteryEfficiency: 0.95,  // rendement charge/décharge aller-retour (LiFePO4)
   depthOfDischarge: 0.8,    // profondeur de décharge retenue (marge de sécurité)
   hybridBatteryRatio: 0.8,  // part de la consommation nocturne stockée en hybride

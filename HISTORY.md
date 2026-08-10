@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-07
+- Rendement des panneaux : 75 % → 85 % dans le calcul de dimensionnement
 - Dimensionnement sur le PIRE MOIS d'ensoleillement, plus la moyenne annuelle
 - Devis pompage : le kit seul — tuyauterie et installation se chiffrent sur place
 - Kits pompage modifiables dans l'app (comme « Mes kits ») et synchronisés à l'équipe

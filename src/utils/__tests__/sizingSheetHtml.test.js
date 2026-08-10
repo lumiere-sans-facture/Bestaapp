@@ -82,9 +82,9 @@ describe('buildSizingSheetHtml', () => {
   });
 
   it('montre les formules appliquées avec les valeurs du calcul', () => {
-    // E = 5,40 ÷ 0,75 = 7,20 kWh/j
-    expect(html).toContain('7,20 kWh/jour');
-    // P = 7,20 ÷ 5,2 → même valeur que le moteur de calcul (séparateur : espace simple)
+    // E = 5,40 ÷ 0,85 = 6,35 kWh/j
+    expect(html).toContain('6,35 kWh/jour');
+    // P = 6,35 ÷ 5,2 → même valeur que le moteur de calcul (séparateur : espace simple)
     const wc = Math.round(sizing.requiredPanelPower).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ');
     expect(html).toContain(`${wc} Wc`);
     // Batterie : 3,2 ÷ 0,95 ÷ 0,80 = 4,21 kWh → Ah sous 48 V
