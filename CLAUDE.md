@@ -77,6 +77,20 @@ abonnement, format, puissance) — y ajouter un test quand on touche à cette lo
 - **Numérotation métier** : devis `BS-AAAAMMJJ-0001`, commandes `CMD-…`,
   factures `FAC-AAAA-001` (compteur par entreprise dans `companies`).
 
+## Skills de design (`.claude/skills/`)
+
+Le pack **UI/UX Pro Max** (`nextlevelbuilder/ui-ux-pro-max-skill`) est installé au niveau
+du projet : `ui-ux-pro-max` (base consultable de styles, palettes, typographies,
+graphiques, guidelines UX), plus `design`, `design-system`, `ui-styling`, `brand`,
+`banner-design`, `slides`.
+
+- Consultation hors ligne : `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<requête>"`.
+- Mise à jour : `npx ui-ux-pro-max-cli init --ai claude` à la racine du dépôt.
+- **Les invariants du projet priment sur les recommandations du skill.** Ces skills
+  proposent souvent Tailwind / shadcn / Chart.js : ne pas les introduire ici. On garde
+  le CSS natif de `src/index.css` et les charts faits main en SVG/CSS ; on n'en retient
+  que les décisions de design (hiérarchie, contrastes, espacements, accessibilité).
+
 ## Backend (optionnel)
 
 Créer `.env` depuis `.env.example` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`), puis
