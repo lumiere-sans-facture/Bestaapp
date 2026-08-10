@@ -134,8 +134,8 @@ describe('buildSizingSheetHtml', () => {
 
   it('porte les mentions légales et l’apporteur au pied de la page 2', () => {
     const avec = buildSizingSheetHtml({ ...data, apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' } });
-    expect(avec).toContain('RCCM TG-LOM-01-0000-A-00000');
-    expect(avec).toContain('NIF 0000000000000');
+    expect(avec).toContain('RCCM RB/PKO/23 A 19308');
+    expect(avec).toContain('IFU 0202274882317');
     expect(avec).toContain('ne constitue ni un devis ni une offre de prix');
   });
 

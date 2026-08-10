@@ -410,7 +410,7 @@ export function buildSizingSheetHtml(d) {
   <div class="foot">
     <div>
       <div class="foot-line navy">${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)} · ${esc(COMPANY.phone)}</div>
-      <div class="foot-legal">RCCM ${esc(COMPANY.rccm)} · NIF ${esc(COMPANY.ifu)}${d.apporteur?.name ? ` · Apporteur d’affaires : ${esc(d.apporteur.name)}${d.apporteur.code ? ` · ${esc(d.apporteur.code)}` : ''}` : ''}</div>
+      <div class="foot-legal">RCCM ${esc(COMPANY.rccm)} · IFU ${esc(COMPANY.ifu)}${d.apporteur?.name ? ` · Apporteur d’affaires : ${esc(d.apporteur.name)}${d.apporteur.code ? ` · ${esc(d.apporteur.code)}` : ''}` : ''}</div>
     </div>
     <div class="foot-line foot-right">Document technique — ne constitue ni un devis ni une offre de prix.</div>
   </div>
