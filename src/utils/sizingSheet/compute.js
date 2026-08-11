@@ -85,7 +85,7 @@ export const RENTA_DEFAUTS = {
 // sera remplacé. Le détail technique (nombre de cycles) reste en note.
 export const DUREES_VIE = [
   { equipement: 'Panneaux', duree: '25 ans' },
-  { equipement: 'Structure', duree: '25 ans' },
+  { equipement: 'Structure et câblages', duree: '15 ans' },
   // Note calibrée pour tenir sur UNE ligne dans la colonne (160 px à 11 px).
   { equipement: 'Batteries lithium', duree: '15 ans', note: '6 000 cycles · 1 par jour' },
   { equipement: 'Onduleur', duree: '5 ans' },

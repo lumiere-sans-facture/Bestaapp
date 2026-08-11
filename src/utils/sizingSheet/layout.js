@@ -290,7 +290,11 @@ export function renderSheet(d, c) {
   .result-calc { font-size: 11px; color: var(--gris); text-align: right; white-space: nowrap; line-height: 1.5; }
   .renta-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 24px; }
   .chart-note { font-size: 11px; color: var(--gris); margin-top: 4px; }
-  .vies { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-top: 16px; }
+  /* Trois rangées explicites (libellé / durée / note) remplies colonne par
+     colonne : les quatre durées restent alignées même quand un libellé passe
+     sur deux lignes. */
+  .vies { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: auto auto auto;
+          grid-auto-flow: column; column-gap: 24px; margin-top: 16px; }
   .foot { margin-top: auto; padding-top: 8px; border-top: 2px solid var(--primaire);
           display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   .foot-line { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gris); }
@@ -430,7 +434,10 @@ export function renderSheet(d, c) {
     </table>
     <div class="micro" style="margin-top:24px">Durée de vie des équipements</div>
     <div class="vies">
-      ${DUREES_VIE.map((v) => stat(v.equipement, v.duree, v.note || '')).join('')}
+      ${DUREES_VIE.map((v) => `
+        <div class="stat-label">${v.equipement}</div>
+        <div class="stat-value">${v.duree}</div>
+        <div class="stat-note">${v.note || ''}</div>`).join('')}
     </div>
   </section>
 
