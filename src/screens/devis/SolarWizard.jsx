@@ -5,7 +5,7 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
 import { factureVersConsommation, REPARTITIONS, DEFAULT_REPARTITION, PRIX_KWH_CEET } from '../../utils/factureConso';
-import { calculateSystemSize, buildKitQuotation, suggestKitForBattery, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE } from '../../utils/solarSizing';
+import { calculateSystemSize, buildKitQuotation, suggestKitForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE } from '../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -588,8 +588,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
                 <Cpu size={13} style={{ verticalAlign: -2 }} /> Onduleur adapté automatiquement : celui du kit
                 ({selectedKit.inverter} kVA) ne suffit pas pour ce besoin —{' '}
                 {displayQuotation.inverterSuggested.quantite > 1 && `${displayQuotation.inverterSuggested.quantite} × `}
-                {displayQuotation.inverterSuggested.capacity} kVA {displayQuotation.inverterSuggested.brand}{' '}
-                {displayQuotation.inverterSuggested.model}
+                {designationOnduleur(displayQuotation.inverterSuggested)}
                 {displayQuotation.inverterSuggested.quantite > 1 ? ' en parallèle' : ''} retenus à la place.
               </div>
             )}

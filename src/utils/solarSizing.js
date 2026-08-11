@@ -111,6 +111,23 @@ export const brandsOf = (options = []) => [...new Set(options.map((o) => o.brand
 // réelle (maxPower) dans Plus › Onduleurs — elle prime toujours.
 export const FACTEUR_PUISSANCE = 1;
 
+/**
+ * Désignation d'un onduleur, sans redite. Les modèles configurés s'appellent
+ * déjà « Onduleur hybride 6kVA » et ceux du catalogue boutique portent en plus
+ * la marque : préfixer aveuglément produisait « Onduleur hybride 6kVA Deye
+ * Onduleur hybride 6kVA » sur les lignes de devis.
+ */
+export const designationOnduleur = (inv) => {
+  if (!inv) return '';
+  const modele = String(inv.model || '').trim();
+  const marque = String(inv.brand || '').trim();
+  const base = /onduleur/i.test(modele)
+    ? modele
+    : `Onduleur hybride ${inv.capacity}kVA${modele ? ` ${modele}` : ''}`;
+  const dejaLa = marque && new RegExp(marque.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(base);
+  return marque && !dejaLa ? `${base} ${marque}` : base;
+};
+
 /** Puissance de sortie continue (W) d'un onduleur, depuis ses kVA à défaut. */
 export const puissanceSortie = (inv) => (Number(inv?.maxPower) > 0
   ? Number(inv.maxPower)
@@ -635,7 +652,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const withInverter = inverterSuggested
     ? withPanels.map((l) => (
         ONDULEUR_LINE_RE.test(l.designation)
-          ? { ...l, productId: null, designation: `Onduleur hybride ${inverterSuggested.capacity}kVA ${inverterSuggested.brand} ${inverterSuggested.model}`, qty: inverterSuggested.quantite, unit: 'pcs', pu: inverterSuggested.price }
+          ? { ...l, productId: null, designation: designationOnduleur(inverterSuggested), qty: inverterSuggested.quantite, unit: 'pcs', pu: inverterSuggested.price }
           : l
       ))
     : withPanels;

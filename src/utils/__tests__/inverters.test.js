@@ -5,7 +5,7 @@ import { normaliserOnduleur, onduleurEstValide, resumeOnduleur, dupliquerOnduleu
 import {
   buildKitQuotation, suggestInverterFor, puissanceSortie, limitePv,
   calibreRequis, sortieOnduleurRequise, onduleurSuffisant, onduleurTientLePic,
-  onduleurAccepteLePv, calculateSystemSize, SIZING_PARAMS,
+  onduleurAccepteLePv, designationOnduleur, calculateSystemSize, SIZING_PARAMS,
 } from '../solarSizing';
 
 describe('normaliserOnduleur / onduleurEstValide', () => {
@@ -41,6 +41,26 @@ describe('normaliserOnduleur / onduleurEstValide', () => {
       // sinon le champ ne veut rien dire (entrée PV ≤ sortie n'a pas de sens).
       expect(o.maxPvPower).toBeGreaterThan(o.capacity * 1000);
     }
+  });
+});
+
+describe('designationOnduleur — jamais deux fois le même nom', () => {
+  it('n’ajoute pas « Onduleur hybride n kVA » devant un modèle qui le dit déjà', () => {
+    // Les modèles configurés s'appellent « Onduleur hybride 6kVA » : préfixer
+    // produisait « Onduleur hybride 6kVA Deye Onduleur hybride 6kVA ».
+    expect(designationOnduleur({ brand: 'Deye', model: 'Onduleur hybride 6kVA', capacity: 6 }))
+      .toBe('Onduleur hybride 6kVA Deye');
+  });
+
+  it('n’ajoute pas la marque si le modèle la porte déjà (catalogue boutique)', () => {
+    expect(designationOnduleur({ brand: 'Growatt', model: 'Onduleur Hybride 6kva Growatt', capacity: 6 }))
+      .toBe('Onduleur Hybride 6kva Growatt');
+  });
+
+  it('compose un nom complet quand le modèle est nu', () => {
+    expect(designationOnduleur({ brand: 'Deye', model: 'SUN-8K', capacity: 8 }))
+      .toBe('Onduleur hybride 8kVA SUN-8K Deye');
+    expect(designationOnduleur({ capacity: 5, model: '', brand: '' })).toBe('Onduleur hybride 5kVA');
   });
 });
 
@@ -196,6 +216,8 @@ describe('buildKitQuotation — remplacement automatique de l’onduleur', () =>
     expect(q.inverterSuggested.capacity).toBeGreaterThan(3);
     const ligneOnduleur = q.components.find((c) => /onduleur/i.test(c.name));
     expect(ligneOnduleur.name).toContain(`${q.inverterSuggested.capacity}kVA`);
+    // Le nom n'apparaît qu'une fois, marque comprise.
+    expect(ligneOnduleur.name.match(/onduleur/gi)).toHaveLength(1);
     expect(ligneOnduleur.unitPrice).toBe(
       INVERTER_MODELS.find((o) => o.id === q.inverterSuggested.id).price
     );
