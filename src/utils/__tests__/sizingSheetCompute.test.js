@@ -1,17 +1,17 @@
 // Fiche de dimensionnement — calculs de productible mensuel et de rentabilité.
 import { describe, it, expect } from 'vitest';
 import {
-  couvertureMensuelle, calerProfilSurPireMois, profilPourVille,
-  productiblesAnnuels, calculerRentabilite, libelleRoi, JOURS_MOIS, RATIO_PRODUCTIBLE_NET,
+  couvertureMensuelle, calerProfilSurPireMois, profilPourVille, productionJour,
+  productionAnnuelle, calculerRentabilite, libelleRoi, JOURS_MOIS,
 } from '../sizingSheet/compute';
 import { calculateSystemSize, SIZING_PARAMS, PANEL_REFERENCE_WC } from '../solarSizing';
 
-describe('productible mensuel', () => {
-  it('une seule convention de pertes : le productible emploie le rendement du dimensionnement', () => {
-    // Dimensionner en divisant par 0,85 puis annoncer une production à 0,75
-    // faisait dire à la fiche que le système produit moins que ce qu'elle
-    // demandait de produire. Les deux taux ne doivent plus jamais diverger.
-    expect(RATIO_PRODUCTIBLE_NET).toBe(SIZING_PARAMS.panelEfficiency);
+describe('production mensuelle', () => {
+  it('production = puissance installée × rendement des panneaux × ensoleillement', () => {
+    // La procédure tient en une ligne : aucune perte système, aucun
+    // « productible théorique » en plus du rendement des panneaux.
+    expect(productionJour(4.96, 4.3)).toBeCloseTo(4.96 * 0.85 * 4.3, 6);
+    expect(productionJour(4.96, 4.3)).toBeCloseTo(4.96 * SIZING_PARAMS.panelEfficiency * 4.3, 6);
   });
 
   it('le profil est calé pour que son PIRE MOIS égale le HSP retenu (± 0,01)', () => {
@@ -23,11 +23,11 @@ describe('productible mensuel', () => {
     profil.forEach((v) => expect(v).toBeGreaterThanOrEqual(4.3 - 1e-9));
   });
 
-  it('la somme des 12 mois égale le productible net annuel (± 2 kWh)', () => {
+  it('la somme des 12 mois égale la production annuelle (± 2 kWh)', () => {
     const kwc = 4.96;
     const { mois } = couvertureMensuelle({ kwc, hspRetenu: 4.3, ville: 'Lomé', consoJour: 17.6 });
     const somme = mois.reduce((s, m) => s + m.prod, 0);
-    expect(Math.abs(somme - productiblesAnnuels(kwc, 4.3, 'Lomé').net)).toBeLessThanOrEqual(2);
+    expect(Math.abs(somme - productionAnnuelle(kwc, 4.3, 'Lomé'))).toBeLessThanOrEqual(2);
   });
 
   it('un système dimensionné par le moteur couvre la CONSOMMATION RÉELLE les 12 mois', () => {
@@ -108,11 +108,11 @@ describe('rentabilité — montants recalculés depuis les valeurs affichées', 
     expect(perso.economiesCumulees).toBe(perso.economieAnnuelle * 5);
   });
 
-  it('le productible net applique le ratio de pertes système au profil réel', () => {
-    const p = productiblesAnnuels(5, 4.3, 'Lomé');
-    // Net et théorique sont arrondis chacun de leur côté : tolérance 1 kWh.
-    expect(Math.abs(p.net - p.theorique * RATIO_PRODUCTIBLE_NET)).toBeLessThanOrEqual(1);
-    // Le net annuel dépasse kWc × pire mois × 365 : les autres mois produisent plus.
-    expect(p.net).toBeGreaterThan(5 * 4.3 * 365 * RATIO_PRODUCTIBLE_NET);
+  it('la production annuelle suit le profil réel de la localité', () => {
+    const annuelle = productionAnnuelle(5, 4.3, 'Lomé');
+    // Elle dépasse « pire mois × 365 » : les autres mois produisent plus.
+    expect(annuelle).toBeGreaterThan(productionJour(5, 4.3) * 365);
+    // …sans dépasser le meilleur mois × 365.
+    expect(annuelle).toBeLessThan(productionJour(5, 5.3) * 365);
   });
 });

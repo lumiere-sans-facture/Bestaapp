@@ -10,7 +10,7 @@ import { SIZING_PARAMS, SYSTEM_VOLTAGE, SYSTEM_TYPES } from '../solarSizing';
 import { CUSTOM_APPLIANCE_LABEL } from '../../data/appliances';
 import { emetteurDe } from '../docTemplates/shared';
 import { couleursLisibles } from '../couleurDocument';
-import { RATIO_PRODUCTIBLE_NET, DUREES_VIE, libelleRoi } from './compute';
+import { DUREES_VIE, libelleRoi } from './compute';
 import { renderCoverageChart } from './chart';
 
 // Milliers à espaces (« 5 400 »). L'unité, elle, est TOUJOURS accrochée à sa
@@ -103,9 +103,9 @@ export function renderSheet(d, c) {
   const paramRows = [
     ['Localisation retenue', d.cityName ? esc(d.cityName) : 'Non précisée'],
     ['Ensoleillement pic (HSP)', `${u(nf(d.sunHours, 1), 'h/jour')}`],
-    // Un seul taux de pertes dans toute la fiche : celui-ci sert AUSSI à
-    // estimer le productible (§ 4 et graphique § 6).
-    ['Rendement système retenu', pct(panelEfficiency)],
+    // Ce rendement sert à la fois à dimensionner (§ 4) et à estimer la
+    // production (§ 4 et graphique § 6) : une seule grandeur, une seule valeur.
+    ['Rendement des panneaux', pct(panelEfficiency)],
     ['Décharge batterie (DoD)', pct(depthOfDischarge)],
     ['Rendement batterie', pct(batteryEfficiency)],
     ['Tension du parc batterie', u(SYSTEM_VOLTAGE, 'V')],
@@ -185,18 +185,21 @@ export function renderSheet(d, c) {
       // calculé et les kVA affichés.
       `≥ ${u(nf(Math.round(d.sizing.requiredPanelPower)), 'W')} × ${nf(inverterMargin, 1)} = ${u(nf(Math.round(d.sizing.requiredPanelPower * inverterMargin)), 'W')} → premier calibre au-dessus`,
     )] : []),
+    // Production : puissance installée × rendement des panneaux × heures
+    // d'ensoleillement. Le chiffre du PIRE MOIS se vérifie à la main en une
+    // ligne et se compare directement à la consommation du client.
     resultat(
-      'Productible annuel net',
-      u(nf(c.prods.net), 'kWh/an'),
-      `théorique ${u(nf(c.prods.theorique), 'kWh/an')} × ${nf(RATIO_PRODUCTIBLE_NET, 2)} de pertes système`,
-      `Net = Σ mensuels (kWc × HSP du mois × jours) × ${nf(RATIO_PRODUCTIBLE_NET, 2)}`,
-      `profil mensuel calé sur le pire mois (${u(nf(d.sunHours, 1), 'h/j')})`,
+      'Production estimée',
+      u(nf(c.production), 'kWh/an'),
+      `${u(nf(c.productionPireMois, 1), 'kWh/jour')} au pire mois · consommation ${u(nf(totalKwh, 1), 'kWh/jour')}`,
+      'Production = puissance installée × rendement des panneaux × ensoleillement',
+      `${u(nf(c.kwc, 2), 'kWc')} × ${nf(panelEfficiency, 2)} × ${u(nf(d.sunHours, 1), 'h/j')} = ${u(nf(c.productionPireMois, 1), 'kWh/jour')}`,
     ),
   ].join('');
 
   // --- Analyse (page 3) ---
   const chart = renderCoverageChart(c.couverture.mois, {
-    kwc: c.kwc, consoJour: totalKwh, ratio: RATIO_PRODUCTIBLE_NET, couleurs,
+    kwc: c.kwc, consoJour: totalKwh, rendement: panelEfficiency, couleurs,
   });
   const rentaRows = [
     ['Consommation couverte', `${u(nf(renta.kwhAnnuels), 'kWh/an')} <span class="muted">(${u(nf(totalKwh, 2), 'kWh/j')} × ${nf(renta.tauxUtilisation, 2)} × 365)</span>`],
@@ -361,7 +364,7 @@ export function renderSheet(d, c) {
     <div>
       <div class="micro">Puissance photovoltaïque à installer</div>
       <div class="focal-value">${u(nf(c.kwc, 2), 'kWc')}</div>
-      <div class="focal-note">${nf(d.sizing.numberOfPanels)} panneau${d.sizing.numberOfPanels > 1 ? 'x' : ''} de ${u(nf(panelWc), 'Wc')} · productible net ${u(nf(c.prods.net), 'kWh/an')}</div>
+      <div class="focal-note">${nf(d.sizing.numberOfPanels)} panneau${d.sizing.numberOfPanels > 1 ? 'x' : ''} de ${u(nf(panelWc), 'Wc')} · production estimée ${u(nf(c.production), 'kWh/an')}</div>
     </div>
     <div class="focal-stats">
       ${/* Le parc RÉELLEMENT installé, pas le besoin théorique : c'est ce que
@@ -446,7 +449,7 @@ export function renderSheet(d, c) {
     <h2>6 · Couverture mensuelle des besoins</h2>
     ${chart}
     <div class="chart-note">
-      Productible net ${u(nf(c.prods.net), 'kWh/an')} (théorique ${u(nf(c.prods.theorique), 'kWh/an')}) ·
+      Production estimée ${u(nf(c.production), 'kWh/an')} ·
       ${Math.round(c.couverture.deficitCumule) > 0
         ? `déficit cumulé de saison des pluies ${u(nf(Math.round(c.couverture.deficitCumule)), 'kWh')}, absorbé par le parc batterie.`
         : 'le besoin est couvert sur les 12 mois de l\'année — aucun déficit saisonnier.'}

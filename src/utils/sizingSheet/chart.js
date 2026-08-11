@@ -23,10 +23,10 @@ export const plafondAxe = (pic) => {
 
 /**
  * @param {Array<{mois:string, prod:number, besoin:number, deficit:boolean}>} monthly
- * @param {{kwc:number, consoJour:number, ratio:number, couleurs?:{primaire:string, accent:string}}} opts
+ * @param {{kwc:number, consoJour:number, rendement:number, couleurs?:{primaire:string, accent:string}}} opts
  * @returns {string} chaîne <svg>
  */
-export function renderCoverageChart(monthly, { kwc, consoJour, ratio, couleurs = {} }) {
+export function renderCoverageChart(monthly, { kwc, consoJour, rendement, couleurs = {} }) {
   const NAVY = couleurs.primaire || NAVY_DEFAUT;
   const ORANGE = couleurs.accent || ORANGE_DEFAUT;
   const W = 714;
@@ -50,7 +50,7 @@ export function renderCoverageChart(monthly, { kwc, consoJour, ratio, couleurs =
     grille += `<text x="${left - 6}" y="${y(v) + 3}" text-anchor="end" font-size="9" fill="${BASE}">${nfInt(v)}</text>`;
   }
 
-  // Barres accolées : productible 26px, besoin 15px, coins arrondis 1,5px.
+  // Barres accolées : production 26px, besoin 15px, coins arrondis 1,5px.
   const LARG_PROD = 26;
   const LARG_BESOIN = 15;
   const paires = LARG_PROD + LARG_BESOIN;
@@ -63,7 +63,7 @@ export function renderCoverageChart(monthly, { kwc, consoJour, ratio, couleurs =
     const fillProd = m.deficit ? 'url(#hachures)' : ORANGE;
     barres += `<rect x="${x0.toFixed(1)}" y="${(base - hP).toFixed(1)}" width="${LARG_PROD}" height="${hP.toFixed(1)}" rx="1.5" fill="${fillProd}"/>`;
     barres += `<rect x="${(x0 + LARG_PROD).toFixed(1)}" y="${(base - hB).toFixed(1)}" width="${LARG_BESOIN}" height="${hB.toFixed(1)}" rx="1.5" fill="${NAVY}"/>`;
-    // Valeur du productible au-dessus de sa barre
+    // Valeur de la production au-dessus de sa barre
     barres += `<text x="${(x0 + LARG_PROD / 2).toFixed(1)}" y="${(base - hP - 4).toFixed(1)}" text-anchor="middle" font-size="9"${m.deficit ? ` font-weight="600" fill="${TERRE}"` : ` fill="${GRIS_TITRE}"`}>${nfInt(m.prod)}</text>`;
     // Libellé du mois, 18px sous la ligne de base
     labels += `<text x="${(x0 + paires / 2).toFixed(1)}" y="${base + 18}" text-anchor="middle" font-size="10"${m.deficit ? ` font-weight="600" fill="${TERRE}"` : ` fill="${GRIS_TITRE}"`}>${esc(m.mois)}</text>`;
@@ -84,8 +84,8 @@ export function renderCoverageChart(monthly, { kwc, consoJour, ratio, couleurs =
 
   // Légende centrée (pastilles, entrées espacées de 18px) + ligne de source.
   const entrees = [
-    { fill: ORANGE, label: 'Productible mensuel estimé' },
-    { fill: 'url(#hachures)', label: 'Productible inférieur au besoin' },
+    { fill: ORANGE, label: 'Production mensuelle estimée' },
+    { fill: 'url(#hachures)', label: 'Production inférieure au besoin' },
     { fill: NAVY, label: `Consommation du client (${nf1(consoJour)} kWh/jour)` },
   ];
   const LARG_CAR = 5.1; // approx. par caractère à 9,5px — pour centrer la légende
@@ -99,7 +99,7 @@ export function renderCoverageChart(monthly, { kwc, consoJour, ratio, couleurs =
       + `<text x="${(xL + 17).toFixed(1)}" y="${yL}" font-size="9.5" fill="${GRIS_TITRE}">${esc(e.label)}</text>`;
     xL += largeurs[i] + 18;
   });
-  const source = `<text x="0" y="${yL + 13}" font-size="8.5" fill="${BASE}">Source : base PVGIS (SARAH-3) — plan incliné à 10°, orientation Sud — ratio de performance ${String(ratio).replace('.', ',')}</text>`;
+  const source = `<text x="0" y="${yL + 13}" font-size="8.5" fill="${BASE}">Source : base PVGIS (SARAH-3) — plan incliné à 10°, orientation Sud — rendement des panneaux ${Math.round(rendement * 100)} %</text>`;
 
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Couverture mensuelle des besoins" xmlns="http://www.w3.org/2000/svg" font-family="'IBM Plex Sans', system-ui, sans-serif">
   <defs>
@@ -108,7 +108,7 @@ export function renderCoverageChart(monthly, { kwc, consoJour, ratio, couleurs =
       <line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="1.5"/>
     </pattern>
   </defs>
-  <text x="0" y="12" font-size="10" fill="${GRIS_TITRE}"><tspan font-size="8.5" letter-spacing="1">FIGURE</tspan> 1 — Productible mensuel estimé et consommation du client</text>
+  <text x="0" y="12" font-size="10" fill="${GRIS_TITRE}"><tspan font-size="8.5" letter-spacing="1">FIGURE</tspan> 1 — Production mensuelle estimée et consommation du client</text>
   <text x="${W}" y="12" text-anchor="end" font-size="10" fill="${GRIS_TITRE}">Générateur ${String(kwc.toFixed(2)).replace('.', ',')} kWc</text>
   <text x="10" y="${plotTop + plotH / 2}" text-anchor="middle" font-size="9" fill="${BASE}" transform="rotate(-90 10 ${plotTop + plotH / 2})">kWh/mois</text>
   ${grille}

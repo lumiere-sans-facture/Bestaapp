@@ -1,20 +1,18 @@
 // Fiche de dimensionnement — CALCULS : dimensionnement (formules importées de
-// solarSizing, jamais dupliquées), productible mensuel et rentabilité.
+// solarSizing, jamais dupliquées), production mensuelle et rentabilité.
 // Logique pure, sans React ni DOM.
 import { SIZING_PARAMS, SYSTEM_VOLTAGE } from '../solarSizing';
 
 export const JOURS_MOIS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 export const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
-// Ratio de performance appliqué au productible théorique (salissures,
-// température, câblage, conversion…) : le NET est la seule valeur annoncée.
-// C'est EXACTEMENT le rendement utilisé pour dimensionner (SIZING_PARAMS) —
-// une seule convention de pertes dans tout le document. Deux taux différents
-// (dimensionner à ÷0,85 puis annoncer ×0,75) faisaient dire à la fiche que le
-// système produit moins que ce qu'elle demandait de produire.
+// PRODUCTION = puissance installée × rendement des panneaux × heures
+// d'ensoleillement. Rien d'autre : ni « productible théorique », ni « ratio de
+// performance », ni « pertes système » en plus. Le rendement des panneaux est
+// celui qui a servi à dimensionner (SIZING_PARAMS.panelEfficiency) — c'est la
+// même grandeur, elle ne peut pas prendre deux valeurs dans un même document.
 // Conséquence utile : un système taillé par le moteur couvre par CONSTRUCTION
-// le besoin au pire mois — kWc × HSP × ratio ≥ conso, par définition du calcul.
-export const RATIO_PRODUCTIBLE_NET = SIZING_PARAMS.panelEfficiency;
+// le besoin au pire mois — kWc × 0,85 × HSP ≥ consommation, par définition.
 
 // Profil d'ensoleillement mensuel (h de pic/jour) par ville — seule la FORME
 // compte (creux de saison des pluies) : le profil est ensuite CALÉ pour que
@@ -45,10 +43,12 @@ export const calerProfilSurPireMois = (profil, hspPireMois) => {
   return profil.map((v) => v * k);
 };
 
+/** Production d'une journée : puissance installée × rendement × heures de pic. */
+export const productionJour = (kwc, hsp) => kwc * SIZING_PARAMS.panelEfficiency * hsp;
+
 /**
- * Couverture mensuelle : productible net et consommation du client, mois
- * par mois. prod[m] = kWc × ratio de performance × hsp[m] × jours[m] ;
- * besoin[m] = consoJour × jours[m].
+ * Couverture mensuelle : production et consommation du client, mois par mois.
+ * prod[m] = kWc × rendement × hsp[m] × jours[m] ; besoin[m] = consoJour × jours[m].
  * Le besoin comparé est la consommation RÉELLE, pas une fraction d'elle : la
  * fiche dimensionne déjà avec une marge, raboter le besoin en plus rendait le
  * graphique vert sans que le système couvre vraiment la consommation.
@@ -56,22 +56,19 @@ export const calerProfilSurPireMois = (profil, hspPireMois) => {
 export const couvertureMensuelle = ({ kwc, hspRetenu, ville, consoJour }) => {
   const profil = calerProfilSurPireMois(profilPourVille(ville), hspRetenu);
   const mois = profil.map((hsp, i) => {
-    const prod = kwc * RATIO_PRODUCTIBLE_NET * hsp * JOURS_MOIS[i];
+    const prod = productionJour(kwc, hsp) * JOURS_MOIS[i];
     const besoin = consoJour * JOURS_MOIS[i];
     return { mois: MOIS_LABELS[i], prod, besoin, deficit: prod < besoin };
   });
-  const produitNet = mois.reduce((s, m) => s + m.prod, 0);
+  const production = mois.reduce((s, m) => s + m.prod, 0);
   const deficitCumule = mois.reduce((s, m) => s + Math.max(0, m.besoin - m.prod), 0);
-  return { mois, produitNet, deficitCumule };
+  return { mois, production, deficitCumule };
 };
 
-/** Productibles annuels dérivés du VRAI profil mensuel calé (somme des 12
- *  mois), pas d'une moyenne : le net affiché est exactement celui que le
- *  graphique totalise, barre par barre. */
-export const productiblesAnnuels = (kwc, hspPireMois, ville) => {
-  const { produitNet } = couvertureMensuelle({ kwc, hspRetenu: hspPireMois, ville, consoJour: 0 });
-  return { net: Math.round(produitNet), theorique: Math.round(produitNet / RATIO_PRODUCTIBLE_NET) };
-};
+/** Production annuelle : somme des 12 mois du profil calé sur le pire mois —
+ *  exactement ce que le graphique totalise, barre par barre. */
+export const productionAnnuelle = (kwc, hspPireMois, ville) =>
+  Math.round(couvertureMensuelle({ kwc, hspRetenu: hspPireMois, ville, consoJour: 0 }).production);
 
 // ---- Rentabilité ----
 // Tous les paramètres sont surchargeables ; les montants affichés sont
@@ -159,13 +156,15 @@ export const computeSheet = (d) => {
   // Parc batterie réellement installé (modules du catalogue) : il dépasse
   // toujours un peu le besoin calculé — c'est ce que le client reçoit.
   const batterieInstallee = (d.batteries || []).reduce((s, b) => s + b.capacity * b.qty, 0);
-  // Le net annuel EST la somme des barres du graphique : une seule vérité.
-  const prods = { net: Math.round(couverture.produitNet), theorique: Math.round(couverture.produitNet / RATIO_PRODUCTIBLE_NET) };
   return {
     consoJour, energieNecessaire, panelWc, kwc, autonomyNights,
+    // La production annuelle EST la somme des barres du graphique, et la
+    // production du pire mois est le chiffre qui se vérifie à la main.
+    production: Math.round(couverture.production),
+    productionPireMois: productionJour(kwc, Number(d.sunHours) || 0),
     batterieAh: d.sizing.batteryCapacity > 0 ? Math.round((d.sizing.batteryCapacity * 1000) / SYSTEM_VOLTAGE) : 0,
     batterieInstallee,
     batterieInstalleeAh: batterieInstallee > 0 ? Math.round((batterieInstallee * 1000) / SYSTEM_VOLTAGE) : 0,
-    prods, couverture, renta,
+    couverture, renta,
   };
 };
