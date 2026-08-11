@@ -133,7 +133,7 @@ export default function CompanyTab({ company }) {
         <div className="sheet-section-title"><FileText size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Coordonnées</div>
         <div className="form-row-2">
           <Field label="Téléphone">
-            <input className="input" type="tel" value={f.telephone} onChange={(e) => set({ telephone: e.target.value })} placeholder="+229 ..." />
+            <input className="input" type="tel" value={f.telephone} onChange={(e) => set({ telephone: e.target.value })} placeholder="+228 ..." />
           </Field>
           <Field label="Email">
             <input className="input" type="email" value={f.email} onChange={(e) => set({ email: e.target.value })} />
@@ -143,7 +143,7 @@ export default function CompanyTab({ company }) {
           <input className="input" value={f.adresse} onChange={(e) => set({ adresse: e.target.value })} placeholder="Quartier, ville" />
         </Field>
         <div className="form-row-2">
-          <Field label="IFU (optionnel)">
+          <Field label="NIF (optionnel)">
             <input className="input" value={f.ifu} onChange={(e) => set({ ifu: e.target.value })} />
           </Field>
           <Field label="RCCM (optionnel)">
@@ -189,7 +189,7 @@ export default function CompanyTab({ company }) {
         </Field>
         <div className="form-row-2">
           <Field label="Numéro Mobile Money">
-            <input className="input" type="tel" value={f.momo} onChange={(e) => set({ momo: e.target.value })} placeholder="+229 ..." />
+            <input className="input" type="tel" value={f.momo} onChange={(e) => set({ momo: e.target.value })} placeholder="+228 ..." />
           </Field>
           <Field label="Nom du compte MoMo">
             <input className="input" value={f.momoNom} onChange={(e) => set({ momoNom: e.target.value })} placeholder="Titulaire" />
@@ -208,7 +208,7 @@ export default function CompanyTab({ company }) {
               TVA {TVA_PCT} %
             </button>
           </div>
-          <div className="field-hint">Le solaire est exonéré de TVA par défaut au Bénin ; ce choix s'applique aux nouveaux devis et factures, ajustable document par document.</div>
+          <div className="field-hint">Le solaire est exonéré de TVA par défaut au Togo ; ce choix s'applique aux nouveaux devis et factures, ajustable document par document.</div>
         </div>
       </div>
 

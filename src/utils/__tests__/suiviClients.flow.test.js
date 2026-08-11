@@ -16,7 +16,7 @@ describe('flux réel du suivi clients', () => {
   it('deux devis d’un client = deux cartes, avancées séparément', () => {
     const s = store();
     s.a.ensurePartnerForUser(USER);
-    s.a.addLead({ name: 'Hôtel du Parc', contact: 'M. Kossi', phone: '+229', address: 'Parakou', estimatedValue: 0, assignedTo: 'u1', parrainL1: null });
+    s.a.addLead({ name: 'Hôtel du Parc', contact: 'M. Kossi', phone: '+228', address: 'Lomé', estimatedValue: 0, assignedTo: 'u1', parrainL1: null });
     const lead = s.get().leads[0];
 
     // Prospection : une carte piste, pilotée à la main

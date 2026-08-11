@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle, Package, Cpu } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -42,6 +42,7 @@ const plusSections = (user) => [
     { path: '/plus/commissions', label: 'Commissions', icon: DollarSign },
     { path: '/plus/kits', label: 'Mes kits', icon: Package },
     { path: '/plus/inverters', label: 'Onduleurs', icon: Cpu },
+    { path: '/plus/pompekits', label: 'Kits pompage', icon: Droplets },
     ...(!isSupabaseConfigured || user.is_platform_admin
       ? [{ path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown }] : []),
     { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },
@@ -85,7 +86,7 @@ export default function AppLayout() {
           </div>
           <div>
             <div className="sidebar-title">{isPro ? (company?.nomEntreprise || 'Espace Pro') : 'BestaSolar Pro'}</div>
-            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Parakou, Bénin'}</div>
+            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Lomé, Togo'}</div>
           </div>
         </div>
         <nav className="sidebar-nav" aria-label="Navigation principale">

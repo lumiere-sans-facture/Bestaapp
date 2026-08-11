@@ -34,7 +34,14 @@ alter table public.orgs enable row level security;
 -- Les inscriptions self-service créent toujours des orgs 'pro'.
 alter table public.orgs add column if not exists kind text not null default 'pro'
   check (kind in ('interne', 'pro'));
-update public.orgs set kind = 'interne' where id = 'org-bestasolar';
+-- Bootstrap SEULEMENT : si une autre organisation a été promue interne depuis
+-- (cas d'un gérant inscrit en self-service, promu via partage-formation.sql),
+-- rejouer ce script ne doit pas créer une DEUXIÈME source interne — deux
+-- copies des mêmes cours partiraient vers les affiliés, dans un ordre
+-- indéterminé.
+update public.orgs set kind = 'interne'
+ where id = 'org-bestasolar'
+   and not exists (select 1 from public.orgs where kind = 'interne' and id <> 'org-bestasolar');
 
 -- Code d'invitation d'équipe : colonne + DÉFAUT défini AVANT toute insertion
 -- (la vérification NOT NULL précède la résolution ON CONFLICT — sans défaut,
@@ -85,6 +92,13 @@ create table if not exists public.inverters (
 );
 alter table public.inverters enable row level security;
 
+-- Kits pompage (assistant Pompe solaire) : même génération.
+create table if not exists public."pompeKits" (
+  id text primary key, data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public."pompeKits" enable row level security;
+
 -- Demandes de paiement des commissions (« retraits ») : même génération.
 create table if not exists public."payoutRequests" (
   id text primary key, data jsonb not null,
@@ -97,7 +111,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests','tombstones'
   ] loop
@@ -112,7 +126,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests'
   ] loop
@@ -130,7 +144,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests'
   ] loop
@@ -161,7 +175,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'products','kits','inverters','leads','partners','commissions','devis','referrals','orders',
+    'products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders',
     'formations','formationProgress','subscriptions','subscriptionPayments',
     'companies','factures','proClients','payoutRequests','tombstones'
   ] loop
@@ -181,6 +195,43 @@ drop policy if exists "catalogue ecriture org" on public.products;
 create policy "catalogue lecture partagee" on public.products for select to authenticated
   using (org_id = public.auth_org_id() or org_id = 'org-bestasolar');
 create policy "catalogue ecriture org" on public.products
+  for all to authenticated
+  using (org_id = public.auth_org_id())
+  with check (org_id = public.auth_org_id());
+
+-- FORMATION : les cours BestaSolar sont, comme le catalogue, un actif interne
+-- PARTAGÉ EN LECTURE avec toutes les organisations — y compris celles nées
+-- d'une inscription par code partenaire. Sans cela, chaque entreprise ne
+-- voyait que sa propre copie des cours livrés avec l'application, et le
+-- contenu ajouté par BestaSolar ne lui parvenait jamais.
+-- L'écriture reste limitée à sa propre organisation : une entreprise crée ses
+-- cours à elle, elle ne modifie pas ceux de BestaSolar.
+-- L'org source est désignée par son TYPE (kind = 'interne') et non par un
+-- identifiant en dur : le partage suit l'organisation interne, quelle qu'elle
+-- soit. L'avancement (formationProgress) n'est PAS partagé — la progression
+-- de chacun reste dans son organisation.
+-- SECURITY DEFINER indispensable : la RLS de `orgs` (policy « own org ») ne
+-- laisse chacun lire QUE sa propre organisation. Une sous-requête directe
+-- dans la policy s'exécuterait avec les droits de l'appelant et ne verrait
+-- jamais l'org interne — le partage serait mort pour tout le monde. Même
+-- mécanisme que auth_org_id / auth_is_platform_admin.
+create or replace function public.org_est_interne(p_org text)
+  returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.orgs where id = p_org and kind = 'interne')
+$$;
+drop policy if exists "org isolation" on public.formations;
+drop policy if exists "formations lecture partagee" on public.formations;
+drop policy if exists "formations ecriture org" on public.formations;
+-- Un cours MASQUÉ (brouillon du gérant) ne quitte jamais son organisation :
+-- filtré ici, il n'est même pas transmis aux affiliés — le masquage ne
+-- repose pas sur la seule bonne volonté de l'affichage client. Sa propre
+-- organisation le reçoit toujours (le gérant doit le voir pour le gérer).
+create policy "formations lecture partagee" on public.formations for select to authenticated
+  using (
+    org_id = public.auth_org_id()
+    or (public.org_est_interne(org_id) and coalesce(data ->> 'masque', 'false') <> 'true')
+  );
+create policy "formations ecriture org" on public.formations
   for all to authenticated
   using (org_id = public.auth_org_id())
   with check (org_id = public.auth_org_id());

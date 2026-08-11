@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -26,6 +26,7 @@ import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import KitsSection from './plus/KitsSection';
 import InvertersSection from './plus/InvertersSection';
+import PompeKitsSection from './plus/PompeKitsSection';
 import { SyncStatusRow } from '../components/SyncStatus';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
 import { reconcileMissingCommissions } from '../utils/commissionSync';
@@ -39,7 +40,7 @@ export default function Plus() {
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
-    partners, commissions, leads, orders, devis, referrals, kits, inverters, payoutRequests, team, teamChargee,
+    partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, payoutRequests, team, teamChargee,
     getPartnerById, getLeadById,
     payCommission, addCommission, syncCommissions, approvePayout, rejectPayout,
     getSubscriptionForUser, requestSubscription, importData,
@@ -50,14 +51,14 @@ export default function Plus() {
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
   // simple utilisateur restait ainsi sur l'écran des commissions du gérant,
   // boutons « Payer » et « Commission manuelle » compris. L'autorisation se
   // décide donc ici, à la section, pas au bouton.
-  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'backup'];
+  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'backup'];
   const sectionAutorisee = (tab) => {
     if (!KNOWN_TABS.includes(tab)) return false;
     if (tab === 'subsadmin') {
@@ -641,6 +642,7 @@ export default function Plus() {
               <MenuItem icon={DollarSign} title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
               <MenuItem icon={Package} title="Mes kits" subtitle={`${(kits || []).length} kits proposés par l'assistant de devis`} onClick={() => setActiveTab('kits')} />
               <MenuItem icon={Cpu} title="Onduleurs" subtitle={`${(inverters || []).length} onduleurs, suggérés si celui du kit ne suffit pas`} onClick={() => setActiveTab('inverters')} />
+              <MenuItem icon={Droplets} title="Kits pompage" subtitle={`${(pompeKits || []).length} kits proposés par l'assistant Pompe solaire`} onClick={() => setActiveTab('pompekits')} />
               {/* Administration du SaaS : en mode backend, réservée à l'admin
                   plateforme (le serveur refuse de toute façon l'activation
                   d'un abonnement à quiconque d'autre). */}
@@ -685,7 +687,7 @@ export default function Plus() {
   const TAB_TITLES = {
     menu: 'Plus', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
-    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs',
+    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
     profile: 'Mon profil', backup: 'Sauvegarde',
   };
 
@@ -704,6 +706,7 @@ export default function Plus() {
         {activeTab === 'team' && <TeamSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'kits' && <KitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'inverters' && <InvertersSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'pompekits' && <PompeKitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'subsadmin' && <SubscriptionsAdmin onBack={() => setActiveTab('menu')} />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
@@ -891,12 +894,12 @@ export default function Plus() {
             <div className="form-row-2">
               <Field label="Opérateur">
                 <select className="input" value={subForm.methode} onChange={(e) => setSubForm({ ...subForm, methode: e.target.value })}>
-                  <option value="momo">MTN MoMo</option>
-                  <option value="moov">Moov Money</option>
+                  <option value="momo">T-Money (Yas)</option>
+                  <option value="moov">Flooz (Moov)</option>
                 </select>
               </Field>
               <Field label="Votre numéro">
-                <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+229 ..." />
+                <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+228 ..." />
               </Field>
             </div>
             <p className="text-sm">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} par Mobile Money à ce numéro, puis validez :</p>

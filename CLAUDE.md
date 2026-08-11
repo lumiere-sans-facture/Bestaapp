@@ -1,7 +1,7 @@
 # CLAUDE.md — Guide de l'agent
 
 Contexte pour Claude Code travaillant sur **BestaSolar Pro** : CRM solaire local-first
-(React 18 + Vite 5 + Supabase) pour BestaSolar, Parakou (Bénin). Web responsive + apps
+(React 18 + Vite 5 + Supabase) pour BestaSolar, Lomé (Togo). Web responsive + apps
 natives Android/iOS (Capacitor) depuis une seule base de code.
 
 > Pour la carte complète du système (flux de données, schéma BDD, paliers de montée en

@@ -3,6 +3,7 @@
 import * as seed from '../data/seed';
 import { SOLAR_KITS } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
+import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
 
@@ -19,8 +20,7 @@ export const buildInitialState = () => ({
   version: seed.SEED_VERSION,
   // Backend configuré (mode SaaS) : une nouvelle entreprise démarre SANS
   // données de démonstration ni catalogue — le catalogue est l'actif interne
-  // BestaSolar, reçu du serveur en lecture partagée (jamais copié). Seuls les
-  // cours de formation sont dotés.
+  // BestaSolar, reçu du serveur en lecture partagée (jamais copié).
   // Mode local (sans backend) : jeu de démonstration complet, comme avant.
   leads: isSupabaseConfigured ? [] : seed.leads,
   products: isSupabaseConfigured ? [] : seed.products,
@@ -37,7 +37,19 @@ export const buildInitialState = () => ({
   // Onduleurs proposés en alternative quand celui d'un kit ne prend pas assez
   // de panneaux pour le besoin calculé — même logique de dotation que les kits.
   inverters: INVERTER_MODELS,
-  formations: seed.formations,
+  // Kits pompage suggérés par l'assistant Pompe solaire — même logique :
+  // dotés partout (l'assistant ne propose QUE des kits), puis modifiables
+  // dans « Kits pompage ». Propres à chaque entreprise, comme les kits.
+  pompeKits: POMPE_KITS,
+  // Cours de formation : actif de l'organisation interne, PARTAGÉ en lecture
+  // (policy « formations lecture partagee ») — même modèle que le catalogue.
+  // En SaaS, AUCUNE copie locale : doter chaque entreprise d'un double des
+  // mêmes cours (mêmes ids) faisait ressurgir la copie périmée dès que la
+  // version partagée était masquée ou supprimée par son propriétaire.
+  formations: isSupabaseConfigured ? [] : seed.formations,
+  // Cours du seed déjà dotés (mode local) : mémorisé pour ne doter chaque
+  // cours qu'UNE FOIS — un cours supprimé ne doit jamais réapparaître.
+  formationsDotees: isSupabaseConfigured ? [] : seed.formations.map((f) => f.id),
   formationProgress: [],
   subscriptions: [],
   subscriptionPayments: [],
@@ -82,8 +94,10 @@ export const loadState = (scope = null) => {
       if (!Array.isArray(saved.kits)) saved.kits = SOLAR_KITS;
       // Migration « Onduleurs » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.inverters)) saved.inverters = INVERTER_MODELS;
+      // Migration « Kits pompage » : même principe, dotation une seule fois.
+      if (!Array.isArray(saved.pompeKits)) saved.pompeKits = POMPE_KITS;
       if (!saved.payoutRequests) saved.payoutRequests = [];
-      if (!saved.formations) saved.formations = seed.formations;
+      if (!saved.formations) saved.formations = isSupabaseConfigured ? [] : seed.formations;
       if (!saved.formationProgress) saved.formationProgress = [];
       // Migration formation : structure « école » (cours → modules → leçons).
       // Les anciens modules plats ajoutés par le gérant sont conservés dans un
@@ -100,9 +114,24 @@ export const loadState = (scope = null) => {
             lecons: custom.map((f) => ({ id: f.id, title: f.title, type: f.type === 'pdf' ? 'pdf' : 'video', url: f.url, duration: f.duration || '' })),
           }],
         }] : [];
-        saved.formations = [...seed.formations, ...customCourse, ...saved.formations.filter((f) => Array.isArray(f.modules))];
+        saved.formations = [...(isSupabaseConfigured ? [] : seed.formations), ...customCourse, ...saved.formations.filter((f) => Array.isArray(f.modules))];
         // L'avancement par module n'a pas d'équivalent leçon : on ne garde que les lignes par leçon.
         saved.formationProgress = (saved.formationProgress || []).filter((p) => p.leconId);
+      }
+      // Dotation des NOUVEAUX cours du seed — MODE LOCAL UNIQUEMENT. En SaaS,
+      // les cours arrivent du serveur, partagés par l'organisation interne :
+      // en injecter une copie locale ici recréerait les doublons (mêmes ids
+      // sous chaque org) qui faisaient ressurgir une version périmée dès que
+      // la version partagée était masquée ou supprimée. UNE SEULE FOIS par
+      // cours (comme les kits) : re-doter à chaque ouverture ressusciterait
+      // un cours supprimé par le gérant.
+      if (!isSupabaseConfigured) {
+        const cursDotes = new Set(saved.formationsDotees || (saved.formations || []).map((f) => f.id));
+        const nouveauxCours = seed.formations.filter(
+          (f) => !cursDotes.has(f.id) && !(saved.formations || []).some((x) => x.id === f.id)
+        );
+        if (nouveauxCours.length) saved.formations = [...(saved.formations || []), ...nouveauxCours];
+        saved.formationsDotees = [...new Set([...cursDotes, ...seed.formations.map((f) => f.id)])];
       }
       if (!saved.subscriptions) saved.subscriptions = [];
       if (!saved.subscriptionPayments) saved.subscriptionPayments = [];

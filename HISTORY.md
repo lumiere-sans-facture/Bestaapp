@@ -5,7 +5,30 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-10
+- Fiche de dimensionnement à l'identité de l'installateur côté Pro (logo, couleurs, coordonnées)
+- Graphique de couverture calé sur le pire mois : un système bien dimensionné affiche 12 mois orange
+
 ## 2026-08-07
+- Fiche de dimensionnement en 3 pages : rentabilité et couverture mensuelle (graphique)
+- Devis : retour des coordonnées officielles BestaSolar (Bénin) sur les documents
+- Ensoleillement : table hors-ligne et repli calés sur les mesures NASA (4,3 h à Lomé)
+- Rendement des panneaux : 75 % → 85 % dans le calcul de dimensionnement
+- Dimensionnement sur le PIRE MOIS d'ensoleillement, plus la moyenne annuelle
+- Devis pompage : le kit seul — tuyauterie et installation se chiffrent sur place
+- Kits pompage modifiables dans l'app (comme « Mes kits ») et synchronisés à l'équipe
+- Deux nouveaux dimensionnements : par facture CEET (F CFA) et pompage solaire (kits suggérés)
+- Clients Pro : une entreprise a un nom ET une personne de contact
+- Togolisation complète : villes, ensoleillement, indicatifs +228, NIF, opérateurs Mobile Money
+- Purge des vieux caches affiliés : les cours masqués ne ressuscitent plus
+- Masquage réparé : plus de copies des cours chez les affiliés (source unique)
+- Formation : cours réservés aux membres Pro et cours masqués sans suppression
+- Formation : le catalogue BestaSolar est partagé à toutes les entreprises inscrites
+- Mon profil affiche l'entreprise de rattachement (+ script SQL de rattachement)
+- Sync bloquée : les abonnements des autres organisations ne polluent plus l'état local
+- Statut de synchronisation : le motif de l'échec devient lisible et copiable
+- Formation : catalogue enrichi (2 nouveaux cours) + dotation des mises à jour
+- Sync : un échec de tombstone ne bloque plus toute la réplication
 - Mes kits : moteur de recherche pour lier une ligne à un produit boutique
 - Mes kits : lier une ligne à un produit boutique synchronise son prix
 - Cohérence des prix : Boutique et devis affichent toujours le prix public

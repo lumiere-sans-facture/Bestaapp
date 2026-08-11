@@ -172,7 +172,7 @@ export function renderVague({ kind, data }) {
 
     <div class="legal push">
       <span>${esc(e.name)}${e.slogan ? ` — ${esc(e.slogan)}` : ''}</span>
-      <span>${e.rccm ? `RCCM ${esc(e.rccm)}` : ''}${e.rccm && e.ifu ? ' · ' : ''}${e.ifu ? `IFU ${esc(e.ifu)}` : ''}${total > 1 ? ` · Page ${i + 1} / ${total}` : ''}</span>
+      <span>${e.rccm ? `RCCM ${esc(e.rccm)}` : ''}${e.rccm && e.ifu ? ' · ' : ''}${e.ifu ? `NIF ${esc(e.ifu)}` : ''}${total > 1 ? ` · Page ${i + 1} / ${total}` : ''}</span>
     </div>
   </div>
   ${vagueBasse(e.couleurPrimaire, clair)}

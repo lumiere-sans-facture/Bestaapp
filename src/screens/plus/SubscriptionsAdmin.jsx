@@ -113,7 +113,7 @@ export default function SubscriptionsAdmin({ onBack }) {
           {pendingPayments.map((p) => (
             <div key={p.id} className="sheet-row">
               <span className="sheet-label">
-                {who(p)} · {p.methode === 'momo' ? 'MTN MoMo' : 'Moov Money'} {p.phone}
+                {who(p)} · {p.methode === 'momo' ? 'T-Money (Yas)' : 'Flooz (Moov)'} {p.phone}
                 {p.referenceTransaction && <span className="text-secondary"> · Réf {p.referenceTransaction}</span>}
                 <span className="text-secondary"> · {formatDate(p.date)}</span>
               </span>

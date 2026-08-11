@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Star } from 'lucide-react';
+import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Star, Building2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import StageBadge from '../../components/StageBadge';
@@ -117,7 +117,7 @@ export default function MyProfile({ onBack }) {
                 <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </Field>
               <Field label="Téléphone">
-                <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+                <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
               </Field>
               <Field label="Email">
                 <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="vous@..." />
@@ -141,6 +141,20 @@ export default function MyProfile({ onBack }) {
             <div className="sheet-row"><span className="sheet-label"><Mail size={14} /> Email</span><span className="sheet-value">{me.email || '—'}</span></div>
             <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Zone d'intervention</span><span className="sheet-value">{me.zone || '—'}</span></div>
             <div className="sheet-row"><span className="sheet-label">Membre depuis</span><span className="sheet-value">{formatDate(me.registeredAt)}</span></div>
+            {/* Entreprise de rattachement. Déterminante : catalogue, clients et
+                cours de formation sont isolés par entreprise. Deux comptes ne
+                partagent leurs données que sous le MÊME identifiant — un simple
+                homonyme (deux « BestaSolar ») reste étanche. Sans cette ligne,
+                rien dans l'app ne permettait de le constater. */}
+            {user.org && (
+              <>
+                <div className="sheet-row">
+                  <span className="sheet-label"><Building2 size={14} /> Entreprise</span>
+                  <span className="sheet-value">{user.org.name}</span>
+                </div>
+                <div className="field-hint profile-org-id">Identifiant : {user.org.id}</div>
+              </>
+            )}
           </>
         )}
       </div>

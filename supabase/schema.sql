@@ -18,6 +18,7 @@ create table if not exists public.profiles (
 create table if not exists public.products    (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
 create table if not exists public.kits        (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
 create table if not exists public.inverters   (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
+create table if not exists public."pompeKits"  (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
 create table if not exists public.leads       (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
 create table if not exists public.partners    (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
 create table if not exists public.commissions (id text primary key, data jsonb not null, updated_at timestamptz not null default now());
@@ -39,6 +40,7 @@ alter table public.profiles    enable row level security;
 alter table public.products    enable row level security;
 alter table public.kits        enable row level security;
 alter table public.inverters   enable row level security;
+alter table public."pompeKits" enable row level security;
 alter table public.leads       enable row level security;
 alter table public.partners    enable row level security;
 alter table public.commissions enable row level security;
@@ -60,7 +62,7 @@ create policy "team read" on public.profiles for select to authenticated using (
 do $$
 declare t text;
 begin
-  foreach t in array array['products','kits','inverters','leads','partners','commissions','devis','referrals','orders','formations','formationProgress','subscriptions','subscriptionPayments','companies','factures','proClients','payoutRequests'] loop
+  foreach t in array array['products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders','formations','formationProgress','subscriptions','subscriptionPayments','companies','factures','proClients','payoutRequests'] loop
     execute format('drop policy if exists "team full access" on public.%I', t);
     execute format('create policy "team full access" on public.%I for all to authenticated using (true) with check (true)', t);
   end loop;
@@ -70,7 +72,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['products','kits','inverters','leads','partners','commissions','devis','referrals','orders','formations','formationProgress','subscriptions','subscriptionPayments','companies','factures','proClients','payoutRequests'] loop
+  foreach t in array array['products','kits','inverters','pompeKits','leads','partners','commissions','devis','referrals','orders','formations','formationProgress','subscriptions','subscriptionPayments','companies','factures','proClients','payoutRequests'] loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
     exception when duplicate_object then null;
@@ -103,9 +105,9 @@ begin
     where table_schema = 'public' and table_name = 'profiles' and column_name = 'org_id'
   ) then
     insert into public.profiles (id, email, name, role, phone, avatar) values
-      ('u1', 'adam@bestasolar.bj',   'Adam Adébiyi',     'gerant',     '+229 97 12 34 56', 'AA'),
-      ('u2', 'fatou@bestasolar.bj',  'Fatou Boko',       'technicien', '+229 96 78 90 12', 'FB'),
-      ('u3', 'ibrahim@bestasolar.bj','Ibrahim Dan Djido','technicien', '+229 95 55 66 77', 'ID')
+      ('u1', 'adam@bestasolar.tg',   'Adam Adébiyi',     'gerant',     '+228 97 12 34 56', 'AA'),
+      ('u2', 'fatou@bestasolar.tg',  'Fatou Boko',       'technicien', '+228 96 78 90 12', 'FB'),
+      ('u3', 'ibrahim@bestasolar.tg','Ibrahim Dan Djido','technicien', '+228 95 55 66 77', 'ID')
     on conflict (id) do nothing;
   end if;
 end $$;

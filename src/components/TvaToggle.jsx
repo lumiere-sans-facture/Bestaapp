@@ -18,7 +18,7 @@ export default function TvaToggle({ value, onChange }) {
           TVA {TVA_PCT} %
         </button>
       </div>
-      <div className="field-hint">Le solaire est exonéré de TVA par défaut au Bénin.</div>
+      <div className="field-hint">Le solaire est exonéré de TVA par défaut au Togo.</div>
     </div>
   );
 }

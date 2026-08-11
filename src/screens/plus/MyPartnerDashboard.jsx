@@ -424,7 +424,7 @@ export default function MyPartnerDashboard({ onBack }) {
               id="mpd-momo"
               className="input"
               type="tel"
-              placeholder="+229 ..."
+              placeholder="+228 ..."
               value={momo === null ? me.momoNumber || '' : momo}
               onChange={(e) => setMomo(e.target.value)}
             />
@@ -481,7 +481,7 @@ export default function MyPartnerDashboard({ onBack }) {
           <Field label={formRetrait.methode === 'momo' ? 'Numéro Mobile Money *' : 'Coordonnées de règlement *'}>
             <input className="input" value={formRetrait.telephone} required
               onChange={(e) => setFormRetrait({ ...formRetrait, telephone: e.target.value })}
-              placeholder="+229 ..." />
+              placeholder="+228 ..." />
           </Field>
           <Field label="Message (facultatif)">
             <input className="input" value={formRetrait.note}

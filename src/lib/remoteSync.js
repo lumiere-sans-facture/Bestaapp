@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 // Chaque entité est une ligne { id, data } ; la logique métier reste
 // dans DataContext, ce module ne fait que répliquer l'état.
 
-export const SYNCED_COLLECTIONS = ['products', 'kits', 'inverters', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'factures', 'proClients', 'payoutRequests'];
+export const SYNCED_COLLECTIONS = ['products', 'kits', 'inverters', 'pompeKits', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'factures', 'proClients', 'payoutRequests'];
 
 // Organisation courante (schéma multi-entreprise). Renseignée par AuthContext
 // au chargement du profil ; absente (null) sur l'ancien schéma mono-équipe —
@@ -15,8 +15,13 @@ let currentOrgId = null;
 // seule l'organisation interne le pousse. Tant que le type est inconnu, on
 // s'abstient de pousser les produits (prudence : jamais de copie).
 let currentOrgKind = null;
-const SHARED_ORG_ID = 'org-bestasolar';
 const pushesProducts = () => !currentOrgId || currentOrgKind === 'interne';
+// Collections dont l'organisation INTERNE est propriétaire et qu'elle partage
+// en lecture avec toutes les autres (policies « lecture partagee ») : le
+// catalogue produits et les cours de formation. Pour ces tables seulement, la
+// réception peut légitimement contenir des lignes d'une AUTRE organisation ;
+// elles sont marquées `partage` et traitées en lecture seule.
+const TABLES_PARTAGEES = new Set(['products', 'formations']);
 export const setSyncOrg = (orgId, kind = null) => {
   currentOrgId = orgId || null;
   currentOrgKind = kind || null;
@@ -32,27 +37,57 @@ const tableManquante = (error) =>
   error?.code === '42P01' || error?.code === 'PGRST205'
   || /does not exist|schema cache/i.test(error?.message || '');
 
+/** Première occurrence par clé, ordre d'entrée préservé. Les collections sont
+ *  rangées du plus récent au plus ancien : la première est donc la bonne. */
+export const dedupePar = (items, cle) => {
+  const vus = new Map();
+  for (const item of items) {
+    const k = cle(item);
+    if (!vus.has(k)) vus.set(k, item);
+  }
+  return [...vus.values()];
+};
+
 /** Récupère toutes les collections + les tombstones. { empty, collections, tombstones } */
 export async function pullAll() {
   // Lecture des collections en parallèle (au lieu de 15 allers-retours séquentiels).
   const fetched = await Promise.all(
     SYNCED_COLLECTIONS.map(async (table) => {
-      // Catalogue partagé : en multi-entreprise, la lecture renvoie aussi les
-      // produits BestaSolar. Une entreprise ayant reçu une copie historique
-      // verrait des doublons — on garde la ligne BestaSolar (source de vérité).
-      const dedupe = table === 'products' && currentOrgId;
+      // En multi-entreprise, org_id est lu pour TOUTES les tables. Certaines
+      // policies (abonnements, paiements) autorisent l'admin plateforme à lire
+      // les lignes des AUTRES organisations : sans filtrage, elles entraient
+      // dans l'état local, repartaient estampillées de NOTRE org_id, puis
+      // revenaient en double au pull suivant (l'originale + notre copie, même
+      // id — la clé primaire est (org_id, id)). Deux lignes de même clé dans
+      // un envoi font rejeter TOUT le lot (« ON CONFLICT DO UPDATE command
+      // cannot affect row a second time ») : synchronisation bloquée en
+      // boucle. La vue inter-organisations de l'admin passe par des RPC
+      // dédiées (adminSubscriptionsOverview…), jamais par cette réplication.
+      const multiOrg = !!currentOrgId;
       if (tablesAbsentes.has(table)) return [table, []];
-      const { data, error } = await supabase.from(table).select(dedupe ? 'id, data, org_id' : 'id, data');
+      const { data, error } = await supabase.from(table).select(multiOrg ? 'id, data, org_id' : 'id, data');
       if (error) {
         if (tableManquante(error)) { tablesAbsentes.add(table); return [table, []]; }
         throw error;
       }
       let rows = data || [];
-      if (dedupe) {
-        const shared = new Set(rows.filter((r) => r.org_id === SHARED_ORG_ID).map((r) => r.id));
-        rows = rows.filter((r) => r.org_id === SHARED_ORG_ID || !shared.has(r.id));
+      if (multiOrg) {
+        if (TABLES_PARTAGEES.has(table)) {
+          // Une ligne venue d'une AUTRE organisation ne peut être ici que
+          // l'actif partagé de l'org interne (la policy ne renvoie rien
+          // d'autre). Une entreprise ayant reçu une copie historique verrait
+          // des doublons — la ligne partagée prime, c'est la source de vérité.
+          const partages = new Set(rows.filter((r) => r.org_id !== currentOrgId).map((r) => r.id));
+          rows = rows.filter((r) => r.org_id !== currentOrgId || !partages.has(r.id));
+        } else {
+          rows = rows.filter((r) => r.org_id === currentOrgId);
+        }
       }
-      return [table, rows.map((row) => ({ ...row.data, id: row.id }))];
+      return [table, dedupePar(rows, (r) => r.id).map((row) => (
+        multiOrg && row.org_id !== currentOrgId
+          ? { ...row.data, id: row.id, partage: true }
+          : { ...row.data, id: row.id }
+      ))];
     })
   );
   const collections = {};
@@ -74,7 +109,11 @@ export async function pullAll() {
     for (const table of SYNCED_COLLECTIONS) {
       const deleted = tombstones.get(table);
       if (deleted?.size) {
-        collections[table] = collections[table].filter((item) => !deleted.has(item.id));
+        // Les éléments PARTAGÉS sont immunisés : un tombstone de NOTRE
+        // organisation (ex. : purge d'une vieille copie locale d'un cours)
+        // ne doit jamais masquer l'actif de l'organisation interne — sinon
+        // un cours partagé disparaîtrait ici définitivement.
+        collections[table] = collections[table].filter((item) => item.partage || !deleted.has(item.id));
       }
     }
   } catch {
@@ -121,6 +160,7 @@ async function envoyerLot(table, lot) {
       const { error } = await supabase.from(table).upsert(lot);
       if (!error) return;
       derniere = new Error(error.message);
+      derniere.code = error.code; // conservé pour la détection « table manquante »
     } catch (e) {
       derniere = e; // requête avortée : le client lève au lieu de retourner error
     }
@@ -147,21 +187,30 @@ export async function pushCollections(collections) {
     // Le catalogue n'est poussé que par l'organisation interne BestaSolar.
     if (table === 'products' && !pushesProducts()) continue;
     // Table pas encore créée côté serveur : on n'envoie rien plutôt que de
-    // faire remonter une erreur de synchronisation à l'utilisateur.
-    if (tablesAbsentes.has(table)) continue;
-    let items = items0;
+    // faire remonter une erreur de synchronisation à l'utilisateur. Elle est
+    // comptée « traitée » pour que l'appelant cesse de la représenter.
+    if (tablesAbsentes.has(table)) { reussies.push(table); continue; }
+    // Un élément PARTAGÉ appartient à l'organisation interne : le repousser
+    // le recopierait sous notre org_id (et la RLS refuserait l'écriture chez
+    // son propriétaire). Il est lu, jamais réémis.
+    let items = items0.filter((i) => !i.partage);
     // Vérité serveur : un abonnement « actif » et un paiement « confirme »
     // ne s'écrivent que côté serveur (RPC admin). L'app ne les repousse
     // jamais — la RLS les rejetterait et bloquerait toute la réplication.
     if (currentOrgId && table === 'subscriptions') items = items.filter((i) => i.status !== 'actif');
     if (currentOrgId && table === 'subscriptionPayments') items = items.filter((i) => i.statut !== 'confirme');
-    const rows = items.map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
+    // Filet : deux lignes de même id dans un même envoi font rejeter TOUT le
+    // lot par Postgres (« ON CONFLICT DO UPDATE command cannot affect row a
+    // second time »), donc toute la synchronisation. Un doublon local — quelle
+    // qu'en soit l'origine — ne doit jamais avoir ce pouvoir.
+    const rows = dedupePar(items, (i) => i.id)
+      .map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
     if (!rows.length) { reussies.push(table); continue; }
     try {
       for (const lot of decouperEnLots(rows)) await envoyerLot(table, lot);
       reussies.push(table);
     } catch (e) {
-      if (tableManquante(e)) { tablesAbsentes.add(table); continue; }
+      if (tableManquante(e)) { tablesAbsentes.add(table); reussies.push(table); continue; }
       erreurs.push(`${table} : ${e.message}`);
     }
   }
@@ -178,10 +227,21 @@ export async function pushTombstone(table, id) {
   // Une entreprise externe ne supprime jamais le catalogue partagé (un
   // tombstone local masquerait les produits BestaSolar à la réception).
   if (table === 'products' && !pushesProducts()) return;
-  const { error } = await supabase
-    .from('tombstones')
-    .upsert(withOrg({ id, collection: table, deleted_at: new Date().toISOString() }));
-  if (error) throw error;
+  // Même filet que les collections : si la table tombstones n'existe pas
+  // encore côté serveur (bloc « tombstones » de schema.sql jamais exécuté),
+  // échouer ici bloquait TOUTE la réplication en boucle — la première
+  // suppression locale rendait la synchronisation rouge en permanence,
+  // et plus rien ne montait. On saute l'upsert (le pull tolère déjà son
+  // absence) et la suppression est quand même appliquée à la table source.
+  if (!tablesAbsentes.has('tombstones')) {
+    const { error } = await supabase
+      .from('tombstones')
+      .upsert(withOrg({ id, collection: table, deleted_at: new Date().toISOString() }));
+    if (error) {
+      if (tableManquante(error)) tablesAbsentes.add('tombstones');
+      else throw error;
+    }
+  }
   // Supprimer aussi la ligne de la table source (cohérence distante)
   await supabase.from(table).delete().eq('id', id);
 }

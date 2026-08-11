@@ -61,7 +61,7 @@ export function generateProPdf({ kind, company = {}, modele = 'couleur', doc: d,
 
   const coordLines = [
     [company.telephone && `Tél : ${company.telephone}`, company.email && company.email].filter(Boolean).join('   ·   '),
-    [company.adresse, company.ifu && `IFU : ${company.ifu}`, company.rccm && `RCCM : ${company.rccm}`].filter(Boolean).join('   ·   '),
+    [company.adresse, company.ifu && `NIF : ${company.ifu}`, company.rccm && `RCCM : ${company.rccm}`].filter(Boolean).join('   ·   '),
   ].filter(Boolean);
 
   let y;

@@ -33,7 +33,7 @@ export default function Boutique() {
   const [detailId, setDetailId] = useState(null);
   // Paiement en ligne : null fermé, 'form' saisie, sinon la commande confirmée
   const [payment, setPayment] = useState(null);
-  const [payForm, setPayForm] = useState({ operator: 'MTN MoMo', phone: '' });
+  const [payForm, setPayForm] = useState({ operator: 'T-Money (Yas)', phone: '' });
   const [justAdded, setJustAdded] = useState(null);
   // Confirmations (remplacent window.confirm) : vidage du panier, suppression produit.
   const [confirmClear, setConfirmClear] = useState(false);
@@ -140,7 +140,7 @@ export default function Boutique() {
   }, [products, selectedCategory, search, priceRange, powerRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePayOnline = () => {
-    setPayForm({ operator: 'MTN MoMo', phone: user.phone || '' });
+    setPayForm({ operator: 'T-Money (Yas)', phone: user.phone || '' });
     setCartOpen(false);
     setPayment('form');
   };
@@ -375,7 +375,7 @@ export default function Boutique() {
             <div className="input-group">
               <span className="input-label" id="bq-operator-label">Opérateur Mobile Money</span>
               <div className="client-type-toggle" role="group" aria-labelledby="bq-operator-label">
-                {['MTN MoMo', 'Moov Money'].map((op) => (
+                {['T-Money (Yas)', 'Flooz (Moov)'].map((op) => (
                   <button
                     key={op}
                     type="button"
@@ -389,7 +389,7 @@ export default function Boutique() {
               </div>
             </div>
             <Field label="Numéro Mobile Money *">
-              <input className="input" type="tel" required value={payForm.phone} onChange={(e) => setPayForm({ ...payForm, phone: e.target.value })} placeholder="+229 ..." />
+              <input className="input" type="tel" required value={payForm.phone} onChange={(e) => setPayForm({ ...payForm, phone: e.target.value })} placeholder="+228 ..." />
             </Field>
             <div className="devis-summary">
               <div className="devis-summary-row total"><span>Montant à payer</span><span>{formatCFA(cartTotal)}</span></div>

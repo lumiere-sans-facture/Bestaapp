@@ -30,15 +30,15 @@ export default function ProDocuments() {
             <button className="btn btn-sm btn-accent" onClick={() => navigate('/pro/abonnement')}>Renouveler</button>
           </div>
         )}
-        {/* Conformité : au Bénin, une facture doit porter l'IFU de l'émetteur.
+        {/* Conformité : au Togo, une facture doit porter le NIF de l'émetteur.
             Sans ce rappel, un abonné émet des factures non conformes sans le
             savoir — c'est lui qui en répond devant l'administration. */}
         {!company?.ifu && (
           <div className="pro-alert is-info">
             <FileWarning size={17} />
             <span>
-              Vos factures ne portent pas d'<strong>IFU</strong>. Il est obligatoire sur une
-              facture au Bénin — renseignez-le dans « Mon entreprise ».
+              Vos factures ne portent pas d'<strong>NIF</strong>. Il est obligatoire sur une
+              facture au Togo — renseignez-le dans « Mon entreprise ».
             </span>
             <button className="btn btn-sm btn-outline" onClick={() => navigate('/pro/entreprise')}>
               Renseigner

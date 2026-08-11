@@ -26,7 +26,7 @@ describe('buildRecuCommissionHtml', () => {
   };
   const html = buildRecuCommissionHtml({
     commission,
-    partner: { name: 'Aminata Kesso', code: 'BESTA-AMINATA', phone: '+229 96 44 55 66' },
+    partner: { name: 'Aminata Kesso', code: 'BESTA-AMINATA', phone: '+228 96 44 55 66' },
     lead: { name: 'Hôtel du Parc', estimatedValue: 1850000 },
     payeur: { name: 'Adam Adébiyi' },
     rates: RATES,
@@ -55,7 +55,7 @@ describe('buildRecuCommissionHtml', () => {
 
 describe('buildReleveCommissionsHtml', () => {
   const html = buildReleveCommissionsHtml({
-    partner: { name: 'Mamadou Balogun', code: 'BESTA-MAMADOU', momoNumber: '+229 97 11 22 33' },
+    partner: { name: 'Mamadou Balogun', code: 'BESTA-MAMADOU', momoNumber: '+228 97 11 22 33' },
     commissions: [
       { id: 'a', leadId: 'l3', amount: 29400, level: 1, status: 'payée', paidAt: '2026-06-10', createdAt: '2026-06-09', payRef: 'TX1' },
       { id: 'b', leadId: 'l8', amount: 26700, level: 1, status: 'payée', paidAt: '2026-05-25', createdAt: '2026-05-20' },
@@ -69,7 +69,7 @@ describe('buildReleveCommissionsHtml', () => {
     expect(html).toContain('Pharmacie Alafia');
     expect(html).toContain('réf. TX1');
     expect(html).toContain('En attente');
-    expect(html).toContain('+229 97 11 22 33');
+    expect(html).toContain('+228 97 11 22 33');
   });
 
   it('totalise payé / reste à payer et arrête le solde en lettres', () => {

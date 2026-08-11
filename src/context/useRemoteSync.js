@@ -31,7 +31,12 @@ export function useRemoteSync(state, setState, stateRef) {
         const localItems = stateRef.current[table] || [];
         const remoteMap = new Map(remoteItems.map((i) => [i.id, i]));
         const deletedIds = tombstones.get(table) || new Set();
-        const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id));
+        // `partage` : élément appartenant à l'organisation interne, reçu en
+        // lecture (catalogue, cours de formation). Absent de la réception, il
+        // a été retiré à la source — le conserver comme « créé hors-ligne »
+        // le figerait ici pour toujours, sans propriétaire pour le mettre à
+        // jour ni le supprimer.
+        const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id) && !i.partage);
         // Rien à ajouter localement : on garde la RÉFÉRENCE reçue du serveur.
         // Créer un nouveau tableau ferait croire à une modification locale, et
         // l'app renverrait l'intégralité des 14 tables au serveur à CHAQUE
@@ -110,8 +115,11 @@ export function useRemoteSync(state, setState, stateRef) {
     for (const table of SYNCED_COLLECTIONS) {
       if (state[table] === syncedRef.current[table]) continue;
       changed[table] = state[table] || [];
-      // Détection des suppressions locales
-      const prevIds = new Set((syncedRef.current[table] || []).map((i) => i.id));
+      // Détection des suppressions locales. Les éléments PARTAGÉS en sont
+      // exclus : ils ne nous appartiennent pas, et un tombstone porte sur un
+      // id — il masquerait la ligne de l'organisation interne à la réception
+      // suivante, faisant disparaître un cours partagé pour tout le monde ici.
+      const prevIds = new Set((syncedRef.current[table] || []).filter((i) => !i.partage).map((i) => i.id));
       const nextIds = new Set((state[table] || []).map((i) => i.id));
       const deleted = [...prevIds].filter((id) => !nextIds.has(id));
       if (deleted.length) deletedByTable[table] = deleted;
@@ -121,38 +129,60 @@ export function useRemoteSync(state, setState, stateRef) {
     let annule = false;
     lastPushAt.current = Date.now();
     const doSync = async () => {
+      const erreurs = [];
+      let reussies = [];
       try {
-        await pushCollections(changed);
-        for (const [table, ids] of Object.entries(deletedByTable)) {
-          for (const id of ids) await pushTombstone(table, id);
+        reussies = await pushCollections(changed);
+      } catch (e) {
+        reussies = e.reussies || [];
+        erreurs.push(e.message);
+      }
+      // Suppressions locales → tombstones, suivies PAR TABLE et tentées même
+      // si l'envoi des lignes a échoué (opérations indépendantes, upsert
+      // idempotent). Avant, un seul tombstone en échec faisait tout perdre :
+      // l'erreur n'ayant pas de `reussies`, AUCUNE table n'était acquise et
+      // l'intégralité repartait à chaque reprise — le volume ne redescendait
+      // jamais, voyant rouge en permanence.
+      const suppressionsEchouees = new Set();
+      for (const [table, ids] of Object.entries(deletedByTable)) {
+        for (const id of ids) {
+          try {
+            await pushTombstone(table, id);
+          } catch (e) {
+            suppressionsEchouees.add(table);
+            erreurs.push(`${table} (suppression) : ${e.message}`);
+            break;
+          }
         }
-        if (annule) return;
+      }
+      if (annule) return;
+      // Une table n'est acquise que si ses lignes ET ses suppressions sont
+      // passées. L'acquérir avec un tombstone en échec ferait oublier la
+      // suppression (deletedByTable est recalculé depuis syncedRef) : l'item
+      // resterait sur le serveur et réapparaîtrait au pull suivant (zombie).
+      const acquises = reussies.filter((t) => !suppressionsEchouees.has(t));
+      if (acquises.length) {
+        const acquis = { ...syncedRef.current };
+        for (const t of acquises) if (changed[t]) acquis[t] = changed[t];
+        syncedRef.current = acquis;
+      }
+      if (!erreurs.length) {
         // Réellement répliqué : on peut enfin considérer ces données à jour.
-        syncedRef.current = { ...syncedRef.current, ...changed };
         echecs.current = 0;
         setSyncError(null);
         setSyncStatus('online');
-      } catch (e) {
-        console.error('Réplication Supabase échouée :', e.message);
-        if (annule) return;
-        // Le voyant passe au rouge et l'envoi est REJOUÉ : les données locales
-        // restent marquées « à pousser » tant qu'elles ne sont pas arrivées.
-        // Les tables qui SONT passées sont toutefois acquises : sans cela, un
-        // échec sur une seule table ferait tout renvoyer à chaque tentative —
-        // le volume ne redescendrait jamais et la reprise échouerait toujours.
-        if (e.reussies?.length) {
-          const acquis = { ...syncedRef.current };
-          for (const t of e.reussies) if (changed[t]) acquis[t] = changed[t];
-          syncedRef.current = acquis;
-        }
-        echecs.current += 1;
-        const restantes = Object.keys(changed).filter((t) => !e.reussies?.includes(t));
-        setSyncError(`${e.message}${restantes.length ? ` (en attente : ${restantes.join(', ')})` : ''}`);
-        setSyncStatus('error');
-        const delai = Math.min(60000, 5000 * 2 ** (echecs.current - 1));
-        clearTimeout(retryTimer.current);
-        retryTimer.current = setTimeout(() => setRetryTick((t) => t + 1), delai);
+        return;
       }
+      console.error('Réplication Supabase échouée :', erreurs.join(' · '));
+      // Le voyant passe au rouge et l'envoi est REJOUÉ : les données locales
+      // restent marquées « à pousser » tant qu'elles ne sont pas arrivées.
+      echecs.current += 1;
+      const restantes = Object.keys(changed).filter((t) => !acquises.includes(t));
+      setSyncError(`${erreurs.join(' · ')}${restantes.length ? ` (en attente : ${restantes.join(', ')})` : ''}`);
+      setSyncStatus('error');
+      const delai = Math.min(60000, 5000 * 2 ** (echecs.current - 1));
+      clearTimeout(retryTimer.current);
+      retryTimer.current = setTimeout(() => setRetryTick((t) => t + 1), delai);
     };
     doSync();
     return () => { annule = true; };

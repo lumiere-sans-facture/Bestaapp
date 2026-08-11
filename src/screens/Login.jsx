@@ -166,7 +166,7 @@ export default function Login() {
         <div className="login-header">
           <div className="logo-icon"><Sun size={32} /></div>
           <h1 className="login-title">BestaSolar Pro</h1>
-          <p className="login-subtitle">CRM solaire — Parakou, Bénin</p>
+          <p className="login-subtitle">CRM solaire — Lomé, Togo</p>
         </div>
 
         {/* Lien « mot de passe oublié » cliqué : définir le nouveau mot de passe. */}
@@ -194,7 +194,7 @@ export default function Login() {
             <div className="input-group">
               <label className="input-label" htmlFor="complete-phone">Numéro de téléphone</label>
               <input id="complete-phone" className="input" type="tel" required value={phone}
-                onChange={(e) => setPhone(e.target.value)} placeholder="+229 01 XX XX XX XX" autoComplete="tel" />
+                onChange={(e) => setPhone(e.target.value)} placeholder="+228 90 XX XX XX" autoComplete="tel" />
             </div>
             {!teamCode && (
               <div className="input-group">
@@ -225,7 +225,7 @@ export default function Login() {
             <div className="input-group">
               <label className="input-label" htmlFor="signup-phone">Numéro de téléphone</label>
               <input id="signup-phone" className="input" type="tel" required value={phone}
-                onChange={(e) => setPhone(e.target.value)} placeholder="+229 01 XX XX XX XX" autoComplete="tel" />
+                onChange={(e) => setPhone(e.target.value)} placeholder="+228 90 XX XX XX" autoComplete="tel" />
             </div>
             {emailField}
             {passwordField('Mot de passe (8 caractères min.)', 'new-password')}

@@ -140,7 +140,11 @@ export const AUTONOMY_OPTIONS = [
 export const INSTALLATION_COST_PER_PANEL = 10000;
 export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
-export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PVGIS indisponibles
+// Repli (Togo) si données NASA/PVGIS indisponibles — heures de pic du PIRE
+// MOIS (saison des pluies), pas la moyenne annuelle : le système doit tenir
+// toute l'année, juillet-août compris. 4,3 h = pire mois mesuré (NASA) à
+// Lomé, la zone la moins ensoleillée du pays — prudent partout ailleurs.
+export const DEFAULT_PEAK_SUN_HOURS = 4.3;
 
 // Hypothèses de dimensionnement — exportées pour être affichées telles quelles
 // sur la fiche de dimensionnement (ne pas dupliquer ces valeurs ailleurs).
@@ -152,7 +156,7 @@ export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PV
 // des ≥ 95 % annoncés : c'est une marge de sécurité maison qui préserve la
 // durée de vie du parc.
 export const SIZING_PARAMS = {
-  panelEfficiency: 0.75,    // rendement des panneaux appliqué au calcul
+  panelEfficiency: 0.85,    // rendement des panneaux appliqué au calcul
   batteryEfficiency: 0.95,  // rendement charge/décharge aller-retour (LiFePO4)
   depthOfDischarge: 0.8,    // profondeur de décharge retenue (marge de sécurité)
   hybridBatteryRatio: 0.8,  // part de la consommation nocturne stockée en hybride

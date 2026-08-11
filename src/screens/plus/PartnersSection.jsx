@@ -356,10 +356,10 @@ export default function PartnersSection({ onBack }) {
             <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Mamadou Balogun" />
           </Field>
           <Field label="Téléphone *">
-            <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+            <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
           </Field>
           <Field label="Numéro Mobile Money (paiement des commissions)">
-            <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+229 ..." />
+            <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+228 ..." />
           </Field>
           <Field label="Parrain (recruteur)">
             <select className="input" value={form.sponsorId} onChange={(e) => setForm({ ...form, sponsorId: e.target.value })}>

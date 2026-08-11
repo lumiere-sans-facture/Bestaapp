@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, User, Building2, Phone, MapPin, Check, Pencil, Send, FileText, Receipt, UserPlus } from 'lucide-react';
+import { Plus, User, Phone, MapPin, Check, Pencil, Send, FileText, Receipt, UserPlus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
@@ -9,10 +9,11 @@ import {
 } from '../../../utils/paiement';
 import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
+import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
 import DangerZone from '../../../components/DangerZone';
 import { useToast } from '../../../components/Toast';
 
-const EMPTY = { name: '', phone: '', ville: '', type: 'particulier' };
+const EMPTY = { name: '', contact: '', phone: '', ville: '', type: 'particulier' };
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
@@ -68,7 +69,7 @@ export default function ClientsTab({ company }) {
 
   const openNew = () => { setForm(EMPTY); setEditingId('new'); };
   const openEdit = (c) => {
-    setForm({ name: c.name, phone: c.phone || '', ville: c.ville || '', type: c.type || 'particulier' });
+    setForm({ name: c.name, contact: c.contact || '', phone: c.phone || '', ville: c.ville || '', type: c.type || 'particulier' });
     setViewId(null);
     setEditingId(c.id);
   };
@@ -76,7 +77,7 @@ export default function ClientsTab({ company }) {
 
   const submit = (e) => {
     e.preventDefault();
-    const data = { name: form.name.trim(), phone: form.phone.trim(), ville: form.ville.trim(), type: form.type };
+    const data = { name: form.name.trim(), contact: contactEffectif(form).trim(), phone: form.phone.trim(), ville: form.ville.trim(), type: form.type };
     if (!data.name) return;
     if (editingId === 'new') addProClient({ userId: user.id, ...data });
     else updateProClient(editingId, data);
@@ -101,6 +102,7 @@ export default function ClientsTab({ company }) {
     addProClient({
       userId: user.id,
       name: l.name,
+      contact: l.contact || '',
       phone: l.phone || '',
       ville: l.address || '',
       type: l.clientType === 'entreprise' ? 'entreprise' : 'particulier',
@@ -166,6 +168,10 @@ export default function ClientsTab({ company }) {
             <div className="sheet-section">
               <div className="sheet-section-title">Contact</div>
               <div className="sheet-row"><span className="sheet-label">Type</span><span className="sheet-value">{viewed.type === 'entreprise' ? 'Entreprise' : 'Particulier'}</span></div>
+              {/* Un particulier est son propre contact : la ligne n'apparaît que pour une entreprise. */}
+              {viewed.type === 'entreprise' && viewed.contact && (
+                <div className="sheet-row"><span className="sheet-label"><User size={14} /> Contact</span><span className="sheet-value">{viewed.contact}</span></div>
+              )}
               {viewed.phone && (
                 <div className="sheet-row">
                   <span className="sheet-label"><Phone size={14} /> Téléphone</span>
@@ -244,20 +250,21 @@ export default function ClientsTab({ company }) {
       {/* Formulaire création / édition */}
       <Sheet open={editingId !== null} onClose={close} title={editingId === 'new' ? 'Nouveau client' : 'Modifier le client'}>
         <form onSubmit={submit}>
-          <Field label="Nom du client *">
-            <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nom / raison sociale" />
-          </Field>
-          <div className="client-type-toggle" role="group" aria-label="Type de client">
-            <button type="button" className={`client-type-btn ${form.type === 'particulier' ? 'active' : ''}`} onClick={() => setForm({ ...form, type: 'particulier' })}>
-              <User size={16} /> Particulier
-            </button>
-            <button type="button" className={`client-type-btn ${form.type === 'entreprise' ? 'active' : ''}`} onClick={() => setForm({ ...form, type: 'entreprise' })}>
-              <Building2 size={16} /> Entreprise
-            </button>
-          </div>
+          {/* Identité adaptée au type : une entreprise a un nom ET une
+              personne de contact — le champ manquait ici, seule la raison
+              sociale était demandée. Composant partagé avec le carnet public. */}
+          <ClientIdentityFields
+            idPrefix="proclient"
+            clientType={form.type}
+            onTypeChange={(type) => setForm({ ...form, type })}
+            name={form.name}
+            onNameChange={(name) => setForm({ ...form, name })}
+            contact={form.contact}
+            onContactChange={(contact) => setForm({ ...form, contact })}
+          />
           <div className="form-row-2">
             <Field label={<><Phone size={13} /> Téléphone</>}>
-              <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+              <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
             </Field>
             <Field label={<><MapPin size={13} /> Ville</>}>
               <input className="input" value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })} />

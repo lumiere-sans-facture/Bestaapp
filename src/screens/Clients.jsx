@@ -29,7 +29,7 @@ function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIc
         onContactChange={(contact) => setForm({ ...form, contact })}
       />
       <Field label="Téléphone">
-        <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+        <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
       </Field>
       <Field label="Adresse">
         <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Quartier, ville" />

@@ -62,6 +62,25 @@ export const courseCounts = (course) => ({
   lecons: allLecons(course).length,
 });
 
+// ---- Garde-fous d'accès aux cours ----
+// Deux réglages posés par le gérant sur chaque cours :
+//   masque : le cours existe mais n'est visible que de ses gestionnaires
+//            (brouillon, contenu retiré sans suppression — la progression
+//            des membres est conservée pour un éventuel retour).
+//   acces  : 'tous' (défaut) ou 'pro' — réservé aux abonnés Devis Pro actifs.
+// Les cours existants n'ont aucun de ces champs : ils restent ouverts à tous.
+
+/** Le cours apparaît-il dans le catalogue de cet utilisateur ?
+ *  `gere` : vrai si l'utilisateur administre ce cours (gérant de l'org
+ *  propriétaire) — il voit alors aussi ses cours masqués. */
+export const coursVisible = (course, gere = false) => !course?.masque || gere;
+
+/** Le cours est-il verrouillé pour cet utilisateur (visible mais pas
+ *  ouvrable) ? Réservé Pro sans abonnement actif — le gestionnaire du cours
+ *  n'est jamais verrouillé. */
+export const coursVerrouille = (course, { proActif = false, gere = false } = {}) =>
+  course?.acces === 'pro' && !proActif && !gere;
+
 // ---- Sommaire minuté des vidéos (« Timer de la vidéo ») ----
 
 /** « mm:ss » ou « h:mm:ss » → secondes (NaN si illisible). */
