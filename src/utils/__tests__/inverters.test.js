@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
 import { INVERTER_MODELS } from '../../data/inverters';
 import { normaliserOnduleur, onduleurEstValide, resumeOnduleur, dupliquerOnduleur } from '../inverters';
-import { buildKitQuotation, suggestInverterForPower, SIZING_PARAMS } from '../solarSizing';
+import { buildKitQuotation, suggestInverterFor, puissanceSortie, limitePv, SIZING_PARAMS } from '../solarSizing';
 
 describe('normaliserOnduleur / onduleurEstValide', () => {
   it('coerce les champs texte du formulaire en nombres', () => {
@@ -40,28 +40,54 @@ describe('normaliserOnduleur / onduleurEstValide', () => {
   });
 });
 
-describe('suggestInverterForPower', () => {
+describe('suggestInverterFor — pic de consommation puis capacité PV', () => {
   const inverters = [
     { id: 'i3', capacity: 3, maxPvPower: 3900 },
     { id: 'i5', capacity: 5, maxPvPower: 6500 },
     { id: 'i8', capacity: 8, maxPvPower: 10400 },
   ];
 
-  it('suggère le plus petit onduleur dont la puissance PV max couvre le besoin + marge', () => {
-    // Besoin 4000 W × marge 1.2 = 4800 W → l'onduleur 3kVA (3900 W) ne suffit pas, le 5kVA (6500 W) oui.
-    expect(suggestInverterForPower(inverters, 4000).id).toBe('i5');
+  it('la puissance de sortie se déduit des kVA (facteur de puissance 0,8)', () => {
+    expect(puissanceSortie({ capacity: 3 })).toBe(2400);
+    expect(puissanceSortie({ capacity: 5 })).toBe(4000);
+    // Une puissance de sortie explicite prime sur la déduction.
+    expect(puissanceSortie({ capacity: 5, maxPower: 4600 })).toBe(4600);
   });
 
-  it('ne suggère jamais un onduleur dont la puissance PV max est insuffisante quand un autre convient', () => {
-    expect(suggestInverterForPower(inverters, 4000).maxPvPower).toBeGreaterThanOrEqual(4000 * SIZING_PARAMS.inverterMargin);
+  it('choisit le plus petit onduleur qui TIENT LE PIC, marge comprise', () => {
+    // Pic 2 000 W × 1,2 = 2 400 W → le 3 kVA (2 400 W) suffit tout juste.
+    expect(suggestInverterFor(inverters, { peakLoad: 2000, pvPower: 3000 }).id).toBe('i3');
+    // Pic 2 660 W × 1,2 = 3 192 W → le 3 kVA ne tient plus, le 5 kVA oui.
+    expect(suggestInverterFor(inverters, { peakLoad: 2660, pvPower: 3000 }).id).toBe('i5');
   });
 
-  it('retombe sur le plus grand disponible si aucun ne couvre le besoin', () => {
-    expect(suggestInverterForPower(inverters, 20000).id).toBe('i8');
+  it('le pic prime sur les panneaux : peu de PV mais gros pic → gros onduleur', () => {
+    const choisi = suggestInverterFor(inverters, { peakLoad: 4000, pvPower: 1000 });
+    expect(choisi.id).toBe('i8'); // 5 kVA = 4 000 W < 4 800 W requis
+    expect(puissanceSortie(choisi)).toBeGreaterThanOrEqual(4000 * SIZING_PARAMS.inverterMargin);
   });
 
-  it('gère une liste vide', () => {
-    expect(suggestInverterForPower([], 4000)).toBeNull();
+  it('écarte un onduleur qui n’accepte pas la puissance PV installée', () => {
+    // Pic modeste (le 3 kVA suffirait) mais 5 000 Wc de panneaux : le 3 kVA
+    // n'en prend que 3 900, le 5 kVA (6 500 Wc) est retenu.
+    const choisi = suggestInverterFor(inverters, { peakLoad: 1500, pvPower: 5000 });
+    expect(choisi.id).toBe('i5');
+    expect(choisi.maxPvPower).toBeGreaterThanOrEqual(5000);
+  });
+
+  it('sans pic déclaré (saisie directe), la puissance PV sert de repère', () => {
+    expect(suggestInverterFor(inverters, { peakLoad: 0, pvPower: 4000 }).id).toBe('i8');
+  });
+
+  it('limite PV inconnue : reprise de celle d’un modèle configuré de même calibre', () => {
+    const sansPv = { id: 'x5', capacity: 5 };
+    expect(limitePv(sansPv, inverters)).toBe(6500);
+    expect(limitePv({ id: 'x9', capacity: 9 }, inverters)).toBe(0); // aucune référence
+  });
+
+  it('retombe sur le plus grand disponible si aucun ne convient, et gère la liste vide', () => {
+    expect(suggestInverterFor(inverters, { peakLoad: 20000 }).id).toBe('i8');
+    expect(suggestInverterFor([], { peakLoad: 4000 })).toBeNull();
   });
 });
 

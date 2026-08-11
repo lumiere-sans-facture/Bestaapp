@@ -6,7 +6,7 @@ import { formatCFA } from '../../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
   calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
-  inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, recommendInverterOption, suggestBatteryCombo,
+  inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, suggestInverterFor, limitePv, puissanceSortie, suggestBatteryCombo,
   AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS,
 } from '../../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
@@ -40,7 +40,7 @@ const accessoryLines = (numberOfPanels) => [
  */
 export default function ProSolarWizard({ onDone }) {
   const { user } = useAuth();
-  const { products, proClientsForUser, addProClient, addDevis, getCompanyForUser } = useData();
+  const { products, proClientsForUser, addProClient, addDevis, getCompanyForUser, inverters: onduleursConfigures } = useData();
 
   const myClients = proClientsForUser(user.id);
   const company = getCompanyForUser(user.id);
@@ -149,10 +149,19 @@ export default function ProSolarWizard({ onDone }) {
   const panelWcCatalogue = useMemo(() => parsePanelWc(panelName) || PANEL_SPEC.power, [panelName]);
   const sizing = useMemo(
     () => (totalConsumption > 0
-      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, panelWcCatalogue, autonomyNights)
+      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, panelWcCatalogue, autonomyNights, { peakLoad, inverters: inverterOptions, configures: onduleursConfigures || [] })
       : null),
-    [consumption, systemType, sunHours, totalConsumption, panelWcCatalogue, autonomyNights]
+    [consumption, systemType, sunHours, totalConsumption, panelWcCatalogue, autonomyNights, peakLoad, inverterOptions, onduleursConfigures]
   );
+
+  // Critère de choix de l'onduleur : le PIC de consommation d'abord (il doit
+  // le tenir), la puissance PV posée ensuite (limite d'entrée PV des onduleurs
+  // configurés dans Plus › Onduleurs, seule source des vraies valeurs).
+  const critereOnduleur = useMemo(() => ({
+    peakLoad,
+    pvPower: sizing?.installedPvPower || 0,
+    configures: onduleursConfigures || [],
+  }), [peakLoad, sizing, onduleursConfigures]);
 
   // Nouveau dimensionnement → on repart des sélections conseillées.
   useEffect(() => { setSelectedInverterId(null); setBatteryQty(null); }, [sizing]);
@@ -164,17 +173,19 @@ export default function ProSolarWizard({ onDone }) {
   const inverter = useMemo(() => {
     if (!sizing) return null;
     if (selectedInverterId) return inverterOptions.find((o) => o.id === selectedInverterId) || null;
-    return recommendInverterOption(brandInverters, sizing.requiredPanelPower);
-  }, [sizing, selectedInverterId, brandInverters, inverterOptions]);
+    return suggestInverterFor(brandInverters, critereOnduleur);
+  }, [sizing, selectedInverterId, brandInverters, inverterOptions, critereOnduleur]);
 
   // Onduleur conseillé de la marque (badge) + filtrage sur la puissance requise.
   const recommendedInv = useMemo(
-    () => (sizing ? recommendInverterOption(brandInverters, sizing.requiredPanelPower) : null),
-    [sizing, brandInverters]
+    () => (sizing ? suggestInverterFor(brandInverters, critereOnduleur) : null),
+    [sizing, brandInverters, critereOnduleur]
   );
+  // Convient = tient le pic ET accepte les panneaux posés (limite PV configurée).
   const suitableInverters = useMemo(
-    () => brandInverters.filter((i) => i.maxPower >= (sizing?.requiredPanelPower || 0) * 1.2),
-    [brandInverters, sizing]
+    () => brandInverters.filter((i) => puissanceSortie(i) >= (critereOnduleur.peakLoad || critereOnduleur.pvPower) * 1.2
+      && (!limitePv(i, critereOnduleur.configures) || limitePv(i, critereOnduleur.configures) >= critereOnduleur.pvPower)),
+    [brandInverters, critereOnduleur]
   );
   const shownInverters = (showAllInverters || suitableInverters.length === 0) ? brandInverters : suitableInverters;
 

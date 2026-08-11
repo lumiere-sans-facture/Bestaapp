@@ -30,17 +30,24 @@ const abonne = {
 };
 
 const consumption = { day: 8.8, night: 8.8 }; // 17,6 kWh/j (climatiseur 3 CV)
-const sizing = calculateSystemSize(consumption, 'off-grid', 4.3);
+const appareils = [
+  { name: 'Climatiseur 3 CV', power: 2200, quantity: 1, day: 3, night: 4 },
+  { name: 'Réfrigérateur 300 L', power: 180, quantity: 1, day: 12, night: 12 },
+  { name: 'Téléviseur LED 43"', power: 80, quantity: 2, day: 4, night: 3 },
+  { name: 'Éclairage LED', power: 10, quantity: 12, day: 1, night: 5 },
+];
+const peakLoad = appareils.reduce((s, a) => s + a.power * a.quantity, 0);
+const onduleurs = [
+  { id: 'o3', brand: 'HZ', model: 'Hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 160000 },
+  { id: 'o6', brand: 'Deye', model: 'Hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 390000 },
+  { id: 'o8', brand: 'Deye', model: 'Hybride 8kVA', capacity: 8, maxPvPower: 10400, price: 620000 },
+];
+const sizing = calculateSystemSize(consumption, 'off-grid', 4.3, undefined, undefined, { peakLoad, inverters: onduleurs });
 const html = buildSizingSheetHtml({
   ...(process.argv.includes('--pro') ? { company: abonne } : {}),
   client: { name: 'Felix Sossa', phone: '+228 94 22 33 44', ville: 'Lomé' },
   apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' },
-  appliances: [
-    { name: 'Climatiseur 3 CV', power: 2200, quantity: 1, day: 3, night: 4 },
-    { name: 'Réfrigérateur 300 L', power: 180, quantity: 1, day: 12, night: 12 },
-    { name: 'Téléviseur LED 43"', power: 80, quantity: 2, day: 4, night: 3 },
-    { name: 'Éclairage LED', power: 10, quantity: 12, day: 1, night: 5 },
-  ],
+  appliances: appareils,
   manualMode: false,
   consumption,
   systemType: 'off-grid',
@@ -48,7 +55,7 @@ const html = buildSizingSheetHtml({
   cityName: 'Lomé',
   solarSource: 'NASA/PVGIS',
   sizing,
-  inverter: { capacity: 8, maxPower: 8000 },
+  inverter: { capacity: sizing.inverter.capacity, maxPvPower: sizing.inverter.maxPvPower },
   batteries: sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
   panelName: 'Panneau photovoltaïque 620W',
   investissement: 2300000,

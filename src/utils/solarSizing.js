@@ -91,9 +91,56 @@ export const batteryOptionsFromCatalog = (products = []) =>
 /** Marques distinctes d'une liste d'options, dans l'ordre d'apparition. */
 export const brandsOf = (options = []) => [...new Set(options.map((o) => o.brand))];
 
-/** Onduleur conseillé : le plus petit couvrant la puissance requise + 20 %. */
-export const recommendInverterOption = (options = [], requiredPower = 0) =>
-  options.find((o) => o.maxPower >= requiredPower * SIZING_PARAMS.inverterMargin) || options[options.length - 1] || null;
+// ---- Choix de l'onduleur ----
+// Deux critères, dans cet ordre :
+//   1. le PIC DE CONSOMMATION — l'onduleur doit pouvoir alimenter toutes les
+//      charges en même temps, marge de sécurité comprise. C'est le critère
+//      principal : un onduleur qui ne tient pas le pic disjoncte, quelle que
+//      soit la taille du champ PV ;
+//   2. la PUISSANCE PV INSTALLÉE — elle doit rester sous la limite d'entrée PV
+//      du modèle (« Max. PV Input Power », renseignée dans Plus › Onduleurs).
+
+/** Puissance apparente → puissance active : un hybride tient ~80 % de ses kVA. */
+export const FACTEUR_PUISSANCE = 0.8;
+
+/** Puissance de sortie continue (W) d'un onduleur, depuis ses kVA à défaut. */
+export const puissanceSortie = (inv) => (Number(inv?.maxPower) > 0
+  ? Number(inv.maxPower)
+  : Math.round((Number(inv?.capacity) || 0) * 1000 * FACTEUR_PUISSANCE));
+
+/**
+ * Limite d'entrée PV (Wc) d'un onduleur. Celle du modèle si elle est connue,
+ * sinon celle d'un onduleur CONFIGURÉ de même calibre (Plus › Onduleurs) —
+ * c'est là que l'entreprise tient les vraies valeurs constructeur.
+ * 0 = inconnue : aucune contrainte ne peut être vérifiée.
+ */
+export const limitePv = (inv, configures = []) => {
+  if (Number(inv?.maxPvPower) > 0) return Number(inv.maxPvPower);
+  const meme = configures.find((o) => Number(o.capacity) === Number(inv?.capacity) && Number(o.maxPvPower) > 0);
+  return meme ? Number(meme.maxPvPower) : 0;
+};
+
+/**
+ * Onduleur adapté : le plus petit modèle qui tient le pic de consommation ET
+ * accepte la puissance PV installée. Si aucun ne convient, le plus grand
+ * disponible (mieux vaut le moins insuffisant que rien).
+ * @param {Array} options     modèles candidats
+ * @param {number} peakLoad   pic de consommation (W). 0 = non déclaré (saisie
+ *   directe) : la puissance PV sert alors de repère, faute de mieux.
+ * @param {number} pvPower    puissance PV installée (Wc)
+ * @param {Array} configures  onduleurs configurés, pour retrouver une limite PV
+ */
+export const suggestInverterFor = (options = [], { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin, configures = [] } = {}) => {
+  if (!options.length) return null;
+  const besoinSortie = (peakLoad > 0 ? peakLoad : pvPower) * margin;
+  const parTaille = [...options].sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
+  const tientLePic = (o) => puissanceSortie(o) >= besoinSortie;
+  // Priorité aux modèles dont la limite PV est CONNUE et suffisante : un
+  // modèle non renseigné ne doit pas passer devant un modèle vérifié.
+  return parTaille.find((o) => tientLePic(o) && limitePv(o, configures) >= pvPower)
+    || parTaille.find((o) => tientLePic(o) && !limitePv(o, configures))
+    || parTaille[parTaille.length - 1];
+};
 
 /** Combinaison de batteries (glouton) approchant la capacité requise. */
 export const suggestBatteryCombo = (options = [], requiredCapacity = 0) => {
@@ -167,10 +214,9 @@ export const SYSTEM_VOLTAGE = BATTERY_MODELS[0].voltage;
 
 // ---- Sélection des composants ----
 
-const findInverterForPower = (requiredPower) => {
-  const powerWithMargin = requiredPower * SIZING_PARAMS.inverterMargin;
-  return SIZING_SHEET_INVERTERS.find((inv) => inv.maxPower >= powerWithMargin) || SIZING_SHEET_INVERTERS[SIZING_SHEET_INVERTERS.length - 1];
-};
+// Gamme de repli quand l'entreprise n'a encore configuré aucun onduleur.
+const findInverterForPower = (peakLoad, pvPower) =>
+  suggestInverterFor(SIZING_SHEET_INVERTERS, { peakLoad, pvPower });
 
 // Combinaison optimale de batteries (du plus grand au plus petit module)
 const findOptimalBatteryCombination = (requiredCapacity) => {
@@ -212,6 +258,14 @@ const groupBatteries = (batteries) => {
  *   vendu, pour que le devis livre bien la puissance calculée.
  * @param {number} autonomyNights  nombre de nuits sans soleil couvertes par le
  *   parc batterie (défaut : DEFAULT_AUTONOMY_NIGHTS, soit 1 nuit).
+ * @param {object} options
+ * @param {number} options.peakLoad   pic de consommation (W) — critère
+ *   PRINCIPAL du choix de l'onduleur : il doit tenir toutes les charges
+ *   allumées ensemble. Absent (saisie directe) : repli sur la puissance PV.
+ * @param {Array} options.inverters   modèles candidats. Sans eux, la gamme de
+ *   repli sert.
+ * @param {Array} options.configures  onduleurs configurés (Plus › Onduleurs) :
+ *   leurs limites d'entrée PV font foi quand les candidats n'en portent pas.
  */
 export const calculateSystemSize = (
   consumption,
@@ -219,6 +273,7 @@ export const calculateSystemSize = (
   peakSunHours = DEFAULT_PEAK_SUN_HOURS,
   panelWc = PANEL_REFERENCE_WC,
   autonomyNights = DEFAULT_AUTONOMY_NIGHTS,
+  { peakLoad = 0, inverters = [], configures = [] } = {},
 ) => {
   const { panelEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio } = SIZING_PARAMS;
   const panelPower = Number(panelWc) > 0 ? Number(panelWc) : PANEL_REFERENCE_WC;
@@ -237,7 +292,12 @@ export const calculateSystemSize = (
   const requiredPanelPower = (requiredDailyEnergy / peakSunHours) * 1000; // W
   const numberOfPanels = Math.max(1, Math.ceil(requiredPanelPower / panelPower));
 
-  const selectedInverter = findInverterForPower(requiredPanelPower);
+  // L'onduleur se choisit sur le PIC de consommation et sur la puissance PV
+  // RÉELLEMENT installée (panneaux entiers), pas sur la puissance calculée.
+  const installedPvPower = numberOfPanels * panelPower;
+  const selectedInverter = inverters.length
+    ? suggestInverterFor(inverters, { peakLoad, pvPower: installedPvPower, configures })
+    : findInverterForPower(peakLoad, installedPvPower);
 
   let batteryCapacity = 0;
   let batteries = [];
@@ -253,6 +313,8 @@ export const calculateSystemSize = (
     numberOfPanels,
     panelWc: panelPower, // puissance crête du panneau de référence retenu
     requiredPanelPower, // W — utile pour filtrer les onduleurs par marque
+    installedPvPower,   // W — puissance PV réellement posée (panneaux entiers)
+    peakLoad,           // W — pic de consommation ayant servi au choix onduleur
     panelCapacity: (numberOfPanels * panelPower) / 1000, // kWc
     inverter: selectedInverter,
     batteryCapacity,
@@ -423,25 +485,6 @@ const PANEL_LINE_RE = /panneau/i;
 const ONDULEUR_LINE_RE = /onduleur/i;
 
 /**
- * Onduleur suggéré parmi une liste configurée (Plus › Onduleurs) : le plus
- * petit dont la puissance PV max COUVRE le besoin calculé + marge de
- * sécurité (jamais moins — un onduleur qui écrête les panneaux réduit la
- * production). Si aucun n'atteint le besoin, repli sur le plus grand
- * disponible (mieux vaut le moins insuffisant que rien).
- * @param {Array} inverters  liste d'onduleurs ({ id, maxPvPower, ... })
- * @param {number} requiredPanelPower  puissance crête panneaux requise (W)
- * @param {number} margin  marge de sécurité (défaut SIZING_PARAMS.inverterMargin)
- * @returns {object|null}
- */
-export const suggestInverterForPower = (inverters = [], requiredPanelPower = 0, margin = SIZING_PARAMS.inverterMargin) => {
-  if (!inverters.length) return null;
-  const need = (Number(requiredPanelPower) || 0) * margin;
-  const suffisants = inverters.filter((o) => o.maxPvPower >= need);
-  if (suffisants.length) return [...suffisants].sort((a, b) => a.maxPvPower - b.maxPvPower)[0];
-  return [...inverters].sort((a, b) => b.maxPvPower - a.maxPvPower)[0];
-};
-
-/**
  * Devis à partir d'un kit préconfiguré : toutes les lignes du kit, sans calcul
  * de composition. « Main d'œuvre » → prestation, le reste → équipements.
  * Prix tout compris (sans TVA) : HT = TTC, comme les devis kit de référence.
@@ -482,14 +525,19 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     PANEL_LINE_RE.test(l.designation) && neededPanels > l.qty ? { ...l, qty: neededPanels } : l
   ));
 
-  // Onduleur : celui du kit ne suffit peut-être pas pour les panneaux
-  // désormais complétés — on ne le sait que si sa capacité kVA correspond à
-  // un onduleur configuré (donc avec une puissance PV max connue).
+  // Onduleur : celui du kit ne convient peut-être pas — soit il ne tient pas
+  // le pic de consommation du client, soit il n'accepte pas les panneaux
+  // désormais complétés. On ne peut le vérifier que si sa capacité kVA
+  // correspond à un onduleur configuré (donc aux caractéristiques connues).
   const currentSpec = inverters.find((o) => o.capacity === kit.inverter);
-  const inverterSuggested = currentSpec && sizing?.requiredPanelPower
-    && currentSpec.maxPvPower < sizing.requiredPanelPower * SIZING_PARAMS.inverterMargin
-    ? suggestInverterForPower(inverters, sizing.requiredPanelPower)
-    : null;
+  const pvPose = sizing?.installedPvPower || (neededPanels * (kit.panelW || 0));
+  const critere = { peakLoad: sizing?.peakLoad || 0, pvPower: pvPose, configures: inverters };
+  const insuffisant = currentSpec && (
+    puissanceSortie(currentSpec) < (critere.peakLoad > 0 ? critere.peakLoad : pvPose) * SIZING_PARAMS.inverterMargin
+    || (limitePv(currentSpec, inverters) > 0 && limitePv(currentSpec, inverters) < pvPose)
+  );
+  const remplacant = insuffisant ? suggestInverterFor(inverters, critere) : null;
+  const inverterSuggested = remplacant && remplacant.capacity !== kit.inverter ? remplacant : null;
   // productId retiré sur les lignes remplacées : elles ne représentent plus
   // le produit boutique éventuellement lié, `pu` (fixé ci-dessous) prime.
   const withInverter = inverterSuggested

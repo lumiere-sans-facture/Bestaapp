@@ -21,7 +21,9 @@ const data = {
   cityName: 'Lomé',
   solarSource: 'PVGIS',
   sizing,
-  inverter: { brand: 'Felicity', model: 'Onduleur Felicity 5kVA', capacity: 5, maxPower: 4000 },
+  // maxPvPower : limite d'entrée PV du modèle, telle que l'assistant la passe
+  // désormais (renseignée dans Plus › Onduleurs).
+  inverter: { brand: 'Felicity', model: 'Onduleur Felicity 5kVA', capacity: 5, maxPower: 4000, maxPvPower: 6500 },
   batteries: [{ brand: 'Taico', model: 'Batterie Taico 5kWh', capacity: 5, qty: 1 }],
   // Même référence 620 Wc que le moteur de dimensionnement : la fiche d'un
   // système taillé par le moteur doit couvrir le besoin les 12 mois.
@@ -103,9 +105,13 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(html).not.toContain('Taux d’utilisation');
   });
 
-  it('page 2 : le calibre de l’onduleur et le parc batterie installé sont explicités', () => {
+  it('page 2 : l’onduleur se choisit sur le pic, l’entrée PV vient en second', () => {
+    // Critère principal affiché : le pic de consommation (420 W ici), pas la
+    // puissance des panneaux — un onduleur qui ne tient pas le pic disjoncte.
+    expect(html).toContain('Puissance onduleur ≥ pic de consommation × 1,2');
     expect(html).toContain('premier calibre au-dessus');
-    expect(html).toContain('pic de charge');
+    expect(html).toContain('entrée PV');
+    expect(html).toContain(`sur 6 500\u202fWc admis`);
     // Les modules ont des capacités fixes : le parc dépasse le besoin calculé,
     // et la fiche affiche les deux valeurs côte à côte.
     expect(html).toContain('Capacité batterie nécessaire');

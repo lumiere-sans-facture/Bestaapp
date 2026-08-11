@@ -148,9 +148,9 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
 
   const sizing = useMemo(
     () => (totalConsumption > 0
-      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, undefined, autonomyNights)
+      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, undefined, autonomyNights, { peakLoad, inverters: INVERTERS })
       : null),
-    [consumption, systemType, sunHours, totalConsumption, autonomyNights]
+    [consumption, systemType, sunHours, totalConsumption, autonomyNights, peakLoad, INVERTERS]
   );
 
   // Kit suggéré : le plus petit kit dont la batterie COUVRE le besoin calculé
@@ -202,7 +202,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
       sizing,
       // Seules les grandeurs techniques sont transmises : les marques du
       // catalogue interne (onduleur, batteries) n'apparaissent jamais.
-      inverter: { capacity: sizing.inverter.capacity },
+      inverter: { capacity: sizing.inverter.capacity, maxPvPower: sizing.inverter.maxPvPower || null },
       batteries: sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
       panelName: `Panneau photovoltaïque ${sizing.panelWc}W`,
       // Rentabilité (page 3) : l'investissement estimé = total du devis kit.

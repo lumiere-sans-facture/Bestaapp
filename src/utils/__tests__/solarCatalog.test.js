@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   detectBrand, parseKva, parseKwh,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog,
-  brandsOf, recommendInverterOption, suggestBatteryCombo,
+  brandsOf, suggestInverterFor, suggestBatteryCombo,
 } from '../solarSizing';
 
 const products = [
@@ -58,15 +58,21 @@ describe('batteryOptionsFromCatalog', () => {
   });
 });
 
-describe('recommendInverterOption', () => {
-  it('choisit le plus petit onduleur couvrant la puissance + 20 %', () => {
-    const opts = inverterOptionsFromCatalog(products); // maxPower : 2400, 3360, 4800
-    expect(recommendInverterOption(opts, 2000).capacity).toBe(3); // 2000*1.2=2400 <= 2400
-    expect(recommendInverterOption(opts, 3000).capacity).toBe(6); // 3600 > 3360 (4.2kVA) → 6kVA (4800)
+describe('onduleurs du catalogue boutique : choix sur le pic', () => {
+  it('choisit le plus petit onduleur qui tient le pic + 20 %', () => {
+    const opts = inverterOptionsFromCatalog(products); // sorties : 2400, 3360, 4800
+    expect(suggestInverterFor(opts, { peakLoad: 2000 }).capacity).toBe(3); // 2000×1,2 = 2400 ≤ 2400
+    expect(suggestInverterFor(opts, { peakLoad: 3000 }).capacity).toBe(6); // 3600 > 3360 → 6 kVA
   });
   it('repli sur le plus gros si aucun ne suffit', () => {
     const opts = inverterOptionsFromCatalog(products);
-    expect(recommendInverterOption(opts, 100000).capacity).toBe(6);
+    expect(suggestInverterFor(opts, { peakLoad: 100000 }).capacity).toBe(6);
+  });
+  it('la limite PV vient des onduleurs configurés (Plus › Onduleurs)', () => {
+    const opts = inverterOptionsFromCatalog(products);
+    // Le 3 kVA tiendrait le pic, mais il n'accepte que 3 900 Wc de panneaux.
+    const configures = [{ capacity: 3, maxPvPower: 3900 }, { capacity: 6, maxPvPower: 7800 }];
+    expect(suggestInverterFor(opts, { peakLoad: 1500, pvPower: 5000, configures }).capacity).toBe(6);
   });
 });
 

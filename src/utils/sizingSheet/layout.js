@@ -97,6 +97,11 @@ export function renderSheet(d, c) {
       ? `<tr><td class="muted">+ ${nf(reste.length)} autre${reste.length > 1 ? 's' : ''} appareil${reste.length > 1 ? 's' : ''} regroupé${reste.length > 1 ? 's' : ''}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf(resteWh)}</td></tr>`
       : '');
   const picDeCharge = d.manualMode ? null : d.appliances.reduce((s, a) => s + a.power * a.quantity, 0);
+  // Choix de l'onduleur : le pic de consommation est le critère principal ;
+  // sans pic déclaré (saisie directe), la puissance PV posée en tient lieu.
+  const pvPose = Math.round(c.kwc * 1000);
+  const baseOnduleur = picDeCharge > 0 ? picDeCharge : pvPose;
+  const critereOnduleur = picDeCharge > 0 ? 'pic de consommation' : 'puissance panneaux';
 
   // --- Paramètres (page 2) ---
   const renta = c.renta;
@@ -174,16 +179,16 @@ export function renderSheet(d, c) {
     ...(d.inverter ? [resultat(
       'Onduleur hybride recommandé',
       u(nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0), 'kVA'),
-      // Le pic de charge est le second critère de choix d'un onduleur ; la
-      // tension système, elle, est déjà au § 3.
-      picDeCharge != null
-        ? `MPPT intégré · pic de charge ${u(nf(picDeCharge), 'W')} couvert`
-        : `MPPT intégré · tension système ${u(SYSTEM_VOLTAGE, 'V')}`,
-      `Puissance onduleur ≥ puissance panneaux × ${nf(inverterMargin, 1)}`,
-      // Le calibre retenu est le premier de la gamme AU-DESSUS du seuil : sans
-      // cette précision, le lecteur cherchait en vain le lien entre le seuil
-      // calculé et les kVA affichés.
-      `≥ ${u(nf(Math.round(d.sizing.requiredPanelPower)), 'W')} × ${nf(inverterMargin, 1)} = ${u(nf(Math.round(d.sizing.requiredPanelPower * inverterMargin)), 'W')} → premier calibre au-dessus`,
+      // Second critère : l'entrée PV de l'onduleur doit encaisser les panneaux
+      // posés (limite constructeur renseignée dans Plus › Onduleurs).
+      d.inverter.maxPvPower
+        ? `MPPT intégré · entrée PV ${u(nf(pvPose), 'Wc')} sur ${u(nf(d.inverter.maxPvPower), 'Wc')} admis`
+        : `MPPT intégré · entrée PV ${u(nf(pvPose), 'Wc')} · tension système ${u(SYSTEM_VOLTAGE, 'V')}`,
+      // Critère PRINCIPAL : le pic de consommation. Un onduleur qui ne tient
+      // pas toutes les charges allumées ensemble disjoncte, quelle que soit la
+      // taille du champ PV. Sans pic déclaré (saisie directe), repli sur le PV.
+      `Puissance onduleur ≥ ${critereOnduleur} × ${nf(inverterMargin, 1)}`,
+      `≥ ${u(nf(Math.round(baseOnduleur)), 'W')} × ${nf(inverterMargin, 1)} = ${u(nf(Math.round(baseOnduleur * inverterMargin)), 'W')} → premier calibre au-dessus`,
     )] : []),
     // Production : puissance installée × rendement des panneaux × heures
     // d'ensoleillement. Le chiffre du PIRE MOIS se vérifie à la main en une

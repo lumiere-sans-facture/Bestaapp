@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Onduleur choisi sur le pic de consommation, puis sur la capacité PV des onduleurs configurés
 - Fiche : le rendement des panneaux intervient à la puissance à installer, plus à l’énergie à produire
 - Fiche : production = puissance installée × rendement des panneaux × ensoleillement, sans « pertes système »
 - Fiche : un seul taux de pertes (85 %) du dimensionnement au productible — fin des chiffres contradictoires
