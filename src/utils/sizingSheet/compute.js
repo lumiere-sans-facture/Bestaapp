@@ -84,7 +84,7 @@ export const RENTA_DEFAUTS = {
 // voit d'un coup d'œil ce qui tient toute la vie de l'installation et ce qui
 // sera remplacé. Le détail technique (nombre de cycles) reste en note.
 export const DUREES_VIE = [
-  { equipement: 'Panneaux', duree: '25 ans' },
+  { equipement: 'Panneaux photovoltaïques', duree: '25 ans' },
   { equipement: 'Structure et câblages', duree: '15 ans' },
   // Note calibrée pour tenir sur UNE ligne dans la colonne (160 px à 11 px).
   { equipement: 'Batteries lithium', duree: '15 ans', note: '6 000 cycles · 1 par jour' },

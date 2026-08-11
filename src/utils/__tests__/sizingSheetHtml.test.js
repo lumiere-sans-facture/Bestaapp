@@ -97,7 +97,7 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(vies).toContain('<div class="stat-note">6 000 cycles · 1 par jour</div>');
     // De la plus longue durée à la plus courte : l'onduleur ferme la marche.
     expect(vies.match(/stat-label">([^<]+)/g).map((m) => m.split('">')[1]))
-      .toEqual(['Panneaux', 'Structure et câblages', 'Batteries lithium', 'Onduleur']);
+      .toEqual(['Panneaux photovoltaïques', 'Structure et câblages', 'Batteries lithium', 'Onduleur']);
   });
 
   it('aucune marque du catalogue, aucun prix hors section rentabilité', () => {

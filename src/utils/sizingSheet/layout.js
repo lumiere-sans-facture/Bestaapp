@@ -293,12 +293,17 @@ export function renderSheet(d, c) {
   /* Trois rangées explicites (libellé / durée / note) remplies colonne par
      colonne : les quatre durées restent alignées même quand un libellé passe
      sur deux lignes. */
-  .vies { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: auto auto auto;
-          grid-auto-flow: column; column-gap: 24px; margin-top: 16px; }
-  /* Les libellés d'équipement tiennent sur UNE ligne : légèrement resserrés
-     (les quatre ensemble, pour rester homogènes) plutôt que renvoyés à la
-     ligne — « Structure et câblages » est le plus long de la série. */
-  .vies .stat-label { font-size: 9.5px; letter-spacing: 0.9px; white-space: nowrap; }
+  /* Colonnes dimensionnées sur leur contenu et réparties sur la largeur :
+     chaque libellé tient sur UNE ligne quelle que soit sa longueur, sans
+     imposer la largeur du plus long à tout le monde. Trois rangées
+     explicites (libellé / durée / note) remplies colonne par colonne :
+     les quatre durées restent alignées. */
+  .vies { display: grid; grid-template-columns: repeat(4, auto); grid-template-rows: auto auto auto;
+          grid-auto-flow: column; justify-content: space-between; column-gap: 24px; margin-top: 16px; }
+  /* Légèrement resserrés (les quatre ensemble, pour rester homogènes) : à
+     11 px, « Panneaux photovoltaïques » et « Structure et câblages » ne
+     laissent que 2 px de marge sur la largeur utile. */
+  .vies .stat-label { font-size: 10px; letter-spacing: 1px; white-space: nowrap; }
   .foot { margin-top: auto; padding-top: 8px; border-top: 2px solid var(--primaire);
           display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   .foot-line { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gris); }

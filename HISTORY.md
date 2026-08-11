@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Fiche : « Panneaux photovoltaïques » en toutes lettres, colonnes ajustées à leur contenu
 - Fiche : libellés des durées de vie sur une seule ligne (légèrement resserrés)
 - Fiche : « Structure et câblages » à 15 ans, durées de vie alignées sur une même ligne
 - Fiche : durée de vie des batteries à 15 ans, équipements classés de la plus longue à la plus courte
