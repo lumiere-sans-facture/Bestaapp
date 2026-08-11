@@ -8,11 +8,13 @@ export const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 
 
 // Ratio de performance appliqué au productible théorique (salissures,
 // température, câblage, conversion…) : le NET est la seule valeur annoncée.
-// 0,75 = le ratio de performance PVGIS annoncé dans la source du graphique —
-// et le pendant cohérent d'un dimensionnement à 85 % de rendement : le
-// système couvre le besoin la plus grande partie de l'année, le creux de
-// saison des pluies restant visible (et absorbé par le parc batterie).
-export const RATIO_PRODUCTIBLE_NET = 0.75;
+// C'est EXACTEMENT le rendement utilisé pour dimensionner (SIZING_PARAMS) —
+// une seule convention de pertes dans tout le document. Deux taux différents
+// (dimensionner à ÷0,85 puis annoncer ×0,75) faisaient dire à la fiche que le
+// système produit moins que ce qu'elle demandait de produire.
+// Conséquence utile : un système taillé par le moteur couvre par CONSTRUCTION
+// le besoin au pire mois — kWc × HSP × ratio ≥ conso, par définition du calcul.
+export const RATIO_PRODUCTIBLE_NET = SIZING_PARAMS.panelEfficiency;
 
 // Profil d'ensoleillement mensuel (h de pic/jour) par ville — seule la FORME
 // compte (creux de saison des pluies) : le profil est ensuite CALÉ pour que
@@ -44,15 +46,18 @@ export const calerProfilSurPireMois = (profil, hspPireMois) => {
 };
 
 /**
- * Couverture mensuelle : productible net et besoin retenu, mois par mois.
- * prod[m] = kWc × ratio de performance × hsp[m] × jours[m] ;
- * besoin[m] = consoJour × taux × jours[m].
+ * Couverture mensuelle : productible net et consommation du client, mois
+ * par mois. prod[m] = kWc × ratio de performance × hsp[m] × jours[m] ;
+ * besoin[m] = consoJour × jours[m].
+ * Le besoin comparé est la consommation RÉELLE, pas une fraction d'elle : la
+ * fiche dimensionne déjà avec une marge, raboter le besoin en plus rendait le
+ * graphique vert sans que le système couvre vraiment la consommation.
  */
-export const couvertureMensuelle = ({ kwc, hspRetenu, ville, consoJour, tauxUtilisation }) => {
+export const couvertureMensuelle = ({ kwc, hspRetenu, ville, consoJour }) => {
   const profil = calerProfilSurPireMois(profilPourVille(ville), hspRetenu);
   const mois = profil.map((hsp, i) => {
     const prod = kwc * RATIO_PRODUCTIBLE_NET * hsp * JOURS_MOIS[i];
-    const besoin = consoJour * tauxUtilisation * JOURS_MOIS[i];
+    const besoin = consoJour * JOURS_MOIS[i];
     return { mois: MOIS_LABELS[i], prod, besoin, deficit: prod < besoin };
   });
   const produitNet = mois.reduce((s, m) => s + m.prod, 0);
@@ -64,7 +69,7 @@ export const couvertureMensuelle = ({ kwc, hspRetenu, ville, consoJour, tauxUtil
  *  mois), pas d'une moyenne : le net affiché est exactement celui que le
  *  graphique totalise, barre par barre. */
 export const productiblesAnnuels = (kwc, hspPireMois, ville) => {
-  const { produitNet } = couvertureMensuelle({ kwc, hspRetenu: hspPireMois, ville, consoJour: 0, tauxUtilisation: 0 });
+  const { produitNet } = couvertureMensuelle({ kwc, hspRetenu: hspPireMois, ville, consoJour: 0 });
   return { net: Math.round(produitNet), theorique: Math.round(produitNet / RATIO_PRODUCTIBLE_NET) };
 };
 
@@ -149,14 +154,18 @@ export const computeSheet = (d) => {
   const kwc = (d.sizing.numberOfPanels * panelWc) / 1000;
   const renta = calculerRentabilite(consoJour, d.investissement ?? null, d.rentabilite || {});
   const couverture = couvertureMensuelle({
-    kwc, hspRetenu: Number(d.sunHours) || 0, ville: d.cityName,
-    consoJour, tauxUtilisation: renta.tauxUtilisation,
+    kwc, hspRetenu: Number(d.sunHours) || 0, ville: d.cityName, consoJour,
   });
+  // Parc batterie réellement installé (modules du catalogue) : il dépasse
+  // toujours un peu le besoin calculé — c'est ce que le client reçoit.
+  const batterieInstallee = (d.batteries || []).reduce((s, b) => s + b.capacity * b.qty, 0);
   // Le net annuel EST la somme des barres du graphique : une seule vérité.
   const prods = { net: Math.round(couverture.produitNet), theorique: Math.round(couverture.produitNet / RATIO_PRODUCTIBLE_NET) };
   return {
     consoJour, energieNecessaire, panelWc, kwc, autonomyNights,
     batterieAh: d.sizing.batteryCapacity > 0 ? Math.round((d.sizing.batteryCapacity * 1000) / SYSTEM_VOLTAGE) : 0,
+    batterieInstallee,
+    batterieInstalleeAh: batterieInstallee > 0 ? Math.round((batterieInstallee * 1000) / SYSTEM_VOLTAGE) : 0,
     prods, couverture, renta,
   };
 };

@@ -12,6 +12,7 @@ const BASE = '#9ca3af';
 const GRIS_TITRE = '#4b5563';
 
 const nfInt = (v) => Math.round(v).toLocaleString('fr-FR').replace(/[  ]/g, ' ');
+const nf1 = (v) => Number(v || 0).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/[  ]/g, ' ');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // Plafond adaptatif de l'axe Y : pas de 75/150/300/600 selon le pic.
@@ -22,10 +23,10 @@ export const plafondAxe = (pic) => {
 
 /**
  * @param {Array<{mois:string, prod:number, besoin:number, deficit:boolean}>} monthly
- * @param {{kwc:number, tauxUtilisation:number, couleurs?:{primaire:string, accent:string}}} opts
+ * @param {{kwc:number, consoJour:number, ratio:number, couleurs?:{primaire:string, accent:string}}} opts
  * @returns {string} chaîne <svg>
  */
-export function renderCoverageChart(monthly, { kwc, tauxUtilisation, couleurs = {} }) {
+export function renderCoverageChart(monthly, { kwc, consoJour, ratio, couleurs = {} }) {
   const NAVY = couleurs.primaire || NAVY_DEFAUT;
   const ORANGE = couleurs.accent || ORANGE_DEFAUT;
   const W = 714;
@@ -85,7 +86,7 @@ export function renderCoverageChart(monthly, { kwc, tauxUtilisation, couleurs = 
   const entrees = [
     { fill: ORANGE, label: 'Productible mensuel estimé' },
     { fill: 'url(#hachures)', label: 'Productible inférieur au besoin' },
-    { fill: NAVY, label: `Besoin énergétique retenu (foisonnement ${String(tauxUtilisation).replace('.', ',')})` },
+    { fill: NAVY, label: `Consommation du client (${nf1(consoJour)} kWh/jour)` },
   ];
   const LARG_CAR = 5.1; // approx. par caractère à 9,5px — pour centrer la légende
   const largeurs = entrees.map((e) => 11 + 6 + e.label.length * LARG_CAR);
@@ -98,7 +99,7 @@ export function renderCoverageChart(monthly, { kwc, tauxUtilisation, couleurs = 
       + `<text x="${(xL + 17).toFixed(1)}" y="${yL}" font-size="9.5" fill="${GRIS_TITRE}">${esc(e.label)}</text>`;
     xL += largeurs[i] + 18;
   });
-  const source = `<text x="0" y="${yL + 13}" font-size="8.5" fill="${BASE}">Source : base PVGIS (SARAH-3) — plan incliné à 10°, orientation Sud — ratio de performance 0,75</text>`;
+  const source = `<text x="0" y="${yL + 13}" font-size="8.5" fill="${BASE}">Source : base PVGIS (SARAH-3) — plan incliné à 10°, orientation Sud — ratio de performance ${String(ratio).replace('.', ',')}</text>`;
 
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Couverture mensuelle des besoins" xmlns="http://www.w3.org/2000/svg" font-family="'IBM Plex Sans', system-ui, sans-serif">
   <defs>
@@ -107,7 +108,7 @@ export function renderCoverageChart(monthly, { kwc, tauxUtilisation, couleurs = 
       <line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="1.5"/>
     </pattern>
   </defs>
-  <text x="0" y="12" font-size="10" fill="${GRIS_TITRE}"><tspan font-size="8.5" letter-spacing="1">FIGURE</tspan> 1 — Productible mensuel estimé et besoin énergétique retenu</text>
+  <text x="0" y="12" font-size="10" fill="${GRIS_TITRE}"><tspan font-size="8.5" letter-spacing="1">FIGURE</tspan> 1 — Productible mensuel estimé et consommation du client</text>
   <text x="${W}" y="12" text-anchor="end" font-size="10" fill="${GRIS_TITRE}">Générateur ${String(kwc.toFixed(2)).replace('.', ',')} kWc</text>
   <text x="10" y="${plotTop + plotH / 2}" text-anchor="middle" font-size="9" fill="${BASE}" transform="rotate(-90 10 ${plotTop + plotH / 2})">kWh/mois</text>
   ${grille}

@@ -4,9 +4,16 @@ import {
   couvertureMensuelle, calerProfilSurPireMois, profilPourVille,
   productiblesAnnuels, calculerRentabilite, libelleRoi, JOURS_MOIS, RATIO_PRODUCTIBLE_NET,
 } from '../sizingSheet/compute';
-import { calculateSystemSize } from '../solarSizing';
+import { calculateSystemSize, SIZING_PARAMS, PANEL_REFERENCE_WC } from '../solarSizing';
 
 describe('productible mensuel', () => {
+  it('une seule convention de pertes : le productible emploie le rendement du dimensionnement', () => {
+    // Dimensionner en divisant par 0,85 puis annoncer une production à 0,75
+    // faisait dire à la fiche que le système produit moins que ce qu'elle
+    // demandait de produire. Les deux taux ne doivent plus jamais diverger.
+    expect(RATIO_PRODUCTIBLE_NET).toBe(SIZING_PARAMS.panelEfficiency);
+  });
+
   it('le profil est calé pour que son PIRE MOIS égale le HSP retenu (± 0,01)', () => {
     // Le HSP du dossier est celui du pire mois : le caler sur la moyenne
     // comptait la pénalité deux fois et hachurait des systèmes bien taillés.
@@ -18,26 +25,37 @@ describe('productible mensuel', () => {
 
   it('la somme des 12 mois égale le productible net annuel (± 2 kWh)', () => {
     const kwc = 4.96;
-    const { mois } = couvertureMensuelle({ kwc, hspRetenu: 4.3, ville: 'Lomé', consoJour: 17.6, tauxUtilisation: 0.85 });
+    const { mois } = couvertureMensuelle({ kwc, hspRetenu: 4.3, ville: 'Lomé', consoJour: 17.6 });
     const somme = mois.reduce((s, m) => s + m.prod, 0);
     expect(Math.abs(somme - productiblesAnnuels(kwc, 4.3, 'Lomé').net)).toBeLessThanOrEqual(2);
   });
 
-  it('un système dimensionné par le moteur couvre le besoin les 12 mois : tout orange', () => {
-    // La demande métier : si la production couvre les besoins, aucun
-    // chandelier hachuré — la couverture reflète le VRAI dimensionnement.
-    const conso = { day: 8.8, night: 8.8 }; // 17,6 kWh/j
-    const sizing = calculateSystemSize(conso, 'off-grid', 4.3);
-    const kwc = (sizing.numberOfPanels * 620) / 1000;
-    const { mois, deficitCumule } = couvertureMensuelle({
-      kwc, hspRetenu: 4.3, ville: 'Lomé', consoJour: conso.day + conso.night, tauxUtilisation: 0.85,
-    });
-    mois.forEach((m) => expect(m.deficit).toBe(false));
-    expect(deficitCumule).toBe(0);
+  it('un système dimensionné par le moteur couvre la CONSOMMATION RÉELLE les 12 mois', () => {
+    // La couverture se compare à la consommation entière, jamais à une
+    // fraction d'elle : avec une seule convention de pertes, un système taillé
+    // par le moteur couvre par construction, sans avoir besoin de raboter le
+    // besoin. Vérifié sur plusieurs profils, pas seulement le cas témoin.
+    const cas = [
+      { day: 8.8, night: 8.8 },   // 17,6 kWh/j — climatiseur
+      { day: 1.2, night: 0.6 },   // petit foyer
+      { day: 0.4, night: 3.4 },   // consommation surtout nocturne
+      { day: 24, night: 11 },     // gros site
+    ];
+    for (const conso of cas) {
+      for (const hsp of [4.3, 4.8]) {
+        const sizing = calculateSystemSize(conso, 'off-grid', hsp);
+        const kwc = (sizing.numberOfPanels * PANEL_REFERENCE_WC) / 1000;
+        const { mois, deficitCumule } = couvertureMensuelle({
+          kwc, hspRetenu: hsp, ville: 'Lomé', consoJour: conso.day + conso.night,
+        });
+        mois.forEach((m) => expect(m.deficit).toBe(false));
+        expect(deficitCumule).toBe(0);
+      }
+    }
   });
 
   it('marque « inférieur au besoin » exactement les mois où prod < besoin', () => {
-    const { mois } = couvertureMensuelle({ kwc: 3, hspRetenu: 4.3, ville: 'Lomé', consoJour: 12, tauxUtilisation: 0.85 });
+    const { mois } = couvertureMensuelle({ kwc: 3, hspRetenu: 4.3, ville: 'Lomé', consoJour: 14 });
     mois.forEach((m) => expect(m.deficit).toBe(m.prod < m.besoin));
     // Le creux de saison des pluies est le premier en déficit — en kWh/MOIS,
     // les mois de 30 jours (Juin, Sep) passent sous Juillet (31 jours).
@@ -46,7 +64,7 @@ describe('productible mensuel', () => {
   });
 
   it('le déficit cumulé additionne uniquement les mois déficitaires', () => {
-    const { mois, deficitCumule } = couvertureMensuelle({ kwc: 3, hspRetenu: 4.3, ville: 'Lomé', consoJour: 12, tauxUtilisation: 0.85 });
+    const { mois, deficitCumule } = couvertureMensuelle({ kwc: 3, hspRetenu: 4.3, ville: 'Lomé', consoJour: 14 });
     const attendu = mois.reduce((s, m) => s + Math.max(0, m.besoin - m.prod), 0);
     expect(deficitCumule).toBeCloseTo(attendu, 6);
     expect(JOURS_MOIS.reduce((a, b) => a + b, 0)).toBe(365);

@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Fiche : un seul taux de pertes (85 %) du dimensionnement au productible — fin des chiffres contradictoires
 - Fiche : « Panneaux photovoltaïques » en toutes lettres, colonnes ajustées à leur contenu
 - Fiche : « Panneaux photovoltaïques », libellés des durées de vie sur une seule ligne
 - Fiche : « Structure et câblages » à 15 ans, durées de vie alignées sur une même ligne

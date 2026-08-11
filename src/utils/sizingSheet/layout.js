@@ -103,14 +103,19 @@ export function renderSheet(d, c) {
   const paramRows = [
     ['Localisation retenue', d.cityName ? esc(d.cityName) : 'Non précisée'],
     ['Ensoleillement pic (HSP)', `${u(nf(d.sunHours, 1), 'h/jour')}`],
-    ['Rendement des panneaux', pct(panelEfficiency)],
+    // Un seul taux de pertes dans toute la fiche : celui-ci sert AUSSI à
+    // estimer le productible (§ 4 et graphique § 6).
+    ['Rendement système retenu', pct(panelEfficiency)],
     ['Décharge batterie (DoD)', pct(depthOfDischarge)],
     ['Rendement batterie', pct(batteryEfficiency)],
     ['Tension du parc batterie', u(SYSTEM_VOLTAGE, 'V')],
     ['Autonomie batterie', autonomie],
     ['Marge de sécurité onduleur', `+${pct(inverterMargin - 1)}`],
     ['Tarif de l’électricité', u(nf(renta.tarifElec), 'F CFA/kWh')],
-    ['Taux d’utilisation', pct(renta.tauxUtilisation)],
+    // Sert UNIQUEMENT au calcul de rentabilité (§ 7) : part de la production
+    // qui remplace vraiment de l'électricité achetée. Rien à voir avec les
+    // pertes ci-dessus, même si les deux valeurs peuvent coïncider.
+    ['Part autoconsommée (rentabilité)', pct(renta.tauxUtilisation)],
   ];
 
   // --- Matériel (page 2, deux tableaux côte à côte) ---
@@ -154,16 +159,31 @@ export function renderSheet(d, c) {
     ...(d.systemType === 'on-grid' ? [] : [resultat(
       'Capacité batterie nécessaire',
       u(nf(batterieKwh, 2), 'kWh'),
-      `soit ${u(nf(Math.round(batterieKwh * 1000)), 'Wh')} ≈ ${u(nf(c.batterieAh), 'Ah')} sous ${u(SYSTEM_VOLTAGE, 'V')} · autonomie ${nuitsLabel}`,
+      // Les modules du catalogue ont des capacités fixes : le parc installé
+      // arrondit toujours AU-DESSUS du besoin. L'afficher à côté du besoin
+      // évite de faire chercher d'où sortent les kWh du récapitulatif
+      // matériel. L'autonomie et la tension figurent déjà au § 3 : la note
+      // reste sur UNE ligne.
+      `≈ ${u(nf(c.batterieAh), 'Ah')} sous ${u(SYSTEM_VOLTAGE, 'V')}`
+        + (c.batterieInstallee > batterieKwh + 0.01
+          ? ` · parc installé ${u(nf(c.batterieInstallee, 1), 'kWh')}`
+          : ` · autonomie ${nuitsLabel}`),
       `C = (Conso. nocturne × nuits d'autonomie) ÷ rendement batterie ÷ DoD${d.systemType === 'hybrid' ? ' × ratio hybride' : ''}`,
       `C = (${u(nf(conso.night, 2), 'kWh')} × ${nf(autonomyNights, autonomyNights % 1 ? 1 : 0)}) ÷ ${nf(batteryEfficiency, 2)} ÷ ${nf(depthOfDischarge, 2)}${d.systemType === 'hybrid' ? ` × ${nf(hybridBatteryRatio, 2)}` : ''}`,
     )]),
     ...(d.inverter ? [resultat(
       'Onduleur hybride recommandé',
       u(nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0), 'kVA'),
-      `MPPT intégré · tension système ${u(SYSTEM_VOLTAGE, 'V')}${d.inverter.maxPower ? ` · ${u(nf(d.inverter.maxPower), 'W')}` : ''}`,
-      `Puissance onduleur ≥ puissance requise × ${nf(inverterMargin, 1)}`,
-      `≥ ${u(nf(Math.round(d.sizing.requiredPanelPower)), 'W')} × ${nf(inverterMargin, 1)} = ${u(nf(Math.round(d.sizing.requiredPanelPower * inverterMargin)), 'W')}`,
+      // Le pic de charge est le second critère de choix d'un onduleur ; la
+      // tension système, elle, est déjà au § 3.
+      picDeCharge != null
+        ? `MPPT intégré · pic de charge ${u(nf(picDeCharge), 'W')} couvert`
+        : `MPPT intégré · tension système ${u(SYSTEM_VOLTAGE, 'V')}`,
+      `Puissance onduleur ≥ puissance panneaux × ${nf(inverterMargin, 1)}`,
+      // Le calibre retenu est le premier de la gamme AU-DESSUS du seuil : sans
+      // cette précision, le lecteur cherchait en vain le lien entre le seuil
+      // calculé et les kVA affichés.
+      `≥ ${u(nf(Math.round(d.sizing.requiredPanelPower)), 'W')} × ${nf(inverterMargin, 1)} = ${u(nf(Math.round(d.sizing.requiredPanelPower * inverterMargin)), 'W')} → premier calibre au-dessus`,
     )] : []),
     resultat(
       'Productible annuel net',
@@ -175,7 +195,9 @@ export function renderSheet(d, c) {
   ].join('');
 
   // --- Analyse (page 3) ---
-  const chart = renderCoverageChart(c.couverture.mois, { kwc: c.kwc, tauxUtilisation: renta.tauxUtilisation, couleurs });
+  const chart = renderCoverageChart(c.couverture.mois, {
+    kwc: c.kwc, consoJour: totalKwh, ratio: RATIO_PRODUCTIBLE_NET, couleurs,
+  });
   const rentaRows = [
     ['Consommation couverte', `${u(nf(renta.kwhAnnuels), 'kWh/an')} <span class="muted">(${u(nf(totalKwh, 2), 'kWh/j')} × ${nf(renta.tauxUtilisation, 2)} × 365)</span>`],
     ['Investissement estimé', renta.investissement != null ? cfa(renta.investissement) : 'À renseigner'],
@@ -342,7 +364,13 @@ export function renderSheet(d, c) {
       <div class="focal-note">${nf(d.sizing.numberOfPanels)} panneau${d.sizing.numberOfPanels > 1 ? 'x' : ''} de ${u(nf(panelWc), 'Wc')} · productible net ${u(nf(c.prods.net), 'kWh/an')}</div>
     </div>
     <div class="focal-stats">
-      ${stat('Stockage', batterieKwh > 0 ? u(nf(batterieKwh, 1), 'kWh') : '—', batterieKwh > 0 ? `${u(nf(c.batterieAh), 'Ah')} · ${u(SYSTEM_VOLTAGE, 'V')}` : 'Sans batterie')}
+      ${/* Le parc RÉELLEMENT installé, pas le besoin théorique : c'est ce que
+           le client reçoit, et c'est ce que liste le récapitulatif matériel. */
+        stat(
+          'Stockage',
+          c.batterieInstallee > 0 ? u(nf(c.batterieInstallee, 1), 'kWh') : '—',
+          c.batterieInstallee > 0 ? `${u(nf(c.batterieInstalleeAh), 'Ah')} · ${u(SYSTEM_VOLTAGE, 'V')}` : 'Sans batterie',
+        )}
       ${stat('Onduleur', d.inverter ? u(nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0), 'kVA') : '—', d.inverter ? 'Hybride' : 'Non retenu')}
       ${stat('Consommation', u(nf(totalKwh, 1), 'kWh/j'), `${u(nf(totalWh), 'Wh')} par jour`)}
     </div>

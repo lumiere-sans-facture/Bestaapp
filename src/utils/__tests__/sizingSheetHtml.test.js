@@ -66,18 +66,41 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(html).toContain(`${Math.round(SIZING_PARAMS.panelEfficiency * 100)} %`);
     expect(html).toContain(`${SYSTEM_VOLTAGE} V`);
     expect(html).toContain('Productible annuel net');
-    expect(html).toContain('× 0,75');
+    // Un seul taux de pertes : celui du dimensionnement sert aussi à annoncer
+    // la production. Aucune trace de l'ancien 0,75 concurrent.
+    expect(html).toContain(`× ${String(SIZING_PARAMS.panelEfficiency).replace('.', ',')}`);
+    expect(html).not.toContain('0,75');
     expect(html).toContain('Tarif de l’électricité');
+  });
+
+  it('page 2 : les deux taux homonymes sont nommés distinctement', () => {
+    // « Rendement des panneaux 85 % » et « Taux d'utilisation 85 % » côte à
+    // côte faisaient croire à un lien : ce sont deux notions étrangères.
+    expect(html).toContain('Rendement système retenu');
+    expect(html).toContain('Part autoconsommée (rentabilité)');
+    expect(html).not.toContain('Taux d’utilisation');
+  });
+
+  it('page 2 : le calibre de l’onduleur et le parc batterie installé sont explicités', () => {
+    expect(html).toContain('premier calibre au-dessus');
+    expect(html).toContain('pic de charge');
+    // Les modules ont des capacités fixes : le parc dépasse le besoin calculé,
+    // et la fiche affiche les deux valeurs côte à côte.
+    expect(html).toContain('Capacité batterie nécessaire');
+    expect(html).toContain('parc installé');
   });
 
   it('page 3 : graphique de couverture (12 mois, hachures, source PVGIS)', () => {
     expect(html).toContain('FIGURE');
-    expect(html).toContain('Productible mensuel estimé et besoin énergétique retenu');
+    expect(html).toContain('Productible mensuel estimé et consommation du client');
     expect(html).toContain('id="hachures"');
     // Système dimensionné par le moteur : le besoin est couvert les 12 mois —
     // la SEULE occurrence des hachures est la pastille de légende.
     expect(html.match(/url\(#hachures\)/g)).toHaveLength(1);
     expect(html).toContain('couvert sur les 12 mois');
+    // La comparaison porte sur la consommation ENTIÈRE, pas sur une fraction.
+    expect(html).toContain('Consommation du client (5,4 kWh/jour)');
+    expect(html).toContain(`ratio de performance ${String(SIZING_PARAMS.panelEfficiency).replace('.', ',')}`);
     expect(html).toContain('SARAH-3');
     expect(html).toContain('kWh/mois');
     for (const mois of ['Jan', 'Juil', 'Déc']) expect(html).toContain(`>${mois}</text>`);
