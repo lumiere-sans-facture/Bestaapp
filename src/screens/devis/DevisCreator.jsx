@@ -21,7 +21,7 @@ export default function DevisCreator({ onDone, startManual = false, initialManua
   const [mode, setMode] = useState(startManual ? 'manual' : 'choose'); // choose | solar | pompe | manual
   const initialLead = initialLeadId ? getLeadById(initialLeadId) : null;
 
-  // Le dimensionnement par facture CEET n'a plus sa carte : c'est un simple
+  // Le dimensionnement par facture n'a plus sa carte : c'est un simple
   // mode de saisie de la consommation, proposé DANS l'assistant solaire
   // (appareils / saisie directe / facture) — une entrée de moins à choisir.
   if (mode === 'solar') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} />;
@@ -40,7 +40,7 @@ export default function DevisCreator({ onDone, startManual = false, initialManua
         <button className="devis-mode-card" onClick={() => setMode('solar')}>
           <div className="devis-mode-icon solar"><PanelTop size={26} /></div>
           <div className="devis-mode-title">Dimensionnement solaire</div>
-          <div className="devis-mode-desc">Estimez la consommation du client — liste d'appareils, saisie directe ou facture CEET — et générez le système (panneaux, onduleur, batteries) et son devis chiffré.</div>
+          <div className="devis-mode-desc">Estimez la consommation du client — liste d'appareils, saisie directe ou facture CEET/SBEE — et générez le système (panneaux, onduleur, batteries) et son devis chiffré.</div>
         </button>
         <button className="devis-mode-card" onClick={() => setMode('pompe')}>
           <div className="devis-mode-icon pompe"><Droplets size={26} /></div>

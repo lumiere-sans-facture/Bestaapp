@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Dimensionnement par facture : « CEET/SBEE » — Togo et Bénin, pas un seul opérateur
 - Devis : la carte « Dimensionnement par facture » disparaît — la facture CEET est un mode de saisie de l’assistant solaire
 - Saisie des charges : la nouvelle ligne apparaît en haut, sous le sélecteur
 - Fiche : l’économie annuelle est doublée de son équivalent mensuel

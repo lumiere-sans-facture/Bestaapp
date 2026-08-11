@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
-import { factureVersConsommation, REPARTITIONS, DEFAULT_REPARTITION, PRIX_KWH_CEET } from '../../utils/factureConso';
+import { factureVersConsommation, REPARTITIONS, DEFAULT_REPARTITION, PRIX_KWH_RESEAU } from '../../utils/factureConso';
 import { calculateSystemSize, buildKitQuotation, suggestKitForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE } from '../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
@@ -48,12 +48,13 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   const [rows, setRows] = useState([]); // appareils sélectionnés
   const [pickerId, setPickerId] = useState('');
   // Trois façons d'estimer la consommation : liste d'appareils (défaut),
-  // saisie directe des kWh, ou FACTURE CEET mensuelle en F CFA — pour le
-  // client qui ne connaît pas ses appareils mais sait ce qu'il paie.
+  // saisie directe des kWh, ou FACTURE d'électricité mensuelle en F CFA (CEET
+  // au Togo, SBEE au Bénin) — pour le client qui ne connaît pas ses appareils
+  // mais sait ce qu'il paie.
   const [consoMode, setConsoMode] = useState('appareils');
   const manualMode = consoMode !== 'appareils'; // la fiche technique n'a pas de liste d'appareils
   const [manual, setManual] = useState({ day: '', night: '' });
-  const [facture, setFacture] = useState({ montant: '', prixKwh: PRIX_KWH_CEET, repartition: DEFAULT_REPARTITION });
+  const [facture, setFacture] = useState({ montant: '', prixKwh: PRIX_KWH_RESEAU, repartition: DEFAULT_REPARTITION });
   // Off-grid par défaut : cas majoritaire sur le terrain.
   const [systemType, setSystemType] = useState('off-grid');
   // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
@@ -273,7 +274,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
           <div>
             <div className="wizard-step-title">Estimez la consommation</div>
             <div className="categories-scroll" style={{ marginBottom: 12 }}>
-              {[['appareils', 'Liste des appareils'], ['facture', 'Facture CEET (F CFA)'], ['direct', 'Saisie directe (kWh)']].map(([id, label]) => (
+              {[['appareils', 'Liste des appareils'], ['facture', 'Facture CEET/SBEE (F CFA)'], ['direct', 'Saisie directe (kWh)']].map(([id, label]) => (
                 <button key={id} type="button" className={`category-chip ${consoMode === id ? 'active' : ''}`}
                   aria-pressed={consoMode === id} onClick={() => setConsoMode(id)}>
                   {id === 'facture' ? <Banknote size={13} style={{ verticalAlign: -2, marginRight: 4 }} /> : id === 'direct' ? <Calculator size={13} style={{ verticalAlign: -2, marginRight: 4 }} /> : null}

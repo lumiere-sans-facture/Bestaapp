@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { factureVersConsommation, partJourDe, PRIX_KWH_CEET } from '../factureConso';
+import { factureVersConsommation, partJourDe, PRIX_KWH_RESEAU } from '../factureConso';
 
 describe('factureVersConsommation — de la facture CEET aux kWh/jour', () => {
   it('convertit une facture mensuelle en consommation jour/nuit', () => {
@@ -25,7 +25,7 @@ describe('factureVersConsommation — de la facture CEET aux kWh/jour', () => {
   });
 
   it('le prix par défaut est celui de la CEET, la répartition inconnue vaut 50/50', () => {
-    const c = factureVersConsommation(PRIX_KWH_CEET * 30, undefined, 'inconnue');
+    const c = factureVersConsommation(PRIX_KWH_RESEAU * 30, undefined, 'inconnue');
     expect(c.kwhMois).toBe(30);
     expect(c.day).toBe(0.5);
     expect(partJourDe('inconnue')).toBe(0.5);

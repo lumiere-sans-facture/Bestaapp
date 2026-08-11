@@ -1,11 +1,13 @@
 // Dimensionnement par FACTURE : convertit la facture d'électricité mensuelle
-// (F CFA) du client en consommation journalière (kWh jour/nuit) — pour les
+// (F CFA, CEET au Togo ou SBEE au Bénin) du client en consommation
+// journalière (kWh jour/nuit) — pour les
 // clients qui ne connaissent pas leurs appareils mais savent ce qu'ils paient.
 // Logique pure, sans React.
 
-// Prix moyen du kWh CEET (tranche domestique, F CFA) — valeur indicative,
-// modifiable dans le formulaire : les tarifs varient par tranche et par usage.
-export const PRIX_KWH_CEET = 114;
+// Prix moyen du kWh du réseau (tranche domestique, F CFA) — valeur indicative
+// calée sur la CEET (Togo), modifiable dans le formulaire : les tarifs varient
+// par opérateur (CEET, SBEE), par tranche et par usage.
+export const PRIX_KWH_RESEAU = 114;
 
 // Jours facturés par mois (moyenne annuelle).
 export const JOURS_PAR_MOIS = 30;
@@ -29,7 +31,7 @@ const round2 = (n) => Number(n.toFixed(2));
  * prête pour calculateSystemSize. Retourne aussi le volume mensuel pour
  * l'affichage. Entrées illisibles ou prix nul → consommation nulle.
  */
-export const factureVersConsommation = (montantMensuel, prixKwh = PRIX_KWH_CEET, repartitionId = DEFAULT_REPARTITION) => {
+export const factureVersConsommation = (montantMensuel, prixKwh = PRIX_KWH_RESEAU, repartitionId = DEFAULT_REPARTITION) => {
   const montant = Number(montantMensuel) || 0;
   const prix = Number(prixKwh) || 0;
   if (montant <= 0 || prix <= 0) return { kwhMois: 0, day: 0, night: 0 };
