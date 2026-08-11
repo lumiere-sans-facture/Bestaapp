@@ -146,7 +146,10 @@ export const computeSheet = (d) => {
   const { panelEfficiency } = SIZING_PARAMS;
   const autonomyNights = d.sizing.autonomyNights || 1;
   const nightEnergyForPanels = d.systemType === 'on-grid' ? conso.night : conso.night * autonomyNights;
-  const energieNecessaire = (conso.day + nightEnergyForPanels) / panelEfficiency;
+  // Énergie que l'installation doit FOURNIR au client dans la journée : la
+  // consommation, rien de plus. Le rendement des panneaux n'intervient qu'au
+  // moment de convertir cette énergie en puissance crête à installer.
+  const energieJour = conso.day + nightEnergyForPanels;
   const panelWc = Number((String(d.panelName || '').match(/(\d{3,4})\s*W/i) || [])[1]) || 550;
   const kwc = (d.sizing.numberOfPanels * panelWc) / 1000;
   const renta = calculerRentabilite(consoJour, d.investissement ?? null, d.rentabilite || {});
@@ -157,7 +160,7 @@ export const computeSheet = (d) => {
   // toujours un peu le besoin calculé — c'est ce que le client reçoit.
   const batterieInstallee = (d.batteries || []).reduce((s, b) => s + b.capacity * b.qty, 0);
   return {
-    consoJour, energieNecessaire, panelWc, kwc, autonomyNights,
+    consoJour, energieJour, panelWc, kwc, autonomyNights,
     // La production annuelle EST la somme des barres du graphique, et la
     // production du pire mois est le chiffre qui se vérifie à la main.
     production: Math.round(couverture.production),

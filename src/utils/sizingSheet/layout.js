@@ -144,17 +144,17 @@ export function renderSheet(d, c) {
   const blocsResultats = [
     resultat(
       'Énergie journalière à produire',
-      u(nf(c.energieNecessaire, 2), 'kWh/jour'),
+      u(nf(c.energieJour, 2), 'kWh/jour'),
       d.systemType === 'on-grid' ? '' : `dont recharge batterie sur ${nuitsLabel}`,
-      `E = (Jour + Nuit${d.systemType === 'on-grid' ? '' : ' × nuits d\'autonomie'}) ÷ rendement des panneaux`,
-      `E = (${nf(conso.day, 2)} + ${nf(conso.night, 2)}${d.systemType === 'on-grid' ? '' : ` × ${nf(autonomyNights, autonomyNights % 1 ? 1 : 0)}`}) kWh ÷ ${nf(panelEfficiency, 2)}`,
+      `E = Jour + Nuit${d.systemType === 'on-grid' ? '' : ' × nuits d\'autonomie'}`,
+      `E = ${nf(conso.day, 2)} + ${nf(conso.night, 2)}${d.systemType === 'on-grid' ? '' : ` × ${nf(autonomyNights, autonomyNights % 1 ? 1 : 0)}`} = ${u(nf(c.energieJour, 2), 'kWh')}`,
     ),
     resultat(
       'Puissance panneaux nécessaire',
       u(nf(Math.round(d.sizing.requiredPanelPower)), 'Wc'),
       `→ ${nf(d.sizing.numberOfPanels)} panneau${d.sizing.numberOfPanels > 1 ? 'x' : ''} de ${u(nf(panelWc), 'Wc')} = ${u(nf(c.kwc, 2), 'kWc')} installés`,
-      'P = E ÷ HSP',
-      `P = ${u(nf(c.energieNecessaire, 2), 'kWh')} ÷ ${u(nf(d.sunHours, 1), 'h')}`,
+      'P = E ÷ (rendement des panneaux × HSP)',
+      `P = ${u(nf(c.energieJour, 2), 'kWh')} ÷ (${nf(panelEfficiency, 2)} × ${u(nf(d.sunHours, 1), 'h')})`,
     ),
     ...(d.systemType === 'on-grid' ? [] : [resultat(
       'Capacité batterie nécessaire',

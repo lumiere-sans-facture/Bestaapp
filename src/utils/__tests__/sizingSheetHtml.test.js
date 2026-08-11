@@ -79,6 +79,22 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     }
   });
 
+  it('page 2 : le rendement intervient à la puissance, pas à l’énergie à produire', () => {
+    // L'énergie journalière à produire EST la consommation du client : aucun
+    // panneau, aucun rendement à ce stade. Le rendement n'apparaît qu'en
+    // convertissant cette énergie en puissance crête à installer.
+    const [energie, puissance] = html
+      .split('Énergie journalière à produire')[1]
+      .split('Capacité batterie nécessaire')[0]
+      .split('Puissance panneaux nécessaire');
+    expect(energie).toContain('E = Jour + Nuit × nuits d’autonomie'.replace('’', "'"));
+    expect(energie).toContain('E = 2,20 + 3,20 × 1 =');
+    expect(energie).not.toContain('rendement');
+    expect(energie).not.toContain('panneaux');
+    expect(puissance).toContain('P = E ÷ (rendement des panneaux × HSP)');
+    expect(puissance).toContain('÷ (0,85 ×');
+  });
+
   it('page 2 : les deux taux homonymes sont nommés distinctement', () => {
     // « Rendement des panneaux 85 % » et « Taux d'utilisation 85 % » côte à
     // côte faisaient croire à un lien : ce sont deux notions étrangères.
