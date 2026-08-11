@@ -80,11 +80,15 @@ export const RENTA_DEFAUTS = {
   provisionOnduleur: 320000, // F CFA — 1 remplacement (durée de vie 5 ans)
 };
 
+// Durées de vie annoncées, de la plus longue à la plus courte : le lecteur
+// voit d'un coup d'œil ce qui tient toute la vie de l'installation et ce qui
+// sera remplacé. Le détail technique (nombre de cycles) reste en note.
 export const DUREES_VIE = [
   { equipement: 'Panneaux', duree: '25 ans' },
-  { equipement: 'Onduleur', duree: '5 ans' },
-  { equipement: 'Batteries lithium', duree: '10 ans (6 000 cycles)' },
   { equipement: 'Structure', duree: '25 ans' },
+  // Note calibrée pour tenir sur UNE ligne dans la colonne (160 px à 11 px).
+  { equipement: 'Batteries lithium', duree: '15 ans', note: '6 000 cycles · 1 par jour' },
+  { equipement: 'Onduleur', duree: '5 ans' },
 ];
 
 /**

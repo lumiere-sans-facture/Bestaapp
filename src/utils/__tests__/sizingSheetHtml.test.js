@@ -91,7 +91,13 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(html).toContain('Investissement estimé');
     expect(html).toContain('2 500 000 F CFA');
     expect(html).toContain('Durée de vie des équipements');
-    expect(html).toContain('6 000 cycles');
+    // Batteries : 15 ans en grand, le détail des cycles en note.
+    const vies = html.split('Durée de vie des équipements')[1];
+    expect(vies).toContain('<div class="stat-value">15 ans</div>');
+    expect(vies).toContain('<div class="stat-note">6 000 cycles · 1 par jour</div>');
+    // De la plus longue durée à la plus courte : l'onduleur ferme la marche.
+    expect(vies.match(/stat-label">([^<]+)/g).map((m) => m.split('">')[1]))
+      .toEqual(['Panneaux', 'Structure', 'Batteries lithium', 'Onduleur']);
   });
 
   it('aucune marque du catalogue, aucun prix hors section rentabilité', () => {

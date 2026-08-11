@@ -430,7 +430,7 @@ export function renderSheet(d, c) {
     </table>
     <div class="micro" style="margin-top:24px">Durée de vie des équipements</div>
     <div class="vies">
-      ${DUREES_VIE.map((v) => stat(v.equipement, v.duree)).join('')}
+      ${DUREES_VIE.map((v) => stat(v.equipement, v.duree, v.note || '')).join('')}
     </div>
   </section>
 
