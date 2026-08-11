@@ -1,8 +1,11 @@
 // FIGURE 1 — graphique de couverture mensuelle : SVG inline autonome, sans
 // bibliothèque, sans dégradé ni ombre, lisible en noir et blanc (les mois en
 // déficit restent identifiables par leurs hachures).
-const NAVY = '#0a2472';
-const ORANGE = '#f5a623';
+// Les deux couleurs de marque viennent de l'émetteur du document (l'abonné Pro
+// ou BestaSolar) ; la terre cuite du déficit, elle, est SÉMANTIQUE : elle
+// signale un manque et ne suit aucune marque.
+const NAVY_DEFAUT = '#0a2472';
+const ORANGE_DEFAUT = '#f5a623';
 const TERRE = '#c2410c';
 const GRILLE = '#eef0f3';
 const BASE = '#9ca3af';
@@ -19,10 +22,12 @@ export const plafondAxe = (pic) => {
 
 /**
  * @param {Array<{mois:string, prod:number, besoin:number, deficit:boolean}>} monthly
- * @param {{kwc:number, tauxUtilisation:number}} opts
+ * @param {{kwc:number, tauxUtilisation:number, couleurs?:{primaire:string, accent:string}}} opts
  * @returns {string} chaîne <svg>
  */
-export function renderCoverageChart(monthly, { kwc, tauxUtilisation }) {
+export function renderCoverageChart(monthly, { kwc, tauxUtilisation, couleurs = {} }) {
+  const NAVY = couleurs.primaire || NAVY_DEFAUT;
+  const ORANGE = couleurs.accent || ORANGE_DEFAUT;
   const W = 714;
   const H = 273;
   const plotTop = 36;             // 14px de titre + 22px de marge

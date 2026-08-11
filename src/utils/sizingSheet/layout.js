@@ -1,13 +1,15 @@
 // Fiche de dimensionnement — MISE EN PAGE : trois pages A4 fixes.
 //   Page 1 · Synthèse et besoin   Page 2 · Étude technique   Page 3 · Analyse
 // Socle visuel identique aux modèles de devis : IBM Plex Sans 400/500/600,
-// échelle 28/18/13/11, navy #0a2472, orange #f5a623 (UN point focal par
-// page : le kWc en page 1, l'économie annuelle en page 3 — page 2 sans
-// orange), terre cuite #c2410c réservée au graphique.
+// échelle 28/18/13/11, deux couleurs de marque (UN point focal par page : le
+// kWc en page 1, l'économie annuelle en page 3 — page 2 sans accent), terre
+// cuite #c2410c réservée au déficit du graphique.
+// La fiche porte l'identité de son ÉMETTEUR : côté Pro, l'entreprise abonnée
+// (logo, couleurs, coordonnées) ; à défaut, celle de BestaSolar.
 import { SIZING_PARAMS, SYSTEM_VOLTAGE, SYSTEM_TYPES } from '../solarSizing';
-import { COMPANY } from '../../config/company';
 import { CUSTOM_APPLIANCE_LABEL } from '../../data/appliances';
-import { LOGO_BESTASOLAR } from '../../assets/logoBestaSolar';
+import { emetteurDe } from '../docTemplates/shared';
+import { couleursLisibles } from '../couleurDocument';
 import { RATIO_PRODUCTIBLE_NET, DUREES_VIE, libelleRoi } from './compute';
 import { renderCoverageChart } from './chart';
 
@@ -46,6 +48,11 @@ const resultat = (label, valeur, precision, formule, application) => `
 /** Assemble le document complet (3 pages) à partir des données du dossier
  *  (`d`, contrat inchangé) et du dossier calculé (`c` = computeSheet(d)). */
 export function renderSheet(d, c) {
+  // Émetteur du document : l'entreprise abonnée (espace Pro) ou BestaSolar.
+  // Même normalisation que les devis et factures — une seule identité par
+  // document, jamais un mélange des deux.
+  const e = emetteurDe(d.company || {});
+  const couleurs = couleursLisibles({ primaire: e.couleurPrimaire, secondaire: e.couleurSecondaire });
   const { panelEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio, inverterMargin } = SIZING_PARAMS;
   const conso = d.consumption;
   const totalKwh = c.consoJour;
@@ -168,7 +175,7 @@ export function renderSheet(d, c) {
   ].join('');
 
   // --- Analyse (page 3) ---
-  const chart = renderCoverageChart(c.couverture.mois, { kwc: c.kwc, tauxUtilisation: renta.tauxUtilisation });
+  const chart = renderCoverageChart(c.couverture.mois, { kwc: c.kwc, tauxUtilisation: renta.tauxUtilisation, couleurs });
   const rentaRows = [
     ['Consommation couverte', `${u(nf(renta.kwhAnnuels), 'kWh/an')} <span class="muted">(${u(nf(totalKwh, 2), 'kWh/j')} × ${nf(renta.tauxUtilisation, 2)} × 365)</span>`],
     ['Investissement estimé', renta.investissement != null ? cfa(renta.investissement) : 'À renseigner'],
@@ -177,13 +184,33 @@ export function renderSheet(d, c) {
     [`Économies cumulées sur ${nf(renta.horizon)} ans`, cfa(renta.economiesCumulees)],
   ];
 
+  const marque = esc(e.name);
   const clientNom = esc(d.client?.name || 'À compléter');
   const ville = esc(d.cityName || d.client?.ville || '—');
   const runner = (page) => `
   <div class="runner">
-    <div class="marque">${esc(COMPANY.name)}</div>
+    <div class="marque">${marque}</div>
     <div class="contexte">${clientNom} · ${ville} · Page ${page} / 3</div>
   </div>`;
+
+  // --- Identité de l'émetteur (en-tête et pieds de page) ---
+  // Tout est conditionnel : une entreprise abonnée qui n'a pas encore rempli
+  // son adresse ou son RCCM ne doit pas voir de tiret orphelin sur sa fiche.
+  const entete = e.logo
+    ? `<img src="${esc(e.logo)}" alt="${marque}">`
+    : `<div>
+      <div class="head-marque">${marque}</div>
+      ${e.slogan ? `<div class="head-slogan">${esc(e.slogan)}</div>` : ''}
+    </div>`;
+  const piedCourt = e.addressShort ? `${marque} — ${esc(e.addressShort)}` : marque;
+  const piedLong = piedCourt + (e.phone ? ` · ${esc(e.phone)}` : '');
+  const mentionsLegales = [
+    e.rccm ? `RCCM ${esc(e.rccm)}` : '',
+    e.ifu ? `IFU ${esc(e.ifu)}` : '',
+    d.apporteur?.name
+      ? `Apporteur d’affaires : ${esc(d.apporteur.name)}${d.apporteur.code ? ` · ${esc(d.apporteur.code)}` : ''}`
+      : '',
+  ].filter(Boolean).join(' · ');
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -195,7 +222,7 @@ export function renderSheet(d, c) {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --navy: #0a2472; --orange: #f5a623; --texte: #3a3a3a; --gris: #6b6b6b; --filet: #e5e5e5; --terre: #c2410c; }
+  :root { --primaire: ${couleurs.primaire}; --accent: ${couleurs.accent}; --texte: #3a3a3a; --gris: #6b6b6b; --filet: #e5e5e5; --terre: #c2410c; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'IBM Plex Sans', system-ui, sans-serif;
@@ -212,35 +239,37 @@ export function renderSheet(d, c) {
   .micro { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
   .muted { color: var(--gris); font-weight: 400; }
   h2 {
-    font-size: 18px; font-weight: 600; color: var(--navy);
-    padding-bottom: 6px; margin-bottom: 8px; border-bottom: 1px solid var(--navy);
+    font-size: 18px; font-weight: 600; color: var(--primaire);
+    padding-bottom: 6px; margin-bottom: 8px; border-bottom: 1px solid var(--primaire);
   }
   .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
-          padding-bottom: 16px; border-bottom: 2px solid var(--navy); margin-bottom: 32px; }
-  .head img { height: 32px; width: auto; display: block; }
+          padding-bottom: 16px; border-bottom: 2px solid var(--primaire); margin-bottom: 32px; }
+  .head img { height: 32px; width: auto; max-width: 260px; object-fit: contain; display: block; }
+  .head-marque { font-size: 18px; font-weight: 600; color: var(--primaire); }
+  .head-slogan { font-size: 11px; color: var(--gris); margin-top: 2px; }
   .head-right { text-align: right; }
-  .head-title { font-size: 18px; font-weight: 600; color: var(--navy); text-transform: uppercase; letter-spacing: 1.6px; }
+  .head-title { font-size: 18px; font-weight: 600; color: var(--primaire); text-transform: uppercase; letter-spacing: 1.6px; }
   .head-sub { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); margin-top: 8px; }
   .runner { display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
-            padding-bottom: 8px; border-bottom: 2px solid var(--navy); margin-bottom: 32px;
+            padding-bottom: 8px; border-bottom: 2px solid var(--primaire); margin-bottom: 32px;
             font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; }
-  .runner .marque { color: var(--navy); }
+  .runner .marque { color: var(--primaire); }
   .runner .contexte { color: var(--gris); }
   .focal { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px;
            padding-bottom: 16px; border-bottom: 1px solid var(--filet); margin-bottom: 32px; }
-  .focal-value { font-size: 28px; font-weight: 600; color: var(--orange); line-height: 1.2; margin: 8px 0; }
+  .focal-value { font-size: 28px; font-weight: 600; color: var(--accent); line-height: 1.2; margin: 8px 0; }
   .focal-note { font-size: 11px; color: var(--gris); }
   .focal-stats { display: grid; grid-template-columns: repeat(3, auto); gap: 32px; text-align: right; }
   .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
-  .stat-value { font-size: 18px; font-weight: 600; color: var(--navy); line-height: 1.4; margin-top: 4px; }
+  .stat-value { font-size: 18px; font-weight: 600; color: var(--primaire); line-height: 1.4; margin-top: 4px; }
   .stat-note { font-size: 11px; color: var(--gris); }
   .synthese { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 8px; }
   .client { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
   .client-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
   .client-value { font-size: 13px; margin-top: 4px; }
-  .client-value.fort { font-weight: 600; color: var(--navy); }
+  .client-value.fort { font-weight: 600; color: var(--primaire); }
   table { width: 100%; border-collapse: collapse; }
-  th { background: var(--navy); color: #fff; font-size: 11px; font-weight: 600;
+  th { background: var(--primaire); color: #fff; font-size: 11px; font-weight: 600;
        text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 10px 12px; }
   th.num { text-align: right; }
   td { padding: 0 12px; border-bottom: 1px solid var(--filet); font-size: 13px; }
@@ -250,27 +279,27 @@ export function renderSheet(d, c) {
   .num { text-align: right; white-space: nowrap; }
   .params { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 32px; }
   .param-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
-  .param-value { font-size: 13px; font-weight: 600; color: var(--navy); margin-top: 2px; }
+  .param-value { font-size: 13px; font-weight: 600; color: var(--primaire); margin-top: 2px; }
   .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
   .result { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px;
             padding: 3px 0; border-bottom: 1px solid var(--filet); }
   .result:last-child { border-bottom: none; }
   .result-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
-  .result-value { font-size: 18px; font-weight: 600; color: var(--navy); line-height: 1.3; margin-top: 2px; }
+  .result-value { font-size: 18px; font-weight: 600; color: var(--primaire); line-height: 1.3; margin-top: 2px; }
   .result-note { font-size: 11px; color: var(--gris); margin-top: 2px; }
   .result-calc { font-size: 11px; color: var(--gris); text-align: right; white-space: nowrap; line-height: 1.5; }
   .renta-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 24px; }
   .chart-note { font-size: 11px; color: var(--gris); margin-top: 4px; }
   .vies { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-top: 16px; }
-  .foot { margin-top: auto; padding-top: 8px; border-top: 2px solid var(--navy);
+  .foot { margin-top: auto; padding-top: 8px; border-top: 2px solid var(--primaire);
           display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   .foot-line { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gris); }
-  .foot-line.navy { color: var(--navy); }
+  .foot-line.marque { color: var(--primaire); }
   .foot-legal { font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--gris); margin-top: 4px; }
   .foot-right { text-align: right; }
   .print-bar { width: 794px; margin: 32px auto 0; display: flex; justify-content: flex-end; }
   .print-btn { font-family: inherit; font-size: 13px; font-weight: 600; color: #fff;
-               background: var(--navy); border: none; border-radius: 4px; padding: 12px 24px; cursor: pointer; }
+               background: var(--primaire); border: none; border-radius: 4px; padding: 12px 24px; cursor: pointer; }
   @page { size: A4; margin: 0; }
   @media print {
     body { background: #fff; padding: 0; }
@@ -286,7 +315,7 @@ export function renderSheet(d, c) {
 <!-- ============ PAGE 1 · Synthèse et besoin ============ -->
 <section class="page">
   <div class="head">
-    <img src="${LOGO_BESTASOLAR}" alt="${esc(COMPANY.name)}">
+    ${entete}
     <div class="head-right">
       <div class="head-title">Fiche de dimensionnement</div>
       <div class="head-sub">Étude technique · ${date} · Réf. ${reference}</div>
@@ -332,7 +361,7 @@ export function renderSheet(d, c) {
   </section>
 
   <div class="foot">
-    <div class="foot-line">${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)}</div>
+    <div class="foot-line">${piedCourt}</div>
     <div class="foot-line foot-right">Fiche de dimensionnement — ${clientNom} · Page 1 / 3</div>
   </div>
 </section>
@@ -363,7 +392,7 @@ export function renderSheet(d, c) {
   </section>
 
   <div class="foot">
-    <div class="foot-line">${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)}</div>
+    <div class="foot-line">${piedCourt}</div>
     <div class="foot-line foot-right">Document technique — Page 2 / 3</div>
   </div>
 </section>
@@ -396,7 +425,7 @@ export function renderSheet(d, c) {
     </div>
     <table>
       <tbody>
-        ${rentaRows.map(([k, v]) => `<tr><td>${k}</td><td class="num" style="font-weight:600;color:var(--navy)">${v}</td></tr>`).join('')}
+        ${rentaRows.map(([k, v]) => `<tr><td>${k}</td><td class="num" style="font-weight:600;color:var(--primaire)">${v}</td></tr>`).join('')}
       </tbody>
     </table>
     <div class="micro" style="margin-top:24px">Durée de vie des équipements</div>
@@ -407,8 +436,8 @@ export function renderSheet(d, c) {
 
   <div class="foot">
     <div>
-      <div class="foot-line navy">${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)} · ${esc(COMPANY.phone)}</div>
-      <div class="foot-legal">RCCM ${esc(COMPANY.rccm)} · IFU ${esc(COMPANY.ifu)}${d.apporteur?.name ? ` · Apporteur d’affaires : ${esc(d.apporteur.name)}${d.apporteur.code ? ` · ${esc(d.apporteur.code)}` : ''}` : ''}</div>
+      <div class="foot-line marque">${piedLong}</div>
+      ${mentionsLegales ? `<div class="foot-legal">${mentionsLegales}</div>` : ''}
     </div>
     <div class="foot-line foot-right">Estimation indicative — ne constitue pas une offre de prix ferme. · Page 3 / 3</div>
   </div>

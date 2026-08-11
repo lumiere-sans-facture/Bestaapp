@@ -1,12 +1,38 @@
 // Fiche témoin pour la vérification visuelle en navigateur (hors tests) :
-//   npx vite-node src/utils/sizingSheet/preview.mjs /chemin/fiche.html
+//   npx vite-node src/utils/sizingSheet/preview.mjs /chemin/fiche.html [--pro]
+// Sans option : identité BestaSolar. Avec --pro : identité d'une entreprise
+// abonnée (logo, couleurs et coordonnées à elle) — les deux mises en page
+// doivent tenir sur trois pages exactement.
 import { writeFileSync } from 'node:fs';
 import { buildSizingSheetHtml } from './index';
 import { calculateSystemSize } from '../solarSizing';
 
+// Logo de démonstration (SVG en data-URI) aux couleurs de l'abonné témoin.
+const logoDemo = `data:image/svg+xml;base64,${Buffer.from(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="32" viewBox="0 0 260 32">
+     <circle cx="16" cy="16" r="13" fill="#e65100"/>
+     <circle cx="16" cy="16" r="7" fill="#fff"/>
+     <text x="40" y="22" font-family="sans-serif" font-size="17" font-weight="700" fill="#1b5e20">SOLEIL DU GOLFE</text>
+   </svg>`,
+).toString('base64')}`;
+
+const abonne = {
+  nomEntreprise: 'Soleil du Golfe',
+  slogan: 'L’énergie qui ne s’arrête jamais',
+  logo: logoDemo,
+  telephone: '+228 90 11 22 33',
+  email: 'contact@soleildugolfe.tg',
+  adresse: 'Lomé, Nyékonakpoè',
+  rccm: 'TG-LOM-2024-B-1234',
+  ifu: '1000987654321',
+  couleurPrimaire: '#1b5e20',
+  couleurSecondaire: '#e65100',
+};
+
 const consumption = { day: 8.8, night: 8.8 }; // 17,6 kWh/j (climatiseur 3 CV)
 const sizing = calculateSystemSize(consumption, 'off-grid', 4.3);
 const html = buildSizingSheetHtml({
+  ...(process.argv.includes('--pro') ? { company: abonne } : {}),
   client: { name: 'Felix Sossa', phone: '+228 94 22 33 44', ville: 'Lomé' },
   apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' },
   appliances: [

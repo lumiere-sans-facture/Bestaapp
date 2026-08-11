@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Fiche de dimensionnement à l'identité de l'installateur côté Pro (logo, couleurs, coordonnées)
 - Graphique de couverture calé sur le pire mois : un système bien dimensionné affiche 12 mois orange
 
 ## 2026-08-07

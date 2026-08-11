@@ -124,3 +124,74 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(manual).toContain('2 200');
   });
 });
+
+// La fiche est un document commercial de l'installateur : côté Pro elle porte
+// SA marque, exactement comme ses devis et ses factures.
+describe('buildSizingSheetHtml — émetteur Pro (entreprise abonnée)', () => {
+  const company = {
+    nomEntreprise: 'Soleil du Golfe',
+    slogan: 'L’énergie qui ne s’arrête jamais',
+    logo: 'data:image/png;base64,iVBORw0KGgo=',
+    telephone: '+228 90 11 22 33',
+    email: 'contact@soleildugolfe.tg',
+    adresse: 'Lomé, Nyékonakpoè',
+    rccm: 'TG-LOM-2024-B-1234',
+    ifu: '1000987654321',
+    couleurPrimaire: '#1b5e20',
+    couleurSecondaire: '#e65100',
+  };
+  const html = buildSizingSheetHtml({ ...data, company });
+
+  it('porte le logo, les couleurs et le nom de l’abonné', () => {
+    expect(html).toContain('--primaire: #1b5e20');
+    expect(html).toContain('--accent: #e65100');
+    expect(html).toContain('src="data:image/png;base64,iVBORw0KGgo="');
+    expect(html).toContain('Soleil du Golfe');
+  });
+
+  it('porte ses coordonnées et ses mentions légales, jamais celles de BestaSolar', () => {
+    expect(html).toContain('Lomé, Nyékonakpoè');
+    expect(html).toContain('+228 90 11 22 33');
+    expect(html).toContain('RCCM TG-LOM-2024-B-1234');
+    expect(html).toContain('IFU 1000987654321');
+    for (const bestasolar of ['BESTA SOLAR', 'Cotonou Saint Rita', 'RB/PKO/23 A 19308', '0202274882317']) {
+      expect(html).not.toContain(bestasolar);
+    }
+  });
+
+  it('teinte aussi le graphique de couverture aux couleurs de l’abonné', () => {
+    const figure = html.split('<svg')[1].split('</svg>')[0];
+    expect(figure).toContain('#e65100'); // productible
+    expect(figure).toContain('#1b5e20'); // besoin retenu
+    expect(figure).not.toContain('#f5a623');
+  });
+
+  it('sans logo : le nom et le slogan tiennent la place de l’en-tête', () => {
+    const sansLogo = buildSizingSheetHtml({ ...data, company: { ...company, logo: '' } });
+    expect(sansLogo).toContain('class="head-marque"');
+    expect(sansLogo).toContain('L’énergie qui ne s’arrête jamais');
+    expect(sansLogo).not.toContain('<img');
+  });
+
+  it('entreprise incomplète : ni tiret orphelin, ni mention légale vide', () => {
+    const minimal = buildSizingSheetHtml({
+      ...data,
+      company: { nomEntreprise: 'Kekeli Énergie', logo: '', telephone: '', adresse: '', rccm: '', ifu: '' },
+    });
+    expect(minimal).toContain('Kekeli Énergie');
+    expect(minimal).not.toContain('Kekeli Énergie —');
+    expect(minimal).not.toContain('<div class="foot-legal">');
+    // Palette par défaut quand l'abonné n'a rien choisi.
+    expect(minimal).toContain('--primaire: #0a2472');
+    expect(minimal.match(/<section class="page">/g)).toHaveLength(3);
+  });
+
+  it('une palette trop claire est assombrie pour rester imprimable', () => {
+    const pale = buildSizingSheetHtml({
+      ...data,
+      company: { ...company, couleurPrimaire: '#7bd0ff', couleurSecondaire: '#fffbe0' },
+    });
+    expect(pale).not.toContain('--primaire: #7bd0ff');
+    expect(pale).not.toContain('--accent: #fffbe0');
+  });
+});

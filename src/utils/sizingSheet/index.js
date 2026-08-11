@@ -9,7 +9,10 @@ import { renderSheet } from './layout';
  * Construit le document HTML complet de la fiche.
  * Contrat de données inchangé (client, appliances, consumption, systemType,
  * sunHours, cityName, solarSource, sizing, inverter, batteries, panelName,
- * apporteur) + deux champs optionnels :
+ * apporteur) + trois champs optionnels :
+ * @param {object} d.company             entreprise ÉMETTRICE côté Pro (nomEntreprise,
+ *                                        logo, couleurPrimaire/Secondaire, telephone,
+ *                                        adresse, rccm, ifu…). Absente → identité BestaSolar.
  * @param {number|null} d.investissement  total du devis (F CFA) pour la rentabilité
  * @param {object} d.rentabilite         surcharges { tarifElec, tauxUtilisation,
  *                                        horizon, maintenanceAnnuelle, provisionOnduleur }

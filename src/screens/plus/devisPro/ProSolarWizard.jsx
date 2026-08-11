@@ -221,6 +221,9 @@ export default function ProSolarWizard({ onDone }) {
     const { openSizingSheet } = await import('../../../utils/sizingSheet');
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
     openSizingSheet({
+      // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
+      // coordonnées), comme ses devis et ses factures.
+      company,
       client: { name: client.name || '', phone: client.phone || '', ville: client.ville || '' },
       appliances: rows,
       manualMode,
