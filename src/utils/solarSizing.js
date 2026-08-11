@@ -151,12 +151,21 @@ export const CALIBRES_KVA = [1, 2, 3, 3.5, 5, 6, 8, 10, 12, 15, 20, 30];
 export const calibreRequis = (sortieW) => CALIBRES_KVA.find((k) => k * 1000 * FACTEUR_PUISSANCE >= sortieW)
   || Math.ceil(sortieW / (1000 * FACTEUR_PUISSANCE));
 
-/** L'onduleur retenu tient-il vraiment le besoin (pic ET entrée PV) ? */
-export const onduleurSuffisant = (inv, { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin, configures = [] } = {}) => {
+/** L'onduleur tient-il le pic de consommation, marge comprise ? */
+export const onduleurTientLePic = (inv, { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin } = {}) =>
+  !!inv && puissanceSortie(inv) >= sortieOnduleurRequise(peakLoad, pvPower, margin);
+
+/** Son entrée PV (MPPT) accepte-t-elle les panneaux posés ? Une limite
+ *  inconnue ne peut pas être contredite : elle ne bloque pas. */
+export const onduleurAccepteLePv = (inv, { pvPower = 0, configures = [] } = {}) => {
   if (!inv) return false;
   const pv = limitePv(inv, configures);
-  return puissanceSortie(inv) >= sortieOnduleurRequise(peakLoad, pvPower, margin) && (!pv || pv >= pvPower);
+  return !pv || pv >= pvPower;
 };
+
+/** L'onduleur retenu tient-il vraiment le besoin (pic ET entrée PV) ? */
+export const onduleurSuffisant = (inv, critere = {}) =>
+  onduleurTientLePic(inv, critere) && onduleurAccepteLePv(inv, critere);
 
 export const suggestInverterFor = (options = [], { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin, configures = [] } = {}) => {
   if (!options.length) return null;
@@ -332,7 +341,12 @@ export const calculateSystemSize = (
   // présenté comme « recommandé » se solde par des disjonctions chez le client.
   const inverterSortieRequise = sortieOnduleurRequise(peakLoad, installedPvPower);
   const inverterCalibreRequis = calibreRequis(inverterSortieRequise);
-  const inverterSuffisant = onduleurSuffisant(selectedInverter, inverters.length ? critereOnduleur : { peakLoad, pvPower: installedPvPower });
+  const critereRetenu = inverters.length ? critereOnduleur : { peakLoad, pvPower: installedPvPower };
+  // Les deux causes d'insuffisance sont distinguées : le message affiché doit
+  // désigner CE qui bloque — le pic de consommation ou l'entrée PV (MPPT).
+  const inverterTientPic = onduleurTientLePic(selectedInverter, critereRetenu);
+  const inverterAcceptePv = onduleurAccepteLePv(selectedInverter, critereRetenu);
+  const inverterSuffisant = inverterTientPic && inverterAcceptePv;
 
   let batteryCapacity = 0;
   let batteries = [];
@@ -355,6 +369,9 @@ export const calculateSystemSize = (
     inverterSortieRequise,   // W  — puissance de sortie exigée (pic × marge)
     inverterCalibreRequis,   // kVA — calibre du marché à retenir
     inverterSuffisant,       // false = aucun modèle disponible ne convient
+    inverterTientPic,        // false = puissance de sortie insuffisante
+    inverterAcceptePv,       // false = entrée PV (MPPT) trop faible
+    inverterPvMax: limitePv(selectedInverter, critereRetenu.configures || []),
     batteryCapacity,
     batteries: groupBatteries(batteries),
     estimatedProduction: (numberOfPanels * panelPower * peakSunHours * 365) / 1000, // kWh/an

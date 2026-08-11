@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Onduleur : l’alerte nomme la contrainte qui bloque — puissance de sortie ou entrée PV (MPPT)
 - Onduleurs : un « n kVA » compte pour n kW — plus de calibre surdimensionné proposé
 - Onduleur : un calibre insuffisant n’est plus proposé en silence — la fiche annonce le calibre à prévoir
 - Devis kit : la structure de montage est ajoutée même aux kits qui n’en portent pas (20 et 32 kWh)

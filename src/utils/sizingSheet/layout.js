@@ -104,9 +104,12 @@ export function renderSheet(d, c) {
   const critereOnduleur = picDeCharge > 0 ? 'pic de consommation' : 'puissance panneaux';
   // Quand aucun modèle disponible ne tient le besoin, la fiche annonce le
   // calibre EXIGÉ (celui à commander), pas le plus grand modèle du catalogue.
+  // Jamais un calibre INFÉRIEUR au modèle retenu : quand c'est l'entrée PV qui
+  // bloque (et non le pic), le calibre calculé sur le pic peut être plus petit.
   const onduleurInsuffisant = d.sizing.inverterSuffisant === false;
-  const calibreOnduleur = (onduleurInsuffisant && d.sizing.inverterCalibreRequis)
-    || d.inverter?.capacity || 0;
+  const calibreOnduleur = onduleurInsuffisant
+    ? Math.max(d.sizing.inverterCalibreRequis || 0, d.inverter?.capacity || 0)
+    : (d.inverter?.capacity || 0);
 
   // --- Paramètres (page 2) ---
   const renta = c.renta;

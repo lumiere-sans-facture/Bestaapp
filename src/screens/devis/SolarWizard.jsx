@@ -591,16 +591,35 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
                 {displayQuotation.inverterSuggested.model} suggéré à la place.
               </div>
             )}
-            {/* Aucun onduleur configuré ne tient le pic : le dire AVANT le
-                devis, sinon un modèle sous-calibré part chez le client et
-                disjoncte à la première mise en route de toutes les charges. */}
+            {/* Aucun onduleur configuré ne convient : le dire AVANT le devis,
+                sinon un modèle sous-calibré part chez le client. Deux causes
+                possibles — la puissance de sortie (pic) et l'entrée PV du MPPT
+                — et le message doit désigner celle qui bloque vraiment. */}
             {sizing?.inverterSuffisant === false && (
               <div className="storage-alert abo-alert is-warning" role="alert">
-                <Cpu size={13} style={{ verticalAlign: -2 }} /> Aucun onduleur ne tient le pic de{' '}
-                {peakLoad.toLocaleString('fr-FR')} W : il faut au moins{' '}
-                <strong>{sizing.inverterCalibreRequis} kVA</strong>{' '}
-                ({Math.round(sizing.inverterSortieRequise).toLocaleString('fr-FR')} W de sortie).
-                Ajoutez ce calibre dans Plus › Onduleurs, ou réduisez les charges simultanées.
+                <div>
+                  <Cpu size={13} style={{ verticalAlign: -2 }} /> Aucun onduleur ne convient pour ce besoin :
+                  {!sizing.inverterTientPic && (
+                    <div style={{ marginTop: 4 }}>
+                      • <strong>Puissance de sortie</strong> — le pic de {peakLoad.toLocaleString('fr-FR')} W
+                      exige {Math.round(sizing.inverterSortieRequise).toLocaleString('fr-FR')} W
+                      (marge +20 %), soit un calibre d’au moins{' '}
+                      <strong>{sizing.inverterCalibreRequis} kVA</strong>.
+                    </div>
+                  )}
+                  {!sizing.inverterAcceptePv && (
+                    <div style={{ marginTop: 4 }}>
+                      • <strong>Entrée PV (MPPT)</strong> — l’installation pose{' '}
+                      {Math.round(sizing.installedPvPower).toLocaleString('fr-FR')} Wc de panneaux, alors que
+                      l’onduleur retenu n’en accepte que{' '}
+                      {Math.round(sizing.inverterPvMax).toLocaleString('fr-FR')} Wc. Il faut un modèle dont
+                      la puissance PV max atteint {Math.round(sizing.installedPvPower).toLocaleString('fr-FR')} Wc.
+                    </div>
+                  )}
+                  <div style={{ marginTop: 4 }}>
+                    Complétez la liste dans Plus › Onduleurs{!sizing.inverterTientPic && ', ou réduisez les charges simultanées'}.
+                  </div>
+                </div>
               </div>
             )}
 

@@ -4,7 +4,8 @@ import { INVERTER_MODELS } from '../../data/inverters';
 import { normaliserOnduleur, onduleurEstValide, resumeOnduleur, dupliquerOnduleur } from '../inverters';
 import {
   buildKitQuotation, suggestInverterFor, puissanceSortie, limitePv,
-  calibreRequis, sortieOnduleurRequise, onduleurSuffisant, calculateSystemSize, SIZING_PARAMS,
+  calibreRequis, sortieOnduleurRequise, onduleurSuffisant, onduleurTientLePic,
+  onduleurAccepteLePv, calculateSystemSize, SIZING_PARAMS,
 } from '../solarSizing';
 
 describe('normaliserOnduleur / onduleurEstValide', () => {
@@ -124,11 +125,37 @@ describe('aucun onduleur disponible ne convient : le dire, pas le taire', () => 
     expect(sizing.inverterSortieRequise).toBe(7920);
   });
 
+  it('distingue les deux causes : puissance de sortie et entrée PV (MPPT)', () => {
+    const gros = { id: 'o8', capacity: 8, maxPvPower: 10400 };
+    // Le pic passe (8 000 W ≥ 6 000), mais 12 000 Wc de panneaux dépassent
+    // l'entrée PV : c'est le MPPT qui bloque, pas la puissance de sortie.
+    expect(onduleurTientLePic(gros, { peakLoad: 5000, pvPower: 12000 })).toBe(true);
+    expect(onduleurAccepteLePv(gros, { pvPower: 12000 })).toBe(false);
+    expect(onduleurSuffisant(gros, { peakLoad: 5000, pvPower: 12000 })).toBe(false);
+    // Cas inverse : peu de panneaux mais un pic hors de portée.
+    expect(onduleurTientLePic(gros, { peakLoad: 9000, pvPower: 3000 })).toBe(false);
+    expect(onduleurAccepteLePv(gros, { pvPower: 3000 })).toBe(true);
+  });
+
+  it('le dimensionnement dit LAQUELLE des deux contraintes bloque', () => {
+    // 24 panneaux de 620 Wc = 14 880 Wc, pic modeste : seul le MPPT coince.
+    const sizing = calculateSystemSize({ day: 30, night: 20 }, 'off-grid', 4.3, undefined, undefined, {
+      peakLoad: 3000, inverters: [{ id: 'o6', capacity: 6, maxPvPower: 7800 }],
+    });
+    expect(sizing.inverterTientPic).toBe(true);
+    expect(sizing.inverterAcceptePv).toBe(false);
+    expect(sizing.inverterSuffisant).toBe(false);
+    expect(sizing.inverterPvMax).toBe(7800);
+    expect(sizing.installedPvPower).toBeGreaterThan(7800);
+  });
+
   it('un catalogue suffisant ne déclenche aucune alerte', () => {
     const sizing = calculateSystemSize({ day: 2, night: 2 }, 'off-grid', 4.3, undefined, undefined, {
       peakLoad: 2000, inverters: petits,
     });
     expect(sizing.inverterSuffisant).toBe(true);
+    expect(sizing.inverterTientPic).toBe(true);
+    expect(sizing.inverterAcceptePv).toBe(true);
     expect(sizing.inverter.capacity).toBe(3);
   });
 });
