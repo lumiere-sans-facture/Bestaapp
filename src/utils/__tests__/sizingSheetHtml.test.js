@@ -177,6 +177,23 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(sans.match(/<section class="page">/g)).toHaveLength(3);
   });
 
+  it('au-delà de 9 appareils, ce sont les plus gourmands qui restent détaillés', () => {
+    // L'ordre de SAISIE ne doit pas décider du contenu de la fiche : un gros
+    // consommateur ajouté en dernier reste détaillé, les petits sont groupés.
+    const petits = Array.from({ length: 12 }, (_, i) => ({
+      name: `Veilleuse ${i + 1}`, power: 5, quantity: 1, day: 1, night: 1,
+    }));
+    const gros = { name: 'Climatiseur 3 CV', power: 2200, quantity: 1, day: 4, night: 5 };
+    const html12 = buildSizingSheetHtml({ ...data, appliances: [...petits, gros] });
+    const charges = html12.split('2 · Charges saisies')[1].split('</table>')[0];
+    expect(charges).toContain('Climatiseur 3 CV');
+    expect(charges).toContain('autres appareils regroupés');
+    // 8 lignes détaillées + 1 ligne de regroupement (13 − 8 = 5 regroupés).
+    expect(charges.match(/<tr><td/g)).toHaveLength(9);
+    expect(charges).toContain('+ 5 autres appareils regroupés');
+    expect(html12.match(/<section class="page">/g)).toHaveLength(3);
+  });
+
   it('gère la saisie directe (mode manuel)', () => {
     const manual = buildSizingSheetHtml({ ...data, manualMode: true, appliances: [] });
     expect(manual).toContain('Consommation de jour (saisie directe)');

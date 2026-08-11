@@ -127,7 +127,9 @@ export default function ProSolarWizard({ onDone }) {
   const addAppliance = () => {
     const tpl = pickerId === CUSTOM_APPLIANCE_ID ? newCustomAppliance() : getApplianceById(pickerId);
     if (!tpl) return;
-    setRows((prev) => [...prev, { rowId: ++rowSeq, ...tpl, quantity: 1 }]);
+    // En TÊTE de liste : la nouvelle ligne apparaît juste sous le sélecteur,
+    // sans défilement jusqu'au bas de la liste (même règle que l'assistant public).
+    setRows((prev) => [{ rowId: ++rowSeq, ...tpl, quantity: 1 }, ...prev]);
     setPickerId('');
   };
   const updateRow = (rowId, field, value) => setRows((p) => p.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r)));

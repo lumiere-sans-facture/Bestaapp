@@ -73,23 +73,31 @@ export function renderSheet(d, c) {
 
   // --- Charges (page 1) ---
   const h = (v) => (v ? nf(v, v % 1 ? 1 : 0) : '—');
+  const whDe = (a) => a.power * a.quantity * ((a.day || 0) + (a.night || 0));
+  const LIGNES_MAX = 9; // la page 1 ne porte plus les paramètres : plus d'air
+  // Au-delà de la place disponible, ce sont les appareils les plus GOURMANDS
+  // qui restent détaillés — les petits sont regroupés en une ligne. Garder les
+  // premiers SAISIS ferait dépendre le contenu de la fiche de l'ordre de
+  // saisie, qui n'a aucun rapport avec le poids de chaque appareil.
+  const appareils = d.manualMode ? [] : d.appliances;
+  const gardes = appareils.length > LIGNES_MAX
+    ? new Set([...appareils.keys()].sort((i, j) => whDe(appareils[j]) - whDe(appareils[i])).slice(0, LIGNES_MAX - 1))
+    : null;
+  const detailles = gardes ? appareils.filter((_, i) => gardes.has(i)) : appareils;
+  const regroupes = gardes ? appareils.filter((_, i) => !gardes.has(i)) : [];
   const lignes = d.manualMode
     ? [
         ['Consommation de jour (saisie directe)', '—', '—', '—', '—', nf(conso.day * 1000)],
         ['Consommation de nuit (saisie directe)', '—', '—', '—', '—', nf(conso.night * 1000)],
       ]
-    : d.appliances.map((a) => [
+    : detailles.map((a) => [
         esc((a.name || '').trim() || CUSTOM_APPLIANCE_LABEL),
-        nf(a.power), nf(a.quantity), h(a.day), h(a.night),
-        nf(a.power * a.quantity * ((a.day || 0) + (a.night || 0))),
+        nf(a.power), nf(a.quantity), h(a.day), h(a.night), nf(whDe(a)),
       ]);
-  const LIGNES_MAX = 9; // la page 1 ne porte plus les paramètres : plus d'air
   const densite = lignes.length <= 6 ? '' : lignes.length <= 8 ? ' dense' : ' tres-dense';
-  const visibles = lignes.length > LIGNES_MAX ? lignes.slice(0, LIGNES_MAX - 1) : lignes;
-  const reste = lignes.slice(visibles.length);
-  const resteWh = d.manualMode ? 0 : d.appliances
-    .slice(visibles.length)
-    .reduce((sum, a) => sum + a.power * a.quantity * ((a.day || 0) + (a.night || 0)), 0);
+  const visibles = lignes;
+  const reste = regroupes;
+  const resteWh = regroupes.reduce((sum, a) => sum + whDe(a), 0);
   const ligneHtml = ([nom, p, q, j, n, wh]) =>
     `<tr><td>${nom}</td><td class="num">${p}</td><td class="num">${q}</td><td class="num">${j}</td><td class="num">${n}</td><td class="num">${wh}</td></tr>`;
   const chargesRows = visibles.map(ligneHtml).join('')
@@ -118,7 +126,7 @@ export function renderSheet(d, c) {
   // Deux appareils identiques en parallèle : la fiche l'annonce comme tel,
   // sinon le récapitulatif matériel semblerait en compter un de trop.
   const nbOnduleurs = picNonTenu ? 1 : Math.max(1, Number(d.inverter?.quantite) || 1);
-  const libelleOnduleur = `${nbOnduleurs > 1 ? `${nf(nbOnduleurs)} × ` : ''}${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`;
+  const libelleOnduleur = `${nbOnduleurs > 1 ? `${nf(nbOnduleurs)}\u00a0×\u00a0` : ''}${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`;
 
   // --- Paramètres (page 2) ---
   const renta = c.renta;
@@ -410,7 +418,7 @@ export function renderSheet(d, c) {
         'Onduleur',
         d.inverter ? libelleOnduleur : '—',
         d.inverter
-          ? (onduleurInsuffisant ? 'Hybride · à prévoir' : (nbOnduleurs > 1 ? 'Hybrides en parallèle' : 'Hybride'))
+          ? (onduleurInsuffisant ? 'Hybride · à prévoir' : (nbOnduleurs > 1 ? 'En parallèle' : 'Hybride'))
           : 'Non retenu',
       )}
       ${stat('Consommation', u(nf(totalKwh, 1), 'kWh/j'), `${u(nf(totalWh), 'Wh')} par jour`)}

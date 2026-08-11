@@ -120,7 +120,10 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
   const addAppliance = () => {
     const tpl = pickerId === CUSTOM_APPLIANCE_ID ? newCustomAppliance() : getApplianceById(pickerId);
     if (!tpl) return;
-    setRows((prev) => [...prev, { rowId: ++rowSeq, ...tpl, quantity: 1 }]);
+    // En TÊTE de liste : le sélecteur est en haut de l'écran, la nouvelle
+    // ligne apparaît donc juste en dessous, prête à être ajustée — sans avoir
+    // à faire défiler jusqu'au bas d'une longue liste d'appareils.
+    setRows((prev) => [{ rowId: ++rowSeq, ...tpl, quantity: 1 }, ...prev]);
     setPickerId('');
   };
 
