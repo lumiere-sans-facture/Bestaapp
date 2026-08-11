@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PanelTop, ShoppingCart, UserCheck, Banknote, Droplets } from 'lucide-react';
+import { PanelTop, ShoppingCart, UserCheck, Droplets } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import ManualWizard from './ManualWizard';
 import SolarWizard from './SolarWizard';
@@ -18,13 +18,13 @@ import PompeWizard from './PompeWizard';
  */
 export default function DevisCreator({ onDone, startManual = false, initialManualItems, initialLeadId = null }) {
   const { getLeadById } = useData();
-  const [mode, setMode] = useState(startManual ? 'manual' : 'choose'); // choose | solar | facture | pompe | manual
+  const [mode, setMode] = useState(startManual ? 'manual' : 'choose'); // choose | solar | pompe | manual
   const initialLead = initialLeadId ? getLeadById(initialLeadId) : null;
 
+  // Le dimensionnement par facture CEET n'a plus sa carte : c'est un simple
+  // mode de saisie de la consommation, proposé DANS l'assistant solaire
+  // (appareils / saisie directe / facture) — une entrée de moins à choisir.
   if (mode === 'solar') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} />;
-  // Même assistant solaire, mais la consommation part de la FACTURE CEET :
-  // pour le client qui ne connaît pas ses appareils mais sait ce qu'il paie.
-  if (mode === 'facture') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} initialConsoMode="facture" />;
   if (mode === 'pompe') return <PompeWizard onDone={onDone} initialLeadId={initialLeadId} />;
   if (mode === 'manual') return <ManualWizard onDone={onDone} initialItems={initialManualItems} initialLeadId={initialLeadId} />;
 
@@ -40,12 +40,7 @@ export default function DevisCreator({ onDone, startManual = false, initialManua
         <button className="devis-mode-card" onClick={() => setMode('solar')}>
           <div className="devis-mode-icon solar"><PanelTop size={26} /></div>
           <div className="devis-mode-title">Dimensionnement solaire</div>
-          <div className="devis-mode-desc">Estimez la consommation du client et générez automatiquement le système (panneaux, onduleur, batteries) et son devis chiffré.</div>
-        </button>
-        <button className="devis-mode-card" onClick={() => setMode('facture')}>
-          <div className="devis-mode-icon facture"><Banknote size={26} /></div>
-          <div className="devis-mode-title">Dimensionnement par facture</div>
-          <div className="devis-mode-desc">Partez de la facture CEET mensuelle (F CFA) du client : la consommation est déduite automatiquement, puis le système est dimensionné.</div>
+          <div className="devis-mode-desc">Estimez la consommation du client — liste d'appareils, saisie directe ou facture CEET — et générez le système (panneaux, onduleur, batteries) et son devis chiffré.</div>
         </button>
         <button className="devis-mode-card" onClick={() => setMode('pompe')}>
           <div className="devis-mode-icon pompe"><Droplets size={26} /></div>

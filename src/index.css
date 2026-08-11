@@ -1087,7 +1087,6 @@ form .login-link { width: 100%; margin-top: 4px; }
 }
 .devis-mode-icon.solar { background: var(--warning-light); color: var(--accent-dark); }
 /* Cartes des nouveaux parcours : billet (facture CEET) et goutte (pompage). */
-.devis-mode-icon.facture { background: var(--success-light); color: var(--success-text); }
 .devis-mode-icon.pompe { background: rgba(26, 58, 140, 0.12); color: var(--primary-light); }
 .devis-mode-title { font-size: 1.0625rem; font-weight: 600; }
 .devis-mode-desc { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5; }

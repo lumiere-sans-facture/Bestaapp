@@ -19,7 +19,7 @@ let rowSeq = 0;
 // Noms des étapes, affichés sous les pastilles de progression.
 const STEP_NAMES = ['Client', 'Consommation', 'Type de système', 'Résultat'];
 
-export default function SolarWizard({ onDone, initialLeadId = null, initialConsoMode = 'appareils' }) {
+export default function SolarWizard({ onDone, initialLeadId = null }) {
   const { user } = useAuth();
   // Les kits viennent de l'état : ils se modifient dans « Mes kits », l'assistant
   // reflète immédiatement les prix du gérant sans mise à jour de l'application.
@@ -50,7 +50,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
   // Trois façons d'estimer la consommation : liste d'appareils (défaut),
   // saisie directe des kWh, ou FACTURE CEET mensuelle en F CFA — pour le
   // client qui ne connaît pas ses appareils mais sait ce qu'il paie.
-  const [consoMode, setConsoMode] = useState(initialConsoMode);
+  const [consoMode, setConsoMode] = useState('appareils');
   const manualMode = consoMode !== 'appareils'; // la fiche technique n'a pas de liste d'appareils
   const [manual, setManual] = useState({ day: '', night: '' });
   const [facture, setFacture] = useState({ montant: '', prixKwh: PRIX_KWH_CEET, repartition: DEFAULT_REPARTITION });
