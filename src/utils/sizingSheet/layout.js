@@ -295,6 +295,10 @@ export function renderSheet(d, c) {
      sur deux lignes. */
   .vies { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: auto auto auto;
           grid-auto-flow: column; column-gap: 24px; margin-top: 16px; }
+  /* Les libellés d'équipement tiennent sur UNE ligne : légèrement resserrés
+     (les quatre ensemble, pour rester homogènes) plutôt que renvoyés à la
+     ligne — « Structure et câblages » est le plus long de la série. */
+  .vies .stat-label { font-size: 9.5px; letter-spacing: 0.9px; white-space: nowrap; }
   .foot { margin-top: auto; padding-top: 8px; border-top: 2px solid var(--primaire);
           display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   .foot-line { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gris); }
