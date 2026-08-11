@@ -49,8 +49,9 @@ describe('calculateSystemSize', () => {
   });
 
   it('choisit un onduleur avec 20 % de marge', () => {
-    // besoin ~2424 W -> +20% = 2909 W -> premier onduleur >= 2909 = 5 kVA
-    expect(sizing.inverter.capacity).toBe(5);
+    // Sans pic déclaré, la puissance PV posée sert de repère :
+    // 4 panneaux × 620 Wc = 2 480 W ; +20 % = 2 976 W -> 3 kVA (3 000 W).
+    expect(sizing.inverter.capacity).toBe(3);
   });
 
   it('off-grid : prévoit des batteries ; on-grid : aucune', () => {

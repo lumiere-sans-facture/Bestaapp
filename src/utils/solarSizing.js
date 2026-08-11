@@ -34,13 +34,15 @@ export const BATTERY_MODELS = [
 // besoin, indépendante du kit facturé) — pas la liste configurable « Plus ›
 // Onduleurs » (data/inverters.js), qui sert elle à remplacer l'onduleur d'un
 // kit dans le DEVIS. Gamme générique, non liée aux kits/marques réels.
+// maxPower = puissance de sortie continue (W). Un hybride étiqueté « n kVA »
+// délivre n kW (voir FACTEUR_PUISSANCE).
 const SIZING_SHEET_INVERTERS = [
-  { id: 'growatt-1k', brand: 'Growatt', model: 'SPF 1000TL', capacity: 1, maxPower: 800, price: 180000, efficiency: 95 },
-  { id: 'growatt-2k', brand: 'Growatt', model: 'SPF 2000TL', capacity: 2, maxPower: 1600, price: 280000, efficiency: 95 },
-  { id: 'growatt-3k', brand: 'Growatt', model: 'SPF 3000TL', capacity: 3, maxPower: 2400, price: 380000, efficiency: 95 },
-  { id: 'growatt-5k', brand: 'Growatt', model: 'SPF 5000TL', capacity: 5, maxPower: 4000, price: 580000, efficiency: 96 },
-  { id: 'growatt-8k', brand: 'Growatt', model: 'SPF 8000TL', capacity: 8, maxPower: 6400, price: 980000, efficiency: 96 },
-  { id: 'growatt-10k', brand: 'Growatt', model: 'SPF 10000TL', capacity: 10, maxPower: 8000, price: 1300000, efficiency: 96 },
+  { id: 'growatt-1k', brand: 'Growatt', model: 'SPF 1000TL', capacity: 1, maxPower: 1000, price: 180000, efficiency: 95 },
+  { id: 'growatt-2k', brand: 'Growatt', model: 'SPF 2000TL', capacity: 2, maxPower: 2000, price: 280000, efficiency: 95 },
+  { id: 'growatt-3k', brand: 'Growatt', model: 'SPF 3000TL', capacity: 3, maxPower: 3000, price: 380000, efficiency: 95 },
+  { id: 'growatt-5k', brand: 'Growatt', model: 'SPF 5000TL', capacity: 5, maxPower: 5000, price: 580000, efficiency: 96 },
+  { id: 'growatt-8k', brand: 'Growatt', model: 'SPF 8000TL', capacity: 8, maxPower: 8000, price: 980000, efficiency: 96 },
+  { id: 'growatt-10k', brand: 'Growatt', model: 'SPF 10000TL', capacity: 10, maxPower: 10000, price: 1300000, efficiency: 96 },
 ];
 
 // ---- Options matériel dérivées du catalogue boutique ----
@@ -69,7 +71,7 @@ export const inverterOptionsFromCatalog = (products = []) =>
     .filter((p) => p.category === 'onduleurs')
     .map((p) => {
       const capacity = parseKva(p.name);
-      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, maxPower: Math.round(capacity * 800), price: prixPublic(p.basePrice) } : null;
+      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, maxPower: Math.round(capacity * 1000 * FACTEUR_PUISSANCE), price: prixPublic(p.basePrice) } : null;
     })
     .filter(Boolean)
     .sort((a, b) => a.capacity - b.capacity);
@@ -100,8 +102,14 @@ export const brandsOf = (options = []) => [...new Set(options.map((o) => o.brand
 //   2. la PUISSANCE PV INSTALLÉE — elle doit rester sous la limite d'entrée PV
 //      du modèle (« Max. PV Input Power », renseignée dans Plus › Onduleurs).
 
-/** Puissance apparente → puissance active : un hybride tient ~80 % de ses kVA. */
-export const FACTEUR_PUISSANCE = 0.8;
+// Puissance apparente (kVA) → puissance active (W). Les onduleurs hybrides
+// vendus sur le marché ouest-africain sont étiquetés en kVA mais délivrent
+// autant de kW : un « 8 kVA » tient 8 000 W. Retenir 0,8 (le facteur de
+// puissance théorique) faisait passer ces modèles pour sous-dimensionnés et
+// poussait à commander un calibre au-dessus, inutilement.
+// Un modèle qui ferait exception se renseigne par sa puissance de sortie
+// réelle (maxPower) dans Plus › Onduleurs — elle prime toujours.
+export const FACTEUR_PUISSANCE = 1;
 
 /** Puissance de sortie continue (W) d'un onduleur, depuis ses kVA à défaut. */
 export const puissanceSortie = (inv) => (Number(inv?.maxPower) > 0

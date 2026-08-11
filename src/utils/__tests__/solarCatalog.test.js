@@ -45,7 +45,7 @@ describe('inverterOptionsFromCatalog', () => {
     expect(opts.map((o) => o.capacity)).toEqual([3, 4.2, 6]);
     // price = prix public (basePrice × 1,1), jamais le prix technicien —
     // un devis client ne doit jamais montrer le prix de gros BestaSolar.
-    expect(opts[2]).toMatchObject({ id: 'i1', brand: 'Growatt', capacity: 6, maxPower: 4800, price: Math.round(360000 * 1.1) });
+    expect(opts[2]).toMatchObject({ id: 'i1', brand: 'Growatt', capacity: 6, maxPower: 6000, price: Math.round(360000 * 1.1) });
     expect(brandsOf(opts)).toEqual(['Felicity', 'Luxsun', 'Growatt']);
   });
 });
@@ -60,9 +60,9 @@ describe('batteryOptionsFromCatalog', () => {
 
 describe('onduleurs du catalogue boutique : choix sur le pic', () => {
   it('choisit le plus petit onduleur qui tient le pic + 20 %', () => {
-    const opts = inverterOptionsFromCatalog(products); // sorties : 2400, 3360, 4800
-    expect(suggestInverterFor(opts, { peakLoad: 2000 }).capacity).toBe(3); // 2000×1,2 = 2400 ≤ 2400
-    expect(suggestInverterFor(opts, { peakLoad: 3000 }).capacity).toBe(6); // 3600 > 3360 → 6 kVA
+    const opts = inverterOptionsFromCatalog(products); // sorties : 3000, 4200, 6000
+    expect(suggestInverterFor(opts, { peakLoad: 2500 }).capacity).toBe(3); // 2500×1,2 = 3000 ≤ 3000
+    expect(suggestInverterFor(opts, { peakLoad: 3000 }).capacity).toBe(4.2); // 3600 ≤ 4200
   });
   it('repli sur le plus gros si aucun ne suffit', () => {
     const opts = inverterOptionsFromCatalog(products);

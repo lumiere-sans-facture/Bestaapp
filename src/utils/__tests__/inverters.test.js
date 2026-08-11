@@ -50,24 +50,25 @@ describe('suggestInverterFor — pic de consommation puis capacité PV', () => {
     { id: 'i8', capacity: 8, maxPvPower: 10400 },
   ];
 
-  it('la puissance de sortie se déduit des kVA (facteur de puissance 0,8)', () => {
-    expect(puissanceSortie({ capacity: 3 })).toBe(2400);
-    expect(puissanceSortie({ capacity: 5 })).toBe(4000);
-    // Une puissance de sortie explicite prime sur la déduction.
+  it('un hybride étiqueté « n kVA » délivre n kW', () => {
+    // Les modèles vendus ici sont étiquetés en kVA mais tiennent autant de kW.
+    expect(puissanceSortie({ capacity: 3 })).toBe(3000);
+    expect(puissanceSortie({ capacity: 8 })).toBe(8000);
+    // Une puissance de sortie explicite prime toujours sur la déduction.
     expect(puissanceSortie({ capacity: 5, maxPower: 4600 })).toBe(4600);
   });
 
   it('choisit le plus petit onduleur qui TIENT LE PIC, marge comprise', () => {
-    // Pic 2 000 W × 1,2 = 2 400 W → le 3 kVA (2 400 W) suffit tout juste.
-    expect(suggestInverterFor(inverters, { peakLoad: 2000, pvPower: 3000 }).id).toBe('i3');
+    // Pic 2 500 W × 1,2 = 3 000 W → le 3 kVA (3 000 W) suffit tout juste.
+    expect(suggestInverterFor(inverters, { peakLoad: 2500, pvPower: 3000 }).id).toBe('i3');
     // Pic 2 660 W × 1,2 = 3 192 W → le 3 kVA ne tient plus, le 5 kVA oui.
     expect(suggestInverterFor(inverters, { peakLoad: 2660, pvPower: 3000 }).id).toBe('i5');
   });
 
   it('le pic prime sur les panneaux : peu de PV mais gros pic → gros onduleur', () => {
-    const choisi = suggestInverterFor(inverters, { peakLoad: 4000, pvPower: 1000 });
-    expect(choisi.id).toBe('i8'); // 5 kVA = 4 000 W < 4 800 W requis
-    expect(puissanceSortie(choisi)).toBeGreaterThanOrEqual(4000 * SIZING_PARAMS.inverterMargin);
+    const choisi = suggestInverterFor(inverters, { peakLoad: 5000, pvPower: 1000 });
+    expect(choisi.id).toBe('i8'); // 5 kVA = 5 000 W < 6 000 W requis
+    expect(puissanceSortie(choisi)).toBeGreaterThanOrEqual(5000 * SIZING_PARAMS.inverterMargin);
   });
 
   it('écarte un onduleur qui n’accepte pas la puissance PV installée', () => {
@@ -79,7 +80,7 @@ describe('suggestInverterFor — pic de consommation puis capacité PV', () => {
   });
 
   it('sans pic déclaré (saisie directe), la puissance PV sert de repère', () => {
-    expect(suggestInverterFor(inverters, { peakLoad: 0, pvPower: 4000 }).id).toBe('i8');
+    expect(suggestInverterFor(inverters, { peakLoad: 0, pvPower: 4000 }).id).toBe('i5'); // 4 000 × 1,2
   });
 
   it('limite PV inconnue : reprise de celle d’un modèle configuré de même calibre', () => {
@@ -101,9 +102,10 @@ describe('aucun onduleur disponible ne convient : le dire, pas le taire', () => 
   ];
 
   it('calcule la sortie exigée et le calibre du marché correspondant', () => {
-    // Pic 6 600 W × 1,2 = 7 920 W → aucun 6 kVA (4 800 W) ne suffit : 10 kVA.
+    // Pic 6 600 W × 1,2 = 7 920 W → un 6 kVA (6 000 W) ne suffit pas ; un
+    // 8 kVA (8 000 W) fait l'affaire, inutile de monter à 10.
     expect(sortieOnduleurRequise(6600)).toBe(7920);
-    expect(calibreRequis(7920)).toBe(10);
+    expect(calibreRequis(7920)).toBe(8);
     expect(calibreRequis(2400)).toBe(3);
   });
 
@@ -118,7 +120,7 @@ describe('aucun onduleur disponible ne convient : le dire, pas le taire', () => 
       peakLoad: 6600, inverters: petits,
     });
     expect(sizing.inverterSuffisant).toBe(false);
-    expect(sizing.inverterCalibreRequis).toBe(10);
+    expect(sizing.inverterCalibreRequis).toBe(8);
     expect(sizing.inverterSortieRequise).toBe(7920);
   });
 
