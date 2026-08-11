@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
 import { INVERTER_MODELS } from '../../data/inverters';
 import { normaliserOnduleur, onduleurEstValide, resumeOnduleur, dupliquerOnduleur } from '../inverters';
-import { buildKitQuotation, suggestInverterFor, puissanceSortie, limitePv, SIZING_PARAMS } from '../solarSizing';
+import {
+  buildKitQuotation, suggestInverterFor, puissanceSortie, limitePv,
+  calibreRequis, sortieOnduleurRequise, onduleurSuffisant, calculateSystemSize, SIZING_PARAMS,
+} from '../solarSizing';
 
 describe('normaliserOnduleur / onduleurEstValide', () => {
   it('coerce les champs texte du formulaire en nombres', () => {
@@ -88,6 +91,43 @@ describe('suggestInverterFor — pic de consommation puis capacité PV', () => {
   it('retombe sur le plus grand disponible si aucun ne convient, et gère la liste vide', () => {
     expect(suggestInverterFor(inverters, { peakLoad: 20000 }).id).toBe('i8');
     expect(suggestInverterFor([], { peakLoad: 4000 })).toBeNull();
+  });
+});
+
+describe('aucun onduleur disponible ne convient : le dire, pas le taire', () => {
+  const petits = [
+    { id: 'o3', capacity: 3, maxPvPower: 3900 },
+    { id: 'o6', capacity: 6, maxPvPower: 7800 },
+  ];
+
+  it('calcule la sortie exigée et le calibre du marché correspondant', () => {
+    // Pic 6 600 W × 1,2 = 7 920 W → aucun 6 kVA (4 800 W) ne suffit : 10 kVA.
+    expect(sortieOnduleurRequise(6600)).toBe(7920);
+    expect(calibreRequis(7920)).toBe(10);
+    expect(calibreRequis(2400)).toBe(3);
+  });
+
+  it('onduleurSuffisant refuse le repli sous-calibré', () => {
+    const choisi = suggestInverterFor(petits, { peakLoad: 6600, pvPower: 5580 });
+    expect(choisi.capacity).toBe(6); // repli : le plus grand disponible
+    expect(onduleurSuffisant(choisi, { peakLoad: 6600, pvPower: 5580 })).toBe(false);
+  });
+
+  it('le dimensionnement signale l’insuffisance et annonce le calibre à prévoir', () => {
+    const sizing = calculateSystemSize({ day: 20, night: 15 }, 'off-grid', 4.3, undefined, undefined, {
+      peakLoad: 6600, inverters: petits,
+    });
+    expect(sizing.inverterSuffisant).toBe(false);
+    expect(sizing.inverterCalibreRequis).toBe(10);
+    expect(sizing.inverterSortieRequise).toBe(7920);
+  });
+
+  it('un catalogue suffisant ne déclenche aucune alerte', () => {
+    const sizing = calculateSystemSize({ day: 2, night: 2 }, 'off-grid', 4.3, undefined, undefined, {
+      peakLoad: 2000, inverters: petits,
+    });
+    expect(sizing.inverterSuffisant).toBe(true);
+    expect(sizing.inverter.capacity).toBe(3);
   });
 });
 

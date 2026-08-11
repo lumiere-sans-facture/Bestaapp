@@ -591,6 +591,18 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
                 {displayQuotation.inverterSuggested.model} suggéré à la place.
               </div>
             )}
+            {/* Aucun onduleur configuré ne tient le pic : le dire AVANT le
+                devis, sinon un modèle sous-calibré part chez le client et
+                disjoncte à la première mise en route de toutes les charges. */}
+            {sizing?.inverterSuffisant === false && (
+              <div className="storage-alert abo-alert is-warning" role="alert">
+                <Cpu size={13} style={{ verticalAlign: -2 }} /> Aucun onduleur ne tient le pic de{' '}
+                {peakLoad.toLocaleString('fr-FR')} W : il faut au moins{' '}
+                <strong>{sizing.inverterCalibreRequis} kVA</strong>{' '}
+                ({Math.round(sizing.inverterSortieRequise).toLocaleString('fr-FR')} W de sortie).
+                Ajoutez ce calibre dans Plus › Onduleurs, ou réduisez les charges simultanées.
+              </div>
+            )}
 
             {/* Structure de montage PV rails galvanisé : le prix suit le
                 type de support, calculé au panneau (terrain différent = coût différent).

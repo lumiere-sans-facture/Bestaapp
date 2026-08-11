@@ -130,6 +130,26 @@ export const limitePv = (inv, configures = []) => {
  * @param {number} pvPower    puissance PV installée (Wc)
  * @param {Array} configures  onduleurs configurés, pour retrouver une limite PV
  */
+/** Puissance de sortie que l'onduleur doit fournir (W) : pic × marge. */
+export const sortieOnduleurRequise = (peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin) =>
+  (peakLoad > 0 ? peakLoad : pvPower) * margin;
+
+// Calibres du marché (kVA). Sert à annoncer le calibre NÉCESSAIRE même quand
+// l'entreprise n'a encore configuré aucun onduleur de cette taille : une étude
+// technique doit dire la vérité, pas se limiter au stock du moment.
+export const CALIBRES_KVA = [1, 2, 3, 3.5, 5, 6, 8, 10, 12, 15, 20, 30];
+
+/** Plus petit calibre commercial dont la sortie couvre `sortieW`. */
+export const calibreRequis = (sortieW) => CALIBRES_KVA.find((k) => k * 1000 * FACTEUR_PUISSANCE >= sortieW)
+  || Math.ceil(sortieW / (1000 * FACTEUR_PUISSANCE));
+
+/** L'onduleur retenu tient-il vraiment le besoin (pic ET entrée PV) ? */
+export const onduleurSuffisant = (inv, { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin, configures = [] } = {}) => {
+  if (!inv) return false;
+  const pv = limitePv(inv, configures);
+  return puissanceSortie(inv) >= sortieOnduleurRequise(peakLoad, pvPower, margin) && (!pv || pv >= pvPower);
+};
+
 export const suggestInverterFor = (options = [], { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin, configures = [] } = {}) => {
   if (!options.length) return null;
   const besoinSortie = (peakLoad > 0 ? peakLoad : pvPower) * margin;
@@ -295,9 +315,16 @@ export const calculateSystemSize = (
   // L'onduleur se choisit sur le PIC de consommation et sur la puissance PV
   // RÉELLEMENT installée (panneaux entiers), pas sur la puissance calculée.
   const installedPvPower = numberOfPanels * panelPower;
+  const critereOnduleur = { peakLoad, pvPower: installedPvPower, configures };
   const selectedInverter = inverters.length
-    ? suggestInverterFor(inverters, { peakLoad, pvPower: installedPvPower, configures })
+    ? suggestInverterFor(inverters, critereOnduleur)
     : findInverterForPower(peakLoad, installedPvPower);
+  // Aucun modèle disponible ne tient forcément le besoin : le repli renvoie le
+  // plus grand de la liste. Le dire explicitement — un onduleur sous-calibré
+  // présenté comme « recommandé » se solde par des disjonctions chez le client.
+  const inverterSortieRequise = sortieOnduleurRequise(peakLoad, installedPvPower);
+  const inverterCalibreRequis = calibreRequis(inverterSortieRequise);
+  const inverterSuffisant = onduleurSuffisant(selectedInverter, inverters.length ? critereOnduleur : { peakLoad, pvPower: installedPvPower });
 
   let batteryCapacity = 0;
   let batteries = [];
@@ -317,6 +344,9 @@ export const calculateSystemSize = (
     peakLoad,           // W — pic de consommation ayant servi au choix onduleur
     panelCapacity: (numberOfPanels * panelPower) / 1000, // kWc
     inverter: selectedInverter,
+    inverterSortieRequise,   // W  — puissance de sortie exigée (pic × marge)
+    inverterCalibreRequis,   // kVA — calibre du marché à retenir
+    inverterSuffisant,       // false = aucun modèle disponible ne convient
     batteryCapacity,
     batteries: groupBatteries(batteries),
     estimatedProduction: (numberOfPanels * panelPower * peakSunHours * 365) / 1000, // kWh/an

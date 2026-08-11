@@ -102,6 +102,11 @@ export function renderSheet(d, c) {
   const pvPose = Math.round(c.kwc * 1000);
   const baseOnduleur = picDeCharge > 0 ? picDeCharge : pvPose;
   const critereOnduleur = picDeCharge > 0 ? 'pic de consommation' : 'puissance panneaux';
+  // Quand aucun modèle disponible ne tient le besoin, la fiche annonce le
+  // calibre EXIGÉ (celui à commander), pas le plus grand modèle du catalogue.
+  const onduleurInsuffisant = d.sizing.inverterSuffisant === false;
+  const calibreOnduleur = (onduleurInsuffisant && d.sizing.inverterCalibreRequis)
+    || d.inverter?.capacity || 0;
 
   // --- Paramètres (page 2) ---
   const renta = c.renta;
@@ -129,7 +134,9 @@ export function renderSheet(d, c) {
   d.batteries.forEach((b) => batParCapacite.set(b.capacity, (batParCapacite.get(b.capacity) || 0) + b.qty));
   const materiel = [
     { ref: `Panneau photovoltaïque ${u(nf(panelWc), 'Wc')}`, qty: d.sizing.numberOfPanels },
-    ...(d.inverter ? [{ ref: `Onduleur hybride ${u(nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0), 'kVA')}`, qty: 1 }] : []),
+    // Même calibre que le § 4 : le récapitulatif ne peut pas lister un
+    // onduleur plus petit que celui que l'étude vient de prescrire.
+    ...(d.inverter ? [{ ref: `Onduleur hybride ${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`, qty: 1 }] : []),
     ...[...batParCapacite.entries()].map(([capacite, qty]) => ({
       ref: `Batterie lithium ${u(SYSTEM_VOLTAGE, 'V')} ${u(nf(Math.round((capacite * 1000) / SYSTEM_VOLTAGE)), 'Ah')} (${u(nf(capacite, capacite % 1 ? 1 : 0), 'kWh')})`,
       qty,
@@ -178,12 +185,17 @@ export function renderSheet(d, c) {
     )]),
     ...(d.inverter ? [resultat(
       'Onduleur hybride recommandé',
-      u(nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0), 'kVA'),
-      // Second critère : l'entrée PV de l'onduleur doit encaisser les panneaux
-      // posés (limite constructeur renseignée dans Plus › Onduleurs).
-      d.inverter.maxPvPower
-        ? `MPPT intégré · entrée PV ${u(nf(pvPose), 'Wc')} sur ${u(nf(d.inverter.maxPvPower), 'Wc')} admis`
-        : `MPPT intégré · entrée PV ${u(nf(pvPose), 'Wc')} · tension système ${u(SYSTEM_VOLTAGE, 'V')}`,
+      // Le calibre ANNONCÉ est celui qu'exige le besoin. Si aucun modèle
+      // disponible ne l'atteint, la fiche dit le calibre nécessaire — jamais
+      // un modèle sous-dimensionné présenté comme recommandé.
+      u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA'),
+      // Quand le calibre nécessaire dépasse le catalogue, la fiche décrit
+      // l'onduleur À PRÉVOIR : le client n'a pas à connaître notre stock.
+      onduleurInsuffisant
+        ? `MPPT intégré · doit admettre ${u(nf(pvPose), 'Wc')} de panneaux`
+        : (d.inverter.maxPvPower
+          ? `MPPT intégré · entrée PV ${u(nf(pvPose), 'Wc')} sur ${u(nf(d.inverter.maxPvPower), 'Wc')} admis`
+          : `MPPT intégré · entrée PV ${u(nf(pvPose), 'Wc')} · tension système ${u(SYSTEM_VOLTAGE, 'V')}`),
       // Critère PRINCIPAL : le pic de consommation. Un onduleur qui ne tient
       // pas toutes les charges allumées ensemble disjoncte, quelle que soit la
       // taille du champ PV. Sans pic déclaré (saisie directe), repli sur le PV.
@@ -379,7 +391,11 @@ export function renderSheet(d, c) {
           c.batterieInstallee > 0 ? u(nf(c.batterieInstallee, 1), 'kWh') : '—',
           c.batterieInstallee > 0 ? `${u(nf(c.batterieInstalleeAh), 'Ah')} · ${u(SYSTEM_VOLTAGE, 'V')}` : 'Sans batterie',
         )}
-      ${stat('Onduleur', d.inverter ? u(nf(d.inverter.capacity, d.inverter.capacity % 1 ? 1 : 0), 'kVA') : '—', d.inverter ? 'Hybride' : 'Non retenu')}
+      ${stat(
+        'Onduleur',
+        d.inverter ? u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA') : '—',
+        d.inverter ? (onduleurInsuffisant ? 'Hybride · à prévoir' : 'Hybride') : 'Non retenu',
+      )}
       ${stat('Consommation', u(nf(totalKwh, 1), 'kWh/j'), `${u(nf(totalWh), 'Wh')} par jour`)}
     </div>
   </div>
