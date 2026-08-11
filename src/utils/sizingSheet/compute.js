@@ -105,6 +105,10 @@ export const calculerRentabilite = (consoJour, investissement, surcharges = {}) 
   // kWh couverts par an, arrondis AVANT le passage en francs.
   const kwhAnnuels = Math.round(consoJour * p.tauxUtilisation * 365);
   const economieAnnuelle = kwhAnnuels * p.tarifElec;
+  // Le client raisonne en facture mensuelle : le montant par mois lui parle
+  // plus que le cumul annuel. Dérivé de l'annuel affiché, jamais recalculé
+  // à part — les deux chiffres doivent toujours se répondre.
+  const economieMensuelle = Math.round(economieAnnuelle / 12);
   const maintenanceTotale = p.maintenanceAnnuelle * (p.horizon - 1);
   const economiesCumulees = economieAnnuelle * p.horizon;
   const gainNet = inv != null
@@ -124,7 +128,7 @@ export const calculerRentabilite = (consoJour, investissement, surcharges = {}) 
     }
   }
   return {
-    ...p, investissement: inv, kwhAnnuels, economieAnnuelle,
+    ...p, investissement: inv, kwhAnnuels, economieAnnuelle, economieMensuelle,
     maintenanceTotale, economiesCumulees, gainNet, roiMois,
   };
 };

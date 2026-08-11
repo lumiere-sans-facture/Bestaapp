@@ -80,6 +80,12 @@ describe('rentabilité — montants recalculés depuis les valeurs affichées', 
     expect(r.economieAnnuelle).toBe(5460 * 145);              // 791 700 F
   });
 
+  it('l’équivalent mensuel dérive de l’annuel affiché', () => {
+    // Le client compare à sa facture : 791 700 ÷ 12 = 65 975 F par mois.
+    expect(r.economieMensuelle).toBe(65975);
+    expect(r.economieMensuelle * 12).toBeCloseTo(r.economieAnnuelle, 0);
+  });
+
   it('gain net = cumul − investissement − provision − maintenance, sur les montants affichés', () => {
     expect(r.economiesCumulees).toBe(7917000);
     expect(r.maintenanceTotale).toBe(450000); // 50 000 × (10 − 1)

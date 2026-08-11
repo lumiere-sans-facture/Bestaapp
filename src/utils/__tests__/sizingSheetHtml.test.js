@@ -137,6 +137,8 @@ describe('buildSizingSheetHtml — 3 pages', () => {
   it('page 3 : rentabilité complète, calculable à la main', () => {
     expect(html).toContain('Estimation de rentabilité sur 10 ans');
     expect(html).toContain('Économie annuelle');
+    // L'équivalent mensuel accompagne l'annuel : 1 675 kWh × 145 = 242 875 F/an.
+    expect(html).toContain('<div class="stat-mois">soit 20 240 F CFA par mois</div>'.replace('20 240 F CFA', '20 240\u202fF CFA'));
     expect(html).toContain('Retour sur investissement');
     expect(html).toContain('Gain net');
     expect(html).toContain('Investissement estimé');

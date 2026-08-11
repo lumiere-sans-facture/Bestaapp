@@ -317,6 +317,9 @@ export function renderSheet(d, c) {
   .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
   .stat-value { font-size: 18px; font-weight: 600; color: var(--primaire); line-height: 1.4; margin-top: 4px; }
   .stat-note { font-size: 11px; color: var(--gris); }
+  /* Équivalent mensuel, sous le montant annuel : lisible sans voler la
+     vedette au point focal de la page. */
+  .stat-mois { font-size: 13px; font-weight: 600; color: var(--primaire); margin-bottom: 2px; }
   .synthese { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 8px; }
   .client { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
   .client-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--gris); }
@@ -497,6 +500,8 @@ export function renderSheet(d, c) {
       ${`<div class="stat">
         <div class="stat-label">Économie annuelle</div>
         <div class="focal-value">${cfa(renta.economieAnnuelle)}</div>
+        <!-- Le client compare à sa facture, qui est mensuelle. -->
+        <div class="stat-mois">soit ${cfa(renta.economieMensuelle)} par mois</div>
         <div class="stat-note">${u(nf(renta.kwhAnnuels), 'kWh')} × ${u(nf(renta.tarifElec), 'F CFA/kWh')}</div>
       </div>`}
       ${stat('Retour sur investissement', libelleRoi(renta.roiMois), renta.roiMois != null ? 'investissement + provision onduleur couverts' : 'investissement à renseigner')}

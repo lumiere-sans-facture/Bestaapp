@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Fiche : l’économie annuelle est doublée de son équivalent mensuel
 - Devis : le nom de l’onduleur n’est plus écrit deux fois sur la ligne
 - Onduleur : escalade automatique jusqu’à deux appareils en parallèle avant de déclarer forfait
 - Onduleur : l’alerte nomme la contrainte qui bloque — puissance de sortie ou entrée PV (MPPT)
