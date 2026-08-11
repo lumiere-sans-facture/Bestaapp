@@ -548,12 +548,31 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
       ))
     : withPanels;
 
-  const lines = (includeMounting ? withInverter : withInverter.filter((l) => !MOUNTING_LINE_RE.test(l.designation)))
-    .map((l) => (
-      includeMounting && MOUNTING_LINE_RE.test(l.designation)
-        ? { ...l, productId: null, designation: `Structure de montage PV rails galvanisé (${mounting.label})`, qty: neededPanels, unit: 'pcs', pu: mounting.pricePerPanel }
-        : l
-    ));
+  // Structure de montage : la ligne est TOUJOURS présente quand le support est
+  // inclus, qu'elle figure ou non dans la composition du kit. Certains kits
+  // n'en portent pas (kits 20 et 32 kWh du catalogue) : se contenter de
+  // recalculer une ligne existante rendait alors le choix « tôle / dalle / au
+  // sol » sans effet, et le devis sortait sans structure.
+  const ligneSupport = {
+    designation: `Structure de montage PV rails galvanisé (${mounting.label})`,
+    qty: neededPanels,
+    unit: 'pcs',
+    pu: mounting.pricePerPanel,
+    productId: null,
+  };
+  const aUnSupport = withInverter.some((l) => MOUNTING_LINE_RE.test(l.designation));
+  let lines;
+  if (!includeMounting) {
+    lines = withInverter.filter((l) => !MOUNTING_LINE_RE.test(l.designation));
+  } else if (aUnSupport) {
+    // productId retiré : la ligne ne représente plus le produit boutique lié.
+    lines = withInverter.map((l) => (MOUNTING_LINE_RE.test(l.designation) ? { ...l, ...ligneSupport } : l));
+  } else {
+    // Insérée juste avant la main d'œuvre, à sa place naturelle dans le devis.
+    const iMainDoeuvre = withInverter.findIndex((l) => l.labor);
+    const place = iMainDoeuvre === -1 ? withInverter.length : iMainDoeuvre;
+    lines = [...withInverter.slice(0, place), ligneSupport, ...withInverter.slice(place)];
+  }
   // Prix résolu ligne par ligne : celui du produit boutique lié s'il existe
   // encore (suit ses changements de prix), sinon le prix figé de la ligne.
   const toItem = (l, type) => {

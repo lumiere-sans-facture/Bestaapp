@@ -12,8 +12,10 @@ describe('buildKitQuotation', () => {
     'kit-2.5kwh-eco': 625000,
     'kit-2.5kwh-premium': 715000,
     'kit-5kwh': 1180000,
-    'kit-20kwh': 3224000,
-    'kit-32kwh': 4358000,
+    // 20 et 32 kWh : leur composition ne portait aucune structure ; le devis
+    // l'ajoute désormais au panneau (12 × 10 000, 16 × 10 000 sur tôle).
+    'kit-20kwh': 3344000,
+    'kit-32kwh': 4518000,
   };
 
   it('propose les 5 kits officiels', () => {
@@ -75,11 +77,21 @@ describe('buildKitQuotation', () => {
     expect(sol).toBeGreaterThan(dalle);
   });
 
-  it('un kit sans ligne « Structure de montage » (20/32 kWh) ignore le type de support', () => {
+  it('un kit sans ligne « Structure de montage » (20/32 kWh) en reçoit une', () => {
+    // Le sélecteur de support de l'assistant restait sans effet sur ces kits :
+    // le devis sortait sans structure, quel que soit le terrain.
     const kit = byId('kit-20kwh');
-    const tole = buildKitQuotation(kit, 'tole').total;
-    const sol = buildKitQuotation(kit, 'sol').total;
-    expect(tole).toBe(sol);
+    const montage = (q) => q.components.find((c) => /structure de montage/i.test(c.name));
+    for (const m of MOUNTING_TYPES) {
+      const ligne = montage(buildKitQuotation(kit, m.id));
+      expect(ligne.quantity).toBe(kit.panels);
+      expect(ligne.unitPrice).toBe(m.pricePerPanel);
+      expect(ligne.name).toContain(m.label);
+    }
+    expect(buildKitQuotation(kit, 'sol').total).toBeGreaterThan(buildKitQuotation(kit, 'tole').total);
+    // Elle se place avant la main d'œuvre, à sa place naturelle dans le devis.
+    const noms = buildKitQuotation(kit, 'tole').components.map((c) => c.name);
+    expect(noms[noms.length - 1]).toContain('Structure de montage');
   });
 
   it('includeMounting=false retire la ligne « Structure de montage » du devis', () => {
@@ -94,9 +106,11 @@ describe('buildKitQuotation', () => {
     expect(sans.total).toBe(avec.total - montagePrice);
   });
 
-  it('includeMounting=false sur un kit sans structure ne change rien', () => {
+  it('includeMounting=false retire la structure ajoutée (client avec son soudeur)', () => {
     const kit = byId('kit-20kwh');
-    expect(buildKitQuotation(kit, 'tole', false).total).toBe(buildKitQuotation(kit, 'tole', true).total);
+    const sans = buildKitQuotation(kit, 'tole', false);
+    expect(sans.components.find((c) => /structure de montage/i.test(c.name))).toBeUndefined();
+    expect(sans.total).toBe(buildKitQuotation(kit, 'tole', true).total - kit.panels * 10000);
   });
 
   it('complète automatiquement les panneaux si le besoin calculé en exige plus que le kit', () => {
@@ -107,9 +121,9 @@ describe('buildKitQuotation', () => {
     expect(q.panelsIncluded).toBe(16);
     expect(lignePanneaux.quantity).toBe(16);
     expect(lignePanneaux.totalPrice).toBe(16 * lignePanneaux.unitPrice);
-    // Le total du devis intègre le surcoût des panneaux ajoutés.
+    // Le total intègre les panneaux ajoutés ET leur structure (au panneau).
     const sansSizing = buildKitQuotation(kit, 'tole', true);
-    expect(q.total).toBe(sansSizing.total + 4 * lignePanneaux.unitPrice);
+    expect(q.total).toBe(sansSizing.total + 4 * lignePanneaux.unitPrice + 4 * 10000);
   });
 
   it('ne réduit jamais les panneaux du kit si le besoin calculé en exige moins', () => {
