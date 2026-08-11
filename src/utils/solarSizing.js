@@ -167,6 +167,43 @@ export const onduleurAccepteLePv = (inv, { pvPower = 0, configures = [] } = {}) 
 export const onduleurSuffisant = (inv, critere = {}) =>
   onduleurTientLePic(inv, critere) && onduleurAccepteLePv(inv, critere);
 
+// Au-delà d'un seul appareil, on met deux onduleurs identiques EN PARALLÈLE :
+// puissance de sortie et entrée PV s'additionnent. Deux au maximum — au-delà,
+// l'installation change de nature (triphasé, armoire dédiée) et se chiffre sur
+// place.
+export const MAX_ONDULEURS = 2;
+
+/** Un même modèle en `n` exemplaires : puissances cumulées. */
+export const onduleursEnParallele = (inv, n = 1, configures = []) => {
+  if (!inv || n <= 1) return inv;
+  const pv = limitePv(inv, configures);
+  return { ...inv, maxPower: puissanceSortie(inv) * n, maxPvPower: pv ? pv * n : 0 };
+};
+
+/**
+ * Onduleur(s) à retenir, par ESCALADE — jamais plus de deux appareils :
+ *   1. le modèle préféré (celui du kit) en 1 exemplaire ;
+ *   2. ce même modèle en 2 exemplaires ;
+ *   3. les modèles de la liste en 1 exemplaire, du plus petit au plus grand ;
+ *   4. ces mêmes modèles en 2 exemplaires.
+ * Doubler le modèle du kit avant d'en changer garde la cohérence du kit ; à
+ * l'inverse, un modèle supérieur seul est préféré à deux petits en parallèle.
+ * @returns {{modele:object, quantite:number, suffisant:boolean}|null}
+ */
+export const resoudreOnduleur = (options = [], critere = {}, { prefere = null } = {}) => {
+  const liste = [...options].sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
+  const escalade = [
+    ...(prefere ? [{ modele: prefere, quantite: 1 }, { modele: prefere, quantite: MAX_ONDULEURS }] : []),
+    ...liste.map((o) => ({ modele: o, quantite: 1 })),
+    ...liste.map((o) => ({ modele: o, quantite: MAX_ONDULEURS })),
+  ];
+  if (!escalade.length) return null;
+  const convient = ({ modele, quantite }) =>
+    onduleurSuffisant(onduleursEnParallele(modele, quantite, critere.configures), critere);
+  const choisi = escalade.find(convient);
+  return choisi ? { ...choisi, suffisant: true } : { ...escalade[escalade.length - 1], suffisant: false };
+};
+
 export const suggestInverterFor = (options = [], { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin, configures = [] } = {}) => {
   if (!options.length) return null;
   const besoinSortie = (peakLoad > 0 ? peakLoad : pvPower) * margin;
@@ -251,10 +288,6 @@ export const SYSTEM_VOLTAGE = BATTERY_MODELS[0].voltage;
 
 // ---- Sélection des composants ----
 
-// Gamme de repli quand l'entreprise n'a encore configuré aucun onduleur.
-const findInverterForPower = (peakLoad, pvPower) =>
-  suggestInverterFor(SIZING_SHEET_INVERTERS, { peakLoad, pvPower });
-
 // Combinaison optimale de batteries (du plus grand au plus petit module)
 const findOptimalBatteryCombination = (requiredCapacity) => {
   const batteries = [];
@@ -333,19 +366,23 @@ export const calculateSystemSize = (
   // RÉELLEMENT installée (panneaux entiers), pas sur la puissance calculée.
   const installedPvPower = numberOfPanels * panelPower;
   const critereOnduleur = { peakLoad, pvPower: installedPvPower, configures };
-  const selectedInverter = inverters.length
-    ? suggestInverterFor(inverters, critereOnduleur)
-    : findInverterForPower(peakLoad, installedPvPower);
+  const resolution = inverters.length
+    ? resoudreOnduleur(inverters, critereOnduleur)
+    : resoudreOnduleur(SIZING_SHEET_INVERTERS, { peakLoad, pvPower: installedPvPower });
+  const selectedInverter = resolution?.modele || null;
+  const inverterQuantite = resolution?.quantite || 1;
   // Aucun modèle disponible ne tient forcément le besoin : le repli renvoie le
   // plus grand de la liste. Le dire explicitement — un onduleur sous-calibré
   // présenté comme « recommandé » se solde par des disjonctions chez le client.
   const inverterSortieRequise = sortieOnduleurRequise(peakLoad, installedPvPower);
   const inverterCalibreRequis = calibreRequis(inverterSortieRequise);
   const critereRetenu = inverters.length ? critereOnduleur : { peakLoad, pvPower: installedPvPower };
-  // Les deux causes d'insuffisance sont distinguées : le message affiché doit
-  // désigner CE qui bloque — le pic de consommation ou l'entrée PV (MPPT).
-  const inverterTientPic = onduleurTientLePic(selectedInverter, critereRetenu);
-  const inverterAcceptePv = onduleurAccepteLePv(selectedInverter, critereRetenu);
+  // Les vérifications portent sur l'ENSEMBLE retenu (un ou deux appareils en
+  // parallèle). Les deux causes d'insuffisance restent distinguées : le
+  // message doit désigner ce qui bloque — le pic ou l'entrée PV (MPPT).
+  const ensembleOnduleur = onduleursEnParallele(selectedInverter, inverterQuantite, critereRetenu.configures);
+  const inverterTientPic = onduleurTientLePic(ensembleOnduleur, critereRetenu);
+  const inverterAcceptePv = onduleurAccepteLePv(ensembleOnduleur, critereRetenu);
   const inverterSuffisant = inverterTientPic && inverterAcceptePv;
 
   let batteryCapacity = 0;
@@ -366,12 +403,13 @@ export const calculateSystemSize = (
     peakLoad,           // W — pic de consommation ayant servi au choix onduleur
     panelCapacity: (numberOfPanels * panelPower) / 1000, // kWc
     inverter: selectedInverter,
+    inverterQuantite,        // 1 ou 2 appareils identiques en parallèle
     inverterSortieRequise,   // W  — puissance de sortie exigée (pic × marge)
     inverterCalibreRequis,   // kVA — calibre du marché à retenir
     inverterSuffisant,       // false = aucun modèle disponible ne convient
     inverterTientPic,        // false = puissance de sortie insuffisante
     inverterAcceptePv,       // false = entrée PV (MPPT) trop faible
-    inverterPvMax: limitePv(selectedInverter, critereRetenu.configures || []),
+    inverterPvMax: limitePv(ensembleOnduleur, critereRetenu.configures || []),
     batteryCapacity,
     batteries: groupBatteries(batteries),
     estimatedProduction: (numberOfPanels * panelPower * peakSunHours * 365) / 1000, // kWh/an
@@ -587,18 +625,17 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const currentSpec = inverters.find((o) => o.capacity === kit.inverter);
   const pvPose = sizing?.installedPvPower || (neededPanels * (kit.panelW || 0));
   const critere = { peakLoad: sizing?.peakLoad || 0, pvPower: pvPose, configures: inverters };
-  const insuffisant = currentSpec && (
-    puissanceSortie(currentSpec) < (critere.peakLoad > 0 ? critere.peakLoad : pvPose) * SIZING_PARAMS.inverterMargin
-    || (limitePv(currentSpec, inverters) > 0 && limitePv(currentSpec, inverters) < pvPose)
-  );
-  const remplacant = insuffisant ? suggestInverterFor(inverters, critere) : null;
-  const inverterSuggested = remplacant && remplacant.capacity !== kit.inverter ? remplacant : null;
+  // Escalade : l'onduleur du kit d'abord, doublé si besoin, puis un modèle
+  // supérieur, doublé à son tour — deux appareils au maximum.
+  const retenu = currentSpec ? resoudreOnduleur(inverters, critere, { prefere: currentSpec }) : null;
+  const change = retenu && (retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
+  const inverterSuggested = change ? { ...retenu.modele, quantite: retenu.quantite } : null;
   // productId retiré sur les lignes remplacées : elles ne représentent plus
   // le produit boutique éventuellement lié, `pu` (fixé ci-dessous) prime.
   const withInverter = inverterSuggested
     ? withPanels.map((l) => (
         ONDULEUR_LINE_RE.test(l.designation)
-          ? { ...l, productId: null, designation: `Onduleur hybride ${inverterSuggested.capacity}kVA ${inverterSuggested.brand} ${inverterSuggested.model}`, qty: 1, unit: 'pcs', pu: inverterSuggested.price }
+          ? { ...l, productId: null, designation: `Onduleur hybride ${inverterSuggested.capacity}kVA ${inverterSuggested.brand} ${inverterSuggested.model}`, qty: inverterSuggested.quantite, unit: 'pcs', pu: inverterSuggested.price }
           : l
       ))
     : withPanels;
@@ -647,7 +684,10 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     mountingType: mounting.id,
     panelsIncluded: neededPanels,
     inverterSuggested: inverterSuggested
-      ? { id: inverterSuggested.id, brand: inverterSuggested.brand, model: inverterSuggested.model, capacity: inverterSuggested.capacity }
+      ? {
+          id: inverterSuggested.id, brand: inverterSuggested.brand, model: inverterSuggested.model,
+          capacity: inverterSuggested.capacity, quantite: inverterSuggested.quantite,
+        }
       : null,
     total,
     roi: 0,

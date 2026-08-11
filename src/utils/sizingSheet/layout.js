@@ -107,9 +107,18 @@ export function renderSheet(d, c) {
   // Jamais un calibre INFÉRIEUR au modèle retenu : quand c'est l'entrée PV qui
   // bloque (et non le pic), le calibre calculé sur le pic peut être plus petit.
   const onduleurInsuffisant = d.sizing.inverterSuffisant === false;
-  const calibreOnduleur = onduleurInsuffisant
+  // Si c'est le PIC qui n'est pas tenu, même à deux appareils, la fiche
+  // annonce le calibre unique qui le résoudrait. Si c'est l'entrée PV qui
+  // manque, aucun calibre ne règle le problème à lui seul : on annonce
+  // l'ensemble retenu et la note dit la puissance PV à admettre.
+  const picNonTenu = onduleurInsuffisant && d.sizing.inverterTientPic === false;
+  const calibreOnduleur = picNonTenu
     ? Math.max(d.sizing.inverterCalibreRequis || 0, d.inverter?.capacity || 0)
     : (d.inverter?.capacity || 0);
+  // Deux appareils identiques en parallèle : la fiche l'annonce comme tel,
+  // sinon le récapitulatif matériel semblerait en compter un de trop.
+  const nbOnduleurs = picNonTenu ? 1 : Math.max(1, Number(d.inverter?.quantite) || 1);
+  const libelleOnduleur = `${nbOnduleurs > 1 ? `${nf(nbOnduleurs)} × ` : ''}${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`;
 
   // --- Paramètres (page 2) ---
   const renta = c.renta;
@@ -139,7 +148,7 @@ export function renderSheet(d, c) {
     { ref: `Panneau photovoltaïque ${u(nf(panelWc), 'Wc')}`, qty: d.sizing.numberOfPanels },
     // Même calibre que le § 4 : le récapitulatif ne peut pas lister un
     // onduleur plus petit que celui que l'étude vient de prescrire.
-    ...(d.inverter ? [{ ref: `Onduleur hybride ${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`, qty: 1 }] : []),
+    ...(d.inverter ? [{ ref: `Onduleur hybride ${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`, qty: nbOnduleurs }] : []),
     ...[...batParCapacite.entries()].map(([capacite, qty]) => ({
       ref: `Batterie lithium ${u(SYSTEM_VOLTAGE, 'V')} ${u(nf(Math.round((capacite * 1000) / SYSTEM_VOLTAGE)), 'Ah')} (${u(nf(capacite, capacite % 1 ? 1 : 0), 'kWh')})`,
       qty,
@@ -191,7 +200,7 @@ export function renderSheet(d, c) {
       // Le calibre ANNONCÉ est celui qu'exige le besoin. Si aucun modèle
       // disponible ne l'atteint, la fiche dit le calibre nécessaire — jamais
       // un modèle sous-dimensionné présenté comme recommandé.
-      u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA'),
+      libelleOnduleur,
       // Quand le calibre nécessaire dépasse le catalogue, la fiche décrit
       // l'onduleur À PRÉVOIR : le client n'a pas à connaître notre stock.
       onduleurInsuffisant
@@ -396,8 +405,10 @@ export function renderSheet(d, c) {
         )}
       ${stat(
         'Onduleur',
-        d.inverter ? u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA') : '—',
-        d.inverter ? (onduleurInsuffisant ? 'Hybride · à prévoir' : 'Hybride') : 'Non retenu',
+        d.inverter ? libelleOnduleur : '—',
+        d.inverter
+          ? (onduleurInsuffisant ? 'Hybride · à prévoir' : (nbOnduleurs > 1 ? 'Hybrides en parallèle' : 'Hybride'))
+          : 'Non retenu',
       )}
       ${stat('Consommation', u(nf(totalKwh, 1), 'kWh/j'), `${u(nf(totalWh), 'Wh')} par jour`)}
     </div>

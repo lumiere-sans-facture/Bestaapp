@@ -116,13 +116,36 @@ describe('aucun onduleur disponible ne convient : le dire, pas le taire', () => 
     expect(onduleurSuffisant(choisi, { peakLoad: 6600, pvPower: 5580 })).toBe(false);
   });
 
-  it('le dimensionnement signale l’insuffisance et annonce le calibre à prévoir', () => {
+  it('plutôt que d’échouer, monte à DEUX onduleurs en parallèle', () => {
+    // Pic 6 600 W → 7 920 W exigés. Le catalogue s'arrête à 6 kVA (6 000 W) :
+    // deux 6 kVA en parallèle fournissent 12 000 W et font l'affaire.
     const sizing = calculateSystemSize({ day: 20, night: 15 }, 'off-grid', 4.3, undefined, undefined, {
       peakLoad: 6600, inverters: petits,
     });
-    expect(sizing.inverterSuffisant).toBe(false);
+    expect(sizing.inverter.capacity).toBe(6);
+    expect(sizing.inverterQuantite).toBe(2);
+    expect(sizing.inverterSuffisant).toBe(true);
+    // Le calibre d'un appareil SEUL reste annoncé pour information.
     expect(sizing.inverterCalibreRequis).toBe(8);
     expect(sizing.inverterSortieRequise).toBe(7920);
+  });
+
+  it('un seul appareil est préféré à deux dès qu’un modèle suffit', () => {
+    const avecHuit = [...petits, { id: 'o8', capacity: 8, maxPvPower: 10400 }];
+    const sizing = calculateSystemSize({ day: 20, night: 15 }, 'off-grid', 4.3, undefined, undefined, {
+      peakLoad: 6600, inverters: avecHuit,
+    });
+    expect(sizing.inverter.capacity).toBe(8);
+    expect(sizing.inverterQuantite).toBe(1);
+  });
+
+  it('deux appareils au maximum : au-delà, l’insuffisance est signalée', () => {
+    const sizing = calculateSystemSize({ day: 20, night: 15 }, 'off-grid', 4.3, undefined, undefined, {
+      peakLoad: 20000, inverters: petits, // 24 000 W exigés, 2 × 6 kVA = 12 000
+    });
+    expect(sizing.inverterQuantite).toBe(2);
+    expect(sizing.inverterSuffisant).toBe(false);
+    expect(sizing.inverterTientPic).toBe(false);
   });
 
   it('distingue les deux causes : puissance de sortie et entrée PV (MPPT)', () => {
@@ -138,15 +161,16 @@ describe('aucun onduleur disponible ne convient : le dire, pas le taire', () => 
   });
 
   it('le dimensionnement dit LAQUELLE des deux contraintes bloque', () => {
-    // 24 panneaux de 620 Wc = 14 880 Wc, pic modeste : seul le MPPT coince.
-    const sizing = calculateSystemSize({ day: 30, night: 20 }, 'off-grid', 4.3, undefined, undefined, {
+    // Pic modeste (deux 6 kVA le tiennent largement) mais un champ PV qui
+    // dépasse même deux entrées PV cumulées : seul le MPPT coince.
+    const sizing = calculateSystemSize({ day: 40, night: 25 }, 'off-grid', 4.3, undefined, undefined, {
       peakLoad: 3000, inverters: [{ id: 'o6', capacity: 6, maxPvPower: 7800 }],
     });
     expect(sizing.inverterTientPic).toBe(true);
     expect(sizing.inverterAcceptePv).toBe(false);
     expect(sizing.inverterSuffisant).toBe(false);
-    expect(sizing.inverterPvMax).toBe(7800);
-    expect(sizing.installedPvPower).toBeGreaterThan(7800);
+    expect(sizing.inverterPvMax).toBe(15600); // 2 × 7 800 Wc cumulés
+    expect(sizing.installedPvPower).toBeGreaterThan(15600);
   });
 
   it('un catalogue suffisant ne déclenche aucune alerte', () => {

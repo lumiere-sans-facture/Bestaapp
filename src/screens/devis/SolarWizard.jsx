@@ -202,7 +202,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
       sizing,
       // Seules les grandeurs techniques sont transmises : les marques du
       // catalogue interne (onduleur, batteries) n'apparaissent jamais.
-      inverter: { capacity: sizing.inverter.capacity, maxPvPower: sizing.inverter.maxPvPower || null },
+      inverter: { capacity: sizing.inverter.capacity, maxPvPower: sizing.inverter.maxPvPower || null, quantite: sizing.inverterQuantite },
       batteries: sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
       panelName: `Panneau photovoltaïque ${sizing.panelWc}W`,
       // Rentabilité (page 3) : l'investissement estimé = total du devis kit.
@@ -579,16 +579,18 @@ export default function SolarWizard({ onDone, initialLeadId = null, initialConso
                 {installedPanels > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
                 {' '}· batterie {selectedKit.battery} kWh · onduleur{' '}
                 {displayQuotation.inverterSuggested
-                  ? `${displayQuotation.inverterSuggested.capacity} kVA ${displayQuotation.inverterSuggested.brand}`
+                  ? `${displayQuotation.inverterSuggested.quantite > 1 ? `${displayQuotation.inverterSuggested.quantite} × ` : ''}${displayQuotation.inverterSuggested.capacity} kVA ${displayQuotation.inverterSuggested.brand}`
                   : `${selectedKit.inverter} kVA`}
               </span>
             </div>
             {displayQuotation.inverterSuggested && (
               <div className="field-hint" role="status" style={{ marginTop: -6, marginBottom: 12 }}>
-                <Cpu size={13} style={{ verticalAlign: -2 }} /> Onduleur remplacé automatiquement : celui du kit
-                ({selectedKit.inverter} kVA) ne prend pas assez de panneaux pour ce besoin —{' '}
+                <Cpu size={13} style={{ verticalAlign: -2 }} /> Onduleur adapté automatiquement : celui du kit
+                ({selectedKit.inverter} kVA) ne suffit pas pour ce besoin —{' '}
+                {displayQuotation.inverterSuggested.quantite > 1 && `${displayQuotation.inverterSuggested.quantite} × `}
                 {displayQuotation.inverterSuggested.capacity} kVA {displayQuotation.inverterSuggested.brand}{' '}
-                {displayQuotation.inverterSuggested.model} suggéré à la place.
+                {displayQuotation.inverterSuggested.model}
+                {displayQuotation.inverterSuggested.quantite > 1 ? ' en parallèle' : ''} retenus à la place.
               </div>
             )}
             {/* Aucun onduleur configuré ne convient : le dire AVANT le devis,
