@@ -5,6 +5,14 @@ import { useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { pullAll, pushCollections, pushTombstone, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 
+// Filet de sécurité du temps réel : intervalle entre deux relectures du
+// serveur quand l'app est visible. Le temps réel reste le canal principal
+// (propagation immédiate) ; ce rappel régulier couvre ce qu'il peut manquer —
+// table absente de la publication `supabase_realtime`, connexion coupée,
+// téléphone sorti de veille. Sans lui, un kit ajouté par le gérant n'arrivait
+// au technicien qu'au prochain lancement de l'app.
+const INTERVALLE_RELECTURE = 60000;
+
 export function useRemoteSync(state, setState, stateRef) {
   const syncedRef = useRef(null); // dernier état RÉELLEMENT répliqué, par collection
   const lastPushAt = useRef(0);
@@ -15,6 +23,10 @@ export function useRemoteSync(state, setState, stateRef) {
   // Motif du dernier échec, affiché dans l'app : sans lui, « Serveur
   // injoignable » n'aide personne à comprendre CE qui est refusé.
   const [syncError, setSyncError] = useState(null);
+
+  // La relecture est déclenchée depuis un autre effet (filet de sécurité) :
+  // elle est donc exposée par une ref, remplie au montage.
+  const refreshRef = useRef(null);
 
   // ---- Pull initial + abonnement temps réel ----
   useEffect(() => {
@@ -59,6 +71,7 @@ export function useRemoteSync(state, setState, stateRef) {
         console.error('Synchronisation Supabase impossible :', e.message);
       }
     };
+    refreshRef.current = refreshFromRemote;
 
     (async () => {
       try {
@@ -187,6 +200,36 @@ export function useRemoteSync(state, setState, stateRef) {
     doSync();
     return () => { annule = true; };
   }, [state, syncStatus, retryTick]);
+
+  // ---- Filet de sécurité : relecture régulière et au retour de l'app ----
+  // Le temps réel reste le canal principal, mais il ne garantit rien : une
+  // table oubliée dans la publication Supabase, un socket coupé ou un
+  // téléphone en veille et l'appareil ne voit plus rien arriver. Ici, il
+  // rattrape au plus tard en une minute, et immédiatement au retour à l'écran.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+    const relire = () => {
+      if (syncStatus !== 'online' || !syncedRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      // Jamais par-dessus un changement local pas encore répliqué : la
+      // réception remplace les items de même id et effacerait l'édition en
+      // cours d'envoi.
+      if (SYNCED_COLLECTIONS.some((t) => stateRef.current[t] !== syncedRef.current[t])) return;
+      // Ni dans la foulée de notre propre écriture (l'écho revient à peine).
+      if (Date.now() - lastPushAt.current < 2500) return;
+      refreshRef.current?.();
+    };
+    const timer = setInterval(relire, INTERVALLE_RELECTURE);
+    document.addEventListener('visibilitychange', relire);
+    window.addEventListener('online', relire);
+    window.addEventListener('focus', relire);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', relire);
+      window.removeEventListener('online', relire);
+      window.removeEventListener('focus', relire);
+    };
+  }, [syncStatus, stateRef]);
 
   // Arrêt du minuteur de reprise au démontage (évite un setState post-unmount).
   useEffect(() => () => clearTimeout(retryTimer.current), []);

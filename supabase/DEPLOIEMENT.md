@@ -38,8 +38,13 @@ Dans **SQL Editor** du dashboard Supabase :
 | 1 | `schema.sql` | Tables + temps réel + tombstones |
 | 2 | `security.sql` | Accès réservé aux porteurs d'un profil (bloque les inscrits inconnus) |
 | 3 | `multitenant.sql` | Organisations, isolation par entreprise (RLS), inscription self-service, codes d'invitation, verrou serveur des abonnements |
+| 4 | `temps-reel.sql` | Diffusion immédiate des changements à toute l'équipe (à rejouer après l'ajout d'une table) |
 
-Les trois scripts sont idempotents (ré-exécutables sans danger).
+Les scripts sont idempotents (ré-exécutables sans danger) — **à une
+exception près** : une fois `multitenant.sql` passé, ne PAS rejouer
+`schema.sql`, qui réinstallerait l'accès « toute l'équipe » à la place de
+l'isolation par organisation. Pour rétablir le temps réel sans toucher aux
+droits, utiliser `temps-reel.sql`.
 
 ## 3. Configuration Auth (dashboard Supabase)
 
