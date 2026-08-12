@@ -199,6 +199,20 @@ create policy "catalogue ecriture org" on public.products
   using (org_id = public.auth_org_id())
   with check (org_id = public.auth_org_id());
 
+-- KITS SOLAIRES : les compositions ajoutées par BestaSolar sont proposées aux
+-- techniciens de toutes les organisations. Elles sont partagées en lecture seule :
+-- chaque organisation peut conserver ses propres variantes, sans pouvoir modifier
+-- les kits officiels ni les recopier dans son périmètre.
+drop policy if exists "org isolation" on public.kits;
+drop policy if exists "kits lecture partagee" on public.kits;
+drop policy if exists "kits ecriture org" on public.kits;
+create policy "kits lecture partagee" on public.kits for select to authenticated
+  using (org_id = public.auth_org_id() or public.org_est_interne(org_id));
+create policy "kits ecriture org" on public.kits
+  for all to authenticated
+  using (org_id = public.auth_org_id())
+  with check (org_id = public.auth_org_id());
+
 -- FORMATION : les cours BestaSolar sont, comme le catalogue, un actif interne
 -- PARTAGÉ EN LECTURE avec toutes les organisations — y compris celles nées
 -- d'une inscription par code partenaire. Sans cela, chaque entreprise ne
