@@ -21,7 +21,7 @@ const pushesProducts = () => !currentOrgId || currentOrgKind === 'interne';
 // catalogue produits et les cours de formation. Pour ces tables seulement, la
 // réception peut légitimement contenir des lignes d'une AUTRE organisation ;
 // elles sont marquées `partage` et traitées en lecture seule.
-const TABLES_PARTAGEES = new Set(['products', 'formations']);
+const TABLES_PARTAGEES = new Set(['products', 'kits', 'formations']);
 export const setSyncOrg = (orgId, kind = null) => {
   currentOrgId = orgId || null;
   currentOrgKind = kind || null;
