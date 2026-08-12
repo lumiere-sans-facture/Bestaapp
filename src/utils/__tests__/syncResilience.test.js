@@ -3,13 +3,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Double minimal de Supabase : on choisit quelles tables échouent ou manquent.
-const state = { echoue: new Set(), absentes: new Set(), pushes: [], deletes: [], rows: {}, avantUpsert: null };
+const state = { echoue: new Set(), absentes: new Set(), pushes: [], tentatives: [], deletes: [], rows: {}, avantUpsert: null };
 vi.mock('../../lib/supabase', () => ({
   isSupabaseConfigured: true,
   supabase: {
     from: (table) => ({
       select: () => Promise.resolve({ data: state.rows[table] || [], error: null }),
       upsert: (rows) => {
+        state.tentatives.push(table); // même refusées, les tentatives se comptent
         if (state.avantUpsert && state.avantUpsert(table)) return Promise.reject(new TypeError('Failed to fetch'));
         if (state.absentes.has(table)) return Promise.resolve({ error: { code: '42P01', message: `relation "public.${table}" does not exist` } });
         if (state.echoue.has(table)) return Promise.resolve({ error: { message: 'réseau' } });
@@ -28,7 +29,7 @@ const { pushCollections, pushTombstone, pullAll, setSyncOrg, decouperEnLots } = 
 
 beforeEach(() => {
   state.echoue.clear(); state.absentes.clear();
-  state.pushes = []; state.deletes = []; state.rows = {}; state.avantUpsert = null;
+  state.pushes = []; state.tentatives = []; state.deletes = []; state.rows = {}; state.avantUpsert = null;
   setSyncOrg(null); // mode mono-équipe par défaut
 });
 
@@ -74,17 +75,45 @@ describe('pushCollections signale les échecs au lieu de les avaler', () => {
     state.avantUpsert = null;
   });
 
-  it('une table absente du schéma distant est sautée ET comptée traitée', async () => {
+  it('une table absente ne bloque pas les autres, mais n’est JAMAIS dite répliquée', async () => {
     // Schéma distant en retard d'une mise à jour : la collection existe côté
-    // client mais pas côté serveur. Ni erreur, ni renvoi en boucle.
+    // client mais pas côté serveur. La compter « traitée » marquait ses
+    // données comme envoyées — elles ne repartaient plus jamais, voyant vert.
     state.absentes.add('factures');
     await expect(pushCollections({ factures: [{ id: 'f1' }], proClients: [{ id: 'c1' }] }))
-      .resolves.toEqual(expect.arrayContaining(['factures', 'proClients']));
-    // Mémorisée absente : plus aucune tentative d'envoi ensuite.
-    state.absentes.delete('factures');
+      .rejects.toMatchObject({ reussies: ['proClients'] });
+    // Le motif nomme la table ET l'action à faire.
+    await expect(pushCollections({ factures: [{ id: 'f1' }] }))
+      .rejects.toThrow(/factures.*scripts SQL/);
+  });
+
+  it('le constat d’absence expire : la table repart dès que le script SQL est passé', async () => {
+    // PostgREST répond « schema cache » dans les secondes qui suivent la
+    // création d'une table : un marquage définitif condamnait la collection
+    // pour toute la session.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      state.absentes.add('pompeKits');
+      await expect(pushCollections({ pompeKits: [{ id: 'k1' }] })).rejects.toBeTruthy();
+      state.absentes.delete('pompeKits'); // le script SQL vient d'être exécuté
+      state.pushes = [];
+      vi.setSystemTime(Date.now() + 6 * 60 * 1000);
+      await expect(pushCollections({ pompeKits: [{ id: 'k1' }] })).resolves.toEqual(['pompeKits']);
+      expect(state.pushes).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('un changement d’organisation remet le schéma distant à l’épreuve', async () => {
+    state.absentes.add('inverters');
+    await expect(pushCollections({ inverters: [{ id: 'i1' }] })).rejects.toBeTruthy();
+    state.absentes.delete('inverters');
+    setSyncOrg('org-1'); // nouvelle connexion
     state.pushes = [];
-    await pushCollections({ factures: [{ id: 'f1' }] });
-    expect(state.pushes).toHaveLength(0);
+    await expect(pushCollections({ inverters: [{ id: 'i1' }] })).resolves.toEqual(['inverters']);
+    expect(state.pushes).toHaveLength(1);
+    setSyncOrg(null);
   });
 });
 
@@ -103,9 +132,13 @@ describe('pushTombstone — une table tombstones manquante ne bloque plus tout',
     expect(state.deletes).toContainEqual({ table: 'leads', id: 'l1' });
   });
 
-  it('…et les suppressions suivantes n’essaient même plus l’upsert tombstones', async () => {
+  it('…et les suppressions suivantes de la session n’essaient même plus l’upsert', async () => {
+    state.absentes.add('tombstones');
+    await pushTombstone('leads', 'l1');
     await pushTombstone('leads', 'l2');
-    expect(state.pushes.filter((p) => p.table === 'tombstones')).toHaveLength(0);
+    // Une seule tentative pour deux suppressions : le constat d'absence tient
+    // le temps de la session, sans pour autant devenir définitif.
+    expect(state.tentatives.filter((t) => t === 'tombstones')).toHaveLength(1);
     expect(state.deletes).toContainEqual({ table: 'leads', id: 'l2' });
   });
 });

@@ -25,6 +25,7 @@ const TABLES_PARTAGEES = new Set(['products', 'formations']);
 export const setSyncOrg = (orgId, kind = null) => {
   currentOrgId = orgId || null;
   currentOrgKind = kind || null;
+  tablesAbsentes.clear(); // nouvelle session : on re-teste le schéma distant
 };
 const withOrg = (row) => (currentOrgId ? { ...row, org_id: currentOrgId } : row);
 
@@ -32,7 +33,22 @@ const withOrg = (row) => (currentOrgId ? { ...row, org_id: currentOrgId } : row)
 // jour de l'application existe côté client AVANT que le SQL ne soit rejoué.
 // Sans ce filet, sa lecture faisait échouer TOUTE la synchronisation — plus
 // rien ne montait ni ne descendait, pour une seule table manquante.
-const tablesAbsentes = new Set();
+//
+// Le constat EXPIRE. PostgREST répond « schema cache » pendant les secondes
+// qui suivent la création d'une table : un marquage définitif condamnait la
+// table pour toute la session, et l'app continuait de tourner au vert en
+// n'envoyant plus rien. Il est donc réévalué régulièrement, et remis à zéro
+// à chaque changement d'organisation (nouvelle connexion).
+const DELAI_RESSAI_TABLE = 5 * 60 * 1000;
+const tablesAbsentes = new Map(); // table -> instant du constat
+const estAbsente = (table) => {
+  const constat = tablesAbsentes.get(table);
+  if (constat === undefined) return false;
+  if (Date.now() - constat < DELAI_RESSAI_TABLE) return true;
+  tablesAbsentes.delete(table); // le délai est écoulé : on retente
+  return false;
+};
+const noterAbsente = (table) => tablesAbsentes.set(table, Date.now());
 const tableManquante = (error) =>
   error?.code === '42P01' || error?.code === 'PGRST205'
   || /does not exist|schema cache/i.test(error?.message || '');
@@ -64,10 +80,10 @@ export async function pullAll() {
       // boucle. La vue inter-organisations de l'admin passe par des RPC
       // dédiées (adminSubscriptionsOverview…), jamais par cette réplication.
       const multiOrg = !!currentOrgId;
-      if (tablesAbsentes.has(table)) return [table, []];
+      if (estAbsente(table)) return [table, []];
       const { data, error } = await supabase.from(table).select(multiOrg ? 'id, data, org_id' : 'id, data');
       if (error) {
-        if (tableManquante(error)) { tablesAbsentes.add(table); return [table, []]; }
+        if (tableManquante(error)) { noterAbsente(table); return [table, []]; }
         throw error;
       }
       let rows = data || [];
@@ -182,14 +198,17 @@ async function envoyerLot(table, lot) {
 export async function pushCollections(collections) {
   const reussies = [];
   const erreurs = [];
+  const manquantes = [];
   for (const [table, items0] of Object.entries(collections)) {
     if (!SYNCED_COLLECTIONS.includes(table) || !Array.isArray(items0)) continue;
     // Le catalogue n'est poussé que par l'organisation interne BestaSolar.
     if (table === 'products' && !pushesProducts()) continue;
-    // Table pas encore créée côté serveur : on n'envoie rien plutôt que de
-    // faire remonter une erreur de synchronisation à l'utilisateur. Elle est
-    // comptée « traitée » pour que l'appelant cesse de la représenter.
-    if (tablesAbsentes.has(table)) { reussies.push(table); continue; }
+    // Table pas encore créée côté serveur : on n'envoie rien, mais on ne fait
+    // JAMAIS croire que c'est passé. La compter « traitée » marquait les
+    // données comme répliquées : elles ne repartaient plus jamais, voyant au
+    // vert — un kit ajouté par le gérant n'atteignait aucun technicien, sans
+    // le moindre signe. Les autres tables continuent de se synchroniser.
+    if (estAbsente(table)) { manquantes.push(table); continue; }
     // Un élément PARTAGÉ appartient à l'organisation interne : le repousser
     // le recopierait sous notre org_id (et la RLS refuserait l'écriture chez
     // son propriétaire). Il est lu, jamais réémis.
@@ -210,9 +229,12 @@ export async function pushCollections(collections) {
       for (const lot of decouperEnLots(rows)) await envoyerLot(table, lot);
       reussies.push(table);
     } catch (e) {
-      if (tableManquante(e)) { tablesAbsentes.add(table); reussies.push(table); continue; }
+      if (tableManquante(e)) { noterAbsente(table); manquantes.push(table); continue; }
       erreurs.push(`${table} : ${e.message}`);
     }
+  }
+  if (manquantes.length) {
+    erreurs.push(`table(s) absente(s) côté serveur : ${manquantes.join(', ')} — exécuter les scripts SQL du dossier supabase/`);
   }
   if (erreurs.length) {
     const err = new Error(erreurs.join(' · '));
@@ -233,12 +255,12 @@ export async function pushTombstone(table, id) {
   // suppression locale rendait la synchronisation rouge en permanence,
   // et plus rien ne montait. On saute l'upsert (le pull tolère déjà son
   // absence) et la suppression est quand même appliquée à la table source.
-  if (!tablesAbsentes.has('tombstones')) {
+  if (!estAbsente('tombstones')) {
     const { error } = await supabase
       .from('tombstones')
       .upsert(withOrg({ id, collection: table, deleted_at: new Date().toISOString() }));
     if (error) {
-      if (tableManquante(error)) tablesAbsentes.add('tombstones');
+      if (tableManquante(error)) noterAbsente('tombstones');
       else throw error;
     }
   }

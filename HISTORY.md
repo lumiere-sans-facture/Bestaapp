@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Sync : une table absente côté serveur ne passe plus pour « envoyée » — voyant rouge explicite et reprise automatique
 - Synchronisation : relecture du serveur toutes les minutes et au retour à l’écran (filet du temps réel)
 - Dimensionnement par facture : « CEET/SBEE » — Togo et Bénin, pas un seul opérateur
 - Devis : la carte « Dimensionnement par facture » disparaît — la facture CEET est un mode de saisie de l’assistant solaire
