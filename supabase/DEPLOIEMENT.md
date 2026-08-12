@@ -46,6 +46,15 @@ exception près** : une fois `multitenant.sql` passé, ne PAS rejouer
 l'isolation par organisation. Pour rétablir le temps réel sans toucher aux
 droits, utiliser `temps-reel.sql`.
 
+### Scripts d'entretien (à la demande, jamais au déploiement)
+
+| Script | Quand s'en servir |
+|---|---|
+| `rattacher-membre.sql` | Un compte s'est inscrit sans le lien d'invitation : il est seul dans sa propre entreprise et ne voit ni les kits ni les clients de l'équipe. Ce script le rattache, et déplace ses données sur option. |
+| `temps-reel.sql` | Les changements d'un appareil n'apparaissent pas tout de suite sur les autres. |
+| `partage-formation.sql`, `nettoyage-doublons-formation.sql` | Cours de formation : partage du catalogue BestaSolar, purge des anciennes copies. |
+| `pompe-kits.sql` | Table des kits de pompage absente (installation antérieure à cette fonctionnalité). |
+
 ## 3. Configuration Auth (dashboard Supabase)
 
 - **Authentication → Providers → Email** : laisser « Enable sign-ups » **activé**
