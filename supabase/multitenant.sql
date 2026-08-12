@@ -216,9 +216,8 @@ create policy "catalogue ecriture org" on public.products
 -- jamais l'org interne — le partage serait mort pour tout le monde. Même
 -- mécanisme que auth_org_id / auth_is_platform_admin.
 create or replace function public.org_est_interne(p_org text)
-  returns boolean language sql stable security definer set search_path = public as $
-  select exists (select 1 from public.orgs where id = p_org and kind = 'interne')
-$;
+  returns boolean language sql stable security definer set search_path = public as
+  'select exists (select 1 from public.orgs where id = p_org and kind = ''interne'')';
 
 -- KITS SOLAIRES : les compositions ajoutées par BestaSolar sont proposées aux
 -- techniciens de toutes les organisations. Elles sont partagées en lecture seule :
