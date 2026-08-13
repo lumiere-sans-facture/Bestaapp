@@ -3,7 +3,7 @@ import {
   allLecons, isLeconDone, courseProgress, resumeLecon, nextLecon, prevLecon,
   parseMinutes, courseDuration, courseCounts,
   parseTimecode, formatTimecode, parseChaptersText, chaptersToText,
-  coursVisible, coursVerrouille,
+  coursVisible, coursVerrouille, actionCours,
 } from '../formation';
 
 const course = {
@@ -126,5 +126,34 @@ describe('garde-fous d’accès aux cours (masqué / réservé Pro)', () => {
 
   it('accès « tous » explicite : jamais verrouillé', () => {
     expect(coursVerrouille({ id: 'c1', acces: 'tous' }, { proActif: false })).toBe(false);
+  });
+});
+
+describe('actionCours — un cours vide reste ouvrable par son gestionnaire', () => {
+  it('cours SANS leçon : le gestionnaire entre pour le remplir', () => {
+    // Régression : le bouton était désactivé dès qu'un cours n'avait aucune
+    // leçon. Or modules et leçons s'ajoutent DANS le cours — un cours neuf
+    // devenait donc impossible à remplir, et le gérant restait bloqué.
+    const a = actionCours({ gere: true, lecons: 0 });
+    expect(a.ouvrable).toBe(true);
+    expect(a.label).toBe('Ajouter le contenu');
+  });
+
+  it('cours SANS leçon : un apprenant voit un cours à venir, pas un bouton mort', () => {
+    const a = actionCours({ gere: false, lecons: 0 });
+    expect(a.ouvrable).toBe(false);
+    expect(a.label).toBe('Bientôt disponible');
+  });
+
+  it('le verrou Pro prime sur tout le reste', () => {
+    const a = actionCours({ verrouille: true, gere: false, lecons: 12, done: 3 });
+    expect(a.ouvrable).toBe(false);
+    expect(a.label).toBe('Réservé aux membres Pro');
+  });
+
+  it('cours rempli : commencer, continuer, puis revoir', () => {
+    expect(actionCours({ lecons: 4 })).toMatchObject({ label: 'Commencer', ouvrable: true });
+    expect(actionCours({ lecons: 4, done: 2, pct: 50 })).toMatchObject({ label: 'Continuer', ouvrable: true });
+    expect(actionCours({ lecons: 4, done: 4, pct: 100 })).toMatchObject({ label: 'Revoir le cours', ouvrable: true });
   });
 });

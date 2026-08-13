@@ -10,7 +10,7 @@ import { toEmbed } from '../../utils/video';
 import {
   allLecons, isLeconDone, courseProgress, resumeLecon, nextLecon, prevLecon,
   courseDuration, courseCounts, parseChaptersText, chaptersToText, formatTimecode,
-  coursVisible, coursVerrouille,
+  coursVisible, coursVerrouille, actionCours,
 } from '../../utils/formation';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
@@ -140,8 +140,11 @@ export default function FormationSection({ onBack }) {
     e.preventDefault();
     const title = moduleTitle.trim();
     if (!title) return;
-    if (moduleEdit.id === 'new') addModule(course.id, { title });
-    else updateModule(course.id, moduleEdit.id, { title });
+    if (moduleEdit.id === 'new') {
+      // Déplié d'office : c'est là que se trouve « Ajouter une leçon ».
+      const nouveauId = addModule(course.id, { title });
+      setOpenModules((prev) => new Set([...prev, nouveauId]));
+    } else updateModule(course.id, moduleEdit.id, { title });
     setModuleEdit(null);
   };
   const removeModule = () => {
@@ -216,6 +219,7 @@ export default function FormationSection({ onBack }) {
             const counts = courseCounts(c);
             const duration = courseDuration(c);
             const verrou = verrouille(c);
+            const action = actionCours({ verrouille: verrou, gere: peutGerer(c), lecons: counts.lecons, pct: p.pct, done: p.done });
             return (
               <div key={c.id} className="card course-card">
                 <div className="course-card-cover">
@@ -250,13 +254,18 @@ export default function FormationSection({ onBack }) {
                     </div>
                     <span className="course-card-pct">{p.pct}%</span>
                   </div>
-                  {verrou ? (
-                    <button className="btn btn-outline btn-block" disabled>
-                      <Lock size={15} /> Réservé aux membres Pro
+                  {/* Un cours neuf n'a aucune leçon : son gestionnaire doit
+                      quand même pouvoir l'ouvrir, c'est là qu'on ajoute
+                      modules et leçons (actionCours tranche les cas). */}
+                  {action.ouvrable ? (
+                    <button className="btn btn-primary btn-block" onClick={() => openCourse(c)}>
+                      {action.etat === 'a-remplir' && <Plus size={15} />}
+                      {action.label}
                     </button>
                   ) : (
-                    <button className="btn btn-primary btn-block" onClick={() => openCourse(c)} disabled={!counts.lecons}>
-                      {p.pct === 100 ? 'Revoir le cours' : p.done > 0 ? 'Continuer' : 'Commencer'}
+                    <button className="btn btn-outline btn-block" disabled>
+                      {action.etat === 'verrouille' && <Lock size={15} />}
+                      {action.label}
                     </button>
                   )}
                 </div>

@@ -34,11 +34,17 @@ export function createFormationActions(setState) {
       })),
 
     // ---- Modules ----
-    addModule: (formationId, data) =>
+    // Retourne l'identifiant créé : l'écran en a besoin pour DÉPLIER le
+    // module aussitôt, sinon « Ajouter une leçon » reste caché et la création
+    // d'un module semble sans effet.
+    addModule: (formationId, data) => {
+      const id = crypto.randomUUID();
       setState(patchCourse(formationId, (f) => ({
         ...f,
-        modules: [...(f.modules || []), { id: crypto.randomUUID(), title: data.title, lecons: [] }],
-      }))),
+        modules: [...(f.modules || []), { id, title: data.title, lecons: [] }],
+      })));
+      return id;
+    },
 
     updateModule: (formationId, moduleId, patch) =>
       setState(patchModule(formationId, moduleId, (m) => ({ ...m, ...patch }))),
