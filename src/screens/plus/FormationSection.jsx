@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Pencil, Check, PlayCircle, FileText, AlignLeft,
-  Clock, ExternalLink, GraduationCap, CheckCircle2, Circle, BookOpen, Layers, Crown, Lock, EyeOff,
+  Clock, ExternalLink, GraduationCap, CheckCircle2, Circle, BookOpen, Layers, Crown, Lock, EyeOff, ListOrdered,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useMode } from '../../context/ModeContext';
 import { toEmbed } from '../../utils/video';
+import { fetchYoutubeSommaire, youtubeVideoId } from '../../lib/youtube';
 import {
   allLecons, isLeconDone, courseProgress, resumeLecon, nextLecon, prevLecon,
   courseDuration, courseCounts, parseChaptersText, chaptersToText, formatTimecode,
@@ -20,6 +21,16 @@ import DangerZone from '../../components/DangerZone';
 const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText };
 const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document' };
 const EMPTY_COURSE = { title: '', description: '', author: '', acces: 'tous', masque: false };
+// Retour visible de la récupération du sommaire : muet quand il n'y a rien à
+// dire, explicite quand YouTube ne donne rien — sans quoi un champ resté vide
+// passe pour une panne.
+const MESSAGE_SOMMAIRE = {
+  chargement: 'Lecture des chapitres…',
+  ok: 'Sommaire récupéré',
+  vide: 'Cette vidéo n’a pas de chapitres',
+  echec: 'Sommaire indisponible — saisie manuelle',
+};
+
 const EMPTY_LECON = { title: '', description: '', type: 'video', url: '', content: '', duration: '', chaptersText: '', actionTitle: '', actionContent: '', targetCourseId: '', targetModuleId: '' };
 
 /** Contenu d'une leçon texte : paragraphes + listes (« - … »), sans dépendance. */
@@ -81,6 +92,8 @@ export default function FormationSection({ onBack }) {
   const [moduleTitle, setModuleTitle] = useState('');
   const [leconEdit, setLeconEdit] = useState(null); // null | { moduleId, id:'new'|id }
   const [leconForm, setLeconForm] = useState(EMPTY_LECON);
+  // Sommaire minuté récupéré depuis YouTube : statut affiché sous le champ.
+  const [sommaire, setSommaire] = useState({ statut: 'idle' });
 
   const course = courses.find((c) => c.id === courseId) || null;
   const lecons = useMemo(() => (course ? allLecons(course) : []), [course]);
@@ -152,6 +165,46 @@ export default function FormationSection({ onBack }) {
     setModuleEdit(null);
     setLeconId(null);
   };
+
+  // Chapitres de la vidéo, lus côté serveur (YouTube refuse le navigateur).
+  // `force` = clic sur le bouton : on remplace le sommaire existant. Sinon
+  // (remplissage automatique à la saisie du lien), on ne touche jamais à ce
+  // que le gérant a déjà écrit.
+  const recupererSommaire = async (force = false) => {
+    const url = leconForm.url;
+    if (!youtubeVideoId(url)) return;
+    if (!force && leconForm.chaptersText.trim()) return;
+    setSommaire({ statut: 'chargement' });
+    const data = await fetchYoutubeSommaire(url);
+    // Le lien a pu changer pendant la requête : on n'écrase pas un autre choix.
+    setLeconForm((f) => {
+      if (f.url !== url) return f;
+      if (!data || !data.chapters.length) {
+        setSommaire({ statut: data ? 'vide' : 'echec' });
+        // La durée reste utile même sans chapitres.
+        return data?.duration && !f.duration.trim() ? { ...f, duration: data.duration } : f;
+      }
+      setSommaire({ statut: 'ok', n: data.chapters.length });
+      return {
+        ...f,
+        chaptersText: chaptersToText(data.chapters),
+        duration: f.duration.trim() || data.duration || '',
+      };
+    });
+  };
+
+  // Saisie d'un lien YouTube → sommaire cherché tout seul, une fois la frappe
+  // terminée. Sans cela, il fallait aller le recopier à la main sur YouTube.
+  useEffect(() => {
+    if (!leconEdit || leconForm.type !== 'video') return undefined;
+    if (!youtubeVideoId(leconForm.url) || leconForm.chaptersText.trim()) {
+      setSommaire({ statut: 'idle' });
+      return undefined;
+    }
+    const t = setTimeout(() => recupererSommaire(false), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leconForm.url, leconForm.type, leconEdit]);
 
   const saveLecon = (e) => {
     e.preventDefault();
@@ -547,14 +600,6 @@ export default function FormationSection({ onBack }) {
               <input className="input" value={leconForm.duration} onChange={(e) => setLeconForm({ ...leconForm, duration: e.target.value })} placeholder="Ex : 12 min" />
             </Field>
           </div>
-          {leconForm.type === 'video' && (
-            <Field label="Sommaire minuté (facultatif)">
-              <textarea className="input" rows="4" value={leconForm.chaptersText}
-                onChange={(e) => setLeconForm({ ...leconForm, chaptersText: e.target.value })}
-                placeholder={'00:00 Introduction\n01:32 Récupérer ses emails\n02:51 Changer ses DNS'} />
-              <div className="field-hint">Une ligne par chapitre : « mm:ss Titre ». Cliquer un chapitre lance la vidéo à cet instant.</div>
-            </Field>
-          )}
           {leconForm.type === 'texte' ? (
             <Field label="Contenu de la leçon *">
               <textarea className="input" rows="8" required value={leconForm.content}
@@ -565,6 +610,25 @@ export default function FormationSection({ onBack }) {
             <Field label="Lien (YouTube, Vimeo, mp4, PDF…) *">
               <input className="input" type="url" required value={leconForm.url} onChange={(e) => setLeconForm({ ...leconForm, url: e.target.value })} placeholder="https://…" />
               <div className="field-hint">Les vidéos YouTube/Vimeo se lisent directement dans l'application.</div>
+            </Field>
+          )}
+          {leconForm.type === 'video' && (
+            <Field label="Sommaire minuté (facultatif)">
+              <textarea className="input" rows="4" value={leconForm.chaptersText}
+                onChange={(e) => setLeconForm({ ...leconForm, chaptersText: e.target.value })}
+                placeholder={'00:00 Introduction\n01:32 Récupérer ses emails\n02:51 Changer ses DNS'} />
+              <div className="sommaire-auto">
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => recupererSommaire(true)}
+                  disabled={!youtubeVideoId(leconForm.url) || sommaire.statut === 'chargement'}>
+                  <ListOrdered size={14} /> {sommaire.statut === 'chargement' ? 'Recherche…' : 'Récupérer depuis YouTube'}
+                </button>
+                <span className={`sommaire-auto-etat ${sommaire.statut}`}>{MESSAGE_SOMMAIRE[sommaire.statut] || ''}</span>
+              </div>
+              <div className="field-hint">
+                Rempli automatiquement depuis les chapitres de la vidéo YouTube. Vous pouvez
+                corriger librement : une ligne par chapitre, « mm:ss Titre ». Cliquer un
+                chapitre lance la vidéo à cet instant.
+              </div>
             </Field>
           )}
           <Field label="Encadré « À retenir / Actions » (facultatif)">

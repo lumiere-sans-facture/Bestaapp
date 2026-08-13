@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Formation : le sommaire minuté d’une vidéo YouTube se remplit tout seul au collage du lien
 - Formation : un cours neuf s’ouvre enfin pour y ajouter modules et leçons
 - Sync : une table absente côté serveur ne passe plus pour « envoyée » — voyant rouge explicite et reprise automatique
 - Synchronisation : relecture du serveur toutes les minutes et au retour à l’écran (filet du temps réel)

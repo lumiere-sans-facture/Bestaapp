@@ -1140,6 +1140,11 @@ form .login-link { width: 100%; margin-top: 4px; }
 .sun-hours-field { margin-top: 16px; margin-bottom: 0; }
 .sun-hours-manual { margin-top: 8px; }
 .field-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; }
+/* Récupération du sommaire YouTube : bouton + retour d'état sur une ligne. */
+.sommaire-auto { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.sommaire-auto-etat { font-size: 0.75rem; color: var(--text-muted); }
+.sommaire-auto-etat.ok { color: var(--success-text); }
+.sommaire-auto-etat.echec, .sommaire-auto-etat.vide { color: var(--warning-dark, #92400e); }
 /* Identifiant d'entreprise : long et sans espaces, il doit pouvoir se couper
    plutôt que déborder de la carte (comparaison entre deux comptes). */
 .profile-org-id { overflow-wrap: anywhere; }

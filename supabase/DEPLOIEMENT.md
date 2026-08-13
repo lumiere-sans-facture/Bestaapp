@@ -79,6 +79,22 @@ update public.profiles set is_platform_admin = true where email = 'ton@email';
 **Dashboard → Database → Backups** : vérifier que les sauvegardes quotidiennes
 sont actives, et tester une restauration une fois avant le lancement.
 
+## 6. Variables d'environnement Vercel
+
+*Settings → Environment Variables*, en plus de `VITE_SUPABASE_URL` et
+`VITE_SUPABASE_ANON_KEY` :
+
+| Variable | Portée | Rôle |
+|---|---|---|
+| `VITE_KKIAPAY_PUBLIC_KEY` | navigateur | clé **publique** du widget de paiement |
+| `YOUTUBE_API_KEY` | serveur, facultative | sommaire minuté des vidéos de formation |
+
+`YOUTUBE_API_KEY` (clé « YouTube Data API v3 », console Google Cloud) n'est pas
+obligatoire : sans elle, `/api/youtube` lit la page publique de la vidéo pour y
+retrouver les chapitres. La clé rend simplement la lecture stable, indépendante
+de la mise en page de YouTube. Elle n'a **pas** de préfixe `VITE_` : une variable
+serveur ne doit jamais partir dans le bundle du navigateur.
+
 ## Ce que fait l'app selon la configuration
 
 | | Sans backend (démo) | Backend configuré (SaaS) |
