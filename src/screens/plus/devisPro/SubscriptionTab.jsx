@@ -18,7 +18,7 @@ import { PAY_NUMBER } from '../../../config/company';
  */
 export default function SubscriptionTab({ sub }) {
   const { user } = useAuth();
-  const { subscriptionPayments, requestSubscription } = useData();
+  const { subscriptionPayments, requestSubscription, activerAbonnementVerifie } = useData();
   const toast = useToast();
   const [subSent, setSubSent] = useState(false);
   const [form, setForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
@@ -34,14 +34,24 @@ export default function SubscriptionTab({ sub }) {
     }
   };
 
-  // KKiaPay n'est qu'un déclencheur côté navigateur : l'activation reste
-  // manuelle tant que l'API serveur de vérification (clés privée + secrète)
-  // n'est pas configurée. Le succès widget fournit néanmoins une référence
-  // traçable au gérant dans l'historique des abonnements.
-  const paiementKkiapay = (reference) => {
+  // Le serveur (api/paiement/verifier) a interrogé l'agrégateur avec les clés
+  // privée et secrète avant de répondre : son verdict fait autorité, pas le
+  // retour du widget. Sans vérification possible (hors-ligne, serveur non
+  // configuré), on retombe sur la validation manuelle du gérant.
+  const paiementKkiapay = (reference, verdict = {}) => {
+    if (verdict.refuse) {
+      toast(verdict.motif || 'Paiement non abouti.', { type: 'error' });
+      return;
+    }
+    if (verdict.active) {
+      activerAbonnementVerifie(user.id, { reference, montant: SUBSCRIPTION_PRICE, dateFin: verdict.dateFin });
+      setSubSent(true);
+      toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — abonnement activé.');
+      return;
+    }
     requestSubscription(user.id, { methode: 'kkiapay', phone: form.phone, reference });
     setSubSent(true);
-    toast('Paiement KKiaPay enregistré — vérification en attente.');
+    toast('Paiement enregistré — vérification par le gérant en attente.');
   };
 
   const demander = (e) => {

@@ -81,3 +81,37 @@ end $$;
 
 -- Rappel : après cette exécution, rejouer temps-reel.sql n'est pas nécessaire
 -- (le bloc 4 ci-dessus s'en charge pour cette table).
+
+-- =====================================================================
+-- 5. Journal des paiements vérifiés côté serveur — VERROU ANTI-REJEU
+-- =====================================================================
+-- Cette table n'est PAS répliquée dans l'app : elle appartient au serveur.
+-- Elle sert à deux choses :
+--   • empêcher qu'un même identifiant de transaction crédite deux fois un
+--     abonnement (clé primaire sur transaction_id : l'unicité est garantie
+--     par PostgreSQL, pas par une lecture préalable, donc deux requêtes
+--     simultanées ne peuvent pas passer toutes les deux) ;
+--   • garder la trace d'un paiement encaissé dont on n'a pas su identifier
+--     le compte (webhook reçu alors que le navigateur avait déjà fermé) —
+--     `credite = false` signale qu'il reste à rattacher.
+create table if not exists public.paiements_verifies (
+  transaction_id text primary key,
+  org_id         text,
+  user_id        text,
+  montant        numeric not null default 0,
+  credite        boolean not null default true,
+  created_at     timestamptz not null default now()
+);
+
+create index if not exists idx_paiements_verifies_org
+  on public.paiements_verifies (org_id, created_at desc);
+-- Retrouver rapidement les paiements encaissés mais non rattachés.
+create index if not exists idx_paiements_verifies_a_rattacher
+  on public.paiements_verifies (created_at desc) where credite = false;
+
+-- RLS ACTIVE SANS AUCUNE POLICY : personne n'y accède depuis le navigateur.
+-- Seule la clé service_role (fonctions serveur, variables Vercel) contourne
+-- la RLS. C'est volontaire — ce journal ne doit jamais être lisible ni
+-- modifiable par un utilisateur, fût-il gérant.
+alter table public.paiements_verifies enable row level security;
+revoke all on public.paiements_verifies from anon, authenticated;

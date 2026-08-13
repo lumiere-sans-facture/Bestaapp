@@ -4,6 +4,8 @@ import { SUBSCRIPTION_PRICE } from '../utils/subscription';
 import { NUMEROS_TEST_SANDBOX, formatMomo, normaliserMomo, problemeNumero } from '../utils/kkiapay';
 import { champConfig, configActive } from '../utils/paiementProviders';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
+import { confirmerPaiement } from '../lib/paiementServeur';
 import { useToast } from './Toast';
 
 // Repli quand aucun moyen de paiement n'est configuré dans l'app : les
@@ -32,6 +34,7 @@ const SANDBOX_BUILD = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
  */
 export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled = false }) {
   const { paiementConfigs } = useData();
+  const { user } = useAuth();
   // L'écran « Moyens de paiement » du gérant prime sur les variables de
   // build : changer d'agrégateur ou passer en réel ne doit plus demander un
   // redéploiement. Une configuration active pour un AUTRE agrégateur cache ce
@@ -69,10 +72,14 @@ export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled
       window.addSuccessListener(succes);
       window.addFailedListener?.(echec);
     };
-    const succes = (reponse = {}) => {
+    // Le retour du widget ne prouve rien : il est reproductible depuis la
+    // console. Il ne sert qu'à connaître la référence de transaction, que le
+    // SERVEUR va vérifier auprès de l'agrégateur avant toute activation.
+    const succes = async (reponse = {}) => {
       const reference = reponse.transactionId || reponse.transaction_id || reponse.id || '';
       setOuvert(false);
-      dernier.current.onPaid?.(reference);
+      const verdict = await confirmerPaiement(reference);
+      dernier.current.onPaid?.(reference, verdict);
     };
     const echec = () => {
       setOuvert(false);
@@ -114,6 +121,10 @@ export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled
       phone: normaliserMomo(phone),
       position: 'center',
       theme: '#0a2472',
+      // Métadonnée renvoyée par l'agrégateur : elle permet au webhook de
+      // savoir à quel compte créditer le paiement si le navigateur se ferme
+      // avant d'avoir confirmé. Rien de secret n'y transite.
+      data: JSON.stringify({ profilId: user?.id || '' }),
     });
   };
 

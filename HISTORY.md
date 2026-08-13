@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Abonnement : activation sur vérification serveur du paiement, plus sur la parole du navigateur
 - Moyens de paiement configurables depuis l'espace gérant — clé publique seule, secrets refusés
 - KKiaPay : le sandbox n’accepte que ses numéros de test — la liste est affichée, l’erreur enfin expliquée
 - Formation : couverture de cours à l’emblème du diplôme, remplaçable par une photo

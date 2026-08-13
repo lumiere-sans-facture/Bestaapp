@@ -1,6 +1,7 @@
 // Domaine Devis Pro (abonnement premium 5 000 F/mois) : abonnements + paiements
 // Mobile Money, identité d'entreprise du technicien et facturation.
 import { defaultEcheance } from '../../utils/paiement';
+import { abonnementApresPaiement } from '../../utils/verificationPaiement';
 import { prochainNumeroFacture } from '../../utils/facture';
 
 export function createProActions(setState) {
@@ -31,6 +32,41 @@ export function createProActions(setState) {
         };
       }),
 
+    // Paiement CONFIRMÉ PAR LE SERVEUR (api/paiement/verifier) : l'abonnement
+    // est déjà actif en base. On applique le même résultat localement, avec
+    // les mêmes identifiants que le serveur (`pay-<transaction>`), pour que la
+    // réplication fasse converger les deux au lieu de créer un doublon ou de
+    // renvoyer un « en attente » qui écraserait l'activation.
+    activerAbonnementVerifie: (userId, { reference, montant, dateFin }) =>
+      setState((s) => {
+        const subId = `sub-${userId}`;
+        const existant = (s.subscriptions || []).find((x) => x.id === subId);
+        const base = existant || {
+          id: subId, userId, type: 'devis_pro', dateDebut: null, dateFin: null,
+          montant: montant || 5000, recurrence: 'mensuel', lastPaymentAt: null,
+        };
+        const maintenant = new Date().toISOString();
+        // La date de fin fait autorité côté serveur : la recalculer ici
+        // risquerait un jour d'écart selon l'horloge de l'appareil.
+        const sub = {
+          ...base, status: 'actif',
+          dateDebut: base.dateDebut || maintenant,
+          dateFin: dateFin || base.dateFin,
+          lastPaymentAt: maintenant,
+        };
+        const payId = `pay-${reference}`;
+        const paiement = {
+          id: payId, subscriptionId: subId, userId, montant: montant || 5000,
+          methode: 'kkiapay', phone: '', referenceTransaction: reference,
+          statut: 'confirme', verifieServeur: true, date: maintenant,
+        };
+        return {
+          ...s,
+          subscriptions: [sub, ...(s.subscriptions || []).filter((x) => x.id !== subId)],
+          subscriptionPayments: [paiement, ...(s.subscriptionPayments || []).filter((p) => p.id !== payId)],
+        };
+      }),
+
     // Validation manuelle par le gérant : +30 jours à partir d'aujourd'hui
     // (ou de la fin actuelle si l'abonnement court encore).
     confirmSubscriptionPayment: (paymentId) =>
@@ -43,19 +79,12 @@ export function createProActions(setState) {
           subscriptionPayments: s.subscriptionPayments.map((p) =>
             p.id === paymentId ? { ...p, statut: 'confirme' } : p
           ),
-          subscriptions: (s.subscriptions || []).map((sub) => {
-            if (sub.id !== payment.subscriptionId) return sub;
-            const base = sub.dateFin && new Date(sub.dateFin).getTime() > now
-              ? new Date(sub.dateFin).getTime()
-              : now;
-            return {
-              ...sub,
-              status: 'actif',
-              dateDebut: sub.dateDebut || new Date(now).toISOString(),
-              dateFin: new Date(base + 30 * 86400000).toISOString(),
-              lastPaymentAt: new Date(now).toISOString(),
-            };
-          }),
+          // Même règle que la confirmation serveur : une seule fonction
+          // décide de l'échéance, donc jamais deux dates contradictoires
+          // selon la porte d'entrée du paiement.
+          subscriptions: (s.subscriptions || []).map((sub) =>
+            (sub.id === payment.subscriptionId ? abonnementApresPaiement(sub, now) : sub)
+          ),
         };
       }),
 

@@ -90,6 +90,7 @@ sont actives, et tester une restauration une fois avant le lancement.
 | `VITE_KKIAPAY_PUBLIC_KEY` | navigateur | clé **publique** du widget de paiement |
 | `YOUTUBE_API_KEY` | serveur, facultative | sommaire minuté des vidéos de formation |
 | `KKIAPAY_PRIVATE_KEY`, `KKIAPAY_SECRET` | serveur | vérification des paiements KkiaPay |
+| `SUPABASE_SERVICE_ROLE_KEY` | serveur | activation de l'abonnement après paiement vérifié |
 | `CINETPAY_API_KEY` | serveur | idem, si CinetPay est branché un jour |
 | `FEDAPAY_SECRET_KEY` | serveur | idem, si FedaPay est branché un jour |
 
@@ -106,6 +107,41 @@ obligatoire : sans elle, `/api/youtube` lit la page publique de la vidéo pour y
 retrouver les chapitres. La clé rend simplement la lecture stable, indépendante
 de la mise en page de YouTube. Elle n'a **pas** de préfixe `VITE_` : une variable
 serveur ne doit jamais partir dans le bundle du navigateur.
+
+## 7. Vérification serveur des paiements
+
+Sans elle, un abonnement s'activait sur la parole du navigateur : le widget
+annonçait « payé », l'app enregistrait. Le même retour était reproductible
+depuis la console du navigateur — donc un abonnement gratuit à qui savait le
+faire.
+
+Deux adresses la portent :
+
+| Adresse | Qui l'appelle | Rôle |
+|---|---|---|
+| `POST /api/paiement/verifier` | l'app, après le widget | vérifie et active — chemin principal |
+| `POST /api/paiement/webhook` | KkiaPay | filet si le navigateur s'est fermé avant |
+
+Ce que le serveur vérifie, et que le navigateur ne peut pas contourner :
+
+1. **Qui** — l'identité vient du jeton Supabase vérifié, jamais du corps de la
+   requête : impossible de faire créditer le compte d'un autre.
+2. **Quoi** — le statut et le montant sont demandés à KkiaPay avec les clés
+   privée et secrète. Un paiement de 100 F n'ouvre pas un abonnement à 5 000.
+3. **Une seule fois** — la transaction est verrouillée dans
+   `paiements_verifies` (clé primaire) : rejouer la même référence ne crédite
+   rien de plus.
+
+**À faire dans le tableau de bord KkiaPay** : déclarer l'URL de webhook
+`https://app.bestasolar.com/api/paiement/webhook`.
+
+Le webhook ne fait jamais confiance à ce qu'il reçoit — n'importe qui peut
+appeler cette adresse. Il n'en retient que la référence de transaction, puis
+demande son vrai statut à KkiaPay. Un appel forgé ne crédite donc rien.
+
+**Si la vérification n'est pas configurée** (clés absentes), l'app le détecte
+et retombe sur la validation manuelle par le gérant, comme avant. Rien ne
+casse ; l'abonnement demande simplement une validation humaine.
 
 ## Ce que fait l'app selon la configuration
 
@@ -140,7 +176,10 @@ rien aujourd'hui.
    numéro affiché + référence.
 2. La demande est synchronisée (statut `en_attente` — la RLS refuse tout autre
    statut à un non-admin).
-3. L'admin plateforme valide dans « Abonnements Devis Pro » → statut `actif`
-   (seul l'admin peut l'écrire).
+3. **Paiement en ligne** : le serveur vérifie la transaction auprès de
+   l'agrégateur et active l'abonnement tout seul (section 7).
+   **Paiement Mobile Money manuel** — ou vérification indisponible : l'admin
+   plateforme valide dans « Abonnements Devis Pro » → statut `actif` (seul
+   l'admin peut l'écrire).
 4. L'espace Pro s'ouvre (vérification côté serveur). Un renouvellement demandé
    pendant la période payée ne coupe jamais l'accès avant l'échéance.

@@ -1,5 +1,6 @@
 // Module Devis Pro : règles de l'abonnement premium.
-import { DAY_MS } from './date';
+// Extension explicite : chargé aussi par Node côté serveur (api/paiement/*).
+import { DAY_MS } from './date.js';
 
 export const SUBSCRIPTION_PRICE = 5000; // F CFA / mois
 export const SUBSCRIPTION_DAYS = 30;

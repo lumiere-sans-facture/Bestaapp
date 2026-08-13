@@ -46,7 +46,7 @@ export default function Plus() {
     partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team, teamChargee,
     getPartnerById, getLeadById,
     payCommission, addCommission, syncCommissions, approvePayout, rejectPayout,
-    getSubscriptionForUser, requestSubscription, importData,
+    getSubscriptionForUser, requestSubscription, activerAbonnementVerifie, importData,
   } = data;
 
   const sub = getSubscriptionForUser(user.id);
@@ -128,6 +128,27 @@ export default function Plus() {
     } catch {
       toast(`Copie impossible — composez le ${PAY_NUMBER}.`, { type: 'error' });
     }
+  };
+
+  // Retour d'un paiement KKiaPay. Trois issues bien distinctes : le serveur
+  // a confirmé (abonnement actif tout de suite), le serveur a REFUSÉ (rien
+  // n'est enregistré — sinon un paiement échoué laisserait une demande à
+  // valider), ou la vérification est indisponible (hors-ligne, serveur non
+  // configuré) et la validation manuelle du gérant reprend la main.
+  const paiementKkiapay = (reference, verdict = {}) => {
+    if (verdict.refuse) {
+      toast(verdict.motif || 'Paiement non abouti.', { type: 'error' });
+      return;
+    }
+    if (verdict.active) {
+      activerAbonnementVerifie(user.id, { reference, montant: SUBSCRIPTION_PRICE, dateFin: verdict.dateFin });
+      setSubSent(true);
+      toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — abonnement activé.');
+      return;
+    }
+    requestSubscription(user.id, { ...subForm, methode: 'kkiapay', reference });
+    setSubSent(true);
+    toast('Paiement enregistré — vérification par le gérant en attente.');
   };
 
   const handleProClick = () => {
@@ -930,11 +951,7 @@ export default function Plus() {
               label="Payer avec KKiaPay (test)"
               disabled={!subForm.phone}
               onNumero={(numero) => setSubForm({ ...subForm, phone: numero })}
-              onPaid={(reference) => {
-                requestSubscription(user.id, { ...subForm, methode: 'kkiapay', reference });
-                setSubSent(true);
-                toast('Paiement KKiaPay enregistré — vérification en attente.');
-              }}
+              onPaid={(reference, verdict) => paiementKkiapay(reference, verdict)}
             />
             <button type="submit" className="btn btn-accent btn-block btn-lg">
               <Crown size={18} /> S'abonner — {formatCFA(SUBSCRIPTION_PRICE)}/mois
