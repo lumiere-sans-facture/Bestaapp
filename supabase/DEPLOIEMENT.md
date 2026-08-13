@@ -39,6 +39,7 @@ Dans **SQL Editor** du dashboard Supabase :
 | 2 | `security.sql` | Accès réservé aux porteurs d'un profil (bloque les inscrits inconnus) |
 | 3 | `multitenant.sql` | Organisations, isolation par entreprise (RLS), inscription self-service, codes d'invitation, verrou serveur des abonnements |
 | 4 | `temps-reel.sql` | Diffusion immédiate des changements à toute l'équipe (à rejouer après l'ajout d'une table) |
+| 5 | `paiements.sql` | Moyens de paiement configurables depuis l'espace gérant (clés PUBLIQUES uniquement) |
 
 Les scripts sont idempotents (ré-exécutables sans danger) — **à une
 exception près** : une fois `multitenant.sql` passé, ne PAS rejouer
@@ -88,6 +89,17 @@ sont actives, et tester une restauration une fois avant le lancement.
 |---|---|---|
 | `VITE_KKIAPAY_PUBLIC_KEY` | navigateur | clé **publique** du widget de paiement |
 | `YOUTUBE_API_KEY` | serveur, facultative | sommaire minuté des vidéos de formation |
+| `KKIAPAY_PRIVATE_KEY`, `KKIAPAY_SECRET` | serveur | vérification des paiements KkiaPay |
+| `CINETPAY_API_KEY` | serveur | idem, si CinetPay est branché un jour |
+| `FEDAPAY_SECRET_KEY` | serveur | idem, si FedaPay est branché un jour |
+
+⚠️ **Les clés privées et secrètes ne se saisissent JAMAIS dans l'application.**
+Tout ce qui est tapé dans un écran part dans `localStorage` puis dans Supabase,
+où chaque membre de l'organisation peut le lire — et ces clés autorisent
+remboursements et versements. L'écran *Plus → Moyens de paiement* n'accepte que
+la clé **publique** et refuse une valeur qui ressemble à un secret ; les secrets
+vivent uniquement ici, en variables d'environnement serveur (sans préfixe
+`VITE_`, qui les ferait entrer dans le bundle du navigateur).
 
 `YOUTUBE_API_KEY` (clé « YouTube Data API v3 », console Google Cloud) n'est pas
 obligatoire : sans elle, `/api/youtube` lit la page publique de la vidéo pour y

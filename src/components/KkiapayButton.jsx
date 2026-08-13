@@ -2,12 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { CreditCard, FlaskConical } from 'lucide-react';
 import { SUBSCRIPTION_PRICE } from '../utils/subscription';
 import { NUMEROS_TEST_SANDBOX, formatMomo, normaliserMomo, problemeNumero } from '../utils/kkiapay';
+import { champConfig, configActive } from '../utils/paiementProviders';
+import { useData } from '../context/DataContext';
 import { useToast } from './Toast';
 
-// Bac à sable tant que VITE_KKIAPAY_SANDBOX n'est pas explicitement mis à
-// « false » : mieux vaut un test qui ne débite personne qu'un vrai paiement
-// déclenché par une variable oubliée.
-const SANDBOX = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
+// Repli quand aucun moyen de paiement n'est configuré dans l'app : les
+// variables de build, seule source avant l'existence de l'écran « Moyens de
+// paiement ». Bac à sable tant que VITE_KKIAPAY_SANDBOX n'est pas
+// explicitement mis à « false » — mieux vaut un test qui ne débite personne
+// qu'un vrai paiement déclenché par une variable oubliée.
+const CLE_BUILD = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
+const SANDBOX_BUILD = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
 
 /**
  * Bouton de paiement KKiaPay (abonnement Devis Pro).
@@ -18,14 +23,25 @@ const SANDBOX = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
  * n'existait que côté Pro, donc uniquement visible par ceux qui avaient DÉJÀ
  * payé — invisible pour le client qui veut justement s'abonner.
  *
- * Sans clé publique configurée (VITE_KKIAPAY_PUBLIC_KEY), le bouton ne s'affiche
- * pas du tout : le paiement Mobile Money manuel reste alors le seul parcours.
+ * Sans clé publique — ni dans « Moyens de paiement », ni dans les variables de
+ * build — le bouton ne s'affiche pas du tout : le paiement Mobile Money manuel
+ * reste alors le seul parcours.
  *
  * @param {(numero: string) => void} [onNumero] permet de proposer les numéros
  *        de test en mode bac à sable (le parent remplit son champ téléphone).
  */
 export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled = false }) {
-  const kkiapayKey = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
+  const { paiementConfigs } = useData();
+  // L'écran « Moyens de paiement » du gérant prime sur les variables de
+  // build : changer d'agrégateur ou passer en réel ne doit plus demander un
+  // redéploiement. Une configuration active pour un AUTRE agrégateur cache ce
+  // bouton — KkiaPay n'encaisse pas ce que CinetPay doit encaisser.
+  const config = configActive(paiementConfigs);
+  const configKkiapay = config?.provider === 'kkiapay' ? config : null;
+  const kkiapayKey = config
+    ? (configKkiapay ? champConfig(configKkiapay, 'publicKey') : '')
+    : CLE_BUILD;
+  const SANDBOX = config ? config.mode !== 'live' : SANDBOX_BUILD;
   const [ouvert, setOuvert] = useState(false);
   const toast = useToast();
   // Les gestionnaires sont enregistrés UNE fois auprès du widget ; cette

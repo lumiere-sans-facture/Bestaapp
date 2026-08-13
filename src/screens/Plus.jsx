@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchPlatformPayouts, decidePlatformPayout } from '../lib/remoteSync';
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
 import { estProprietaireEspace } from '../utils/roles';
+import { configActive, providerById, MODE_LABEL } from '../utils/paiementProviders';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
 import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
@@ -25,6 +26,7 @@ import TeamSection from './plus/TeamSection';
 import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import KitsSection from './plus/KitsSection';
+import PaiementsSection from './plus/PaiementsSection';
 import KkiapayButton from '../components/KkiapayButton';
 import InvertersSection from './plus/InvertersSection';
 import PompeKitsSection from './plus/PompeKitsSection';
@@ -41,7 +43,7 @@ export default function Plus() {
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
-    partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, payoutRequests, team, teamChargee,
+    partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team, teamChargee,
     getPartnerById, getLeadById,
     payCommission, addCommission, syncCommissions, approvePayout, rejectPayout,
     getSubscriptionForUser, requestSubscription, importData,
@@ -49,17 +51,24 @@ export default function Plus() {
 
   const sub = getSubscriptionForUser(user.id);
   const subStatus = effectiveStatus(sub);
+  // Résumé de l'encaissement pour l'entrée de menu : quel agrégateur encaisse,
+  // et dans quel mode — « réel » ou « test » ne se devine pas.
+  const configPaiement = configActive(paiementConfigs);
+  const paiementActif = configPaiement
+    ? { nom: providerById(configPaiement.provider)?.nom || configPaiement.provider,
+        mode: (MODE_LABEL[configPaiement.mode] || configPaiement.mode).toLowerCase() }
+    : null;
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
   // simple utilisateur restait ainsi sur l'écran des commissions du gérant,
   // boutons « Payer » et « Commission manuelle » compris. L'autorisation se
   // décide donc ici, à la section, pas au bouton.
-  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'backup'];
+  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'backup'];
   const sectionAutorisee = (tab) => {
     if (!KNOWN_TABS.includes(tab)) return false;
     if (tab === 'subsadmin') {
@@ -644,6 +653,7 @@ export default function Plus() {
               <MenuItem icon={Package} title="Mes kits" subtitle={`${(kits || []).length} kits proposés par l'assistant de devis`} onClick={() => setActiveTab('kits')} />
               <MenuItem icon={Cpu} title="Onduleurs" subtitle={`${(inverters || []).length} onduleurs, suggérés si celui du kit ne suffit pas`} onClick={() => setActiveTab('inverters')} />
               <MenuItem icon={Droplets} title="Kits pompage" subtitle={`${(pompeKits || []).length} kits proposés par l'assistant Pompe solaire`} onClick={() => setActiveTab('pompekits')} />
+              <MenuItem icon={CreditCard} title="Moyens de paiement" subtitle={paiementActif ? `${paiementActif.nom} · ${paiementActif.mode}` : 'Aucun agrégateur activé — Mobile Money manuel'} onClick={() => setActiveTab('paiements')} />
               {/* Administration du SaaS : en mode backend, réservée à l'admin
                   plateforme (le serveur refuse de toute façon l'activation
                   d'un abonnement à quiconque d'autre). */}
@@ -689,6 +699,7 @@ export default function Plus() {
     menu: 'Plus', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
     subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
+    paiements: 'Moyens de paiement',
     profile: 'Mon profil', backup: 'Sauvegarde',
   };
 
@@ -708,6 +719,7 @@ export default function Plus() {
         {activeTab === 'kits' && <KitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'inverters' && <InvertersSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'pompekits' && <PompeKitsSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'paiements' && <PaiementsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'subsadmin' && <SubscriptionsAdmin onBack={() => setActiveTab('menu')} />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}

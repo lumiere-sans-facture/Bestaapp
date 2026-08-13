@@ -1039,6 +1039,23 @@ form .login-link { width: 100%; margin-top: 4px; }
   .school-side { position: sticky; top: 16px; }
 }
 
+/* Moyens de paiement (espace gérant) */
+.callout.callout-danger { background: var(--error-light); }
+.callout.callout-danger .callout-title { color: var(--error-text); }
+.paiement-card { margin-bottom: 12px; }
+.paiement-card.actif { border-left: 3px solid var(--success); }
+.paiement-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.paiement-etat { display: flex; color: var(--text-muted); }
+.paiement-card.actif .paiement-etat { color: var(--success); }
+.paiement-card-titre { flex: 1; min-width: 0; }
+.paiement-nom { font-weight: 700; }
+.paiement-champs { margin-bottom: 6px; }
+/* Une clé se lit caractère par caractère : chasse fixe, jamais coupée en deux. */
+.paiement-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8125rem; word-break: break-all; }
+.paiement-note { margin: 6px 0 2px; }
+.paiement-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.paiement-supprimer:hover { border-color: var(--error); color: var(--error-text); }
+
 /* Bac à sable KKiaPay : numéros de test, cliquables pour remplir le champ. */
 .kkiapay-sandbox {
   margin-top: 10px; padding: 10px 12px;

@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 // Chaque entité est une ligne { id, data } ; la logique métier reste
 // dans DataContext, ce module ne fait que répliquer l'état.
 
-export const SYNCED_COLLECTIONS = ['products', 'kits', 'inverters', 'pompeKits', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'factures', 'proClients', 'payoutRequests'];
+export const SYNCED_COLLECTIONS = ['products', 'kits', 'inverters', 'pompeKits', 'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions', 'subscriptionPayments', 'companies', 'paiementConfigs', 'factures', 'proClients', 'payoutRequests'];
 
 // Organisation courante (schéma multi-entreprise). Renseignée par AuthContext
 // au chargement du profil ; absente (null) sur l'ancien schéma mono-équipe —
@@ -21,7 +21,7 @@ const pushesProducts = () => !currentOrgId || currentOrgKind === 'interne';
 // catalogue produits et les cours de formation. Pour ces tables seulement, la
 // réception peut légitimement contenir des lignes d'une AUTRE organisation ;
 // elles sont marquées `partage` et traitées en lecture seule.
-const TABLES_PARTAGEES = new Set(['products', 'kits', 'formations']);
+const TABLES_PARTAGEES = new Set(['products', 'kits', 'formations', 'paiementConfigs']);
 export const setSyncOrg = (orgId, kind = null) => {
   currentOrgId = orgId || null;
   currentOrgKind = kind || null;

@@ -54,6 +54,9 @@ export const buildInitialState = () => ({
   subscriptions: [],
   subscriptionPayments: [],
   companies: [],
+  // Agrégateurs de paiement configurés par BestaSolar (clés PUBLIQUES et mode
+  // seulement — les secrets vivent en variables d'environnement serveur).
+  paiementConfigs: [],
   factures: [],
   proClients: [],
   // Demandes de paiement des commissions : vide au départ, alimentée par
@@ -136,6 +139,7 @@ export const loadState = (scope = null) => {
       if (!saved.subscriptions) saved.subscriptions = [];
       if (!saved.subscriptionPayments) saved.subscriptionPayments = [];
       if (!saved.companies) saved.companies = [];
+      if (!saved.paiementConfigs) saved.paiementConfigs = [];
       if (!saved.factures) saved.factures = [];
       if (!saved.proClients) saved.proClients = [];
       const isNameBased = (p) => p.code && p.code.startsWith(`BESTA-${codeBaseFromName(p.name)}`);

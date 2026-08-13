@@ -76,6 +76,32 @@ export function createProActions(setState) {
         };
       }),
 
+    // Agrégateurs de paiement (KkiaPay, CinetPay, FedaPay…).
+    // Ne transitent ici que des valeurs PUBLIQUES : clé publique, mode,
+    // activation. Une clé privée ou secrète finirait dans localStorage puis
+    // dans Supabase, lisible par tout membre de l'organisation — elle reste
+    // en variable d'environnement serveur. Le refus est appliqué en amont
+    // par problemeConfig() (utils/paiementProviders.js).
+    savePaiementConfig: (config) =>
+      setState((s) => {
+        const liste = s.paiementConfigs || [];
+        const id = config.id || crypto.randomUUID();
+        const ligne = { ...config, id, majLe: new Date().toISOString() };
+        // Un seul agrégateur encaisse à la fois : activer celui-ci désactive
+        // les autres, sinon deux configurations actives se disputeraient le
+        // paiement et le client partirait chez l'un ou l'autre au hasard.
+        const autres = liste
+          .filter((c) => c.id !== id)
+          .map((c) => (ligne.actif ? { ...c, actif: false } : c));
+        return { ...s, paiementConfigs: [ligne, ...autres] };
+      }),
+
+    deletePaiementConfig: (id) =>
+      setState((s) => ({
+        ...s,
+        paiementConfigs: (s.paiementConfigs || []).filter((c) => c.id !== id),
+      })),
+
     // Identité de l'entreprise du technicien (logo, couleurs, coordonnées)
     saveCompany: (userId, data) =>
       setState((s) => {
