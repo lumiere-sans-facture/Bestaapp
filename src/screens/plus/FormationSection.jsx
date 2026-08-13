@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Pencil, Check, PlayCircle, FileText, AlignLeft,
-  Clock, ExternalLink, GraduationCap, CheckCircle2, Circle, BookOpen, Layers, Crown, Lock, EyeOff, ListOrdered,
+  Clock, ExternalLink, GraduationCap, CheckCircle2, Circle, Layers, Crown, Lock, EyeOff, ListOrdered,
+  Camera, Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useMode } from '../../context/ModeContext';
+import { useToast } from '../../components/Toast';
+import { fileToResizedDataUrl } from '../../utils/image';
 import { toEmbed } from '../../utils/video';
 import { fetchYoutubeSommaire, youtubeVideoId } from '../../lib/youtube';
 import {
@@ -20,7 +23,22 @@ import DangerZone from '../../components/DangerZone';
 
 const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText };
 const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document' };
-const EMPTY_COURSE = { title: '', description: '', author: '', acces: 'tous', masque: false };
+const EMPTY_COURSE = { title: '', description: '', author: '', acces: 'tous', masque: false, cover: '' };
+
+/**
+ * Couverture d'un cours : la photo du formateur si elle existe, sinon un
+ * emblème « formation » (chapeau de diplômé) sur le dégradé maison. Le repli
+ * doit se lire comme un cours, pas comme un fichier : un cours sans photo est
+ * la règle, pas l'exception.
+ */
+function CouvertureCours({ cover, title }) {
+  if (cover) return <img className="course-cover-photo" src={cover} alt={`Couverture — ${title}`} loading="lazy" />;
+  return (
+    <span className="course-cover-emblem" aria-hidden="true">
+      <GraduationCap size={30} strokeWidth={1.6} />
+    </span>
+  );
+}
 // Retour visible de la récupération du sommaire : muet quand il n'y a rien à
 // dire, explicite quand YouTube ne donne rien — sans quoi un champ resté vide
 // passe pour une panne.
@@ -136,6 +154,7 @@ export default function FormationSection({ onBack }) {
       author: courseForm.author.trim(),
       acces: courseForm.acces === 'pro' ? 'pro' : 'tous',
       masque: !!courseForm.masque,
+      cover: courseForm.cover || '',
     };
     if (!data.title) return;
     if (courseEdit === 'new') addFormation(data);
@@ -275,12 +294,12 @@ export default function FormationSection({ onBack }) {
             const action = actionCours({ verrouille: verrou, gere: peutGerer(c), lecons: counts.lecons, pct: p.pct, done: p.done });
             return (
               <div key={c.id} className="card course-card">
-                <div className="course-card-cover">
-                  <BookOpen size={36} strokeWidth={1.6} />
+                <div className={`course-card-cover ${c.cover ? 'has-photo' : ''}`}>
+                  <CouvertureCours cover={c.cover} title={c.title} />
                   {duration && <span className="course-cover-duration"><Clock size={12} /> {duration}</span>}
                   {peutGerer(c) && (
                     <button className="course-cover-edit" aria-label="Modifier le cours"
-                      onClick={() => { setCourseForm({ title: c.title, description: c.description || '', author: c.author || '', acces: c.acces === 'pro' ? 'pro' : 'tous', masque: !!c.masque }); setCourseEdit(c.id); }}>
+                      onClick={() => { setCourseForm({ title: c.title, description: c.description || '', author: c.author || '', acces: c.acces === 'pro' ? 'pro' : 'tous', masque: !!c.masque, cover: c.cover || '' }); setCourseEdit(c.id); }}>
                       <Pencil size={14} />
                     </button>
                   )}
@@ -353,6 +372,11 @@ export default function FormationSection({ onBack }) {
       </div>
 
       <div className="course-head">
+        {/* Même couverture qu'au catalogue : le cours reste reconnaissable
+            une fois ouvert. */}
+        <div className={`course-head-cover ${course.cover ? 'has-photo' : ''}`}>
+          <CouvertureCours cover={course.cover} title={course.title} />
+        </div>
         <div className="course-head-title">{course.title}</div>
         {course.author && <div className="course-head-author">Par {course.author}</div>}
         <div className="course-head-progress">
@@ -659,9 +683,54 @@ export default function FormationSection({ onBack }) {
 
 /** Formulaire cours (création / édition) — partagé entre catalogue et vue cours. */
 function CourseFormSheet({ open, isNew, form, setForm, onClose, onSubmit, onDelete }) {
+  const toast = useToast();
+  const fichierRef = useRef(null);
+
+  // La photo est redimensionnée avant d'être stockée : une photo de téléphone
+  // brute ferait plusieurs Mo dans localStorage, donc dans la réplication.
+  const choisirPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setForm({ ...form, cover: await fileToResizedDataUrl(file) });
+    } catch {
+      toast('Impossible de lire cette image. Essayez avec une autre photo.', { type: 'error' });
+    }
+    e.target.value = '';
+  };
+
   return (
     <Sheet open={open} onClose={onClose} title={isNew ? 'Nouveau cours' : 'Modifier le cours'}>
       <form onSubmit={onSubmit}>
+        <div className="photo-field">
+          <button type="button" className="photo-preview photo-preview-cover" onClick={() => fichierRef.current?.click()}>
+            {form.cover ? (
+              <img src={form.cover} alt="Aperçu de la couverture" />
+            ) : (
+              // Aperçu fidèle de ce que verront les membres sans photo.
+              <span className="course-cover-apercu">
+                <span className="course-cover-emblem"><GraduationCap size={30} strokeWidth={1.6} /></span>
+              </span>
+            )}
+          </button>
+          <input ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto}
+            className="photo-input" aria-label="Photo de couverture du cours" />
+          <div className="photo-actions">
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => fichierRef.current?.click()}>
+              <Camera size={15} /> {form.cover ? 'Changer la photo' : 'Ajouter une photo'}
+            </button>
+            {form.cover && (
+              <button type="button" className="btn btn-sm btn-outline photo-retirer"
+                onClick={() => setForm({ ...form, cover: '' })}>
+                <Trash2 size={15} /> Retirer
+              </button>
+            )}
+          </div>
+          <div className="field-hint photo-hint">
+            Sans photo, le cours affiche l’emblème de formation ci-dessus.
+          </div>
+        </div>
+
         <Field label="Titre du cours *">
           <input className="input" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex : Devenir installateur solaire" />
         </Field>

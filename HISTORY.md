@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Formation : couverture de cours à l’emblème du diplôme, remplaçable par une photo
 - Formation : le sommaire minuté d’une vidéo YouTube se remplit tout seul au collage du lien
 - Formation : un cours neuf s’ouvre enfin pour y ajouter modules et leçons
 - Sync : une table absente côté serveur ne passe plus pour « envoyée » — voyant rouge explicite et reprise automatique

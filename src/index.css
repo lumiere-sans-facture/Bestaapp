@@ -904,19 +904,46 @@ form .login-link { width: 100%; margin-top: 4px; }
 @media (min-width: 1100px) { .course-grid { grid-template-columns: repeat(3, 1fr); } }
 .course-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .course-card-cover {
-  position: relative; height: 110px; flex-shrink: 0;
+  position: relative; height: 110px; flex-shrink: 0; overflow: hidden;
   background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 100%);
   color: rgba(255, 255, 255, 0.9);
   display: flex; align-items: center; justify-content: center;
 }
+/* Emblème du cours sans photo : un chapeau de diplômé posé sur une pastille,
+   pour que la couverture se lise comme une formation et non comme un fichier. */
+.course-cover-emblem {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  width: 58px; height: 58px; border-radius: 18px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  color: white;
+}
+/* Deux arcs très discrets derrière l'emblème : la couverture unie faisait
+   « champ vide ». Masqués dès qu'une photo prend la place. */
+.course-card-cover::before, .course-head-cover::before {
+  content: ''; position: absolute; inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.16) 0 34%, transparent 35%),
+    radial-gradient(circle at 6% 96%, rgba(255, 255, 255, 0.12) 0 26%, transparent 27%);
+}
+.course-card-cover.has-photo::before, .course-head-cover.has-photo::before { display: none; }
+.course-cover-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Voile bas sur les photos : sans lui, la durée et le crayon se perdent sur
+   un ciel clair. */
+.course-card-cover.has-photo::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.12) 34%, transparent 62%);
+}
 .course-cover-duration {
-  position: absolute; left: 12px; bottom: 10px;
+  position: absolute; left: 12px; bottom: 10px; z-index: 2;
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 0.6875rem; font-weight: 700; color: white;
   background: rgba(255, 255, 255, 0.16); border-radius: 20px; padding: 3px 9px;
 }
 .course-cover-edit {
-  position: absolute; top: 8px; right: 8px; padding: 6px;
+  position: absolute; top: 8px; right: 8px; padding: 6px; z-index: 2;
   color: white; background: rgba(255, 255, 255, 0.14); border-radius: 8px;
   display: flex; cursor: pointer;
 }
@@ -931,6 +958,13 @@ form .login-link { width: 100%; margin-top: 4px; }
 .course-card-pct { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); min-width: 34px; text-align: right; }
 
 .course-head { margin: 2px 0 14px; }
+/* Bandeau du cours ouvert : la même couverture qu'au catalogue, en plus bas. */
+.course-head-cover {
+  position: relative; overflow: hidden; height: 92px; margin-bottom: 10px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 100%);
+  display: flex; align-items: center; justify-content: center;
+}
 .course-head-title { font-weight: 700; font-size: 1.125rem; }
 .course-head-progress { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
 .course-head-progress .funnel-track { flex: 1; max-width: 340px; }
@@ -1017,6 +1051,18 @@ form .login-link { width: 100%; margin-top: 4px; }
 .photo-preview img { width: 100%; height: 100%; object-fit: contain; background: white; }
 .photo-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.8125rem; }
 .photo-input { display: none; }
+/* Couverture de cours : une photo de couverture se recadre (cover), là où une
+   photo de produit doit rester entière (contain). */
+.photo-preview-cover { padding: 0; }
+.photo-preview-cover img { object-fit: cover; background: var(--bg); }
+.course-cover-apercu {
+  width: 100%; height: 100%; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; color: white;
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 100%);
+}
+.photo-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.photo-retirer:hover { border-color: var(--error); color: var(--error-text); }
+.photo-hint { text-align: center; margin-top: 2px; }
 /* Une colonne partout ; les paires courtes et jumelles utilisent .form-pair. */
 .form-row-2 { display: block; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
