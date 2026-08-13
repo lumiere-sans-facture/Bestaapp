@@ -317,7 +317,6 @@ export default function FormationSection({ onBack }) {
               <div className="school-module-head" role="button" tabIndex={0}
                 onClick={() => toggleModule(m.id)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleModule(m.id); } }}>
-                <span className="school-module-label">Module {mi + 1}</span>
                 <span className="school-module-title">{m.title}</span>
                 <span className="school-module-count">{done_m}/{(m.lecons || []).length}</span>
                 {gereCeCours && (
