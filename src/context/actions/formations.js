@@ -66,6 +66,25 @@ export function createFormationActions(setState) {
         lecons: (m.lecons || []).map((l) => (l.id === leconId ? { ...l, ...patch } : l)),
       }))),
 
+    // Déplace une leçon vers un autre module sans perdre son identifiant ni
+    // l'avancement déjà enregistré par les apprenants.
+    moveLecon: (formationId, fromModuleId, toModuleId, leconId, patch) =>
+      setState((s) => {
+        const course = (s.formations || []).find((f) => f.id === formationId);
+        const source = (course?.modules || []).find((m) => m.id === fromModuleId);
+        const lesson = (source?.lecons || []).find((l) => l.id === leconId);
+        if (!lesson || fromModuleId === toModuleId) return s;
+        const nextLesson = { ...lesson, ...patch };
+        return patchCourse(formationId, (f) => ({
+          ...f,
+          modules: (f.modules || []).map((m) => {
+            if (m.id === fromModuleId) return { ...m, lecons: (m.lecons || []).filter((l) => l.id !== leconId) };
+            if (m.id === toModuleId) return { ...m, lecons: [...(m.lecons || []), nextLesson] };
+            return m;
+          }),
+        }))(s);
+      }),
+
     deleteLecon: (formationId, moduleId, leconId) =>
       setState((s) => ({
         ...patchModule(formationId, moduleId, (m) => ({
