@@ -25,6 +25,7 @@ import TeamSection from './plus/TeamSection';
 import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import KitsSection from './plus/KitsSection';
+import KkiapayButton from '../components/KkiapayButton';
 import InvertersSection from './plus/InvertersSection';
 import PompeKitsSection from './plus/PompeKitsSection';
 import { SyncStatusRow } from '../components/SyncStatus';
@@ -910,6 +911,18 @@ export default function Plus() {
             <Field label="Référence de la transaction (optionnel)">
               <input className="input" value={subForm.reference} onChange={(e) => setSubForm({ ...subForm, reference: e.target.value })} placeholder="Ex : ID du transfert MoMo" />
             </Field>
+            {/* Paiement en ligne : c'est ICI qu'un non-abonné passe, l'espace
+                Pro lui étant fermé tant qu'il n'a pas d'abonnement actif. */}
+            <KkiapayButton
+              phone={subForm.phone}
+              label="Payer avec KKiaPay (test)"
+              disabled={!subForm.phone}
+              onPaid={(reference) => {
+                requestSubscription(user.id, { ...subForm, methode: 'kkiapay', reference });
+                setSubSent(true);
+                toast('Paiement KKiaPay enregistré — vérification en attente.');
+              }}
+            />
             <button type="submit" className="btn btn-accent btn-block btn-lg">
               <Crown size={18} /> S'abonner — {formatCFA(SUBSCRIPTION_PRICE)}/mois
             </button>
