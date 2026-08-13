@@ -478,15 +478,6 @@ export default function FormationSection({ onBack }) {
           <Field label="Titre du module *">
             <input className="input" required value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder="Ex : Dimensionner une installation" />
           </Field>
-          <Field label="Encadré « À retenir / Actions » (facultatif)">
-            <input className="input" value={leconForm.actionTitle}
-              onChange={(e) => setLeconForm({ ...leconForm, actionTitle: e.target.value })}
-              placeholder="Ex : Notez ou retenez bien" />
-            <textarea className="input lesson-action-input" rows="4" value={leconForm.actionContent}
-              onChange={(e) => setLeconForm({ ...leconForm, actionContent: e.target.value })}
-              placeholder={'Une action ou un rappel par ligne.\n- Exemple de point important'} />
-            <div className="field-hint">Cet encadré est affiché sous la vidéo ou le contenu. Les listes commencent par « - ».</div>
-          </Field>
           <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer</button>
         </form>
         {moduleEdit?.id !== 'new' && (
@@ -541,6 +532,15 @@ export default function FormationSection({ onBack }) {
               <div className="field-hint">Les vidéos YouTube/Vimeo se lisent directement dans l'application.</div>
             </Field>
           )}
+          <Field label="Encadré « À retenir / Actions » (facultatif)">
+            <input className="input" value={leconForm.actionTitle}
+              onChange={(e) => setLeconForm({ ...leconForm, actionTitle: e.target.value })}
+              placeholder="Ex : Notez ou retenez bien" />
+            <textarea className="input lesson-action-input" rows="4" value={leconForm.actionContent}
+              onChange={(e) => setLeconForm({ ...leconForm, actionContent: e.target.value })}
+              placeholder={'Une action ou un rappel par ligne.\n- Exemple de point important'} />
+            <div className="field-hint">Cet encadré est affiché sous la vidéo ou le contenu. Les listes commencent par « - ».</div>
+          </Field>
           <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer</button>
         </form>
         {leconEdit?.id !== 'new' && (
