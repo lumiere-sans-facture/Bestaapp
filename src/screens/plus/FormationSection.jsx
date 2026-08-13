@@ -20,7 +20,7 @@ import DangerZone from '../../components/DangerZone';
 const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText };
 const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document' };
 const EMPTY_COURSE = { title: '', description: '', author: '', acces: 'tous', masque: false };
-const EMPTY_LECON = { title: '', description: '', type: 'video', url: '', content: '', duration: '', chaptersText: '', actionTitle: '', actionContent: '' };
+const EMPTY_LECON = { title: '', description: '', type: 'video', url: '', content: '', duration: '', chaptersText: '', actionTitle: '', actionContent: '', targetModuleId: '' };
 
 /** Contenu d'une leçon texte : paragraphes + listes (« - … »), sans dépendance. */
 function TexteContent({ content }) {
@@ -54,7 +54,7 @@ export default function FormationSection({ onBack }) {
     formations, formationProgress,
     addFormation, updateFormation, deleteFormation,
     addModule, updateModule, deleteModule,
-    addLecon, updateLecon, deleteLecon, setLeconDone,
+    addLecon, updateLecon, moveLecon, deleteLecon, setLeconDone,
   } = useData();
 
   const isManager = user.role === 'gerant';
@@ -164,7 +164,9 @@ export default function FormationSection({ onBack }) {
       chapters: leconForm.type === 'video' ? parseChaptersText(leconForm.chaptersText) : [],
     };
     if (!data.title) return;
-    if (leconEdit.id === 'new') addLecon(course.id, leconEdit.moduleId, data);
+    const targetModuleId = leconForm.targetModuleId || leconEdit.moduleId;
+    if (leconEdit.id === 'new') addLecon(course.id, targetModuleId, data);
+    else if (targetModuleId !== leconEdit.moduleId) moveLecon(course.id, leconEdit.moduleId, targetModuleId, leconEdit.id, data);
     else updateLecon(course.id, leconEdit.moduleId, leconEdit.id, data);
     setLeconEdit(null);
   };
@@ -351,6 +353,7 @@ export default function FormationSection({ onBack }) {
                             chaptersText: chaptersToText(l.chapters || []),
                             actionTitle: l.actionTitle || '',
                             actionContent: l.actionContent || '',
+                            targetModuleId: m.id,
                           });
                           setLeconEdit({ moduleId: m.id, id: l.id });
                         }}>
@@ -361,7 +364,7 @@ export default function FormationSection({ onBack }) {
                 );
               })}
               {ouvert && gereCeCours && (
-                <button className="school-add-lecon" onClick={() => { setLeconForm(EMPTY_LECON); setLeconEdit({ moduleId: m.id, id: 'new' }); }}>
+                <button className="school-add-lecon" onClick={() => { setLeconForm({ ...EMPTY_LECON, targetModuleId: m.id }); setLeconEdit({ moduleId: m.id, id: 'new' }); }}>
                   <Plus size={14} /> Ajouter une leçon
                 </button>
               )}
@@ -493,6 +496,13 @@ export default function FormationSection({ onBack }) {
         <form onSubmit={saveLecon}>
           <Field label="Titre *">
             <input className="input" required value={leconForm.title} onChange={(e) => setLeconForm({ ...leconForm, title: e.target.value })} placeholder="Ex : Choisir l'onduleur" />
+          </Field>
+          <Field label="Module de destination *">
+            <select className="input" required value={leconForm.targetModuleId || leconEdit?.moduleId || ''}
+              onChange={(e) => setLeconForm({ ...leconForm, targetModuleId: e.target.value })}>
+              {(course.modules || []).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </select>
+            <div className="field-hint">Vous pouvez choisir un autre module pour cette leçon.</div>
           </Field>
           <Field label="Introduction de la leçon">
             <textarea className="input" rows="2" value={leconForm.description}
