@@ -170,7 +170,10 @@ export const calibreRequis = (sortieW) => CALIBRES_KVA.find((k) => k * 1000 * FA
 
 /** L'onduleur tient-il le pic de consommation, marge comprise ? */
 export const onduleurTientLePic = (inv, { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin } = {}) =>
-  !!inv && puissanceSortie(inv) >= sortieOnduleurRequise(peakLoad, pvPower, margin);
+  // En saisie directe/facture, aucun appareil n'est listé : on ne connaît pas
+  // le pic réel. La puissance PV reste un repère pour CHOISIR un calibre, mais
+  // ne peut pas déclencher un refus « puissance de sortie » fictif.
+  !!inv && (peakLoad <= 0 || puissanceSortie(inv) >= sortieOnduleurRequise(peakLoad, pvPower, margin));
 
 /** Son entrée PV (MPPT) accepte-t-elle les panneaux posés ? Une limite
  *  inconnue ne peut pas être contredite : elle ne bloque pas. */
