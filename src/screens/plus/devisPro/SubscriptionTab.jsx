@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CreditCard, Crown, Clock, Check } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
@@ -21,6 +21,8 @@ export default function SubscriptionTab({ sub }) {
   const toast = useToast();
   const [subSent, setSubSent] = useState(false);
   const [form, setForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
+  const [kkiapayOuvert, setKkiapayOuvert] = useState(false);
+  const kkiapayKey = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
   const status = effectiveStatus(sub);
   const myPayments = (subscriptionPayments || []).filter((p) => p.userId === user.id);
 
@@ -31,6 +33,55 @@ export default function SubscriptionTab({ sub }) {
     } catch {
       toast(`Copie impossible — composez le ${PAY_NUMBER}.`, { type: 'error' });
     }
+  };
+
+  // KKiaPay n'est qu'un déclencheur côté navigateur : l'activation reste
+  // manuelle tant que l'API serveur de vérification (clés privée + secrète)
+  // n'est pas configurée. Le succès widget fournit néanmoins une référence
+  // traçable au gérant dans l'historique des abonnements.
+  useEffect(() => {
+    if (!kkiapayKey || typeof window.addSuccessListener !== 'function') return undefined;
+    const onSuccess = (response = {}) => {
+      const reference = response.transactionId || response.transaction_id || response.id || '';
+      requestSubscription(user.id, { methode: 'kkiapay', phone: form.phone, reference });
+      setSubSent(true);
+      setKkiapayOuvert(false);
+      toast('Paiement KKiaPay enregistré — vérification en attente.');
+    };
+    const onFailure = () => {
+      setKkiapayOuvert(false);
+      toast('Paiement KKiaPay non finalisé.', { type: 'error' });
+    };
+    window.addSuccessListener(onSuccess);
+    window.addFailedListener?.(onFailure);
+    return () => {
+      window.removeSuccessListener?.(onSuccess);
+      window.removeFailedListener?.(onFailure);
+    };
+  }, [form.phone, kkiapayKey, requestSubscription, toast, user.id]);
+
+  const ouvrirKkiapay = () => {
+    if (!kkiapayKey) {
+      toast('KKiaPay test n’est pas configuré : ajoutez VITE_KKIAPAY_PUBLIC_KEY dans Vercel.', { type: 'error' });
+      return;
+    }
+    if (typeof window.openKkiapayWidget !== 'function') {
+      toast('Le widget KKiaPay est indisponible. Rechargez la page puis réessayez.', { type: 'error' });
+      return;
+    }
+    setKkiapayOuvert(true);
+    window.openKkiapayWidget({
+      amount: SUBSCRIPTION_PRICE,
+      key: kkiapayKey,
+      sandbox: true,
+      paymentmethod: 'momo',
+      phone: form.phone.replace(/\D/g, ''),
+      email: user.email || '',
+      name: user.name || '',
+      data: JSON.stringify({ type: 'devis_pro', userId: user.id }),
+      position: 'center',
+      theme: '#0a2472',
+    });
   };
 
   const demander = (e) => {
@@ -70,6 +121,11 @@ export default function SubscriptionTab({ sub }) {
           <Field label="Référence de la transaction (optionnel)">
             <input className="input" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} placeholder="Ex : ID du transfert MoMo" />
           </Field>
+          {kkiapayKey && (
+            <button type="button" className="btn btn-primary btn-block btn-lg" onClick={ouvrirKkiapay} disabled={!form.phone || kkiapayOuvert}>
+              <CreditCard size={18} /> {kkiapayOuvert ? 'Paiement KKiaPay ouvert…' : 'Payer avec KKiaPay (test)'}
+            </button>
+          )}
           <button type="submit" className="btn btn-accent btn-block btn-lg">
             <Crown size={18} /> J'ai payé — demander l'activation
           </button>
@@ -112,6 +168,11 @@ export default function SubscriptionTab({ sub }) {
         <span className="copy-block-value">{PAY_NUMBER}</span>
         <button type="button" className="btn btn-sm btn-outline" onClick={copyPayNumber}>Copier</button>
       </div>
+      {kkiapayKey && (
+        <button className="btn btn-primary btn-block" onClick={ouvrirKkiapay} disabled={!form.phone || kkiapayOuvert}>
+          <CreditCard size={16} /> {kkiapayOuvert ? 'Paiement KKiaPay ouvert…' : 'Renouveler avec KKiaPay (test)'}
+        </button>
+      )}
       <button className="btn btn-accent btn-block" onClick={() => { requestSubscription(user.id, { methode: 'momo', phone: user.phone || '', reference: '' }); setSubSent(true); }}>
         <Crown size={16} /> J'ai payé — demander le renouvellement (+30 jours)
       </button>
