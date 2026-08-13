@@ -20,7 +20,7 @@ import DangerZone from '../../components/DangerZone';
 const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText };
 const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document' };
 const EMPTY_COURSE = { title: '', description: '', author: '', acces: 'tous', masque: false };
-const EMPTY_LECON = { title: '', type: 'video', url: '', content: '', duration: '', chaptersText: '' };
+const EMPTY_LECON = { title: '', description: '', type: 'video', url: '', content: '', duration: '', chaptersText: '', actionTitle: '', actionContent: '' };
 
 /** Contenu d'une leçon texte : paragraphes + listes (« - … »), sans dépendance. */
 function TexteContent({ content }) {
@@ -158,6 +158,9 @@ export default function FormationSection({ onBack }) {
       duration: leconForm.duration.trim(),
       url: leconForm.type === 'texte' ? '' : leconForm.url.trim(),
       content: leconForm.type === 'texte' ? leconForm.content : '',
+      description: leconForm.description.trim(),
+      actionTitle: leconForm.actionTitle.trim(),
+      actionContent: leconForm.actionContent.trim(),
       chapters: leconForm.type === 'video' ? parseChaptersText(leconForm.chaptersText) : [],
     };
     if (!data.title) return;
@@ -296,6 +299,16 @@ export default function FormationSection({ onBack }) {
       <div className={`school-layout ${mobileFocus ? 'focus-content' : ''}`}>
         {/* Programme (modules + leçons) */}
         <aside className="school-side">
+          <section className="school-profile-card" aria-label="Votre progression">
+            <div className="school-profile-avatar">{String(user.name || user.email || 'A').trim().slice(0, 1).toUpperCase()}</div>
+            <div className="school-profile-name">{user.name || user.email?.split('@')[0] || 'Apprenant'}</div>
+            <div className="school-profile-caption">Votre progression</div>
+            <div className="school-profile-progress">
+              <div className="funnel-track"><div className="funnel-bar" style={{ width: `${progress.pct}%`, background: progress.pct === 100 ? 'var(--success)' : 'var(--accent)' }} /></div>
+              <span>{progress.pct}%</span>
+            </div>
+          </section>
+          <div className="school-program-title">Programme du cours</div>
           {(course.modules || []).map((m, mi) => {
             const done_m = (m.lecons || []).filter((l) => done(l.id)).length;
             const ouvert = openModules.has(m.id);
@@ -329,7 +342,17 @@ export default function FormationSection({ onBack }) {
                       <button className="school-edit-btn" aria-label="Modifier la leçon"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLeconForm({ title: l.title, type: l.type || 'video', url: l.url || '', content: l.content || '', duration: l.duration || '', chaptersText: chaptersToText(l.chapters || []) });
+                          setLeconForm({
+                            title: l.title,
+                            description: l.description || '',
+                            type: l.type || 'video',
+                            url: l.url || '',
+                            content: l.content || '',
+                            duration: l.duration || '',
+                            chaptersText: chaptersToText(l.chapters || []),
+                            actionTitle: l.actionTitle || '',
+                            actionContent: l.actionContent || '',
+                          });
                           setLeconEdit({ moduleId: m.id, id: l.id });
                         }}>
                         <Pencil size={13} />
@@ -365,6 +388,7 @@ export default function FormationSection({ onBack }) {
                 </div>
               </div>
               <h2 className="school-content-title">{lecon.title}</h2>
+              {lecon.description && <p className="school-content-description">{lecon.description}</p>}
 
               {lecon.type === 'video' && embed && (
                 <div className="video-embed">
@@ -400,6 +424,22 @@ export default function FormationSection({ onBack }) {
                 <a className="btn btn-outline" href={lecon.url} target="_blank" rel="noopener noreferrer">
                   <FileText size={15} /> Ouvrir le document
                 </a>
+              )}
+
+              {(lecon.actionTitle || lecon.actionContent) && (
+                <section className="lesson-action">
+                  <div className="lesson-action-label">À retenir / Actions</div>
+                  {lecon.actionTitle && <h3>{lecon.actionTitle}</h3>}
+                  {lecon.actionContent && <div className="lesson-action-content"><TexteContent content={lecon.actionContent} /></div>}
+                </section>
+              )}
+
+              {next && (
+                <button className="lesson-next-card" type="button" onClick={() => setLeconId(next.id)}>
+                  <span className="lesson-next-label">Étape suivante</span>
+                  <strong>{next.title}</strong>
+                  <span className="lesson-next-cta">Ouvrir la leçon <ChevronRight size={16} /></span>
+                </button>
               )}
 
               <div className="lesson-nav">
@@ -438,6 +478,15 @@ export default function FormationSection({ onBack }) {
           <Field label="Titre du module *">
             <input className="input" required value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder="Ex : Dimensionner une installation" />
           </Field>
+          <Field label="Encadré « À retenir / Actions » (facultatif)">
+            <input className="input" value={leconForm.actionTitle}
+              onChange={(e) => setLeconForm({ ...leconForm, actionTitle: e.target.value })}
+              placeholder="Ex : Notez ou retenez bien" />
+            <textarea className="input lesson-action-input" rows="4" value={leconForm.actionContent}
+              onChange={(e) => setLeconForm({ ...leconForm, actionContent: e.target.value })}
+              placeholder={'Une action ou un rappel par ligne.\n- Exemple de point important'} />
+            <div className="field-hint">Cet encadré est affiché sous la vidéo ou le contenu. Les listes commencent par « - ».</div>
+          </Field>
           <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> Enregistrer</button>
         </form>
         {moduleEdit?.id !== 'new' && (
@@ -454,6 +503,11 @@ export default function FormationSection({ onBack }) {
         <form onSubmit={saveLecon}>
           <Field label="Titre *">
             <input className="input" required value={leconForm.title} onChange={(e) => setLeconForm({ ...leconForm, title: e.target.value })} placeholder="Ex : Choisir l'onduleur" />
+          </Field>
+          <Field label="Introduction de la leçon">
+            <textarea className="input" rows="2" value={leconForm.description}
+              onChange={(e) => setLeconForm({ ...leconForm, description: e.target.value })}
+              placeholder="Une brève introduction qui apparaît sous le titre." />
           </Field>
           <div className="form-row-2">
             <Field label="Type">
