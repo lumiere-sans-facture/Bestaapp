@@ -2134,3 +2134,34 @@ form .login-link { width: 100%; margin-top: 4px; }
   /* Le bouton d'action reste à droite quand le retour est masqué. */
   .partners-toolbar, .commissions-toolbar { justify-content: flex-end; }
 }
+
+
+/* Lecteur Formation : disposition guidée, inspirée d'un espace de cours. */
+.school-layout { gap: 20px; }
+.school-side { gap: 10px; }
+.school-profile-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 16px 16px; text-align: center; }
+.school-profile-avatar { display: flex; align-items: center; justify-content: center; width: 54px; height: 54px; margin: 0 auto 9px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; font-size: 1.125rem; font-weight: 800; }
+.school-profile-name { font-size: .9375rem; font-weight: 800; overflow-wrap: anywhere; }
+.school-profile-caption { margin-top: 3px; color: var(--text-secondary); font-size: .75rem; }
+.school-profile-progress { display: flex; align-items: center; gap: 8px; margin-top: 15px; font-size: .75rem; font-weight: 800; color: var(--primary); }
+.school-profile-progress .funnel-track { flex: 1; }
+.school-program-title { padding: 6px 4px 2px; font-size: .75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.school-content { padding: clamp(18px, 3vw, 34px); }
+.school-content-title { font-size: clamp(1.45rem, 3vw, 2.15rem); text-align: center; margin-bottom: 8px; }
+.school-content-description { max-width: 720px; margin: 0 auto 22px; text-align: center; color: var(--text-secondary); font-size: 1rem; line-height: 1.55; }
+.video-chapters { border: 1px solid rgba(10, 36, 114, .24); border-radius: 0; padding: 0 10px 10px; margin: 0 0 18px; }
+.video-chapters-title { margin: 0 -10px 8px; padding: 10px 12px; background: var(--primary-light); color: white; font-size: .875rem; text-transform: none; letter-spacing: 0; }
+.video-chapter { padding: 6px; }
+.video-chapter-time { background: transparent; padding: 0; color: var(--text-primary); font-size: .875rem; }
+.video-chapter.active .video-chapter-time { background: transparent; color: var(--primary); }
+.lesson-action { margin-top: 20px; border: 1px solid rgba(245, 166, 35, .42); background: #fffdf7; }
+.lesson-action-label { padding: 10px 13px; background: var(--accent); color: var(--primary-dark); font-weight: 800; }
+.lesson-action h3 { margin: 18px 18px 8px; text-align: center; font-size: 1.15rem; }
+.lesson-action-content { padding: 0 18px 8px; }
+.lesson-action .lecon-texte p, .lesson-action .lecon-texte li { font-size: .9rem; }
+.lesson-next-card { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; margin-top: 20px; padding: 15px; border: 1px solid var(--border); background: white; border-radius: var(--radius); cursor: pointer; color: var(--text-primary); transition: border-color .15s, background .15s; }
+.lesson-next-card:hover { border-color: var(--primary); background: rgba(10,36,114,.03); }
+.lesson-next-label { color: var(--text-secondary); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.lesson-next-cta { display: inline-flex; align-items: center; gap: 3px; margin-top: 3px; color: var(--primary); font-size: .8125rem; font-weight: 800; }
+.lesson-action-input { margin-top: 8px; }
+@media (min-width: 900px) { .school-layout { grid-template-columns: 320px minmax(0, 1fr); } .school-side { top: 84px; } }
