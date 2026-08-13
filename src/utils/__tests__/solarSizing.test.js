@@ -54,6 +54,20 @@ describe('calculateSystemSize', () => {
     expect(sizing.inverter.capacity).toBe(3);
   });
 
+  it('ne rejette pas une sortie onduleur quand le pic n’est pas mesuré', () => {
+    // En saisie directe ou par facture, il n’y a pas de liste d’appareils :
+    // le pic est inconnu. Deux Deye 12 kVA peuvent donc être retenus selon
+    // leurs limites PV cumulées, sans erreur de sortie basée sur les panneaux.
+    const deuxDeye = [{ id: 'deye-12', capacity: 12, maxPower: 12000, maxPvPower: 12000 }];
+    const resultat = calculateSystemSize(
+      { day: 60, night: 40 }, 'off-grid', 5, undefined, 1,
+      { peakLoad: 0, inverters: deuxDeye, configures: deuxDeye },
+    );
+    expect(resultat.inverterQuantite).toBe(2);
+    expect(resultat.inverterTientPic).toBe(true);
+    expect(resultat.inverterSuffisant).toBe(true);
+  });
+
   it('off-grid : prévoit des batteries ; on-grid : aucune', () => {
     expect(sizing.batteries.length).toBeGreaterThan(0);
     const onGrid = calculateSystemSize({ day: 5, night: 5 }, 'on-grid', 5.5);
