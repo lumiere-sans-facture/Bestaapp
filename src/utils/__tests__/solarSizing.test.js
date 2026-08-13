@@ -68,6 +68,23 @@ describe('calculateSystemSize', () => {
     expect(resultat.inverterSuffisant).toBe(true);
   });
 
+  it('sans pic mesuré, la puissance PV guide quand même le CHOIX du calibre', () => {
+    // L'indulgence du verdict ne doit pas neutraliser la sélection : sinon le
+    // plus petit onduleur du catalogue est retenu pour n'importe quel besoin.
+    const gamme = [
+      { id: 'p1', capacity: 1, maxPvPower: 1300 },
+      { id: 'p6', capacity: 6, maxPvPower: 7800 },
+      { id: 'p12', capacity: 12, maxPvPower: 15600 },
+    ];
+    const petit = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, undefined, 1,
+      { peakLoad: 0, inverters: gamme });
+    const gros = calculateSystemSize({ day: 30, night: 20 }, 'off-grid', 5.5, undefined, 1,
+      { peakLoad: 0, inverters: gamme });
+    // 2 480 Wc posés → 1 kVA insuffisant ; 23 500 Wc → il faut le plus grand.
+    expect(petit.inverter.capacity).toBe(6);
+    expect(gros.inverter.capacity).toBe(12);
+  });
+
   it('off-grid : prévoit des batteries ; on-grid : aucune', () => {
     expect(sizing.batteries.length).toBeGreaterThan(0);
     const onGrid = calculateSystemSize({ day: 5, night: 5 }, 'on-grid', 5.5);

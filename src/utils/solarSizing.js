@@ -168,6 +168,18 @@ export const CALIBRES_KVA = [1, 2, 3, 3.5, 5, 6, 8, 10, 12, 15, 20, 30];
 export const calibreRequis = (sortieW) => CALIBRES_KVA.find((k) => k * 1000 * FACTEUR_PUISSANCE >= sortieW)
   || Math.ceil(sortieW / (1000 * FACTEUR_PUISSANCE));
 
+/**
+ * Critère servant à CHOISIR un onduleur. Sans pic mesuré (saisie directe ou
+ * facture), la puissance PV posée en tient lieu : c'est un repère imparfait,
+ * mais s'en priver ferait retenir le plus petit modèle du catalogue pour une
+ * installation de plusieurs dizaines de kWh. Le VERDICT affiché, lui, reste
+ * indulgent (voir onduleurTientLePic) : on ne reproche pas à un onduleur de
+ * ne pas tenir un pic que personne n'a mesuré.
+ */
+const critereDeChoix = (critere = {}) => (critere.peakLoad > 0
+  ? critere
+  : { ...critere, peakLoad: critere.pvPower || 0 });
+
 /** L'onduleur tient-il le pic de consommation, marge comprise ? */
 export const onduleurTientLePic = (inv, { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin } = {}) =>
   // En saisie directe/facture, aucun appareil n'est listé : on ne connaît pas
@@ -211,6 +223,7 @@ export const onduleursEnParallele = (inv, n = 1, configures = []) => {
  * @returns {{modele:object, quantite:number, suffisant:boolean}|null}
  */
 export const resoudreOnduleur = (options = [], critere = {}, { prefere = null } = {}) => {
+  const choix = critereDeChoix(critere);
   const liste = [...options].sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
   const escalade = [
     ...(prefere ? [{ modele: prefere, quantite: 1 }, { modele: prefere, quantite: MAX_ONDULEURS }] : []),
@@ -219,7 +232,7 @@ export const resoudreOnduleur = (options = [], critere = {}, { prefere = null } 
   ];
   if (!escalade.length) return null;
   const convient = ({ modele, quantite }) =>
-    onduleurSuffisant(onduleursEnParallele(modele, quantite, critere.configures), critere);
+    onduleurSuffisant(onduleursEnParallele(modele, quantite, choix.configures), choix);
   const choisi = escalade.find(convient);
   return choisi ? { ...choisi, suffisant: true } : { ...escalade[escalade.length - 1], suffisant: false };
 };
