@@ -917,6 +917,7 @@ export default function Plus() {
               phone={subForm.phone}
               label="Payer avec KKiaPay (test)"
               disabled={!subForm.phone}
+              onNumero={(numero) => setSubForm({ ...subForm, phone: numero })}
               onPaid={(reference) => {
                 requestSubscription(user.id, { ...subForm, methode: 'kkiapay', reference });
                 setSubSent(true);

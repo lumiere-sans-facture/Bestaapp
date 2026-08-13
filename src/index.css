@@ -1039,6 +1039,27 @@ form .login-link { width: 100%; margin-top: 4px; }
   .school-side { position: sticky; top: 16px; }
 }
 
+/* Bac à sable KKiaPay : numéros de test, cliquables pour remplir le champ. */
+.kkiapay-sandbox {
+  margin-top: 10px; padding: 10px 12px;
+  border: 1px dashed var(--border); border-radius: 10px; background: var(--bg);
+}
+.kkiapay-sandbox-titre {
+  display: flex; align-items: center; gap: 5px; margin-bottom: 8px;
+  font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-secondary);
+}
+.kkiapay-sandbox-liste { display: flex; flex-direction: column; gap: 6px; }
+.kkiapay-sandbox-num {
+  display: flex; flex-direction: column; gap: 1px; text-align: left;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: white; cursor: pointer; transition: border-color 0.15s ease;
+}
+.kkiapay-sandbox-num:hover:not(:disabled) { border-color: var(--primary); }
+.kkiapay-sandbox-num:disabled { cursor: default; }
+.kkiapay-sandbox-numero { font-weight: 700; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.kkiapay-sandbox-scenario { font-size: 0.6875rem; color: var(--text-secondary); }
+
 /* Fiche produit (gestion catalogue) */
 .photo-field { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 18px; }
 .photo-preview {
