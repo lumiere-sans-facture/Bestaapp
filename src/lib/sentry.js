@@ -16,16 +16,33 @@
 //
 // Sans VITE_SENTRY_DSN, ce module ne fait rien du tout : le journal maison
 // (/api/erreur) reste seul en service.
-import { nettoyerEvenementSentry } from '../utils/journalErreurs';
+import { dsnValide, nettoyerEvenementSentry } from '../utils/journalErreurs';
 
-const DSN = import.meta.env.VITE_SENTRY_DSN;
+const DSN_BRUT = String(import.meta.env.VITE_SENTRY_DSN || '').trim();
+// Un DSN mal collé (tronqué, avec une espace, entre guillemets) ne fait rien
+// échouer : les plantages cesseraient juste d'arriver. On le refuse plutôt,
+// en le disant — et sans télécharger le SDK pour rien.
+const DSN = dsnValide(DSN_BRUT) ? DSN_BRUT : '';
+if (DSN_BRUT && !DSN) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[BestaSolar] VITE_SENTRY_DSN mal formé — Sentry est désactivé. '
+    + 'Attendu : https://<clé>@<organisation>.ingest.<région>.sentry.io/<projet>'
+  );
+}
 export const sentryConfigure = () => !!DSN;
 
 let promesse = null;
 
 /** Charge et initialise le SDK une seule fois. */
 function charger() {
-  if (!DSN) return Promise.resolve(null);
+  // Garde de COMPILATION : `import.meta.env.VITE_SENTRY_DSN` est remplacé par
+  // sa valeur au build. Sans DSN, la condition devient constante, la suite
+  // devient inatteignable, et le SDK disparaît entièrement du bundle. Tester
+  // `DSN` (issu d'un appel de fonction) ne le permettrait pas : le chunk
+  // serait livré même sans Sentry configuré.
+  if (!import.meta.env.VITE_SENTRY_DSN) return Promise.resolve(null);
+  if (!DSN) return Promise.resolve(null); // DSN présent mais mal formé
   if (promesse) return promesse;
   promesse = import('./sentryCore')
     .then((Sentry) => {

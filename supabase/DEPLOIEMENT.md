@@ -183,7 +183,13 @@ traduit la pile d'appel minifiée en vraies lignes de code, regroupe les
 occurrences et alerte par e-mail à la première apparition d'un bug.
 
 1. Créer un projet sur [sentry.io](https://sentry.io) (offre gratuite).
-2. Copier le DSN dans `VITE_SENTRY_DSN` (Vercel).
+2. Copier le DSN dans `VITE_SENTRY_DSN` (Vercel). Il est long — 80 à 100
+   caractères, de la forme
+   `https://<clé>@<organisation>.ingest.<région>.sentry.io/<projet>` — et
+   entièrement **public** : il finit de toute façon dans le code JavaScript
+   livré au navigateur. Le copier en entier, sans guillemets ni espace : un
+   DSN tronqué est refusé par l'app (avertissement dans la console) plutôt que
+   d'échouer en silence.
 3. Pour les source maps — sans lesquelles l'intérêt principal disparaît :
    créer un jeton (*Settings → Auth Tokens*, portée `project:releases`) et
    déclarer `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`.

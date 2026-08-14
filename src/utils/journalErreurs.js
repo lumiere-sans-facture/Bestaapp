@@ -131,6 +131,17 @@ export const nettoyerEvenementSentry = (evenement) => {
 };
 
 /**
+ * Un DSN Sentry est-il complet ?
+ *
+ * Il est long (80 à 100 caractères) et se copie à la main : tronqué d'un
+ * caractère, ou collé avec une espace, il ne provoque AUCUNE erreur visible —
+ * les plantages cessent simplement d'arriver, sans que rien ne le dise. On
+ * vérifie donc sa forme : protocole, clé publique, hôte, numéro de projet.
+ */
+export const dsnValide = (dsn) =>
+  /^https:\/\/[0-9a-z]+@[\w.-]+\.sentry\.io\/\d+$/i.test(String(dsn || '').trim());
+
+/**
  * Message de signalement prêt pour WhatsApp. L'utilisateur décrit ce qu'il
  * faisait ; le contexte technique est déjà là, sinon il manque toujours.
  */

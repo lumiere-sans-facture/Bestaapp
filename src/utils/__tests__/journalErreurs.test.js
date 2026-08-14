@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   nettoyer, signature, codeErreur, appareilResume, construireRapport, messageSignalement,
-  nettoyerEvenementSentry,
+  nettoyerEvenementSentry, dsnValide,
 } from '../journalErreurs';
 
 describe('nettoyer', () => {
@@ -151,5 +151,26 @@ describe('nettoyerEvenementSentry', () => {
 
   it('supporte une entrée vide', () => {
     expect(nettoyerEvenementSentry(null)).toBeNull();
+  });
+});
+
+describe('dsnValide', () => {
+  it('accepte un DSN Sentry complet', () => {
+    expect(dsnValide('https://a1b2c3d4e5f6@o123456.ingest.us.sentry.io/7654321')).toBe(true);
+    expect(dsnValide('https://abc123@o1.ingest.de.sentry.io/42')).toBe(true);
+    expect(dsnValide('  https://abc123@o1.ingest.de.sentry.io/42  ')).toBe(true); // espaces au collage
+  });
+
+  it('REFUSE un DSN tronqué — l’erreur la plus probable au copier-coller', () => {
+    expect(dsnValide('https://a1b2c3d4e5f6@o123456.ingest.us.sentry.io')).toBe(false);  // projet manquant
+    expect(dsnValide('a1b2c3d4e5f6@o123456.ingest.us.sentry.io/7654321')).toBe(false);  // protocole manquant
+    expect(dsnValide('https://o123456.ingest.us.sentry.io/7654321')).toBe(false);       // clé manquante
+  });
+
+  it('refuse le vide et les valeurs fantaisistes', () => {
+    expect(dsnValide('')).toBe(false);
+    expect(dsnValide(null)).toBe(false);
+    expect(dsnValide('à remplir')).toBe(false);
+    expect(dsnValide('https://abc@exemple.com/1')).toBe(false); // pas un hôte Sentry
   });
 });
