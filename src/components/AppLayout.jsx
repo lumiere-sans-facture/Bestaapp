@@ -43,6 +43,7 @@ const plusSections = (user) => [
     { path: '/plus/kits', label: 'Mes kits', icon: Package },
     { path: '/plus/inverters', label: 'Onduleurs', icon: Cpu },
     { path: '/plus/pompekits', label: 'Kits pompage', icon: Droplets },
+    { path: '/plus/paiements', label: 'Moyens de paiement', icon: CreditCard },
     ...(!isSupabaseConfigured || user.is_platform_admin
       ? [{ path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown }] : []),
     { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },
