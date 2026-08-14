@@ -7,11 +7,17 @@ import { ModeProvider, useMode } from './context/ModeContext';
 import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
 import AppLayout from './components/AppLayout';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import Login from './screens/Login';
+import { installerFiletsGlobaux } from './lib/rapportErreur';
 
 // Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
 captureRefFromUrl();
+
+// Erreurs hors React (minuteurs, gestionnaires d'événements) et promesses
+// rejetées sans `catch` : installées au chargement, avant tout rendu.
+installerFiletsGlobaux();
 
 // Découpage par route : chaque écran est un chunk chargé à la demande, pour
 // alléger le bundle initial (parse/eval plus rapide au démarrage — déterminant
@@ -130,10 +136,14 @@ function ModeSwitch() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    // Le filet enveloppe TOUT, y compris les fournisseurs de contexte : une
+    // erreur dans l'un d'eux plantait l'app entière sans laisser de trace.
+    <AppErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </AppErrorBoundary>
   );
 }

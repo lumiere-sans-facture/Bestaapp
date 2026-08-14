@@ -40,6 +40,7 @@ Dans **SQL Editor** du dashboard Supabase :
 | 3 | `multitenant.sql` | Organisations, isolation par entreprise (RLS), inscription self-service, codes d'invitation, verrou serveur des abonnements |
 | 4 | `temps-reel.sql` | Diffusion immédiate des changements à toute l'équipe (à rejouer après l'ajout d'une table) |
 | 5 | `paiements.sql` | Moyens de paiement configurables depuis l'espace gérant (clés PUBLIQUES uniquement) |
+| 6 | `erreurs.sql` | Journal des plantages — sans lui, aucune panne ne vous remonte |
 
 Les scripts sont idempotents (ré-exécutables sans danger) — **à une
 exception près** : une fois `multitenant.sql` passé, ne PAS rejouer
@@ -151,6 +152,41 @@ demande son vrai statut à KkiaPay. Un appel forgé ne crédite donc rien.
 **Si la vérification n'est pas configurée** (clés absentes), l'app le détecte
 et retombe sur la validation manuelle par le gérant, comme avant. Rien ne
 casse ; l'abonnement demande simplement une validation humaine.
+
+## 8. Journal des plantages
+
+Sans lui, un écran qui plante chez un technicien reste invisible : l'utilisateur
+voit un message, referme, et personne n'est prévenu.
+
+Chaque plantage produit un **code court** (« ERR-7F3A »), identique pour toutes
+les occurrences du même bug. L'utilisateur le voit à l'écran et peut le dicter ;
+vous le retrouvez en base.
+
+Ce qui est capté : erreurs d'affichage React, erreurs hors React (minuteurs,
+gestionnaires d'événements) et promesses rejetées sans `catch`. Les rapports
+sont mis en **file d'attente sur l'appareil** et repartent au retour du réseau —
+un technicien plante souvent là où il n'a pas de connexion.
+
+⚠️ **Aucune donnée personnelle n'y entre.** Noms, téléphones, e-mails, clés et
+jetons sont remplacés par des marqueurs (`[tel]`, `[email]`, `[cle]`) — deux
+fois : sur l'appareil, puis à la réception. `/api/erreur` est volontairement
+ouverte (un plantage survient souvent avant même la lecture de la session), donc
+le serveur ne fait jamais confiance à ce qu'il reçoit. La table n'est lisible
+par personne depuis le navigateur : seul le `service_role` y accède.
+
+**Exploitation** — dans SQL Editor, les requêtes prêtes figurent en bas de
+`erreurs.sql`. La plus utile :
+
+```sql
+select code, count(*) as occurrences, count(distinct user_id) as comptes,
+       max(recu_le) as dernier, max(message) as exemple
+from public.erreurs
+where recu_le > now() - interval '7 days'
+group by code order by occurrences desc limit 20;
+```
+
+Le journal fonctionne sans `SUPABASE_SERVICE_ROLE_KEY`, mais n'enregistre alors
+rien : l'écran d'erreur et le signalement WhatsApp restent opérationnels.
 
 ## Ce que fait l'app selon la configuration
 

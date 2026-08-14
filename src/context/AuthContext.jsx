@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { users } from '../data/seed';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { setContexteErreur } from '../lib/rapportErreur';
 import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
 import { getActiveRef } from '../utils/referral';
 
@@ -42,6 +43,14 @@ export function AuthProvider({ children }) {
     if (profile?.org_id) org = await fetchMyOrg();
     // Le type (interne/pro) conditionne la sync du catalogue partagé.
     setSyncOrg(profile?.org_id, org?.kind);
+    // Les rapports d'erreur portent désormais l'identifiant du compte et de
+    // l'entreprise (jamais le nom ni le téléphone) : sans eux, impossible de
+    // savoir qui est bloqué.
+    setContexteErreur({
+      userId: profile?.id || null,
+      orgId: profile?.org_id || null,
+      role: profile?.role || null,
+    });
     setUser(org ? { ...profile, org } : profile);
   };
 
@@ -113,6 +122,9 @@ export function AuthProvider({ children }) {
     );
     if (!found) return false;
     const { password: _pw, ...safeUser } = found;
+    // Mode local (démo) : le contexte d'erreur se renseigne aussi ici, sinon
+    // un plantage en démonstration remonterait sans savoir qui l'a vécu.
+    setContexteErreur({ userId: safeUser.id, orgId: null, role: safeUser.role });
     setUser(safeUser);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(safeUser));
     return true;
@@ -203,6 +215,9 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     if (isSupabaseConfigured) supabase.auth.signOut();
+    // Le compte quitte l'app : les rapports suivants ne doivent plus lui être
+    // attribués.
+    setContexteErreur({ userId: null, orgId: null, role: null });
     setUser(null);
     setSyncOrg(null);
     localStorage.removeItem(STORAGE_KEY);
