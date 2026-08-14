@@ -1,5 +1,5 @@
 import { lazy, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
@@ -10,6 +10,7 @@ import AppLayout from './components/AppLayout';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import Login from './screens/Login';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
+import { installerAnalytique, suivrePage } from './lib/analytique';
 
 // Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
@@ -18,6 +19,8 @@ captureRefFromUrl();
 // Erreurs hors React (minuteurs, gestionnaires d'événements) et promesses
 // rejetées sans `catch` : installées au chargement, avant tout rendu.
 installerFiletsGlobaux();
+// Analytique : filets d'envoi (retour du réseau, fermeture de l'onglet).
+installerAnalytique();
 
 // Découpage par route : chaque écran est un chunk chargé à la demande, pour
 // alléger le bundle initial (parse/eval plus rapide au démarrage — déterminant
@@ -60,6 +63,10 @@ function usePreloadScreens() {
 function AppRoutes() {
   const { user, isLoading, recovery } = useAuth();
   const navigate = useNavigate();
+  // Page vue : UN SEUL point d'émission, à la racine des routes. Le chemin est
+  // normalisé (« /clients/c-4f2a » → « /clients/:id ») avant tout envoi.
+  const { pathname } = useLocation();
+  useEffect(() => { suivrePage(pathname); }, [pathname]);
 
   // Une session neuve repart de l'accueil. L'app est une PAGE UNIQUE : sans
   // cela, l'adresse ouverte par un compte survit à sa déconnexion et le compte

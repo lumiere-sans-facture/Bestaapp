@@ -8,6 +8,7 @@ import KkiapayButton from '../../../components/KkiapayButton';
 import { formatCFA, formatDate } from '../../../utils/format';
 import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft } from '../../../utils/subscription';
 import { PAY_NUMBER } from '../../../config/company';
+import { suivre, EVENEMENTS } from '../../../lib/analytique';
 
 /**
  * Onglet « Mon abonnement » : trois états.
@@ -44,6 +45,7 @@ export default function SubscriptionTab({ sub }) {
       return;
     }
     if (verdict.active) {
+      suivre(EVENEMENTS.PAIEMENT_VERIFIE, { objet: 'abonnement', montant: SUBSCRIPTION_PRICE });
       activerAbonnementVerifie(user.id, { reference, montant: SUBSCRIPTION_PRICE, dateFin: verdict.dateFin });
       setSubSent(true);
       toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — abonnement activé.');

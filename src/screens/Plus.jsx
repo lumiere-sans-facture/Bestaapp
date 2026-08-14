@@ -35,6 +35,7 @@ import DiagnosticCard from '../components/DiagnosticCard';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
 import { reconcileMissingCommissions } from '../utils/commissionSync';
 import { MODES_RETRAIT, ETATS_COMMISSION, commissionsEngagees, etatCommission } from '../utils/payouts';
+import { suivre, EVENEMENTS } from '../lib/analytique';
 
 export default function Plus() {
   const { user, logout, refreshOrg } = useAuth();
@@ -142,6 +143,7 @@ export default function Plus() {
       return;
     }
     if (verdict.active) {
+      suivre(EVENEMENTS.PAIEMENT_VERIFIE, { objet: 'abonnement', montant: SUBSCRIPTION_PRICE });
       activerAbonnementVerifie(user.id, { reference, montant: SUBSCRIPTION_PRICE, dateFin: verdict.dateFin });
       setSubSent(true);
       toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — abonnement activé.');

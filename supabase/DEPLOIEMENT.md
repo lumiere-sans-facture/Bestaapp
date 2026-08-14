@@ -94,6 +94,7 @@ sont actives, et tester une restauration une fois avant le lancement.
 | `KKIAPAY_PRIVATE_KEY`, `KKIAPAY_SECRET` | serveur | vérification des paiements KkiaPay |
 | `SUPABASE_SERVICE_ROLE_KEY` | serveur | activation de l'abonnement après paiement vérifié |
 | `VITE_SENTRY_DSN` | navigateur | suivi des plantages (valeur publique) |
+| `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` | navigateur | analytique produit (clé de projet, publique) |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | build | envoi des source maps — sans elles, les piles restent illisibles |
 | `CINETPAY_API_KEY` | serveur | idem, si CinetPay est branché un jour |
 | `FEDAPAY_SECRET_KEY` | serveur | idem, si FedaPay est branché un jour |
@@ -240,6 +241,47 @@ group by code order by occurrences desc limit 20;
 
 Le journal fonctionne sans `SUPABASE_SERVICE_ROLE_KEY`, mais n'enregistre alors
 rien : l'écran d'erreur et le signalement WhatsApp restent opérationnels.
+
+## 9. Analytique produit (PostHog)
+
+Répond à « par où passent les utilisateurs », là où Sentry répond à « où ça
+casse ». Deux besoins distincts, deux outils.
+
+**Ce qui est mesuré** — une liste fermée d'événements
+(`src/utils/analytique.js`), pas de capture automatique :
+
+| Événement | Quand |
+|---|---|
+| `page_vue` | changement d'écran, chemin normalisé |
+| `devis_cree` | création d'un devis (montant, type) |
+| `commande_creee` | commande boutique (montant, nombre d'articles) |
+| `abonnement_demande` | demande d'abonnement Devis Pro |
+| `paiement_verifie` | paiement confirmé par le serveur |
+| `lecon_terminee` | progression en formation |
+| `ecran_plante` | l'écran d'erreur s'est affiché |
+
+**Trois décisions, et pourquoi :**
+
+- **Pas de SDK.** `posthog-js` pèse une cinquantaine de kilooctets et sa force
+  est la capture automatique. Nous n'en voulons pas : les événements partent
+  par une simple requête HTTP. Coût dans le bundle : **zéro**.
+- **Pas de capture automatique, pas de rejeu de session.** Ils filmeraient les
+  coordonnées des clients de vos abonnés, et feraient payer la donnée mobile à
+  des techniciens en tournée.
+- **Chemins normalisés.** `/clients/c-4f2a-9b` devient `/clients/:id`. Sans
+  cela, la liste des pages vues serait l'annuaire des clients.
+
+**Ce qui ne part jamais** : aucun nom, aucun téléphone, aucun e-mail. Les
+propriétés textuelles passent par le même nettoyage que les rapports d'erreur,
+et les objets ou tableaux sont écartés — trop faciles à remplir d'une fiche
+client entière. L'identité est l'identifiant interne du compte, rien d'autre.
+
+**Hors-ligne** : les événements sont mis en file sur l'appareil et partent par
+lots (toutes les 15 s au plus, ou à la fermeture de l'écran via `sendBeacon`).
+
+**Vérifier** : *Plus → Diagnostic* affiche « PostHog actif » ou « Non
+configurée ». Côté PostHog, l'onglet *Activity* montre les événements en
+direct — naviguez entre deux écrans de l'app, `page_vue` doit apparaître.
 
 ## Ce que fait l'app selon la configuration
 

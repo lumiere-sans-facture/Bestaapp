@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { users } from '../data/seed';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { setContexteErreur } from '../lib/rapportErreur';
+import { setContexteAnalytique } from '../lib/analytique';
 import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
 import { getActiveRef } from '../utils/referral';
 
@@ -51,6 +52,7 @@ export function AuthProvider({ children }) {
       orgId: profile?.org_id || null,
       role: profile?.role || null,
     });
+    setContexteAnalytique({ distinctId: profile?.id || null });
     setUser(org ? { ...profile, org } : profile);
   };
 
@@ -125,6 +127,7 @@ export function AuthProvider({ children }) {
     // Mode local (démo) : le contexte d'erreur se renseigne aussi ici, sinon
     // un plantage en démonstration remonterait sans savoir qui l'a vécu.
     setContexteErreur({ userId: safeUser.id, orgId: null, role: safeUser.role });
+    setContexteAnalytique({ distinctId: safeUser.id });
     setUser(safeUser);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(safeUser));
     return true;
@@ -218,6 +221,7 @@ export function AuthProvider({ children }) {
     // Le compte quitte l'app : les rapports suivants ne doivent plus lui être
     // attribués.
     setContexteErreur({ userId: null, orgId: null, role: null });
+    setContexteAnalytique({ distinctId: null });
     setUser(null);
     setSyncOrg(null);
     localStorage.removeItem(STORAGE_KEY);

@@ -6,6 +6,7 @@
 // gérant valide : la commission ne naît qu'à la validation.
 import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForDevis, rattacherCommissionsClient } from '../../utils/commissionSync';
+import { suivre, EVENEMENTS } from '../../lib/analytique';
 import { devisStage, etapeDuClient, prochainNumeroDevis } from '../../utils/affaires';
 
 // L'issue d'un devis met à jour la fiche du CLIENT : son activité (indicateur
@@ -84,8 +85,12 @@ export function createDevisActions(setState) {
     // Le devis porte la référence du partenaire apporteur : c'est par lui
     // que le parrainage est tracé. Sans partenaire explicite, l'attribution
     // d'affiliation active rattache le devis (conversion enregistrée au registre).
-    addDevis: (devis) =>
-      setState((s) => {
+    addDevis: (devis) => {
+      // Hors du réducteur : React peut le ré-exécuter (StrictMode), ce qui
+      // compterait l'événement deux fois. Aucune donnée client n'y transite —
+      // un montant et un type, rien d'autre.
+      suivre(EVENEMENTS.DEVIS_CREE, { total: Number(devis.total) || 0, type: devis.type || '' });
+      return setState((s) => {
         const now = new Date();
         // Numéro DÉDUIT des devis existants (répliqués), pas d'un compteur
         // local : deux appareils ne peuvent plus produire le même numéro.
@@ -147,7 +152,8 @@ export function createDevisActions(setState) {
             return next;
           }),
         };
-      }),
+      });
+    },
 
     // ---- Suivi devis par devis : chaque devis a sa propre issue ----
     // Le vendeur applique l'étape immédiatement — le « gagné » génère la

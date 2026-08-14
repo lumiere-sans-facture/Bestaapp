@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import { AlertTriangle, RotateCcw, MessageCircle } from 'lucide-react';
 import { signalerErreur } from '../lib/rapportErreur';
+import { suivre, EVENEMENTS } from '../lib/analytique';
 import { messageSignalement } from '../utils/journalErreurs';
 import { whatsappLink } from '../utils/paiement';
 import { COMPANY } from '../config/company';
@@ -38,6 +39,9 @@ export default class AppErrorBoundary extends Component {
       origine: 'rendu',
       ecran: typeof window !== 'undefined' ? window.location?.pathname : '',
     });
+    // Combien d'utilisateurs voient réellement cet écran ? Le journal compte
+    // les plantages ; ceci compte les personnes bloquées.
+    suivre(EVENEMENTS.ECRAN_PLANTE, { code: rapport.code, ecran: rapport.ecran });
     this.setState({ rapport });
   }
 

@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Analytique PostHog : parcours utilisateur mesuré sans SDK, sans capture automatique, chemins anonymisés
 - Plus → Diagnostic : état réel du suivi des erreurs et bouton d'envoi d'une erreur de test
 - Sentry branché : piles d'appel lisibles, chargé seulement au premier plantage (27 Ko), sans fil d'Ariane
 - Plantages : écran clair avec code de référence, journal serveur, signalement WhatsApp pré-rempli

@@ -1,6 +1,7 @@
 // Domaine boutique : catalogue produits et commandes. Le stock est décrémenté
 // à la confirmation d'une commande et restitué à l'annulation (couplage assumé).
 import { prochainNumeroCommande } from '../../utils/affaires';
+import { suivre, EVENEMENTS } from '../../lib/analytique';
 export function createCatalogueActions(setState) {
   return {
     // ---- Gestion du catalogue boutique (gérant) ----
@@ -24,6 +25,12 @@ export function createCatalogueActions(setState) {
 
     // Commande payée en ligne (Mobile Money — stub en attendant l'agrégateur)
     addOrder: (order) => {
+      // Montant et nombre d'articles : de quoi mesurer le parcours d'achat,
+      // sans rien qui identifie l'acheteur ni ce qu'il a commandé.
+      suivre(EVENEMENTS.COMMANDE_CREEE, {
+        total: Number(order.total) || 0,
+        articles: (order.items || []).length,
+      });
       const now = new Date();
       let full = null;
       setState((s) => {

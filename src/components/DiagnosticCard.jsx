@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Stethoscope, CheckCircle2, AlertTriangle, Send } from 'lucide-react';
 import { signalerErreur } from '../lib/rapportErreur';
 import { sentryConfigure } from '../lib/sentry';
+import { analytiqueConfiguree } from '../lib/analytique';
 import { useToast } from './Toast';
 
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
@@ -25,6 +26,7 @@ export default function DiagnosticCard() {
   const [dernier, setDernier] = useState(null);
   const toast = useToast();
   const sentryActif = sentryConfigure();
+  const analytiqueActive = analytiqueConfiguree();
 
   const tester = () => {
     // signalerErreur consigne et transmet SANS lever : l'app continue de
@@ -52,6 +54,16 @@ export default function DiagnosticCard() {
               <span className="diag-ok"><CheckCircle2 size={14} /> Sentry actif</span>
             ) : (
               <span className="diag-partiel"><AlertTriangle size={14} /> Journal serveur seul</span>
+            )}
+          </span>
+        </div>
+        <div className="sheet-row">
+          <span className="sheet-label">Analytique</span>
+          <span className="sheet-value">
+            {analytiqueActive ? (
+              <span className="diag-ok"><CheckCircle2 size={14} /> PostHog actif</span>
+            ) : (
+              <span className="diag-partiel"><AlertTriangle size={14} /> Non configurée</span>
             )}
           </span>
         </div>
