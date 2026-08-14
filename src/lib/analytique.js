@@ -15,8 +15,15 @@
 import { construireEvenement, cheminNormalise, EVENEMENTS } from '../utils/analytique';
 
 const CLE = String(import.meta.env.VITE_POSTHOG_KEY || '').trim();
-// Région du projet : « eu » par défaut (données hébergées en Europe).
-const HOTE = String(import.meta.env.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com').trim().replace(/\/$/, '');
+// RÉGION DU PROJET. PostHog héberge en « eu » ou en « us », et un projet créé
+// dans l'une est inconnu de l'autre : viser la mauvaise région n'échoue pas
+// bruyamment, les événements disparaissent simplement. La valeur par défaut
+// ne peut donc être qu'un pari — d'où l'affichage de l'hôte réellement
+// utilisé dans Plus → Diagnostic, et le bouton de test qui rend le verdict.
+const HOTE = String(import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com').trim().replace(/\/$/, '');
+
+/** Destination réelle des événements — affichée au gérant. */
+export const hoteAnalytique = () => HOTE;
 
 const CLE_FILE = 'bestasolar_analytique_file';
 const MAX_FILE = 100;      // au-delà, on jette les plus anciens
@@ -107,6 +114,29 @@ export function suivrePage(chemin) {
   if (c === dernierChemin) return;
   dernierChemin = c;
   suivre(EVENEMENTS.PAGE_VUE, { chemin: c });
+}
+
+/**
+ * Envoi immédiat d'un événement de test, avec le verdict de PostHog.
+ *
+ * C'est la seule façon de distinguer « ça marche » de « ça part dans le
+ * vide » : une mauvaise région ou une clé erronée ne provoque aucun symptôme
+ * visible dans l'app.
+ * @returns {Promise<{ok: boolean, statut: number|string, hote: string}>}
+ */
+export async function testerAnalytique() {
+  if (!CLE) return { ok: false, statut: 'clé absente', hote: HOTE };
+  const evenement = construireEvenement(EVENEMENTS.PAGE_VUE, { chemin: '/test-diagnostic' }, contexte);
+  try {
+    const res = await fetch(`${HOTE}/e/`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ api_key: CLE, batch: [evenement] }),
+    });
+    return { ok: res.ok, statut: res.status, hote: HOTE };
+  } catch (e) {
+    return { ok: false, statut: e.message || 'réseau injoignable', hote: HOTE };
+  }
 }
 
 /** Filets d'envoi : retour du réseau, et fermeture de l'onglet. */

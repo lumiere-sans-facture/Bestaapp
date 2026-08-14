@@ -279,9 +279,23 @@ client entière. L'identité est l'identifiant interne du compte, rien d'autre.
 **Hors-ligne** : les événements sont mis en file sur l'appareil et partent par
 lots (toutes les 15 s au plus, ou à la fermeture de l'écran via `sendBeacon`).
 
-**Vérifier** : *Plus → Diagnostic* affiche « PostHog actif » ou « Non
-configurée ». Côté PostHog, l'onglet *Activity* montre les événements en
-direct — naviguez entre deux écrans de l'app, `page_vue` doit apparaître.
+⚠️ **La RÉGION doit correspondre au projet.** PostHog héberge en `eu` ou en
+`us`, et un projet créé dans l'une est inconnu de l'autre. Viser la mauvaise
+région ne provoque aucun symptôme : les événements disparaissent, et les
+statistiques restent simplement vides. La région se lit dans l'adresse de
+votre tableau de bord (`us.posthog.com` → `VITE_POSTHOG_HOST=https://us.i.posthog.com`).
+
+**Vérifier** : *Plus → Diagnostic* affiche l'état, **la destination réelle**
+des envois, et un bouton **« Tester l'envoi analytique »** qui montre la
+réponse de PostHog :
+
+| Réponse | Signification |
+|---|---|
+| `200` | tout fonctionne |
+| `401` | clé erronée, **ou mauvaise région** |
+| `404` | hôte incorrect |
+
+Côté PostHog, l'onglet *Activity* montre ensuite les événements en direct.
 
 ## Ce que fait l'app selon la configuration
 

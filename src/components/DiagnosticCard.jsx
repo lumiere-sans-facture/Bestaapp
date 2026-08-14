@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Stethoscope, CheckCircle2, AlertTriangle, Send } from 'lucide-react';
 import { signalerErreur } from '../lib/rapportErreur';
 import { sentryConfigure } from '../lib/sentry';
-import { analytiqueConfiguree } from '../lib/analytique';
+import { analytiqueConfiguree, hoteAnalytique, testerAnalytique } from '../lib/analytique';
 import { useToast } from './Toast';
 
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
@@ -24,9 +24,20 @@ const ENVIRONNEMENT = typeof __APP_ENV__ === 'string' ? __APP_ENV__ : 'test';
  */
 export default function DiagnosticCard() {
   const [dernier, setDernier] = useState(null);
+  const [verdictAnalytique, setVerdictAnalytique] = useState(null);
   const toast = useToast();
   const sentryActif = sentryConfigure();
   const analytiqueActive = analytiqueConfiguree();
+
+  // Envoi réel vers PostHog, et affichage de SA réponse : une mauvaise région
+  // (projet créé en « us », envois vers « eu ») ne se voit pas autrement.
+  const testerEnvoiAnalytique = async () => {
+    setVerdictAnalytique({ statut: '…' });
+    const r = await testerAnalytique();
+    setVerdictAnalytique(r);
+    toast(r.ok ? 'Événement de test accepté par PostHog.' : `PostHog a répondu : ${r.statut}`,
+      { type: r.ok ? 'success' : 'error' });
+  };
 
   const tester = () => {
     // signalerErreur consigne et transmet SANS lever : l'app continue de
@@ -67,6 +78,12 @@ export default function DiagnosticCard() {
             )}
           </span>
         </div>
+        {analytiqueActive && (
+          <div className="sheet-row">
+            <span className="sheet-label">Destination</span>
+            <span className="sheet-value paiement-mono">{hoteAnalytique().replace('https://', '')}</span>
+          </div>
+        )}
         <p className="text-sm text-secondary" style={{ margin: '8px 0 0' }}>
           {sentryActif
             ? 'Les plantages partent vers Sentry et vers le journal serveur. Le test ci-dessous vérifie toute la chaîne.'
@@ -76,6 +93,25 @@ export default function DiagnosticCard() {
         <button className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={tester}>
           <Send size={16} /> Envoyer une erreur de test
         </button>
+
+        {analytiqueActive && (
+          <button className="btn btn-outline btn-block" style={{ marginTop: 8 }} onClick={testerEnvoiAnalytique}>
+            <Send size={16} /> Tester l’envoi analytique
+          </button>
+        )}
+
+        {verdictAnalytique && (
+          <div className={`callout ${verdictAnalytique.ok ? '' : 'callout-danger'}`} role="status" style={{ marginTop: 12 }}>
+            <div className="callout-title">
+              <Stethoscope size={13} /> {verdictAnalytique.ok ? 'PostHog a accepté' : 'PostHog a refusé'}
+            </div>
+            <div className="text-sm">
+              Réponse <strong className="paiement-mono">{String(verdictAnalytique.statut)}</strong> depuis{' '}
+              <span className="paiement-mono">{verdictAnalytique.hote?.replace('https://', '')}</span>.
+              {!verdictAnalytique.ok && ' Vérifiez la clé et la RÉGION : un projet « us » ne reconnaît pas les envois vers « eu », et inversement.'}
+            </div>
+          </div>
+        )}
 
         {dernier && (
           <div className="callout" role="status" style={{ marginTop: 12 }}>
