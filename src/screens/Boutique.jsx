@@ -45,10 +45,10 @@ export default function Boutique() {
   const detailProduct = products.find((p) => p.id === detailId);
 
   const isManager = user.role === 'gerant';
-  // Le paiement en ligne alimente les commandes internes BestaSolar : réservé
-  // à l'organisation interne (en SaaS, les comptes externes consultent et
-  // créent leur devis ; la commande cross-entreprise viendra plus tard).
-  const canPayOnline = !user.org || user.org.kind === 'interne';
+  // La boutique est accessible aux techniciens : ils peuvent donc également
+  // payer leur panier en ligne. La commande garde l'identité de l'acheteur,
+  // ce qui permet son suivi, quelle que soit son organisation.
+  const canPayOnline = true;
   // Prix PUBLIC toujours — même prix que sur un devis, peu importe le rôle.
   const getPrice = (basePrice) => prixPublic(basePrice);
   const categoryLabel = (id) => productCategories.find((c) => c.id === id)?.label || '';
@@ -306,7 +306,7 @@ export default function Boutique() {
           </button>
           {canPayOnline ? (
             <button className="btn btn-outline btn-block" onClick={handlePayOnline}>
-              <Smartphone size={17} /> Commander en ligne
+              <Smartphone size={17} /> Commander et payer en ligne
             </button>
           ) : (
             // Masquer le bouton sans rien dire faisait passer une règle
@@ -393,7 +393,7 @@ export default function Boutique() {
       <Sheet
         open={!!payment}
         onClose={() => setPayment(null)}
-        title={payment === 'form' ? 'Commander' : 'Commande enregistrée'}
+        title={payment === 'form' ? 'Commander et payer' : 'Commande enregistrée'}
         subtitle={payment === 'form' ? `Total : ${formatCFA(cartTotal)}` : undefined}
       >
         {payment === 'form' ? (
@@ -426,7 +426,7 @@ export default function Boutique() {
               sur ce numéro.
             </div>
             <button type="submit" className="btn btn-primary btn-block">
-              <Smartphone size={17} /> Enregistrer ma commande · {formatCFA(cartTotal)}
+              <Smartphone size={17} /> Continuer vers le paiement · {formatCFA(cartTotal)}
             </button>
           </form>
         ) : payment && (
