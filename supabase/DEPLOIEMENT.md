@@ -55,6 +55,7 @@ droits, utiliser `temps-reel.sql`.
 | `temps-reel.sql` | Les changements d'un appareil n'apparaissent pas tout de suite sur les autres. |
 | `partage-formation.sql`, `nettoyage-doublons-formation.sql` | Cours de formation : partage du catalogue BestaSolar, purge des anciennes copies. |
 | `pompe-kits.sql` | Table des kits de pompage absente (installation antérieure à cette fonctionnalité). |
+| `organisation-interne.sql` | Le bouton « Commander en ligne » n'apparaît pas dans le panier : vérifie quelle entreprise porte `kind = 'interne'` (la seule à pouvoir encaisser pour BestaSolar) et permet de la désigner. |
 
 ## 3. Configuration Auth (dashboard Supabase)
 

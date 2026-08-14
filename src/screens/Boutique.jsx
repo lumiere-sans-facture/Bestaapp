@@ -304,10 +304,18 @@ export default function Boutique() {
           <button className="btn btn-accent btn-block" onClick={goToDevis}>
             <FileText size={17} /> Créer le devis
           </button>
-          {canPayOnline && (
+          {canPayOnline ? (
             <button className="btn btn-outline btn-block" onClick={handlePayOnline}>
               <Smartphone size={17} /> Commander en ligne
             </button>
+          ) : (
+            // Masquer le bouton sans rien dire faisait passer une règle
+            // métier pour une panne. Le motif compte plus que le bouton.
+            <div className="field-hint" style={{ textAlign: 'center' }}>
+              La commande en ligne encaisse pour BestaSolar : elle est réservée à son
+              équipe. {user.org?.name ? `Votre entreprise : ${user.org.name}.` : ''} Créez
+              un devis pour ce panier — le règlement se convient ensuite avec votre client.
+            </div>
           )}
         </div>
         <button
