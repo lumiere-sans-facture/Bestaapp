@@ -12,7 +12,12 @@
 //
 // LOCAL-FIRST : les événements sont mis en file sur l'appareil et partent par
 // lots quand le réseau revient. Un technicien hors ligne n'est pas invisible.
-import { construireEvenement, cheminNormalise, EVENEMENTS } from '../utils/analytique';
+import {
+  construireEvenement,
+  cheminNormalise,
+  EVENEMENTS,
+  problemeAnalytique as evaluerConfig,
+} from '../utils/analytique';
 
 const CLE = String(import.meta.env.VITE_POSTHOG_KEY || '').trim();
 // RÉGION DU PROJET. PostHog héberge en « eu » ou en « us », et un projet créé
@@ -22,14 +27,28 @@ const CLE = String(import.meta.env.VITE_POSTHOG_KEY || '').trim();
 // utilisé dans Plus → Diagnostic, et le bouton de test qui rend le verdict.
 const HOTE = String(import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com').trim().replace(/\/$/, '');
 
+// Évalué une fois : une variable d'environnement ne change pas en cours de vie.
+const PROBLEME = CLE ? evaluerConfig({ cle: CLE, hote: HOTE }) : null;
+
 /** Destination réelle des événements — affichée au gérant. */
 export const hoteAnalytique = () => HOTE;
+
+/** Ce qui empêche l'analytique de fonctionner, en clair, ou null. */
+export const problemeAnalytique = () => PROBLEME;
+
+if (PROBLEME && typeof console !== 'undefined') {
+  // Le gérant ne lit pas la console : c'est Plus → Diagnostic qui le lui dira.
+  // Cette trace sert au développeur, et évite un envoi vers notre propre
+  // serveur — un hôte non absolu est résolu comme un chemin relatif.
+  console.warn(`[analytique] configuration ignorée — ${PROBLEME}`);
+}
 
 const CLE_FILE = 'bestasolar_analytique_file';
 const MAX_FILE = 100;      // au-delà, on jette les plus anciens
 const DELAI_LOT = 15000;   // regroupement : un envoi toutes les 15 s au plus
 
-export const analytiqueConfiguree = () => !!CLE;
+/** Vraiment opérationnelle : clé présente ET configuration cohérente. */
+export const analytiqueConfiguree = () => !!CLE && !PROBLEME;
 
 let contexte = {
   distinctId: null,
@@ -58,7 +77,7 @@ const ecrireFile = (file) => {
  *   fait pour ça : le navigateur prend la charge et l'envoie sans la page.
  */
 export async function viderFileAnalytique({ beacon = false } = {}) {
-  if (!CLE) return;
+  if (!CLE || PROBLEME) return;
   const batch = lireFile();
   if (!batch.length || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
   const corps = JSON.stringify({ api_key: CLE, batch });
@@ -99,7 +118,7 @@ const programmerEnvoi = () => {
  * ignoré sans bruit (utils/analytique.js explique pourquoi).
  */
 export function suivre(nom, props = {}) {
-  if (!CLE) return;
+  if (!CLE || PROBLEME) return;
   const evenement = construireEvenement(nom, props, contexte);
   if (!evenement) return;
   ecrireFile([...lireFile(), evenement]);
@@ -126,6 +145,9 @@ export function suivrePage(chemin) {
  */
 export async function testerAnalytique() {
   if (!CLE) return { ok: false, statut: 'clé absente', hote: HOTE };
+  // On n'envoie pas une requête vouée à partir au mauvais endroit : sans hôte
+  // absolu, elle atterrirait sur notre propre serveur (réponse « 405 »).
+  if (PROBLEME) return { ok: false, statut: 'configuration invalide', hote: HOTE, probleme: PROBLEME };
   const evenement = construireEvenement(EVENEMENTS.PAGE_VUE, { chemin: '/test-diagnostic' }, contexte);
   try {
     const res = await fetch(`${HOTE}/e/`, {
@@ -141,7 +163,7 @@ export async function testerAnalytique() {
 
 /** Filets d'envoi : retour du réseau, et fermeture de l'onglet. */
 export function installerAnalytique() {
-  if (!CLE || typeof window === 'undefined') return;
+  if (!CLE || PROBLEME || typeof window === 'undefined') return;
   window.addEventListener('online', viderFileAnalytique);
   // `pagehide` est le seul événement fiable sur mobile pour capter une
   // fermeture : `beforeunload` ne se déclenche pas sur iOS.

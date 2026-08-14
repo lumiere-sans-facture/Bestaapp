@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Analytique : clé PostHog collée dans l'adresse détectée et nommée — c'était la cause du « 405 »
 - Diagnostic : destination des envois analytiques affichée et testable — une mauvaise région ne se voyait pas
 - Analytique PostHog : parcours utilisateur mesuré sans SDK, sans capture automatique, chemins anonymisés
 - Plus → Diagnostic : état réel du suivi des erreurs et bouton d'envoi d'une erreur de test

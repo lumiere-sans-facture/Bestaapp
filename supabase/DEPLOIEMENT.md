@@ -279,6 +279,24 @@ client entière. L'identité est l'identifiant interne du compte, rien d'autre.
 **Hors-ligne** : les événements sont mis en file sur l'appareil et partent par
 lots (toutes les 15 s au plus, ou à la fermeture de l'écran via `sendBeacon`).
 
+⚠️ **Deux clés existent dans PostHog, et une seule va dans l'app.**
+
+| Clé | Prefixe | Où |
+|---|---|---|
+| Clé de **projet** | `phc_…` | `VITE_POSTHOG_KEY` — publique, faite pour le navigateur |
+| Clé **personnelle** | `phx_…` | **nulle part ici** — c'est un mot de passe du compte |
+
+Une variable `VITE_` part telle quelle dans le bundle que chaque visiteur
+télécharge. Une clé `phx_` qui y arrive est publiée : il faut la **révoquer**
+dans PostHog (*Settings → Personal API keys*), pas seulement la retirer.
+
+⚠️ **`VITE_POSTHOG_HOST` est une ADRESSE, pas une clé.** Les deux variables se
+saisissent l'une après l'autre et s'intervertissent facilement. Une adresse qui
+n'est pas une URL absolue est traitée par le navigateur comme un chemin
+*relatif* : les événements partent alors sur notre propre serveur, qui répond
+`405 Method Not Allowed`. L'app détecte ce cas, cesse d'émettre et l'écrit dans
+*Plus → Diagnostic*.
+
 ⚠️ **La RÉGION doit correspondre au projet.** PostHog héberge en `eu` ou en
 `us`, et un projet créé dans l'une est inconnu de l'autre. Viser la mauvaise
 région ne provoque aucun symptôme : les événements disparaissent, et les
@@ -294,6 +312,7 @@ réponse de PostHog :
 | `200` | tout fonctionne |
 | `401` | clé erronée, **ou mauvaise région** |
 | `404` | hôte incorrect |
+| `405` | l'envoi n'est pas parti chez PostHog : `VITE_POSTHOG_HOST` n'est pas une URL |
 
 Côté PostHog, l'onglet *Activity* montre ensuite les événements en direct.
 

@@ -28,6 +28,58 @@ export const EVENEMENTS = {
 const NOMS = new Set(Object.values(EVENEMENTS));
 export const evenementValide = (nom) => NOMS.has(String(nom || ''));
 
+// ---------------------------------------------------------------------------
+// CONFIGURATION — deux variables, faciles à intervertir.
+//
+// VITE_POSTHOG_KEY et VITE_POSTHOG_HOST se collent l'une après l'autre dans
+// Vercel, et rien ne les distingue à l'œil. Interverties, l'adresse d'envoi
+// n'est plus une URL : le navigateur la traite alors comme un chemin RELATIF
+// et poste les événements sur notre propre serveur, qui répond « 405 ». Le
+// symptôme ne parle ni de clé ni de région — d'où ce diagnostic explicite.
+// ---------------------------------------------------------------------------
+
+const FORMAT_HOTE = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?$/i;
+
+/** Adresse d'envoi PostHog exploitable ? (URL absolue en https, sans chemin) */
+export const hoteAnalytiqueValide = (hote) =>
+  FORMAT_HOTE.test(String(hote || '').trim().replace(/\/+$/, ''));
+
+/** Clé de PROJET PostHog — publique par nature, faite pour le navigateur. */
+export const cleProjetValide = (cle) => /^phc_[A-Za-z0-9]{20,}$/.test(String(cle || '').trim());
+
+/**
+ * Clé PERSONNELLE PostHog (« phx_… ») : elle vaut un accès complet au compte.
+ * Elle n'a rien à faire dans une variable VITE_, qui part telle quelle dans
+ * le bundle téléchargé par chaque visiteur.
+ */
+export const estClePersonnelle = (cle) => /^phx_/i.test(String(cle || '').trim());
+
+const ressembleAUneCle = (valeur) => /^ph[a-z]_/i.test(String(valeur || '').trim());
+
+/**
+ * Ce qui cloche dans la configuration analytique, en clair, ou null si tout va
+ * bien. Aucune valeur n'est recopiée dans le message : l'une d'elles peut être
+ * un secret, et ce texte s'affiche à l'écran.
+ * @param {{cle?: string, hote?: string}} config
+ * @returns {string|null}
+ */
+export const problemeAnalytique = ({ cle = '', hote = '' } = {}) => {
+  const c = String(cle).trim();
+  const h = String(hote).trim();
+  if (!hoteAnalytiqueValide(h)) {
+    return ressembleAUneCle(h)
+      ? 'VITE_POSTHOG_HOST contient une clé au lieu d’une adresse : les deux variables sont inversées. VITE_POSTHOG_HOST doit valoir https://us.i.posthog.com (ou https://eu.i.posthog.com).'
+      : 'VITE_POSTHOG_HOST n’est pas une adresse valide. Attendu : https://us.i.posthog.com ou https://eu.i.posthog.com.';
+  }
+  if (estClePersonnelle(c)) {
+    return 'VITE_POSTHOG_KEY contient une clé PERSONNELLE (« phx_… ») : c’est un mot de passe, et il est parti dans le bundle. À révoquer dans PostHog, puis à remplacer par la clé de projet, qui commence par « phc_ ».';
+  }
+  if (c && !cleProjetValide(c)) {
+    return 'VITE_POSTHOG_KEY ne ressemble pas à une clé de projet PostHog (Settings → Project → Project API Key, elle commence par « phc_ »).';
+  }
+  return null;
+};
+
 /**
  * Chemin d'URL débarrassé de ses identifiants.
  * « /clients/c-4f2a-9b » → « /clients/:id », « /devis/12 » → « /devis/:id ».

@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   EVENEMENTS, evenementValide, cheminNormalise, proprietesSures, construireEvenement,
+  hoteAnalytiqueValide, cleProjetValide, estClePersonnelle, problemeAnalytique,
 } from '../analytique';
 
 describe('cheminNormalise', () => {
@@ -88,5 +89,62 @@ describe('construireEvenement', () => {
   it('nettoie les propriétés au passage', () => {
     const e = construireEvenement(EVENEMENTS.DEVIS_CREE, { note: 'client kossi@exemple.tg' }, {});
     expect(e.properties.note).toBe('client [email]');
+  });
+});
+
+// La panne réellement rencontrée : les deux variables Vercel interverties.
+// L'hôte n'étant plus une URL absolue, le navigateur poste sur notre propre
+// serveur, qui répond « 405 » — un message qui n'accuse ni la clé ni la région.
+describe('problemeAnalytique', () => {
+  const CLE_OK = 'phc_' + 'a'.repeat(40);
+
+  it('accepte une configuration correcte', () => {
+    expect(problemeAnalytique({ cle: CLE_OK, hote: 'https://us.i.posthog.com' })).toBeNull();
+    expect(problemeAnalytique({ cle: CLE_OK, hote: 'https://eu.i.posthog.com/' })).toBeNull();
+  });
+
+  it('détecte les variables inversées et le dit', () => {
+    const msg = problemeAnalytique({ cle: CLE_OK, hote: 'phx_zYK27qrKJq7KJ3F76XuBair6Ffq' });
+    expect(msg).toMatch(/inversées/);
+    expect(msg).toMatch(/VITE_POSTHOG_HOST/);
+  });
+
+  it('ne recopie jamais la valeur fautive dans le message', () => {
+    const secret = 'phx_zYK27qrKJq7KJ3F76XuBair6Ffq';
+    expect(problemeAnalytique({ cle: secret, hote: secret })).not.toContain(secret);
+    expect(problemeAnalytique({ cle: CLE_OK, hote: secret })).not.toContain(secret);
+  });
+
+  it('refuse un hôte relatif ou non https', () => {
+    expect(problemeAnalytique({ cle: CLE_OK, hote: 'us.i.posthog.com' })).toMatch(/adresse valide/);
+    expect(problemeAnalytique({ cle: CLE_OK, hote: 'http://us.i.posthog.com' })).toMatch(/adresse valide/);
+    expect(problemeAnalytique({ cle: CLE_OK, hote: '' })).toMatch(/adresse valide/);
+  });
+
+  it('refuse une clé personnelle — c’est un mot de passe dans le bundle', () => {
+    const msg = problemeAnalytique({ cle: 'phx_zYK27qrKJq7KJ3F76XuBair6Ffq', hote: 'https://us.i.posthog.com' });
+    expect(msg).toMatch(/PERSONNELLE/);
+    expect(msg).toMatch(/révoquer/);
+  });
+
+  it('signale une clé qui n’est pas une clé de projet', () => {
+    expect(problemeAnalytique({ cle: 'abc123', hote: 'https://us.i.posthog.com' })).toMatch(/phc_/);
+  });
+});
+
+describe('validation des valeurs analytiques', () => {
+  it('hoteAnalytiqueValide', () => {
+    expect(hoteAnalytiqueValide('https://eu.i.posthog.com')).toBe(true);
+    expect(hoteAnalytiqueValide('https://analytics.bestasolar.com:8443')).toBe(true);
+    expect(hoteAnalytiqueValide('https://posthog')).toBe(false);   // pas de domaine
+    expect(hoteAnalytiqueValide('phc_abc')).toBe(false);
+    expect(hoteAnalytiqueValide(null)).toBe(false);
+  });
+
+  it('distingue clé de projet et clé personnelle', () => {
+    expect(cleProjetValide('phc_' + 'x'.repeat(40))).toBe(true);
+    expect(cleProjetValide('phc_court')).toBe(false);
+    expect(estClePersonnelle('phx_abcdef')).toBe(true);
+    expect(estClePersonnelle('phc_abcdef')).toBe(false);
   });
 });

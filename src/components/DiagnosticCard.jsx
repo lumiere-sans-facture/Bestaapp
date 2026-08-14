@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Stethoscope, CheckCircle2, AlertTriangle, Send } from 'lucide-react';
 import { signalerErreur } from '../lib/rapportErreur';
 import { sentryConfigure } from '../lib/sentry';
-import { analytiqueConfiguree, hoteAnalytique, testerAnalytique } from '../lib/analytique';
+import { analytiqueConfiguree, hoteAnalytique, problemeAnalytique, testerAnalytique } from '../lib/analytique';
 import { useToast } from './Toast';
 
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
@@ -28,6 +28,7 @@ export default function DiagnosticCard() {
   const toast = useToast();
   const sentryActif = sentryConfigure();
   const analytiqueActive = analytiqueConfiguree();
+  const problemeConfig = problemeAnalytique();
 
   // Envoi réel vers PostHog, et affichage de SA réponse : une mauvaise région
   // (projet créé en « us », envois vers « eu ») ne se voit pas autrement.
@@ -71,9 +72,11 @@ export default function DiagnosticCard() {
         <div className="sheet-row">
           <span className="sheet-label">Analytique</span>
           <span className="sheet-value">
-            {analytiqueActive ? (
-              <span className="diag-ok"><CheckCircle2 size={14} /> PostHog actif</span>
-            ) : (
+            {analytiqueActive && <span className="diag-ok"><CheckCircle2 size={14} /> PostHog actif</span>}
+            {!analytiqueActive && problemeConfig && (
+              <span className="diag-partiel"><AlertTriangle size={14} /> Mal configurée</span>
+            )}
+            {!analytiqueActive && !problemeConfig && (
               <span className="diag-partiel"><AlertTriangle size={14} /> Non configurée</span>
             )}
           </span>
@@ -82,6 +85,16 @@ export default function DiagnosticCard() {
           <div className="sheet-row">
             <span className="sheet-label">Destination</span>
             <span className="sheet-value paiement-mono">{hoteAnalytique().replace('https://', '')}</span>
+          </div>
+        )}
+        {problemeConfig && (
+          <div className="callout callout-danger" role="status" style={{ marginTop: 8 }}>
+            <div className="callout-title"><AlertTriangle size={13} /> Analytique à corriger dans Vercel</div>
+            <div className="text-sm">{problemeConfig}</div>
+            <div className="text-sm" style={{ marginTop: 6 }}>
+              Aucun événement n’est envoyé tant que ce n’est pas corrigé — plutôt que de
+              les expédier à la mauvaise adresse. Redéployez après la correction.
+            </div>
           </div>
         )}
         <p className="text-sm text-secondary" style={{ margin: '8px 0 0' }}>
