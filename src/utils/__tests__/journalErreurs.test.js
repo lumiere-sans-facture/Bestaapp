@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   nettoyer, signature, codeErreur, appareilResume, construireRapport, messageSignalement,
+  nettoyerEvenementSentry,
 } from '../journalErreurs';
 
 describe('nettoyer', () => {
@@ -114,5 +115,41 @@ describe('messageSignalement', () => {
   it('se passe du nom quand il est absent', () => {
     const msg = messageSignalement(construireRapport(new Error('Boum')));
     expect(msg).not.toContain('Compte :');
+  });
+});
+
+describe('nettoyerEvenementSentry', () => {
+  it('nettoie le message et les exceptions avant tout envoi', () => {
+    const e = nettoyerEvenementSentry({
+      message: 'Client +228 90 12 34 56 introuvable',
+      exception: { values: [{ type: 'Error', value: 'écrire à kossi@exemple.tg' }] },
+    });
+    expect(e.message).toBe('Client [tel] introuvable');
+    expect(e.exception.values[0].value).toBe('écrire à [email]');
+  });
+
+  it('VIDE le fil d’Ariane — c’est là que fuiraient les données', () => {
+    // Texte des boutons cliqués, URL appelées, sorties console : rien de tout
+    // cela ne doit partir, et un filtre laisserait toujours passer quelque chose.
+    const e = nettoyerEvenementSentry({
+      breadcrumbs: [{ message: 'clic sur « Kossi Adjé — +228 90 12 34 56 »' }],
+    });
+    expect(e.breadcrumbs).toEqual([]);
+  });
+
+  it('nettoie l’URL de la requête', () => {
+    const e = nettoyerEvenementSentry({ request: { url: 'https://app.tg/clients/90123456' } });
+    expect(e.request.url).toBe('https://app.tg/clients/[numero]');
+  });
+
+  it('ne modifie pas l’objet reçu', () => {
+    const origine = { message: 'tel +228 90 12 34 56', breadcrumbs: [{ message: 'x' }] };
+    nettoyerEvenementSentry(origine);
+    expect(origine.message).toBe('tel +228 90 12 34 56');
+    expect(origine.breadcrumbs).toHaveLength(1);
+  });
+
+  it('supporte une entrée vide', () => {
+    expect(nettoyerEvenementSentry(null)).toBeNull();
   });
 });

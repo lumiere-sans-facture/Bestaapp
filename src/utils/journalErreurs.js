@@ -108,6 +108,29 @@ export const construireRapport = (erreur, contexte = {}) => {
 };
 
 /**
+ * Dernier rempart avant l'envoi à un service tiers : un événement Sentry
+ * repart nettoyé, et sans fil d'Ariane.
+ *
+ * Le fil d'Ariane (breadcrumbs) est la vraie fuite : texte des boutons
+ * cliqués, URL appelées, sorties console. Il est vidé, jamais filtré — un
+ * filtre laisse toujours passer quelque chose.
+ */
+export const nettoyerEvenementSentry = (evenement) => {
+  if (!evenement || typeof evenement !== 'object') return evenement;
+  const e = { ...evenement, breadcrumbs: [] };
+  if (e.message) e.message = nettoyer(e.message);
+  if (e.exception?.values) {
+    e.exception = {
+      ...e.exception,
+      values: e.exception.values.map((v) => (v?.value ? { ...v, value: nettoyer(v.value) } : v)),
+    };
+  }
+  // Une requête peut porter l'URL complète, donc des identifiants.
+  if (e.request?.url) e.request = { ...e.request, url: nettoyer(e.request.url) };
+  return e;
+};
+
+/**
  * Message de signalement prêt pour WhatsApp. L'utilisateur décrit ce qu'il
  * faisait ; le contexte technique est déjà là, sinon il manque toujours.
  */

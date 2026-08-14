@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Sentry branché : piles d'appel lisibles, chargé seulement au premier plantage (27 Ko), sans fil d'Ariane
 - Plantages : écran clair avec code de référence, journal serveur, signalement WhatsApp pré-rempli
 - Paiement en ligne indisponible : le gérant lit le motif et où le corriger, au lieu d'un bouton absent
 - Panier : « Commander en ligne » absent s'explique au lieu de disparaître en silence

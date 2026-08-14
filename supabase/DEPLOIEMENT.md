@@ -93,6 +93,8 @@ sont actives, et tester une restauration une fois avant le lancement.
 | `YOUTUBE_API_KEY` | serveur, facultative | sommaire minuté des vidéos de formation |
 | `KKIAPAY_PRIVATE_KEY`, `KKIAPAY_SECRET` | serveur | vérification des paiements KkiaPay |
 | `SUPABASE_SERVICE_ROLE_KEY` | serveur | activation de l'abonnement après paiement vérifié |
+| `VITE_SENTRY_DSN` | navigateur | suivi des plantages (valeur publique) |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | build | envoi des source maps — sans elles, les piles restent illisibles |
 | `CINETPAY_API_KEY` | serveur | idem, si CinetPay est branché un jour |
 | `FEDAPAY_SECRET_KEY` | serveur | idem, si FedaPay est branché un jour |
 
@@ -173,6 +175,39 @@ fois : sur l'appareil, puis à la réception. `/api/erreur` est volontairement
 ouverte (un plantage survient souvent avant même la lecture de la session), donc
 le serveur ne fait jamais confiance à ce qu'il reçoit. La table n'est lisible
 par personne depuis le navigateur : seul le `service_role` y accède.
+
+### Sentry (facultatif, recommandé)
+
+Le journal ci-dessus dit **qu'il y a** un problème. Sentry dit **où** : il
+traduit la pile d'appel minifiée en vraies lignes de code, regroupe les
+occurrences et alerte par e-mail à la première apparition d'un bug.
+
+1. Créer un projet sur [sentry.io](https://sentry.io) (offre gratuite).
+2. Copier le DSN dans `VITE_SENTRY_DSN` (Vercel).
+3. Pour les source maps — sans lesquelles l'intérêt principal disparaît :
+   créer un jeton (*Settings → Auth Tokens*, portée `project:releases`) et
+   déclarer `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`.
+
+Comment il est branché, et pourquoi :
+
+- **Aucune instrumentation automatique.** Sentry sait capturer clics,
+  requêtes et console pour en faire un « fil d'Ariane ». C'est exactement là
+  que fuiraient les données de vos clients : le texte d'un bouton, une URL.
+  Toutes ces intégrations sont désactivées ; Sentry ne reçoit que ce que nous
+  lui donnons, après nettoyage, et le fil d'Ariane est vidé.
+- **Chargé à la demande.** Le SDK (27 Ko compressés) n'est téléchargé qu'au
+  premier plantage. Sur une app qui fonctionne, il ne coûte rien — ce qui
+  compte quand la connexion se paie au mégaoctet.
+- **Absent sans DSN.** Sans `VITE_SENTRY_DSN` au build, le SDK n'entre même
+  pas dans le bundle.
+
+⚠️ **Limite à connaître.** Le nettoyage reconnaît les téléphones, e-mails,
+suites de chiffres, clés et jetons. Il ne peut PAS reconnaître un **nom
+propre** : « Kossi Adjé » ressemble à n'importe quel mot. Un message d'erreur
+qui cite le nom d'un client le ferait donc sortir. D'où la règle de
+développement : **ne jamais interpoler de donnée client dans un message
+d'erreur** — utiliser l'identifiant (`client c-4f2a introuvable`), jamais le
+nom.
 
 **Exploitation** — dans SQL Editor, les requêtes prêtes figurent en bas de
 `erreurs.sql`. La plus utile :

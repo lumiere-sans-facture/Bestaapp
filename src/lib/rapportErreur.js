@@ -6,9 +6,16 @@
 // rapport le plus utile. Tout est mis en file d'attente sur l'appareil et
 // repart à la prochaine occasion.
 //
-// POINT DE BRANCHEMENT SENTRY : `envoyerVersService` est le seul endroit à
-// modifier si un outil externe est adopté un jour. Rien d'autre ne bouge.
+// DEUX DESTINATIONS, complémentaires et indépendantes :
+//   • Sentry (si VITE_SENTRY_DSN est configuré) — pile d'appel lisible grâce
+//     aux source maps, regroupement, alerte. Envoi immédiat, sans file : son
+//     SDK gère lui-même les reprises.
+//   • notre journal (/api/erreur) — la trace nous reste, même si Sentry est
+//     bloqué par un pare-feu ou un bloqueur de publicité, et c'est lui qui
+//     porte la file d'attente hors-ligne.
+// L'échec de l'un n'empêche jamais l'autre.
 import { construireRapport } from '../utils/journalErreurs';
+import { envoyerASentry, sentryConfigure } from './sentry';
 
 const CLE_FILE = 'bestasolar_erreurs_file';
 const MAX_FILE = 30;          // au-delà, ce sont les mêmes qui se répètent
@@ -34,9 +41,9 @@ const ecrireFile = (file) => {
 };
 
 /**
- * Envoi effectif d'un lot. Aujourd'hui : notre propre fonction serveur.
- * Demain, si Sentry est adopté, c'est ICI — et nulle part ailleurs — que
- * l'appel change.
+ * Envoi d'un lot vers NOTRE journal. Sentry, lui, reçoit chaque plantage à
+ * l'unité au moment où il survient (voir signalerErreur) : son SDK a sa
+ * propre file, la doubler ferait des doublons au retour du réseau.
  * @returns {Promise<boolean>} vrai si le lot est parti (donc retirable de la file)
  */
 async function envoyerVersService(rapports) {
@@ -82,6 +89,11 @@ export function signalerErreur(erreur, extra = {}) {
     envoyesCetteSession += 1;
     ecrireFile([...lireFile(), rapport]);
     viderFile();
+    // L'objet Error d'origine part vers Sentry : sa pile est structurée, donc
+    // traduisible par les source maps. Le rapport, lui, est déjà nettoyé.
+    if (sentryConfigure()) {
+      envoyerASentry(erreur instanceof Error ? erreur : null, rapport);
+    }
   }
   return rapport;
 }

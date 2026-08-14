@@ -72,6 +72,11 @@ abonnement, format, puissance) — y ajouter un test quand on touche à cette lo
   `--radius`… + primitives `card`, `stat-pill`, `ring`, `sheet`, `alert-feed`).
   Pas de Tailwind, pas de librairie de graphiques — les charts sont faits main en
   SVG/CSS. Réutiliser les primitives existantes avant d'en créer.
+- **Messages d'erreur** : ne JAMAIS y interpoler une donnée client (nom,
+  téléphone, adresse). Les rapports de plantage partent vers Sentry et le
+  journal serveur ; le nettoyage (`utils/journalErreurs.js`) attrape les
+  numéros et les e-mails, mais un nom propre est indétectable. Citer
+  l'identifiant (`client c-4f2a introuvable`), jamais le nom.
 - **Langue** : UI, libellés et commentaires en **français**. Montants en F CFA via
   `formatCFA` (`utils/format.js`).
 - **Numérotation métier** : devis `BS-AAAAMMJJ-0001`, commandes `CMD-…`,
