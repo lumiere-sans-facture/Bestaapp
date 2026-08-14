@@ -13,10 +13,11 @@ import { supabase, isSupabaseConfigured } from './supabase';
 
 /**
  * @param {string} transactionId  référence rendue par le widget
+ * @param {{type: string, commandeId?: string}} [objet]  ce qui est payé
  * @returns {Promise<{active?: boolean, deja?: boolean, dateFin?: string,
  *                    refuse?: boolean, motif?: string, indisponible?: boolean}>}
  */
-export async function confirmerPaiement(transactionId) {
+export async function confirmerPaiement(transactionId, objet = { type: 'abonnement' }) {
   if (!transactionId) return { indisponible: true };
   // Sans backend, il n'y a ni session ni serveur à interroger.
   if (!isSupabaseConfigured) return { indisponible: true };
@@ -32,10 +33,10 @@ export async function confirmerPaiement(transactionId) {
     const res = await fetch('/api/paiement/verifier', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-      body: JSON.stringify({ transactionId }),
+      body: JSON.stringify({ transactionId, objet }),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return { active: true, deja: !!data.deja, dateFin: data.dateFin };
+    if (res.ok) return { active: true, deja: !!data.deja, dateFin: data.dateFin, montant: data.montant };
     // 402 : l'agrégateur dit que le paiement n'a pas abouti. C'est un vrai
     // refus, à distinguer d'une panne — il ne faut PAS enregistrer une
     // demande d'abonnement dans ce cas.

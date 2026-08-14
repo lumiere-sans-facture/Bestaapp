@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Boutique : régler sa commande en ligne, avec la même vérification serveur que l'abonnement
 - « Moyens de paiement » rejoint la barre latérale desktop (oublié à sa création)
 - Abonnement : activation sur vérification serveur du paiement, plus sur la parole du navigateur
 - Moyens de paiement configurables depuis l'espace gérant — clé publique seule, secrets refusés

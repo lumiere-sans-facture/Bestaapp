@@ -41,6 +41,22 @@ export function createCatalogueActions(setState) {
       return full;
     },
 
+    // Paiement VÉRIFIÉ PAR LE SERVEUR (api/paiement/verifier). Le statut de la
+    // commande ne bouge pas : « confirmé » décrémente le stock, c'est une
+    // décision du gérant qui doit avoir la marchandise. Le paiement, lui, est
+    // un fait — il est noté séparément.
+    marquerCommandePayee: (orderId, { reference, montant, methode = 'kkiapay' }) =>
+      setState((s) => ({
+        ...s,
+        orders: (s.orders || []).map((o) => (o.id === orderId ? {
+          ...o,
+          paiement: {
+            statut: 'verifie', reference, montant, methode,
+            date: new Date().toISOString(),
+          },
+        } : o)),
+      })),
+
     updateOrderStatus: (orderId, status) =>
       setState((s) => {
         const order = (s.orders || []).find((o) => o.id === orderId);

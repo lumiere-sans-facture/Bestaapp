@@ -122,6 +122,10 @@ Deux adresses la portent :
 | `POST /api/paiement/verifier` | l'app, après le widget | vérifie et active — chemin principal |
 | `POST /api/paiement/webhook` | KkiaPay | filet si le navigateur s'est fermé avant |
 
+Deux choses peuvent être payées : l'**abonnement Devis Pro** et une
+**commande boutique**. Le montant attendu est lu côté serveur dans les deux
+cas — prix de l'abonnement, ou total de la commande en base.
+
 Ce que le serveur vérifie, et que le navigateur ne peut pas contourner :
 
 1. **Qui** — l'identité vient du jeton Supabase vérifié, jamais du corps de la
@@ -131,6 +135,10 @@ Ce que le serveur vérifie, et que le navigateur ne peut pas contourner :
 3. **Une seule fois** — la transaction est verrouillée dans
    `paiements_verifies` (clé primaire) : rejouer la même référence ne crédite
    rien de plus.
+
+Une commande réglée n'est pas pour autant *confirmée* : la confirmation
+décrémente le stock, elle reste une décision du gérant qui doit avoir la
+marchandise. Le paiement est noté à part (`paiement.statut = 'verifie'`).
 
 **À faire dans le tableau de bord KkiaPay** : déclarer l'URL de webhook
 `https://app.bestasolar.com/api/paiement/webhook`.

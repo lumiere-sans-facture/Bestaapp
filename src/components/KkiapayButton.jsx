@@ -17,7 +17,7 @@ const CLE_BUILD = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
 const SANDBOX_BUILD = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
 
 /**
- * Bouton de paiement KKiaPay (abonnement Devis Pro).
+ * Bouton de paiement KKiaPay.
  *
  * Partagé par les DEUX écrans d'abonnement — la fiche « Passer en mode Pro »
  * (écran Plus, seul point d'entrée d'un NON-abonné) et l'onglet « Mon
@@ -29,10 +29,16 @@ const SANDBOX_BUILD = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
  * build — le bouton ne s'affiche pas du tout : le paiement Mobile Money manuel
  * reste alors le seul parcours.
  *
+ * @param {number} [amount]  montant à encaisser (défaut : l'abonnement Pro).
+ * @param {{type: string, commandeId?: string}} [objet]  ce qui est payé — le
+ *        serveur en déduit le montant ATTENDU et ce qu'il doit débloquer.
  * @param {(numero: string) => void} [onNumero] permet de proposer les numéros
  *        de test en mode bac à sable (le parent remplit son champ téléphone).
  */
-export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled = false }) {
+export default function KkiapayButton({
+  phone, label, onPaid, onNumero, disabled = false,
+  amount = SUBSCRIPTION_PRICE, objet = { type: 'abonnement' },
+}) {
   const { paiementConfigs } = useData();
   const { user } = useAuth();
   // L'écran « Moyens de paiement » du gérant prime sur les variables de
@@ -51,8 +57,8 @@ export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled
   // référence leur donne accès aux valeurs courantes sans réenregistrement
   // (désabonner/réabonner à chaque frappe dans le champ téléphone ferait
   // manquer le retour de paiement s'il tombait entre les deux).
-  const dernier = useRef({ phone, onPaid });
-  dernier.current = { phone, onPaid };
+  const dernier = useRef({ phone, onPaid, objet });
+  dernier.current = { phone, onPaid, objet };
 
   // Le script du widget est chargé depuis un CDN (index.html) : au premier
   // rendu il n'est pas forcément arrivé. On attend donc sa disponibilité au
@@ -78,7 +84,7 @@ export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled
     const succes = async (reponse = {}) => {
       const reference = reponse.transactionId || reponse.transaction_id || reponse.id || '';
       setOuvert(false);
-      const verdict = await confirmerPaiement(reference);
+      const verdict = await confirmerPaiement(reference, dernier.current.objet);
       dernier.current.onPaid?.(reference, verdict);
     };
     const echec = () => {
@@ -112,7 +118,7 @@ export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled
     }
     setOuvert(true);
     window.openKkiapayWidget({
-      amount: SUBSCRIPTION_PRICE,
+      amount,
       key: kkiapayKey,
       sandbox: SANDBOX,
       paymentmethod: 'momo',
@@ -124,7 +130,7 @@ export default function KkiapayButton({ phone, label, onPaid, onNumero, disabled
       // Métadonnée renvoyée par l'agrégateur : elle permet au webhook de
       // savoir à quel compte créditer le paiement si le navigateur se ferme
       // avant d'avoir confirmé. Rien de secret n'y transite.
-      data: JSON.stringify({ profilId: user?.id || '' }),
+      data: JSON.stringify({ profilId: user?.id || '', ...objet }),
     });
   };
 

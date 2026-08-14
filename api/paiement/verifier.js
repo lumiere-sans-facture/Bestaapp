@@ -13,7 +13,10 @@
 //   3. UNE FOIS — la transaction est verrouillée en base, un rejeu ne crédite
 //             rien de plus.
 import { statutTransaction, clesCompletes } from '../_lib/kkiapay.js';
-import { crediterAbonnement, profilDuJeton, supabaseConfigure, modeSandbox } from '../_lib/abonnement.js';
+import {
+  crediterAbonnement, marquerCommandePayee, montantCommande,
+  profilDuJeton, supabaseConfigure, modeSandbox,
+} from '../_lib/encaissement.js';
 import { transactionIdValide, verdictTransaction } from '../../src/utils/verificationPaiement.js';
 
 
@@ -34,6 +37,11 @@ export default async function handler(req, res) {
 
   const corps = typeof req.body === 'string' ? safeJson(req.body) : (req.body || {});
   const transactionId = String(corps.transactionId || '').trim();
+  const objet = corps.objet && typeof corps.objet === 'object' ? corps.objet : { type: 'abonnement' };
+  if (objet.type !== 'abonnement' && objet.type !== 'commande') {
+    res.status(400).json({ error: 'Objet du paiement inconnu' });
+    return;
+  }
   if (!transactionIdValide(transactionId)) {
     res.status(400).json({ error: 'Référence de transaction invalide' });
     return;
@@ -44,6 +52,19 @@ export default async function handler(req, res) {
   if (!profil) {
     res.status(401).json({ error: 'Session non reconnue — reconnectez-vous.' });
     return;
+  }
+
+  // Montant ATTENDU : lu côté serveur (prix de l'abonnement, ou total de la
+  // commande en base). Jamais celui annoncé par le navigateur — sinon il
+  // suffirait de déclarer 100 F pour une commande de 500 000.
+  let montantAttendu;
+  if (objet.type === 'commande') {
+    const r = await montantCommande(String(objet.commandeId || ''), profil);
+    if (r.erreur) {
+      res.status(409).json({ error: r.erreur });
+      return;
+    }
+    montantAttendu = r.montant;
   }
 
   let reponse;
@@ -57,23 +78,28 @@ export default async function handler(req, res) {
     return;
   }
 
-  const verdict = verdictTransaction(reponse);
+  const verdict = verdictTransaction(reponse, montantAttendu ? { montantAttendu } : undefined);
   if (!verdict.valide) {
     res.status(402).json({ error: verdict.motif, statut: verdict.statut });
     return;
   }
 
   try {
-    const resultat = await crediterAbonnement({
-      profil, transactionId, montant: verdict.montant, methode: 'kkiapay',
-    });
+    const resultat = objet.type === 'commande'
+      ? await marquerCommandePayee({
+          profil, commandeId: String(objet.commandeId), transactionId,
+          montant: verdict.montant, methode: 'kkiapay',
+        })
+      : await crediterAbonnement({
+          profil, transactionId, montant: verdict.montant, methode: 'kkiapay',
+        });
     if (resultat.deja) {
       res.status(200).json({ active: true, deja: true, message: 'Ce paiement a déjà été pris en compte.' });
       return;
     }
-    res.status(200).json({ active: true, dateFin: resultat.dateFin });
+    res.status(200).json({ active: true, dateFin: resultat.dateFin, montant: verdict.montant });
   } catch (e) {
-    res.status(500).json({ error: 'Activation impossible', detail: e.message });
+    res.status(500).json({ error: 'Enregistrement du paiement impossible', detail: e.message });
   }
 }
 

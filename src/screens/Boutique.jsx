@@ -4,6 +4,7 @@ import { Search, Plus, Pencil, Trash2, Camera, Check, ShoppingCart, FileText, Sm
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
+import KkiapayButton from '../components/KkiapayButton';
 import { formatCFA } from '../utils/format';
 import { fileToResizedDataUrl } from '../utils/image';
 import { extractPowerWatts, POWER_RANGES, PRICE_RANGES } from '../utils/power';
@@ -19,7 +20,7 @@ const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', catego
 
 export default function Boutique() {
   const { user } = useAuth();
-  const { products, productCategories, addProduct, updateProduct, deleteProduct, addOrder } = useData();
+  const { products, productCategories, addProduct, updateProduct, deleteProduct, addOrder, marquerCommandePayee } = useData();
   const { items: cartItems, addItem, setQty, removeItem, clearCart, count } = useCart();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -145,10 +146,27 @@ export default function Boutique() {
     setPayment('form');
   };
 
+  // Retour d'un paiement KKiaPay sur une commande. Le verdict vient du
+  // serveur, qui a comparé le montant reçu au TOTAL DE LA COMMANDE en base —
+  // pas à celui annoncé par cet écran.
+  const paiementCommande = (reference, verdict = {}) => {
+    if (verdict.refuse) {
+      toast(verdict.motif || 'Paiement non abouti.', { type: 'error' });
+      return;
+    }
+    if (!verdict.active) {
+      toast('Paiement enregistré — vérification par BestaSolar en attente.');
+      return;
+    }
+    marquerCommandePayee(payment.id, { reference, montant: verdict.montant || payment.total });
+    setPayment((o) => (o && o !== 'form' ? { ...o, paiement: { statut: 'verifie', reference } } : o));
+    toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — commande réglée.');
+  };
+
   const confirmPayment = (e) => {
     e.preventDefault();
-    // Stub Mobile Money : la commande est enregistrée « paiement initié ».
-    // Point d'accroche pour l'agrégateur réel (FedaPay / Kkiapay) : ici.
+    // La commande est créée AVANT le paiement : le serveur a besoin d'une
+    // commande en base pour connaître le montant à exiger.
     const order = addOrder({
       items: Object.entries(cartItems).map(([productId, qty]) => ({ productId, qty })),
       total: cartTotal,
@@ -395,8 +413,9 @@ export default function Boutique() {
               <div className="devis-summary-row total"><span>Montant à payer</span><span>{formatCFA(cartTotal)}</span></div>
             </div>
             <div className="field-hint payment-stub-note">
-              Aucun prélèvement n'est effectué ici : votre commande est enregistrée et
-              BestaSolar vous rappelle sur ce numéro pour convenir du règlement.
+              Rien n'est prélevé à cette étape : la commande est d'abord enregistrée.
+              Vous pourrez ensuite la régler en ligne, ou attendre l'appel de BestaSolar
+              sur ce numéro.
             </div>
             <button type="submit" className="btn btn-primary btn-block">
               <Smartphone size={17} /> Enregistrer ma commande · {formatCFA(cartTotal)}
@@ -406,12 +425,31 @@ export default function Boutique() {
           <div className="payment-confirm">
             <div className="payment-confirm-icon"><Check size={28} /></div>
             <div className="payment-confirm-title">Commande {payment.orderNumber}</div>
-            <p className="text-sm text-secondary">
-              Commande de {formatCFA(payment.total)} enregistrée. BestaSolar vous rappelle au
-              {' '}{payment.phone} pour convenir du règlement ({payment.operator}).
-              <strong> Aucun montant n'a été prélevé.</strong>
-            </p>
-            <button className="btn btn-primary btn-block" onClick={() => setPayment(null)}>Fermer</button>
+            {payment.paiement?.statut === 'verifie' ? (
+              <p className="text-sm text-secondary">
+                Commande de {formatCFA(payment.total)} <strong>réglée</strong> — paiement vérifié.
+                BestaSolar vous rappelle au {payment.phone} pour la livraison.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-secondary">
+                  Commande de {formatCFA(payment.total)} enregistrée. Réglez-la maintenant en ligne,
+                  ou attendez l'appel de BestaSolar au {payment.phone} ({payment.operator}).
+                </p>
+                {/* Le montant vient de la commande, pas du panier : celui-ci
+                    est déjà vidé, et c'est la commande qui fait foi. */}
+                <KkiapayButton
+                  phone={payment.phone}
+                  amount={payment.total}
+                  objet={{ type: 'commande', commandeId: payment.id }}
+                  label={`Payer maintenant · ${formatCFA(payment.total)}`}
+                  onPaid={paiementCommande}
+                  onNumero={(numero) => setPayment((o) => (o && o !== 'form' ? { ...o, phone: numero } : o))}
+                />
+              </>
+            )}
+            <button className="btn btn-outline btn-block" style={{ marginTop: 10 }}
+              onClick={() => setPayment(null)}>Fermer</button>
           </div>
         )}
       </Sheet>

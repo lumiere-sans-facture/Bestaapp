@@ -1,4 +1,7 @@
-// Activation d'un abonnement Devis Pro — CÔTÉ SERVEUR EXCLUSIVEMENT.
+// Encaissement vérifié — CÔTÉ SERVEUR EXCLUSIVEMENT.
+// Deux objets peuvent être payés : l'abonnement Devis Pro et une commande
+// boutique. Les deux partagent le même verrou anti-rejeu ; seul ce qu'ils
+// débloquent diffère.
 // Utilise la clé service_role de Supabase, qui contourne la RLS : elle ne doit
 // jamais quitter les variables d'environnement Vercel.
 import { createClient } from '@supabase/supabase-js';
@@ -113,6 +116,68 @@ async function reserverTransaction(transactionId, profil, montant) {
 // réclamable — un incident réseau ne doit pas faire perdre un paiement réel.
 const libererTransaction = (transactionId) =>
   admin().from('paiements_verifies').update({ credite: false }).eq('transaction_id', transactionId);
+
+/**
+ * Commande boutique correspondant à cet identifiant, dans l'organisation du
+ * payeur. La réplication est asynchrone : une commande créée à l'instant peut
+ * ne pas être encore arrivée. On patiente brièvement plutôt que de refuser un
+ * paiement réel pour une seconde d'écart.
+ */
+async function lireCommande(commandeId, org, essais = 3) {
+  const db = admin();
+  for (let i = 0; i < essais; i += 1) {
+    const { data } = await db.from('orders')
+      .select('data').eq('id', commandeId).eq('org_id', org).maybeSingle();
+    if (data?.data) return data.data;
+    if (i < essais - 1) await new Promise((r) => setTimeout(r, 1000));
+  }
+  return null;
+}
+
+/**
+ * Montant ATTENDU pour une commande — le serveur ne croit jamais celui que le
+ * navigateur annonce.
+ * @returns {Promise<{montant: number}|{erreur: string}>}
+ */
+export async function montantCommande(commandeId, profil) {
+  const commande = await lireCommande(commandeId, profil.org_id);
+  if (!commande) return { erreur: 'Commande introuvable — attendez la synchronisation puis réessayez.' };
+  const total = Number(commande.total) || 0;
+  if (total <= 0) return { erreur: 'Commande sans montant.' };
+  if (commande.paiement?.statut === 'verifie') return { erreur: 'Commande déjà réglée.' };
+  return { montant: total };
+}
+
+/**
+ * Marque une commande réglée. Le statut de la commande n'est PAS avancé à
+ * « confirmé » : la confirmation décrémente le stock, c'est une décision du
+ * gérant qui doit avoir la marchandise. Le paiement, lui, est un fait.
+ */
+export async function marquerCommandePayee({ profil, commandeId, transactionId, montant, methode = 'kkiapay' }) {
+  if (!(await reserverTransaction(transactionId, profil, montant))) {
+    return { active: false, deja: true };
+  }
+  try {
+    const db = admin();
+    const commande = await lireCommande(commandeId, profil.org_id, 1);
+    if (!commande) throw new Error('Commande introuvable');
+    const maintenant = new Date().toISOString();
+    const { error } = await db.from('orders').upsert({
+      id: commandeId,
+      org_id: profil.org_id,
+      updated_at: maintenant,
+      data: {
+        ...commande,
+        paiement: { statut: 'verifie', reference: transactionId, montant, methode, date: maintenant },
+      },
+    });
+    if (error) throw new Error(error.message);
+    return { active: true, montant };
+  } catch (e) {
+    await libererTransaction(transactionId).catch(() => {});
+    throw e;
+  }
+}
 
 /**
  * Crédite 30 jours d'abonnement au profil, et consigne le paiement.

@@ -14,17 +14,19 @@
 // crédité directement ; sinon la transaction est seulement consignée, et
 // c'est le retour du navigateur — ou le gérant — qui la rattachera.
 import { statutTransaction, clesCompletes } from '../_lib/kkiapay.js';
-import { consignerTransaction, crediterAbonnement, profilParId, supabaseConfigure, modeSandbox } from '../_lib/abonnement.js';
+import {
+  consignerTransaction, crediterAbonnement, marquerCommandePayee, montantCommande,
+  profilParId, supabaseConfigure, modeSandbox,
+} from '../_lib/encaissement.js';
 import { transactionIdValide, verdictTransaction } from '../../src/utils/verificationPaiement.js';
 
 
-/** Identifiant de profil éventuellement transporté par la transaction. */
-const profilIdDeLaTransaction = (reponse) => {
+/** Métadonnée posée par le widget : à qui, et pour quoi. */
+const metaDeLaTransaction = (reponse) => {
   const brut = reponse?.data ?? reponse?.metadata ?? reponse?.custom_data;
-  if (!brut) return null;
+  if (!brut) return {};
   const meta = typeof brut === 'string' ? safeJson(brut) : brut;
-  const id = meta?.profilId || meta?.userId;
-  return id ? String(id) : null;
+  return meta && typeof meta === 'object' ? meta : {};
 };
 
 export default async function handler(req, res) {
@@ -61,8 +63,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  const profilId = profilIdDeLaTransaction(reponse);
-  const profil = profilId ? await profilParId(profilId) : null;
+  const meta = metaDeLaTransaction(reponse);
+  const profilId = meta.profilId || meta.userId;
+  const profil = profilId ? await profilParId(String(profilId)) : null;
 
   try {
     if (!profil) {
@@ -70,12 +73,32 @@ export default async function handler(req, res) {
       res.status(200).json({ traite: true, active: false, motif: 'Compte non identifié — transaction consignée.' });
       return;
     }
+    if (meta.type === 'commande' && meta.commandeId) {
+      // Le montant attendu est relu en base, comme sur le chemin principal :
+      // la métadonnée dit QUOI est payé, jamais COMBIEN.
+      const r = await montantCommande(String(meta.commandeId), profil);
+      if (r.erreur) {
+        await consignerTransaction(transactionId, verdict.montant);
+        res.status(200).json({ traite: true, active: false, motif: r.erreur });
+        return;
+      }
+      if (verdict.montant < r.montant) {
+        res.status(200).json({ traite: true, active: false, motif: 'Montant reçu inférieur au total de la commande.' });
+        return;
+      }
+      const resultat = await marquerCommandePayee({
+        profil, commandeId: String(meta.commandeId), transactionId,
+        montant: verdict.montant, methode: 'kkiapay',
+      });
+      res.status(200).json({ traite: true, active: true, deja: !!resultat.deja });
+      return;
+    }
     const resultat = await crediterAbonnement({
       profil, transactionId, montant: verdict.montant, methode: 'kkiapay',
     });
     res.status(200).json({ traite: true, active: true, deja: !!resultat.deja });
   } catch (e) {
-    res.status(500).json({ error: 'Activation impossible', detail: e.message });
+    res.status(500).json({ error: 'Enregistrement du paiement impossible', detail: e.message });
   }
 }
 
