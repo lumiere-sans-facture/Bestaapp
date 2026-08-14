@@ -215,6 +215,18 @@ développement : **ne jamais interpoler de donnée client dans un message
 d'erreur** — utiliser l'identifiant (`client c-4f2a introuvable`), jamais le
 nom.
 
+### Vérifier que tout est branché
+
+**Plus → Diagnostic** (bas du menu, gérant uniquement) affiche la version
+installée et l'état réel du suivi — *Sentry actif* ou *Journal serveur seul*.
+Une clé oubliée dans Vercel ne provoque aucune erreur : sans cet indicateur,
+l'absence de signalement se lit à tort comme « tout va bien ».
+
+Le bouton **« Envoyer une erreur de test »** déclenche une erreur inoffensive
+(elle ne fait pas planter l'écran) et affiche son code. Cherchez ce code dans
+Sentry, onglet *Issues*, ou dans la table `erreurs` : s'il y est, toute la
+chaîne fonctionne.
+
 **Exploitation** — dans SQL Editor, les requêtes prêtes figurent en bas de
 `erreurs.sql`. La plus utile :
 

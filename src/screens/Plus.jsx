@@ -31,6 +31,7 @@ import KkiapayButton from '../components/KkiapayButton';
 import InvertersSection from './plus/InvertersSection';
 import PompeKitsSection from './plus/PompeKitsSection';
 import { SyncStatusRow } from '../components/SyncStatus';
+import DiagnosticCard from '../components/DiagnosticCard';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
 import { reconcileMissingCommissions } from '../utils/commissionSync';
 import { MODES_RETRAIT, ETATS_COMMISSION, commissionsEngagees, etatCommission } from '../utils/payouts';
@@ -710,6 +711,10 @@ export default function Plus() {
             <MenuItem icon={LogOut} tone="danger" title="Déconnexion" subtitle="Quitter l'application" onClick={logout} />
           </div>
         </div>
+
+        {/* Réservé au gérant : lui seul peut agir sur la configuration du
+            suivi, et lui seul a besoin de savoir s'il est actif. */}
+        {user.role === 'gerant' && <DiagnosticCard />}
       </div>
     </div>
   );
