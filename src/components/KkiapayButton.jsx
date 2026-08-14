@@ -102,7 +102,21 @@ export default function KkiapayButton({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kkiapayKey]);
 
-  if (!kkiapayKey) return null;
+  // Aucune clé — ni configurée dans l'app, ni héritée du build : le bouton
+  // n'a rien pour fonctionner. Disparaître sans un mot laissait chercher une
+  // panne là où il n'y a qu'une configuration à faire ; le gérant, lui, peut
+  // agir, on lui dit donc où.
+  if (!kkiapayKey) {
+    if (user?.role !== 'gerant') return null;
+    return (
+      <div className="field-hint" style={{ textAlign: 'center' }}>
+        Paiement en ligne indisponible : {config
+          ? `l'agrégateur activé (${config.provider}) n'a pas de clé publique renseignée.`
+          : 'aucun moyen de paiement activé.'}
+        {' '}À configurer dans <strong>Plus › Moyens de paiement</strong>.
+      </div>
+    );
+  }
 
   const ouvrir = () => {
     // Le widget se contente de « numéro n'est pas valide » : on explique

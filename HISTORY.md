@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Paiement en ligne indisponible : le gérant lit le motif et où le corriger, au lieu d'un bouton absent
 - Panier : « Commander en ligne » absent s'explique au lieu de disparaître en silence
 - Boutique : régler sa commande en ligne, avec la même vérification serveur que l'abonnement
 - « Moyens de paiement » rejoint la barre latérale desktop (oublié à sa création)
