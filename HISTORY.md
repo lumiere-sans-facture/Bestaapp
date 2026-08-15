@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Fiche de dimensionnement : ouverte en vrai PDF dans un nouvel onglet, prête à envoyer au client
 - Analytique : clé PostHog collée dans l'adresse détectée et nommée — c'était la cause du « 405 »
 - Diagnostic : destination des envois analytiques affichée et testable — une mauvaise région ne se voyait pas
 - Analytique PostHog : parcours utilisateur mesuré sans SDK, sans capture automatique, chemins anonymisés

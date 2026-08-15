@@ -13,6 +13,7 @@ import LeadPicker from './LeadPicker';
 import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
 import { TVA_PCT } from '../../config/company';
+import { signalerErreur } from '../../lib/rapportErreur';
 
 let rowSeq = 0;
 
@@ -46,6 +47,9 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, partners]);
   const [rows, setRows] = useState([]); // appareils sélectionnés
+  // Production de la fiche PDF : quelques secondes sur un téléphone d'entrée
+  // de gamme. Sans cet état, on appuie deux fois et deux onglets s'ouvrent.
+  const [ficheEnCours, setFicheEnCours] = useState(false);
   const [pickerId, setPickerId] = useState('');
   // Trois façons d'estimer la consommation : liste d'appareils (défaut),
   // saisie directe des kWh, ou FACTURE d'électricité mensuelle en F CFA (CEET
@@ -188,12 +192,18 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   // d'onduleur, capacité batterie et production sont ceux du calcul, exprimés
   // sur le panneau de référence (PANEL_REFERENCE_WC).
   const openSheet = async () => {
-    if (!sizing) return;
-    const { openSizingSheet } = await import('../../utils/sizingSheet');
+    if (!sizing || ficheEnCours) return;
+    // L'onglet est ouvert AVANT tout `await` : passé une opération
+    // asynchrone, le navigateur ne rattache plus l'ouverture au clic et la
+    // bloque — systématiquement sur iOS. Sans onglet, la fiche est
+    // téléchargée (voir ouvrirFichePdf) : elle n'est jamais perdue.
+    const onglet = window.open('', '_blank');
+    setFicheEnCours(true);
+    const { ouvrirFichePdf } = await import('../../utils/sizingSheet');
     const lead = myLeads.find((l) => l.id === selectedLeadId);
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const apporteur = partnerId ? partners.find((p) => p.id === partnerId) : null;
-    openSizingSheet({
+    await ouvrirFichePdf({
       client: { name: lead?.contact || lead?.name || '', phone: lead?.phone || '', ville: lead?.address || '' },
       apporteur: apporteur ? { name: apporteur.name, code: apporteur.code } : null,
       appliances: rows,
@@ -211,7 +221,10 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
       panelName: `Panneau photovoltaïque ${sizing.panelWc}W`,
       // Rentabilité (page 3) : l'investissement estimé = total du devis kit.
       investissement: displayQuotation?.total || null,
-    });
+    }, { onglet }).catch((e) => {
+      // L'onglet affiche déjà l'échec ; le journal en garde la trace.
+      signalerErreur(e, { origine: 'fiche-dimensionnement', ecran: '/devis' });
+    }).finally(() => setFicheEnCours(false));
   };
 
   const handleSubmit = (statut = 'finalise') => {
@@ -682,8 +695,9 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
               </div>
             )}
 
-            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
-              <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
+            <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }}
+              onClick={openSheet} disabled={ficheEnCours}>
+              <FileText size={16} /> {ficheEnCours ? 'Préparation de la fiche…' : 'Fiche de dimensionnement (PDF)'}
             </button>
           </div>
         )}

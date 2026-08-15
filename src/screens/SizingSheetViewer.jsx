@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, FileText, Printer, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { signalerErreur } from '../lib/rapportErreur';
 
 const STORAGE_PREFIX = 'besta:sizing-sheet:';
 const PAGES = [
@@ -31,6 +32,8 @@ export default function SizingSheetViewer() {
   const [html, setHtml] = useState('');
   const [page, setPage] = useState(1);
   const [zoom, setZoom] = useState(92);
+  // Production du PDF : quelques secondes, le temps de rendre les trois pages.
+  const [pdfEnCours, setPdfEnCours] = useState(false);
 
   useEffect(() => { setHtml(readDocument()); }, []);
 
@@ -43,15 +46,24 @@ export default function SizingSheetViewer() {
 
   const print = () => frameRef.current?.contentWindow?.print();
 
-  const download = () => {
-    if (!html) return;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'fiche-dimensionnement.html';
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  // PDF, et non le HTML du document : la fiche se transmet au client, et un
+  // fichier .html reçu sur WhatsApp ne s'ouvre nulle part correctement.
+  const download = async () => {
+    if (!html || pdfEnCours) return;
+    setPdfEnCours(true);
+    try {
+      const { pdfDepuisHtml } = await import('../utils/sizingSheet');
+      const { url, nom } = await pdfDepuisHtml(html);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nom;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      signalerErreur(e, { origine: 'fiche-pdf', ecran: '/fiche-dimensionnement' });
+    } finally {
+      setPdfEnCours(false);
+    }
   };
 
   if (!html) {
@@ -84,7 +96,7 @@ export default function SizingSheetViewer() {
           <span className="sizing-viewer-zoom">{zoom}%</span>
           <button type="button" aria-label="Agrandir l’aperçu" disabled={zoom >= 110} onClick={() => setZoom((value) => value + 10)}><ZoomIn size={18} /></button>
           <span className="sizing-viewer-separator" />
-          <button type="button" className="sizing-viewer-action" onClick={download}><Download size={17} /> Télécharger</button>
+          <button type="button" className="sizing-viewer-action" onClick={download} disabled={pdfEnCours}><Download size={17} /> {pdfEnCours ? 'PDF…' : 'Télécharger le PDF'}</button>
           <button type="button" className="sizing-viewer-action sizing-viewer-print" onClick={print}><Printer size={17} /> Imprimer / PDF</button>
           <button type="button" className="sizing-viewer-icon-close" aria-label="Fermer" onClick={() => window.close()}><X size={19} /></button>
         </div>

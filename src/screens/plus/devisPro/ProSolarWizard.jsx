@@ -15,6 +15,7 @@ import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
 import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
 import TvaToggle from '../../../components/TvaToggle';
+import { signalerErreur } from '../../../lib/rapportErreur';
 
 let rowSeq = 0;
 const EMPTY_CLIENT = { name: '', contact: '', phone: '', ville: '', type: 'particulier' };
@@ -226,14 +227,23 @@ export default function ProSolarWizard({ onDone }) {
   // (tarif 145 F/kWh, taux 0,85, maintenance 50 000 F/an, provision 320 000 F,
   // investissement = total du devis).
   const [renta, setRenta] = useState({ tarifElec: '', tauxUtilisation: '', maintenanceAnnuelle: '', provisionOnduleur: '', investissement: '' });
+  // Production de la fiche PDF : quelques secondes sur un téléphone d'entrée
+  // de gamme. Sans cet état, on appuie deux fois et deux onglets s'ouvrent.
+  const [ficheEnCours, setFicheEnCours] = useState(false);
 
-  // Fiche de dimensionnement — récapitulatif technique complet (HTML imprimable),
-  // généré à la dernière étape avec le client et le matériel réellement retenus.
+  // Fiche de dimensionnement — récapitulatif technique complet, produit en PDF
+  // à la dernière étape avec le client et le matériel réellement retenus.
   const openSheet = async () => {
-    if (!sizing) return;
-    const { openSizingSheet } = await import('../../../utils/sizingSheet');
+    if (!sizing || ficheEnCours) return;
+    // L'onglet est ouvert AVANT tout `await` : passé une opération
+    // asynchrone, le navigateur ne rattache plus l'ouverture au clic et la
+    // bloque — systématiquement sur iOS. Sans onglet, la fiche est
+    // téléchargée (voir ouvrirFichePdf) : elle n'est jamais perdue.
+    const onglet = window.open('', '_blank');
+    setFicheEnCours(true);
+    const { ouvrirFichePdf } = await import('../../../utils/sizingSheet');
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
-    openSizingSheet({
+    await ouvrirFichePdf({
       // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
       // coordonnées), comme ses devis et ses factures.
       company,
@@ -258,7 +268,10 @@ export default function ProSolarWizard({ onDone }) {
         ...(Number(renta.maintenanceAnnuelle) >= 0 && renta.maintenanceAnnuelle !== '' ? { maintenanceAnnuelle: Number(renta.maintenanceAnnuelle) } : {}),
         ...(Number(renta.provisionOnduleur) >= 0 && renta.provisionOnduleur !== '' ? { provisionOnduleur: Number(renta.provisionOnduleur) } : {}),
       },
-    });
+    }, { onglet }).catch((e) => {
+      // L'onglet affiche déjà l'échec ; le journal en garde la trace.
+      signalerErreur(e, { origine: 'fiche-dimensionnement', ecran: '/plus/devis-pro' });
+    }).finally(() => setFicheEnCours(false));
   };
 
   const submit = (statut = 'finalise') => {
@@ -635,8 +648,9 @@ export default function ProSolarWizard({ onDone }) {
                   </Field>
                 </details>
 
-                <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={openSheet}>
-                  <FileText size={16} /> Fiche de dimensionnement (imprimable / PDF)
+                <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }}
+                  onClick={openSheet} disabled={ficheEnCours}>
+                  <FileText size={16} /> {ficheEnCours ? 'Préparation de la fiche…' : 'Fiche de dimensionnement (PDF)'}
                 </button>
 
                 <TvaToggle value={tvaActive} onChange={setTvaActive} />

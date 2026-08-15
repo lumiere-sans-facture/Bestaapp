@@ -1,7 +1,13 @@
 // Fiche de dimensionnement — point d'entrée : assemble les calculs
 // (compute.js), le graphique (chart.js) et la mise en page 3 pages A4
-// (layout.js). Le document s'ouvre dans un lecteur dédié, puis peut être
-// imprimé ou enregistré en PDF depuis sa barre d'outils.
+// (layout.js).
+//
+// Deux façons de l'ouvrir, qui partagent la même mise en page HTML :
+//   · openSizingSheet — lecteur intégré (/fiche-dimensionnement) : instantané,
+//     avec sa barre d'outils. Le document reste du HTML.
+//   · ouvrirFichePdf  — vrai fichier PDF affiché dans le lecteur du
+//     navigateur : quelques secondes de plus, mais c'est un document que l'on
+//     ENVOIE au client (WhatsApp), ce qu'une page HTML ne permet pas.
 import { computeSheet } from './compute';
 import { renderSheet } from './layout';
 
@@ -11,7 +17,7 @@ export function buildSizingSheetHtml(d) {
   return renderSheet(d, computeSheet(d));
 }
 
-/** Ouvre la fiche dans un lecteur dédié (repli : fichier HTML téléchargeable). */
+/** Ouvre la fiche dans le lecteur intégré (repli : fichier HTML téléchargeable). */
 export function openSizingSheet(data) {
   const html = buildSizingSheetHtml(data);
   const random = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -36,3 +42,5 @@ export function openSizingSheet(data) {
   a.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+export { ouvrirFichePdf, construireFichePdf, pdfDepuisHtml } from './pdf';
