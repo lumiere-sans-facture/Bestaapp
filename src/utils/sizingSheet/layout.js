@@ -8,7 +8,7 @@
 // (logo, couleurs, coordonnées) ; à défaut, celle de BestaSolar.
 import { SIZING_PARAMS, SYSTEM_VOLTAGE, SYSTEM_TYPES } from '../solarSizing';
 import { CUSTOM_APPLIANCE_LABEL } from '../../data/appliances';
-import { emetteurDe } from '../docTemplates/shared';
+import { emetteurDe, policeDocument } from '../docTemplates/shared';
 import { couleursLisibles } from '../couleurDocument';
 import { DUREES_VIE, libelleRoi } from './compute';
 import { renderCoverageChart } from './chart';
@@ -280,9 +280,7 @@ export function renderSheet(d, c) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fiche de dimensionnement — ${clientNom}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+${policeDocument()}
 <style>
   :root { --primaire: ${couleurs.primaire}; --accent: ${couleurs.accent}; --texte: #3a3a3a; --gris: #6b6b6b; --filet: #e5e5e5; --terre: #c2410c; }
   * { margin: 0; padding: 0; box-sizing: border-box; }

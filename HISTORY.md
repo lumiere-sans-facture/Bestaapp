@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Documents : police IBM Plex Sans rétablie et embarquée — plus de dépendance à Google Fonts
 - Devis : « En cours / Converti en vente / Expiré », relance à 7 jours et conversion qui fige le montant
 - Outillage agent : linter réparé (0 problème), démarrage de session automatique, procédures écrites
 - Fiche de dimensionnement : ouverte en vrai PDF dans un nouvel onglet, prête à envoyer au client

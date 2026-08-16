@@ -68,7 +68,12 @@ describe('rendu des six combinaisons kind × model', () => {
         expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
         expect(html.length).toBeGreaterThan(2000);
         expect(html).toContain('<section class="page">');
-        expect(html).toContain('IBM+Plex+Sans');
+        // La police est SERVIE PAR L'APP : un document composé hors ligne doit
+        // être identique à celui composé en ligne. Une dépendance à Google
+        // Fonts faisait retomber le document en police système, sans bruit.
+        expect(html).toContain("@font-face");
+        expect(html).toContain('ibm-plex-sans-latin-600-normal.woff2');
+        expect(html).not.toContain('fonts.googleapis.com');
         expect(html).toContain('tabular-nums');
         expect(html).toContain('width: 794px; height: 1123px');
         expect(html).toContain('Imprimer / Exporter en PDF');
