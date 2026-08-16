@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FileText, Plus, Download, Search, Check, Trash2, Pencil, BadgeCheck } from 'lucide-react';
+import { FileText, Plus, Download, Search, Check, Trash2, Pencil, BadgeCheck, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchAdminPublicDevis } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
 import { etatDevis, ETAT_DEVIS_LABEL, joursAvantExpiration, dateExpiration } from '../utils/affaires';
+import { dimensionnementRejouable, resumeDimensionnement } from '../utils/dimensionnement';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import ConfirmSheet from '../components/ConfirmSheet';
@@ -60,6 +61,9 @@ export default function Devis() {
   // all | brouillon | en-cours | converti | expire | solar | manual
   const [typeFilter, setTypeFilter] = useState('all');
   const [confirmVente, setConfirmVente] = useState(null);
+  // Étude solaire rouverte pour ajustement : l'assistant repart des saisies
+  // enregistrées et MET À JOUR le devis au lieu d'en créer un second.
+  const [devisAModifier, setDevisAModifier] = useState(null);
   const [sortBy, setSortBy] = useState('recent');
   const [editDevis, setEditDevis] = useState(null);
   const [actions, setActions] = useState(null);
@@ -216,6 +220,12 @@ export default function Devis() {
               {actions.partnerId && !actions._externe && (
                 <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{getPartnerById(actions.partnerId)?.name}{(actions.partnerCode || getPartnerById(actions.partnerId)?.code) ? ` · ${actions.partnerCode || getPartnerById(actions.partnerId)?.code}` : ''}</span></div>
               )}
+              {dimensionnementRejouable(actions) && (
+                <div className="sheet-row">
+                  <span className="sheet-label">Dimensionnement</span>
+                  <span className="sheet-value">{resumeDimensionnement(actions)}</span>
+                </div>
+              )}
               {/* Validité : imprimée sur le document, elle engage le prix. On la
                   montre ici pour que la décision de relancer ou de convertir se
                   prenne sans rouvrir le PDF. */}
@@ -248,6 +258,16 @@ export default function Devis() {
                       comme toute validation qui engage de l'argent. Un devis
                       expiré reste convertible : le client peut revenir, et
                       c'est au gérant d'en décider, pas au calendrier. */}
+                  {/* L'étude est rangée sur le devis : on peut y revenir, revoir
+                      les appareils saisis et les corriger. Le devis est mis à
+                      jour — pas dupliqué — pour ne pas casser le lien avec la
+                      commission déjà calculée. */}
+                  {dimensionnementRejouable(actions) && (
+                    <button className="btn btn-outline btn-block"
+                      onClick={() => { setDevisAModifier(actions); setActions(null); setView('create'); }}>
+                      <SlidersHorizontal size={16} /> Revoir le dimensionnement
+                    </button>
+                  )}
                   {user.role === 'gerant' && actions.statut !== 'brouillon'
                     && !['converti', 'perdu'].includes(etatDevis(actions, getLeadById(actions.leadId))) && (
                     <button className="btn btn-won btn-block" onClick={() => setConfirmVente(actions)}>
@@ -286,15 +306,16 @@ export default function Devis() {
   return (
     <div className="page">
       <PageHeader
-        title="Nouveau devis"
-        actions={<button className="btn btn-outline-light" onClick={backToList}>Annuler</button>}
+        title={devisAModifier ? 'Modifier le dimensionnement' : 'Nouveau devis'}
+        actions={<button className="btn btn-outline-light" onClick={() => { setDevisAModifier(null); backToList(); }}>Annuler</button>}
       />
       <div className="page-content">
         <DevisCreator
           startManual={fromCart}
           initialManualItems={fromCart ? cartItems : undefined}
-          initialLeadId={initialLeadId}
-          onDone={() => { if (fromCart) clearCart(); backToList(); }}
+          initialLeadId={devisAModifier ? devisAModifier.leadId : initialLeadId}
+          devisAModifier={devisAModifier}
+          onDone={() => { if (fromCart) clearCart(); setDevisAModifier(null); backToList(); }}
         />
       </div>
     </div>

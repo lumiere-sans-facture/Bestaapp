@@ -15,16 +15,18 @@ import PompeWizard from './PompeWizard';
  * @param {object}     initialManualItems pré-remplissage (ex. panier boutique)
  * @param {string}     initialLeadId     client présélectionné (ex. fiche client) —
  *                                       l'étape de sélection du client est sautée
+ * @param {object}     devisAModifier    étude solaire déjà enregistrée, rouverte
+ *                                       pour ajustement (le devis est mis à jour)
  */
-export default function DevisCreator({ onDone, startManual = false, initialManualItems, initialLeadId = null }) {
+export default function DevisCreator({ onDone, startManual = false, initialManualItems, initialLeadId = null, devisAModifier = null }) {
   const { getLeadById } = useData();
-  const [mode, setMode] = useState(startManual ? 'manual' : 'choose'); // choose | solar | pompe | manual
+  const [mode, setMode] = useState(devisAModifier ? 'solar' : startManual ? 'manual' : 'choose'); // choose | solar | pompe | manual
   const initialLead = initialLeadId ? getLeadById(initialLeadId) : null;
 
   // Le dimensionnement par facture n'a plus sa carte : c'est un simple
   // mode de saisie de la consommation, proposé DANS l'assistant solaire
   // (appareils / saisie directe / facture) — une entrée de moins à choisir.
-  if (mode === 'solar') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} />;
+  if (mode === 'solar') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} devisAModifier={devisAModifier} />;
   if (mode === 'pompe') return <PompeWizard onDone={onDone} initialLeadId={initialLeadId} />;
   if (mode === 'manual') return <ManualWizard onDone={onDone} initialItems={initialManualItems} initialLeadId={initialLeadId} />;
 

@@ -4,8 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
-import { factureVersConsommation, REPARTITIONS, DEFAULT_REPARTITION, PRIX_KWH_RESEAU } from '../../utils/factureConso';
-import { calculateSystemSize, buildKitQuotation, suggestKitForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE } from '../../utils/solarSizing';
+import { factureVersConsommation, REPARTITIONS } from '../../utils/factureConso';
+import { calculateSystemSize, buildKitQuotation, suggestKitForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -14,22 +14,39 @@ import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
 import { TVA_PCT } from '../../config/company';
 import { signalerErreur } from '../../lib/rapportErreur';
+import { capturerDimensionnement, restaurerDimensionnement, prochainRowId } from '../../utils/dimensionnement';
 
 let rowSeq = 0;
 
 // Noms des étapes, affichés sous les pastilles de progression.
 const STEP_NAMES = ['Client', 'Consommation', 'Type de système', 'Résultat'];
 
-export default function SolarWizard({ onDone, initialLeadId = null }) {
+/**
+ * @param {object|null} devisAModifier  étude déjà enregistrée, rouverte pour
+ *   être ajustée. Le devis est alors MIS À JOUR, jamais dupliqué : le numéro,
+ *   l'apporteur et la commission déjà calculée restent attachés au même
+ *   document.
+ */
+export default function SolarWizard({ onDone, initialLeadId = null, devisAModifier = null }) {
+  // Lu une seule fois : rejouer la restauration à chaque rendu écraserait ce
+  // que le technicien est en train de modifier.
+  const [reprise] = useState(() => {
+    const r = restaurerDimensionnement(devisAModifier);
+    // Le compteur de lignes est global au module : le recaler au-dessus des
+    // lignes restaurées évite qu'un appareil ajouté ensuite reprenne le
+    // `rowId` d'une ligne existante — les deux se modifieraient ensemble.
+    rowSeq = Math.max(rowSeq, prochainRowId(r.appareils) - 1);
+    return r;
+  });
   const { user } = useAuth();
   // Les kits viennent de l'état : ils se modifient dans « Mes kits », l'assistant
   // reflète immédiatement les prix du gérant sans mise à jour de l'application.
-  const { addDevis, leadsForUser, partners, ensurePartnerForUser, kits, inverters, products } = useData();
+  const { addDevis, updateDevis, leadsForUser, partners, ensurePartnerForUser, kits, inverters, products } = useData();
   const SOLAR_KITS = useMemo(() => kits || [], [kits]);
   const INVERTERS = useMemo(() => inverters || [], [inverters]);
   // Client déjà choisi (fiche client) : l'étape de sélection est sautée.
-  const [step, setStep] = useState(initialLeadId ? 2 : 1);
-  const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);
+  const [step, setStep] = useState(initialLeadId || devisAModifier ? 2 : 1);
+  const [selectedLeadId, setSelectedLeadId] = useState(devisAModifier?.leadId || initialLeadId);
   const [partnerId, setPartnerId] = useState('');
 
   // Chaque devis a impérativement un apporteur : le profil partenaire du
@@ -46,7 +63,7 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
     setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id)?.id || '' : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, partners]);
-  const [rows, setRows] = useState([]); // appareils sélectionnés
+  const [rows, setRows] = useState(reprise.appareils); // appareils sélectionnés
   // Production de la fiche PDF : quelques secondes sur un téléphone d'entrée
   // de gamme. Sans cet état, on appuie deux fois et deux onglets s'ouvrent.
   const [ficheEnCours, setFicheEnCours] = useState(false);
@@ -55,24 +72,24 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
   // saisie directe des kWh, ou FACTURE d'électricité mensuelle en F CFA (CEET
   // au Togo, SBEE au Bénin) — pour le client qui ne connaît pas ses appareils
   // mais sait ce qu'il paie.
-  const [consoMode, setConsoMode] = useState('appareils');
+  const [consoMode, setConsoMode] = useState(reprise.consoMode);
   const manualMode = consoMode !== 'appareils'; // la fiche technique n'a pas de liste d'appareils
-  const [manual, setManual] = useState({ day: '', night: '' });
-  const [facture, setFacture] = useState({ montant: '', prixKwh: PRIX_KWH_RESEAU, repartition: DEFAULT_REPARTITION });
+  const [manual, setManual] = useState(reprise.manuel);
+  const [facture, setFacture] = useState(reprise.facture);
   // Off-grid par défaut : cas majoritaire sur le terrain.
-  const [systemType, setSystemType] = useState('off-grid');
+  const [systemType, setSystemType] = useState(reprise.systemType);
   // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
-  const [autonomyNights, setAutonomyNights] = useState(DEFAULT_AUTONOMY_NIGHTS);
+  const [autonomyNights, setAutonomyNights] = useState(reprise.autonomyNights);
   // Type de support des panneaux : tôle par défaut (cas le plus courant).
-  const [mountingType, setMountingType] = useState(DEFAULT_MOUNTING_TYPE);
+  const [mountingType, setMountingType] = useState(reprise.mountingType);
   // Inclure ou non la structure de montage au devis (client qui a déjà le sien).
-  const [includeMounting, setIncludeMounting] = useState(true);
+  const [includeMounting, setIncludeMounting] = useState(reprise.includeMounting);
   // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
   // ou recherche de ville ; repli en saisie manuelle des heures de pic.
-  const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
+  const [sunHours, setSunHours] = useState(reprise.sunHours);
   const [query, setQuery] = useState('');
-  const [location, setLocation] = useState(null); // { name, lat, lon }
-  const [solar, setSolar] = useState(null);        // { peakSunHours, yearlyYield, optimalAngle, source }
+  const [location, setLocation] = useState(reprise.location); // { name, lat, lon }
+  const [solar, setSolar] = useState(reprise.solarSource ? { source: reprise.solarSource } : null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
 
@@ -247,18 +264,36 @@ export default function SolarWizard({ onDone, initialLeadId = null }) {
       city: location?.name || null,
       kit: selectedKit.name,
     };
-    addDevis({
-      type: 'solar',
-      leadId: selectedLeadId,
-      partnerId: partnerId || null,
+    // L'ÉTUDE elle-même est rangée sur le devis : liste des appareils, mode de
+    // saisie, ensoleillement retenu. Sans elle, le devis gardait le résultat
+    // sans ce qui l'avait produit — impossible de revenir changer un
+    // climatiseur sans tout ressaisir de mémoire.
+    const dimensionnement = capturerDimensionnement({
+      consoMode, rows, manual, facture, systemType, autonomyNights,
+      mountingType, includeMounting, sunHours: psh, location, solar,
+    });
+    const contenu = {
       consumption,
       sizing: submitSizing,
       kit: { id: selectedKit.id, name: selectedKit.name },
       quotation: displayQuotation,
       total: displayQuotation.total,
-      statut,
-      createdBy: user.id,
-    });
+      dimensionnement,
+    };
+    if (devisAModifier) {
+      // Mise à jour, jamais duplication : le numéro, l'apporteur, l'étape et
+      // la commission déjà calculée restent attachés au même document.
+      updateDevis(devisAModifier.id, contenu);
+    } else {
+      addDevis({
+        type: 'solar',
+        leadId: selectedLeadId,
+        partnerId: partnerId || null,
+        statut,
+        createdBy: user.id,
+        ...contenu,
+      });
+    }
     onDone();
   };
 

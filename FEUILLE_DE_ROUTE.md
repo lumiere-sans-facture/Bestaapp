@@ -75,6 +75,8 @@ avec l'horloge simulée).*
 - [ ] **Correspondance kits BestaSolar** : proposer automatiquement le kit du catalogue le plus adapté au dimensionnement, avec modèle et prix (§3.2.3)
 - [ ] **Autonomie** estimée (jours sans soleil) paramétrable
 - [ ] Choix **contrôleur MPPT/PWM** avec ampérage + **sections de câble (mm²)** recommandées
+- [x] **Historique de l'étude** : la liste des appareils, le mode de saisie et l'ensoleillement retenu sont
+      gardés avec le devis, rouvrables et modifiables (le devis est mis à jour, jamais dupliqué)
 - [ ] **Modèles de charges sauvegardés** (profils fréquents : maison type, boutique, congélateur…)
 - [ ] Ajouter les kits congélateurs de l'annexe 10.3 au catalogue (118 L → 318 L) quand les prix seront fournis
 
