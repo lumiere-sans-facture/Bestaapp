@@ -5,6 +5,7 @@
 // client utilisent `etapeDuClient` pour la synthèse.
 // La numérotation des documents est déduite de l'existant : un compteur local
 // n'est pas répliqué et produirait des numéros en double entre appareils.
+import { DAY_MS } from './date';
 
 /** Étape d'un devis : la sienne, sinon celle de son client (devis créés avant
  *  le suivi par devis), sinon « nouveau » — jamais « proposition » par défaut :
@@ -117,3 +118,103 @@ export function etapeDuClient(stagesDevis = []) {
   return ouvertes.reduce((best, st) =>
     (ORDRE_ETAPES.indexOf(st) > ORDRE_ETAPES.indexOf(best) ? st : best));
 }
+
+// ---------------------------------------------------------------------------
+// CYCLE DE VIE D'UN DEVIS — état dérivé, jamais stocké.
+//
+// Un devis finalisé restait une affaire ouverte indéfiniment : au bout de six
+// mois, le kanban montrait encore comme « en négociation » des devis dont le
+// prix n'était plus valable. La validité est une donnée du document (elle est
+// imprimée dessus) ; l'état s'en déduit, exactement comme le statut d'un
+// abonnement se déduit de sa date de fin (utils/subscription.js).
+//
+// Ne rien stocker évite la dérive classique : un champ « expiré » figé le jour
+// où quelqu'un a ouvert l'app, faux dès le lendemain, et qui doit être
+// recalculé par une tâche de fond — impossible dans une app locale d'abord.
+// ---------------------------------------------------------------------------
+
+/**
+ * Validité par défaut d'un devis, en jours.
+ * DÉCISION D3 EN ATTENTE (feuille de route) : le cahier des charges évoque
+ * 60 jours, la pratique actuelle est de 30. On reste sur 30 — la valeur
+ * imprimée sur les devis déjà émis — et chaque devis peut porter la sienne
+ * dans `validiteJours`.
+ */
+export const VALIDITE_JOURS = 30;
+
+const jourISO = (d) => new Date(d).toISOString().slice(0, 10);
+
+/** Dernier jour de validité d'un devis (AAAA-MM-JJ), ou null si indatable. */
+export function dateExpiration(devis) {
+  const depart = devis?.date || devis?.createdAt;
+  if (!depart) return null;
+  const t = new Date(depart).getTime();
+  if (!Number.isFinite(t)) return null;
+  const jours = Number(devis.validiteJours) > 0 ? Number(devis.validiteJours) : VALIDITE_JOURS;
+  return jourISO(t + jours * DAY_MS);
+}
+
+/**
+ * Jours restants avant expiration : 0 le dernier jour, négatif au-delà.
+ * null si le devis n'est pas datable.
+ */
+export function joursAvantExpiration(devis, maintenant = new Date()) {
+  const fin = dateExpiration(devis);
+  if (!fin) return null;
+  return Math.round((new Date(`${fin}T00:00:00`) - new Date(`${jourISO(maintenant)}T00:00:00`)) / DAY_MS);
+}
+
+/**
+ * État commercial d'un devis, dans l'ordre où il prime :
+ *
+ *  · `brouillon` — pas encore émis, donc rien à expirer ;
+ *  · `converti`  — vendu. Une vente conclue ne s'annule pas au calendrier ;
+ *  · `perdu`     — issue négative, l'expiration n'apporte rien ;
+ *  · `expire`    — validité dépassée sans issue : le prix n'engage plus ;
+ *  · `en-cours`  — affaire ouverte, dans les délais.
+ *
+ * @param {object} devis
+ * @param {object} [lead]        client, pour l'étape héritée (devis anciens)
+ * @param {Date}   [maintenant]
+ */
+export function etatDevis(devis, lead = null, maintenant = new Date()) {
+  if (!devis) return null;
+  if (devis.statut === 'brouillon') return 'brouillon';
+  const stage = devisStage(devis, lead);
+  if (stage === 'gagne') return 'converti';
+  if (stage === 'perdu') return 'perdu';
+  const restants = joursAvantExpiration(devis, maintenant);
+  return restants != null && restants < 0 ? 'expire' : 'en-cours';
+}
+
+export const ETAT_DEVIS_LABEL = {
+  brouillon: 'Brouillon',
+  'en-cours': 'En cours',
+  converti: 'Converti en vente',
+  expire: 'Expiré',
+  perdu: 'Perdu',
+};
+
+/**
+ * Devis à relancer : émis, sans issue, et dont la validité tombe dans les
+ * `seuil` jours. C'est la liste qui vaut de l'argent — un devis qu'on laisse
+ * expirer est une vente perdue sans que personne l'ait décidé.
+ */
+export function devisAExpirer(devisList = [], leads = [], seuil = 7, maintenant = new Date()) {
+  const clientDe = new Map(leads.map((l) => [l.id, l]));
+  return devisList
+    .filter((d) => d.type !== 'pro')
+    .filter((d) => etatDevis(d, clientDe.get(d.leadId), maintenant) === 'en-cours')
+    .map((d) => ({ devis: d, lead: clientDe.get(d.leadId) || null, jours: joursAvantExpiration(d, maintenant) }))
+    .filter((x) => x.jours != null && x.jours <= seuil)
+    .sort((a, b) => a.jours - b.jours);
+}
+
+/**
+ * Montant retenu pour une vente : celui FIGÉ à la conversion.
+ *
+ * Sans ce gel, modifier un devis après la vente changerait rétroactivement le
+ * chiffre d'affaires et la commission déjà calculée du partenaire.
+ */
+export const montantVente = (devis) =>
+  (Number(devis?.montantVente) > 0 ? Number(devis.montantVente) : Number(devis?.total) || 0);

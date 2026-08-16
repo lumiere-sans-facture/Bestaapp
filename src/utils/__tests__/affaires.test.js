@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildAffaires, devisStage, devisDuClient } from '../affaires';
+import {
+  buildAffaires, devisStage, devisDuClient,
+  dateExpiration, joursAvantExpiration, etatDevis, devisAExpirer, montantVente,
+} from '../affaires';
 import { missingCommissionsForDevis, reconcileMissingCommissions } from '../commissionSync';
 
 const RATES = { 1: 0.03, 2: 0.015 };
@@ -219,5 +222,74 @@ describe('reconcileMissingCommissions — rattrapage du suivi par affaire', () =
       partners, commissions: [], referrals: [],
     }, RATES, '2026-08-03');
     expect(created).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cycle de vie d'un devis. Le piège que ces tests gardent : un devis vendu ou
+// perdu ne doit JAMAIS basculer en « expiré » le jour où sa validité tombe —
+// une vente conclue ne se défait pas au calendrier.
+// ---------------------------------------------------------------------------
+describe('cycle de vie d’un devis', () => {
+  const LE_15 = new Date('2026-08-15T10:00:00Z');
+  const devisDu = (jour, extra = {}) => ({
+    id: 'd1', leadId: 'l1', statut: 'finalise', date: jour, total: 900000, ...extra,
+  });
+
+  it('calcule la date d’expiration à 30 jours par défaut', () => {
+    expect(dateExpiration(devisDu('2026-08-01'))).toBe('2026-08-31');
+  });
+
+  it('respecte la validité portée par le devis', () => {
+    expect(dateExpiration(devisDu('2026-08-01', { validiteJours: 60 }))).toBe('2026-09-30');
+  });
+
+  it('compte les jours restants, zéro le dernier jour', () => {
+    expect(joursAvantExpiration(devisDu('2026-08-01'), LE_15)).toBe(16);
+    expect(joursAvantExpiration(devisDu('2026-07-16'), LE_15)).toBe(0);
+    expect(joursAvantExpiration(devisDu('2026-07-01'), LE_15)).toBe(-15);
+  });
+
+  it('déclare expiré un devis émis dont la validité est passée', () => {
+    expect(etatDevis(devisDu('2026-07-01'), null, LE_15)).toBe('expire');
+    expect(etatDevis(devisDu('2026-08-01'), null, LE_15)).toBe('en-cours');
+  });
+
+  it('n’expire jamais un brouillon : il n’a pas été émis', () => {
+    expect(etatDevis(devisDu('2026-01-01', { statut: 'brouillon' }), null, LE_15)).toBe('brouillon');
+  });
+
+  it('n’expire jamais une vente conclue ni une affaire perdue', () => {
+    expect(etatDevis(devisDu('2026-01-01', { stage: 'gagne' }), null, LE_15)).toBe('converti');
+    expect(etatDevis(devisDu('2026-01-01', { stage: 'perdu' }), null, LE_15)).toBe('perdu');
+  });
+
+  it('hérite de l’étape du client pour les devis créés avant le suivi par devis', () => {
+    expect(etatDevis(devisDu('2026-01-01'), { stage: 'gagne' }, LE_15)).toBe('converti');
+  });
+
+  it('liste les devis à relancer, du plus urgent au moins urgent', () => {
+    const leads = [{ id: 'l1', name: 'Client A' }];
+    // Validité 30 jours, nous sommes le 15 août.
+    const liste = [
+      devisDu('2026-07-21', { id: 'dans-5-jours' }),            // expire le 20 août
+      devisDu('2026-07-01', { id: 'deja-expire' }),             // expiré le 31 juillet
+      devisDu('2026-07-17', { id: 'dans-1-jour' }),             // expire le 16 août
+      devisDu('2026-08-10', { id: 'loin' }),                    // expire le 9 septembre
+      devisDu('2026-07-17', { id: 'vendu', stage: 'gagne' }),
+      devisDu('2026-07-17', { id: 'brouillon', statut: 'brouillon' }),
+    ];
+    expect(devisAExpirer(liste, leads, 7, LE_15).map((x) => x.devis.id))
+      .toEqual(['dans-1-jour', 'dans-5-jours']);
+  });
+
+  it('écarte les documents Pro, qui ne sont pas des affaires du réseau', () => {
+    const liste = [devisDu('2026-07-22', { id: 'pro1', type: 'pro' })];
+    expect(devisAExpirer(liste, [{ id: 'l1' }], 7, LE_15)).toEqual([]);
+  });
+
+  it('retient le montant FIGÉ à la vente, pas le total courant', () => {
+    expect(montantVente({ total: 900000 })).toBe(900000);
+    expect(montantVente({ total: 1200000, montantVente: 900000 })).toBe(900000);
   });
 });

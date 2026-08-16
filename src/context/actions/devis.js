@@ -74,6 +74,14 @@ export function createDevisActions(setState) {
               pendingStage: null,
               wonAt: stage === 'gagne' ? today : x.wonAt,
               lostAt: stage === 'perdu' ? today : null,
+              // Le montant de la vente est FIGÉ ici, une fois. Sans cela,
+              // corriger le devis après coup changerait rétroactivement le
+              // chiffre d'affaires ET la commission déjà versée au partenaire.
+              // Figé une seule fois : reconvertir un devis déjà vendu ne doit
+              // pas réécrire le montant sur lequel la commission a été calculée.
+              ...(stage === 'gagne' && x.montantVente == null
+                ? { montantVente: Number(x.total) || 0 }
+                : {}),
             }
           : x
       ),
