@@ -24,7 +24,9 @@ export default function PompeWizard({ onDone, initialLeadId = null }) {
   // Les kits viennent de l'état : ils se modifient dans « Kits pompage »,
   // l'assistant reflète immédiatement les réglages du gérant.
   const { addDevis, leadsForUser, partners, ensurePartnerForUser, pompeKits } = useData();
-  const kitsDisponibles = pompeKits || [];
+  // Mémorisé : `pompeKits || []` fabriquait un tableau NEUF à chaque rendu,
+  // ce qui invalidait la suggestion de kit ci-dessous à chaque frappe.
+  const kitsDisponibles = useMemo(() => pompeKits || [], [pompeKits]);
 
   const [step, setStep] = useState(initialLeadId ? 2 : 1);
   const [selectedLeadId, setSelectedLeadId] = useState(initialLeadId);

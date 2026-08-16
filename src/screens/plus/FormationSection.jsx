@@ -400,7 +400,7 @@ export default function FormationSection({ onBack }) {
             </div>
           </section>
           <div className="school-program-title">Programme du cours</div>
-          {(course.modules || []).map((m, mi) => {
+          {(course.modules || []).map((m) => {
             const done_m = (m.lecons || []).filter((l) => done(l.id)).length;
             const ouvert = openModules.has(m.id);
             return (

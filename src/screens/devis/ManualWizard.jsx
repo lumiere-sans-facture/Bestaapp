@@ -63,7 +63,7 @@ export default function ManualWizard({ onDone, initialItems, initialLeadId = nul
         const product = products.find((p) => p.id === id);
         return sum + getPrice(product?.basePrice || 0) * qty;
       }, 0),
-    [items, products] // eslint-disable-line react-hooks/exhaustive-deps
+    [items, products]
   );
 
   const handleSubmit = (statut = 'finalise') => {

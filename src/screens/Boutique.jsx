@@ -138,7 +138,7 @@ export default function Boutique() {
       .sort((a, b) => (a.stock === 0) - (b.stock === 0));
   // getPrice n'est pas listé : il est stable (ne dépend d'aucun état) et
   // serait recréé à chaque rendu, invalidant le mémo en vain.
-  }, [products, selectedCategory, search, priceRange, powerRange]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [products, selectedCategory, search, priceRange, powerRange]);
 
   const handlePayOnline = () => {
     setPayForm({ operator: 'T-Money (Yas)', phone: user.phone || '' });

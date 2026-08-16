@@ -43,6 +43,14 @@ export default [
       'react/prop-types': 'off',     // pas de typage runtime, la revue suffit
       'react/no-unescaped-entities': 'off', // UI en français : apostrophes partout
       'no-empty': ['error', { allowEmptyCatch: true }], // catch vides assumés
+      // Les documents composent « 4,96 kWc » avec une espace fine insécable
+      // (U+202F) ou insécable (U+00A0) : c'est une CONVENTION du projet, pas
+      // un caractère collé par accident. Elle vit dans des gabarits et des
+      // expressions régulières, d'où ces exceptions. Hors de ces contextes,
+      // la règle reste active : un espace exotique dans du code est un bug.
+      'no-irregular-whitespace': ['error', {
+        skipStrings: true, skipTemplates: true, skipRegExps: true, skipComments: true,
+      }],
     },
   },
   {
@@ -51,8 +59,18 @@ export default [
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    // Fichiers de configuration exécutés par Node
-    files: ['vite.config.js', 'eslint.config.js', 'capacitor.config.*'],
+    // Code exécuté par NODE, jamais par le navigateur : fonctions serverless
+    // Vercel (api/), scripts de bout en bout, outils de prévisualisation et
+    // fichiers de configuration. Sans cette déclaration, `process` y était
+    // signalé comme inexistant — 16 fausses alertes qui masquaient les vraies.
+    files: [
+      'api/**/*.js',
+      'e2e/**/*.{js,mjs}',
+      '**/*.mjs',
+      'vite.config.js',
+      'eslint.config.js',
+      'capacitor.config.*',
+    ],
     languageOptions: { globals: { ...globals.node } },
   },
 ];

@@ -24,7 +24,6 @@ const DSN_BRUT = String(import.meta.env.VITE_SENTRY_DSN || '').trim();
 // en le disant — et sans télécharger le SDK pour rien.
 const DSN = dsnValide(DSN_BRUT) ? DSN_BRUT : '';
 if (DSN_BRUT && !DSN) {
-  // eslint-disable-next-line no-console
   console.warn(
     '[BestaSolar] VITE_SENTRY_DSN mal formé — Sentry est désactivé. '
     + 'Attendu : https://<clé>@<organisation>.ingest.<région>.sentry.io/<projet>'

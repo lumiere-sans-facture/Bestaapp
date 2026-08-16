@@ -15,12 +15,26 @@ npm run dev       # http://localhost:3000 (mode local, sans backend)
 npm run build     # bundle de production -> dist/  (À LANCER avant tout commit)
 npm run preview   # prévisualiser le build
 npm run test      # tests unitaires (Vitest) sur la logique métier pure
+npm run lint      # ESLint — doit sortir 0 problème
+npm run e2e       # parcours de bout en bout (nécessite `npm run dev` à côté)
 ```
 
-Pas de linter configuré. **La vérification, c'est `npm run test` ET `npm run build`
-qui passent sans erreur**, plus une relecture du diff. Les tests couvrent les
+**La vérification, c'est `npm run test`, `npm run lint` ET `npm run build` qui
+passent sans erreur**, plus une relecture du diff. Les tests couvrent les
 utilitaires purs de `src/utils/` (devis solaire, totaux facture, affiliation, dates,
 abonnement, format, puissance) — y ajouter un test quand on touche à cette logique.
+
+Le linter est volontairement étroit : il ne juge pas le style, il attrape ce qui
+casse en production (`no-undef` — une variable supprimée mais encore référencée
+dans du JSX a déjà blanchi un écran). Deux réglages à connaître avant de
+« corriger » un signalement : `api/`, `e2e/` et les `.mjs` tournent sous **Node**
+(`process` y est légitime), et l'espace fine insécable des unités (« 4,96 kWc »)
+est une convention du projet, pas un caractère collé par accident.
+
+Un changement qui se voit à l'écran se vérifie **dans un navigateur** : les tests
+ne voient ni un bouton masqué par un rôle, ni une fenêtre bloquée, ni un CSS sans
+effet. Procédures détaillées dans `.claude/skills/` (`publier`,
+`verifier-au-navigateur`), appliquées automatiquement par les sessions Claude.
 
 ## Invariants à préserver (ne pas casser)
 

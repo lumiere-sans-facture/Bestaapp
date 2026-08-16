@@ -147,7 +147,6 @@ export const libelleRoi = (mois) => {
 export const computeSheet = (d) => {
   const conso = d.consumption;
   const consoJour = conso.day + conso.night;
-  const { panelEfficiency } = SIZING_PARAMS;
   const autonomyNights = d.sizing.autonomyNights || 1;
   const nightEnergyForPanels = d.systemType === 'on-grid' ? conso.night : conso.night * autonomyNights;
   // Énergie que l'installation doit FOURNIR au client dans la journée : la
