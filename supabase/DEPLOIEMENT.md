@@ -38,9 +38,17 @@ Dans **SQL Editor** du dashboard Supabase :
 | 1 | `schema.sql` | Tables + temps réel + tombstones |
 | 2 | `security.sql` | Accès réservé aux porteurs d'un profil (bloque les inscrits inconnus) |
 | 3 | `multitenant.sql` | Organisations, isolation par entreprise (RLS), inscription self-service, codes d'invitation, verrou serveur des abonnements |
-| 4 | `temps-reel.sql` | Diffusion immédiate des changements à toute l'équipe (à rejouer après l'ajout d'une table) |
-| 5 | `paiements.sql` | Moyens de paiement configurables depuis l'espace gérant (clés PUBLIQUES uniquement) |
-| 6 | `erreurs.sql` | Journal des plantages — sans lui, aucune panne ne vous remonte |
+| 4 | `paiements.sql` | Moyens de paiement configurables depuis l'espace gérant (clés PUBLIQUES uniquement) |
+| 5 | `erreurs.sql` | Journal des plantages — sans lui, aucune panne ne vous remonte |
+| 6 | `temps-reel.sql` | **En dernier, et facultatif** — diffusion immédiate à toute l'équipe (à rejouer après l'ajout d'une table) |
+
+`temps-reel.sql` vient en dernier parce qu'il ne crée rien : il ne fait
+qu'INSCRIRE au temps réel des tables déjà existantes. Passé plus tôt, il
+ignore simplement celles qui n'existent pas encore. Et il est **facultatif** :
+sans lui l'app fonctionne, chaque appareil relisant le serveur au plus tard
+toutes les minutes et à chaque retour à l'écran. Il fait passer de « au plus
+tard une minute » à « immédiat ». **Il ne doit donc jamais retarder une mise
+en production.**
 
 Les scripts sont idempotents (ré-exécutables sans danger) — **à une
 exception près** : une fois `multitenant.sql` passé, ne PAS rejouer
@@ -416,7 +424,7 @@ données des clients. Mais elle a un prix : **tout ce qui n'est pas du code doit
 Dans cet ordre, à chaque fois :
 
 1. Les scripts SQL du § 2 : `schema.sql` → `security.sql` → `multitenant.sql`
-   → `temps-reel.sql` → `paiements.sql` → `erreurs.sql`.
+   → `paiements.sql` → `erreurs.sql`, puis `temps-reel.sql` **en dernier**.
 2. *Authentication → SMTP* (§ 10), *« Confirm email »*, *Site URL* et
    *Redirect URLs* — avec **l'adresse propre à cet environnement**.
 3. Se déclarer admin plateforme (§ 4) : les comptes ne sont **pas** partagés

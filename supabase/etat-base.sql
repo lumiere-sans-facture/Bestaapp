@@ -23,25 +23,25 @@
 -- ---------------------------------------------------------------------------
 with attendues(table_name, script) as (
   values
-    ('profiles',           '2 · schema.sql'),
-    ('leads',              '2 · schema.sql'),
-    ('devis',              '2 · schema.sql'),
-    ('products',           '2 · schema.sql'),
-    ('partners',           '2 · schema.sql'),
-    ('commissions',        '2 · schema.sql'),
-    ('referrals',          '2 · schema.sql'),
-    ('orders',             '2 · schema.sql'),
-    ('kits',               '2 · schema.sql'),
-    ('inverters',          '2 · schema.sql'),
-    ('formations',         '2 · schema.sql'),
-    ('tombstones',         '2 · schema.sql — REQUIS pour la suppression multi-appareils'),
+    ('profiles',           '1 · schema.sql'),
+    ('leads',              '1 · schema.sql'),
+    ('devis',              '1 · schema.sql'),
+    ('products',           '1 · schema.sql'),
+    ('partners',           '1 · schema.sql'),
+    ('commissions',        '1 · schema.sql'),
+    ('referrals',          '1 · schema.sql'),
+    ('orders',             '1 · schema.sql'),
+    ('kits',               '1 · schema.sql'),
+    ('inverters',          '1 · schema.sql'),
+    ('formations',         '1 · schema.sql'),
+    ('tombstones',         '1 · schema.sql — REQUIS pour la suppression multi-appareils'),
     ('orgs',               '3 · multitenant.sql'),
     ('companies',          '3 · multitenant.sql'),
     ('subscriptions',      '3 · multitenant.sql'),
     ('factures',           '3 · multitenant.sql'),
-    ('paiementConfigs',    '5 · paiements.sql'),
-    ('paiements_verifies', '5 · paiements.sql — verrou anti-rejeu des paiements'),
-    ('erreurs',            '6 · erreurs.sql — journal des plantages')
+    ('paiementConfigs',    '4 · paiements.sql'),
+    ('paiements_verifies', '4 · paiements.sql — verrou anti-rejeu des paiements'),
+    ('erreurs',            '5 · erreurs.sql — journal des plantages')
 )
 select
   a.table_name                                as "table",
