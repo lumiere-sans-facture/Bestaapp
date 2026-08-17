@@ -443,7 +443,24 @@ variables pour *Production* **et** *Preview*, et ne jamais faire pointer un
 environnement vers la base de l'autre. Un aperçu qui écrit dans la vraie base
 crée des comptes et des devis bien réels.
 
-### 11.3 Vérifier qu'un environnement est complet
+### 11.3 Savoir ce qui manque AVANT de toucher à la base
+
+Exécuter **`supabase/etat-base.sql`** dans le SQL Editor du projet concerné.
+Il est en **lecture seule** : il ne crée rien, ne modifie rien. Il dit quelles
+tables manquent, si l'isolation par entreprise (`org_id` + RLS) est en place,
+si le temps réel est branché, et combien de comptes et de clients contient la
+base — de quoi ne jamais confondre les deux.
+
+⚠️ **On ne « recopie » jamais une base dans l'autre.** Les scripts de
+`supabase/` sont les mêmes pour les deux environnements : on les EXÉCUTE dans
+chacun, et ils n'ajoutent que ce qui manque. Copier la base de test sur la
+production effacerait les vrais clients, devis et commissions.
+
+⚠️ **Une fois `multitenant.sql` passé, ne PAS rejouer `schema.sql`** : il
+réinstallerait l'accès « toute l'équipe » à la place de l'isolation par
+entreprise. Pour rétablir seulement le temps réel, utiliser `temps-reel.sql`.
+
+### 11.4 Vérifier qu'un environnement est complet
 
 Ouvrir l'app de cet environnement :
 
