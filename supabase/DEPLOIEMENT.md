@@ -397,6 +397,62 @@ l'e-mail arrive, et c'est la page d'arrivée qui refuse.
 Les textes des deux e-mails sont dans `supabase/emails/` — à coller dans
 *Authentication → Email Templates*.
 
+## 11. Deux environnements — comment les tenir alignés
+
+Le projet vit sur **deux environnements complets**, chacun avec son projet
+Vercel et son projet Supabase :
+
+| | Branche déployée | Base | Paiement |
+|---|---|---|---|
+| **Test** | `claude/kit-selection-preconfigured-ixj6o0` | recette | KkiaPay **Sandbox** |
+| **Production** | `main` | réelle | KkiaPay **Live** |
+
+C'est la bonne architecture — elle évite d'écrire des devis d'essai dans les
+données des clients. Mais elle a un prix : **tout ce qui n'est pas du code doit
+être fait deux fois.**
+
+### 11.1 Ce qui se fait DANS LES DEUX projets Supabase
+
+Dans cet ordre, à chaque fois :
+
+1. Les scripts SQL du § 2 : `schema.sql` → `security.sql` → `multitenant.sql`
+   → `temps-reel.sql` → `paiements.sql` → `erreurs.sql`.
+2. *Authentication → SMTP* (§ 10), *« Confirm email »*, *Site URL* et
+   *Redirect URLs* — avec **l'adresse propre à cet environnement**.
+3. Se déclarer admin plateforme (§ 4) : les comptes ne sont **pas** partagés
+   entre les deux bases, c'est deux fois le même geste.
+
+⚠️ **Le piège de la mise en production.** Fusionner vers `main` déploie le
+CODE, pas le schéma. Du code neuf devant une base restée en arrière donne une
+table manquante, donc une synchronisation en échec — visible au voyant rouge
+de *Plus*, mais après coup. **Passer les scripts SQL sur la base de production
+AVANT de fusionner**, jamais après.
+
+### 11.2 Ce qui doit DIFFÉRER entre les deux
+
+| Variable Vercel | Test | Production |
+|---|---|---|
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | base de recette | base réelle |
+| `VITE_KKIAPAY_PUBLIC_KEY` | clé Sandbox | clé Live |
+| `VITE_KKIAPAY_SANDBOX` | `true` | `false` |
+| `KKIAPAY_PRIVATE_KEY`, `KKIAPAY_SECRET` | onglet Sandbox | onglet Live |
+| `SUPABASE_SERVICE_ROLE_KEY` | base de recette | base réelle |
+
+**La règle qui évite les accidents** : sur chaque projet Vercel, cocher les
+variables pour *Production* **et** *Preview*, et ne jamais faire pointer un
+environnement vers la base de l'autre. Un aperçu qui écrit dans la vraie base
+crée des comptes et des devis bien réels.
+
+### 11.3 Vérifier qu'un environnement est complet
+
+Ouvrir l'app de cet environnement :
+
+| Ce qu'on voit | Ce que ça veut dire |
+|---|---|
+| *Plus* affiche « Mode local — données sur cet appareil » | les variables Supabase manquent sur ce projet Vercel |
+| Voyant rouge de synchronisation | la base répond mais **il manque des tables** : scripts SQL non passés |
+| *Plus → Diagnostic* en vert, « Mot de passe oublié » reçu | l'environnement est complet |
+
 ## Ce que fait l'app selon la configuration
 
 | | Sans backend (démo) | Backend configuré (SaaS) |

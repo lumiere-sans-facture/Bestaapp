@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Deux environnements documentés, et historiques de branche reliés : les fusions redeviennent ordinaires
 - Recette avant production : liste de vérification à dérouler sur l'aperçu, du plus risqué au plus visible
 - E-mails du compte : marche à suivre SMTP Brevo + textes français d'inscription et de mot de passe
 - Dimensionnement : l'étude est gardée avec le devis — on revient voir les appareils et on les corrige

@@ -104,6 +104,29 @@ exécuter `supabase/schema.sql` dans le SQL Editor Supabase — **y compris le b
 
 ## Git / déploiement
 
-- Développer sur la branche `claude/mobile-web-app-rebuild-7vdnm7`.
-- Vercel déploie automatiquement sur merge vers `main` (squash).
+**Deux branches, deux environnements complets** — chacun avec son projet Vercel
+ET son projet Supabase :
+
+| Branche | Vercel | Supabase | Rôle |
+|---|---|---|---|
+| `claude/kit-selection-preconfigured-ixj6o0` | projet *test* | base de recette | tout le développement |
+| `main` | projet *production* | base réelle | ce que voient les clients |
+
+- **Développer sur la branche de travail**, jamais directement sur `main`.
+- **Mettre en production** = fusionner la branche dans `main` et pousser ; Vercel
+  déploie tout seul. La marche complète est dans la procédure `publier`
+  (`.claude/skills/publier/`), et la liste de contrôle dans `RECETTE.md`.
 - Ne pas créer de PR sans demande explicite.
+
+⚠️ **Le code n'est que la moitié du déploiement.** Les scripts SQL de
+`supabase/` et les réglages d'authentification (SMTP, *Redirect URLs*,
+« Confirm email ») doivent être passés **dans les DEUX projets Supabase**.
+Du code neuf devant une base restée en arrière, c'est une table manquante et
+une synchronisation en échec. Détail dans `supabase/DEPLOIEMENT.md`.
+
+*Note d'historique* : la branche de travail est née d'un dépôt neuf le 3 août,
+sans ancêtre commun avec `main`. Les deux historiques ont été reliés le
+17 août par une fusion sans changement de contenu — les fusions suivantes sont
+donc des avances rapides ordinaires. Si un jour `git merge` réclame
+`--allow-unrelated-histories`, c'est que quelque chose a été recréé de zéro :
+s'arrêter et comprendre avant de forcer.
