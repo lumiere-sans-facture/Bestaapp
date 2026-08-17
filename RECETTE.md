@@ -21,8 +21,17 @@ reçus par e-mail arrivent mais sont refusés à l'atterrissage.
 
 Ces écrans n'existent pas en production aujourd'hui : tout est neuf.
 
+- [ ] Supabase → *Authentication → Providers → Email* : **« Confirm email »
+      activé**. Il était coupé tant qu'aucun SMTP ne marchait — l'activer sans
+      courrier qui part enferme tout le monde dehors.
 - [ ] **Inscription** d'un compte d'essai (adresse réelle) → l'e-mail de
       confirmation arrive, et le lien ouvre l'app connectée.
+- [ ] **Confirmer depuis un AUTRE appareil** que celui de l'inscription
+      (s'inscrire sur l'ordinateur, ouvrir le mail sur le téléphone). C'est le
+      cas le plus courant dans la vraie vie, et le plus fragile : les
+      informations d'inscription sont gardées sur l'appareil de départ. L'app
+      doit alors proposer de terminer l'inscription à la connexion, sans
+      perdre l'entreprise ni le code de parrainage.
 - [ ] **Mot de passe oublié** → l'e-mail arrive, le lien mène à la saisie du
       nouveau mot de passe, et le nouveau mot de passe fonctionne.
 - [ ] Brevo → *Transactional → Logs* : les deux envois en `delivered`.
