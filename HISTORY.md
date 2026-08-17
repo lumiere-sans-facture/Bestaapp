@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-10
+- Temps réel : une table qui coince n'interrompt plus l'inscription des suivantes
 - `etat-base.sql` : savoir en lecture seule ce qui manque à une base, avant d'y toucher
 - Deux environnements documentés, et historiques de branche reliés : les fusions redeviennent ordinaires
 - Recette avant production : liste de vérification à dérouler sur l'aperçu, du plus risqué au plus visible

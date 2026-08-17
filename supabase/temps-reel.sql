@@ -23,6 +23,14 @@
 do $$
 declare t text;
 begin
+  -- La publication est créée par Supabase. Si elle manque, aucune table ne
+  -- peut être inscrite : autant le dire en une phrase plutôt que de laisser
+  -- dix-neuf erreurs identiques défiler.
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    raise notice 'Publication « supabase_realtime » absente : rien à faire ici. Le temps réel est à activer dans Database → Replication.';
+    return;
+  end if;
+
   foreach t in array array[
     'products', 'kits', 'inverters', 'pompeKits', 'leads', 'partners',
     'commissions', 'devis', 'referrals', 'orders', 'formations',
@@ -37,8 +45,15 @@ begin
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
       raise notice 'Table % ajoutée au temps réel', t;
-    exception when duplicate_object then
-      raise notice 'Table % déjà diffusée', t;
+    exception
+      when duplicate_object then
+        raise notice 'Table % déjà diffusée', t;
+      -- TOUTE autre erreur est signalée puis ENJAMBÉE. Sans ce filet, un seul
+      -- cas particulier (droits insuffisants, objet qui n'est pas une vraie
+      -- table…) interrompait la boucle et les tables suivantes n'étaient
+      -- jamais inscrites — sans que rien ne le dise.
+      when others then
+        raise notice 'Table % non inscrite (%) : ignorée', t, sqlerrm;
     end;
   end loop;
 end $$;
