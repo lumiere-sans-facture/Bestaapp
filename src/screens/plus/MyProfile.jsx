@@ -1,18 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Wallet, Trophy, Star } from 'lucide-react';
+import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Star, Building2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { formatCFA, formatDate, initials } from '../../utils/format';
+import StageBadge from '../../components/StageBadge';
+import { formatCFA, formatNombre, formatDate, initials } from '../../utils/format';
 import { fileToResizedDataUrl } from '../../utils/image';
 import { ENSOLEILLEMENT } from '../../data/ensoleillement';
 import Field from '../../components/Field';
+import { useToast } from '../../components/Toast';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { updateMyProfile } from '../../lib/remoteSync';
 
+// Le profil ne parle QUE de la personne et de son travail en cours.
+// Rien de ce qui mène à une commission n'y figure — montants, Mobile Money,
+// affaires gagnées, historique des versements : tout vit dans « Mon espace
+// partenaire », d'un seul tenant.
 export default function MyProfile({ onBack }) {
   const { user } = useAuth();
-  const { partners, leads, commissions, ensurePartnerForUser, updatePartner } = useData();
+  const { partners, leads, devis, stages, lostStage, ensurePartnerForUser, updatePartner } = useData();
   const fileRef = useRef(null);
   const [form, setForm] = useState(null); // null = lecture
-  const [saved, setSaved] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     ensurePartnerForUser(user);
@@ -21,14 +29,15 @@ export default function MyProfile({ onBack }) {
   const me = partners.find((p) => p.userId === user.id);
   if (!me) return null;
 
-  const wonLeads = leads.filter((l) => l.assignedTo === user.id && l.stage === 'gagne');
-  const wonValue = wonLeads.reduce((s, l) => s + l.estimatedValue, 0);
-  const myComs = commissions.filter((c) => c.partnerId === me.id);
-  const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
-  const paid = myComs.filter((c) => c.status === 'payée').reduce((s, c) => s + c.amount, 0);
+  // Mes affaires encore ouvertes, de la plus récemment active à la plus ancienne.
+  const mesClients = leads
+    .filter((l) => l.assignedTo === user.id && l.stage !== 'gagne' && l.stage !== 'perdu')
+    .sort((a, b) => new Date(b.lastActivity || 0) - new Date(a.lastActivity || 0));
+  const mesDevis = (devis || []).filter((d) => d.createdBy === user.id);
+  const stageInfo = (l) => (l.stage === 'perdu' ? lostStage : stages.find((st) => st.id === l.stage));
 
   const startEdit = () =>
-    setForm({ name: me.name, phone: me.phone || '', email: me.email || '', zone: me.zone || '', momoNumber: me.momoNumber || '' });
+    setForm({ name: me.name, phone: me.phone || '', email: me.email || '', zone: me.zone || '' });
 
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0];
@@ -37,23 +46,32 @@ export default function MyProfile({ onBack }) {
       const dataUrl = await fileToResizedDataUrl(file, 240, 0.8);
       updatePartner(me.id, { photo: dataUrl });
     } catch {
-      alert('Impossible de lire cette image.');
+      toast('Impossible de lire cette image.', { type: 'error' });
     }
     e.target.value = '';
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
+    const nom = form.name.trim() || me.name;
     updatePartner(me.id, {
-      name: form.name.trim() || me.name,
+      name: nom,
       phone: form.phone.trim(),
       email: form.email.trim(),
       zone: form.zone,
-      momoNumber: form.momoNumber.trim(),
     });
     setForm(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    // L'annuaire de l'équipe vit dans `profiles` (serveur) : sans cet appel,
+    // les collègues continueraient de voir l'ancien nom.
+    if (isSupabaseConfigured) {
+      try {
+        await updateMyProfile({ name: nom, phone: form.phone.trim() });
+      } catch {
+        toast('Coordonnées enregistrées ici, mais pas encore partagées à l’équipe.', { type: 'error' });
+        return;
+      }
+    }
+    toast('Modifications enregistrées.');
   };
 
   return (
@@ -76,11 +94,12 @@ export default function MyProfile({ onBack }) {
           {me.name}
           {me.tier === 'or' && <span className="tier-badge"><Star size={12} /> OR</span>}
         </div>
-        <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'} · <span className="partner-code-chip">{me.code}</span></div>
+        <div className="profile-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'} · <span className="partner-code-chip">{me.code}</span></div>
+        {/* Le travail en cours, rien d'autre : issues des affaires et
+            montants se lisent dans « Mon espace partenaire ». */}
         <div className="profile-stats">
-          <div><div className="profile-stat-value">{formatCFA(pending)}</div><div className="profile-stat-label">Solde en attente</div></div>
-          <div><div className="profile-stat-value">{formatCFA(paid)}</div><div className="profile-stat-label">Commissions payées</div></div>
-          <div><div className="profile-stat-value">{wonLeads.length}</div><div className="profile-stat-label">Affaires gagnées</div></div>
+          <div><div className="profile-stat-value">{formatNombre(mesClients.length)}</div><div className="profile-stat-label">Clients en cours</div></div>
+          <div><div className="profile-stat-value">{formatNombre(mesDevis.length)}</div><div className="profile-stat-label">Devis créés</div></div>
         </div>
       </div>
 
@@ -88,9 +107,7 @@ export default function MyProfile({ onBack }) {
         <div className="profile-edit-header">
           <div className="card-title">Mes informations</div>
           {!form && (
-            <button className="btn btn-sm btn-outline" onClick={startEdit}>
-              {saved ? <><Check size={14} /> Enregistré</> : 'Modifier'}
-            </button>
+            <button className="btn btn-sm btn-outline" onClick={startEdit}>Modifier</button>
           )}
         </div>
         {form ? (
@@ -100,7 +117,7 @@ export default function MyProfile({ onBack }) {
                 <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </Field>
               <Field label="Téléphone">
-                <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+                <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
               </Field>
               <Field label="Email">
                 <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="vous@..." />
@@ -113,12 +130,9 @@ export default function MyProfile({ onBack }) {
                 </select>
               </Field>
             </div>
-            <Field label="Numéro Mobile Money (réception des commissions)">
-              <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+229 ..." />
-            </Field>
-            <div className="cart-actions">
-              <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>Annuler</button>
+            <div className="form-actions">
               <button type="submit" className="btn btn-primary btn-block"><Check size={16} /> Enregistrer</button>
+              <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>Annuler</button>
             </div>
           </form>
         ) : (
@@ -126,29 +140,39 @@ export default function MyProfile({ onBack }) {
             <div className="sheet-row"><span className="sheet-label"><Phone size={14} /> Téléphone</span><span className="sheet-value">{me.phone || '—'}</span></div>
             <div className="sheet-row"><span className="sheet-label"><Mail size={14} /> Email</span><span className="sheet-value">{me.email || '—'}</span></div>
             <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Zone d'intervention</span><span className="sheet-value">{me.zone || '—'}</span></div>
-            <div className="sheet-row"><span className="sheet-label"><Wallet size={14} /> Mobile Money</span><span className="sheet-value">{me.momoNumber || '—'}</span></div>
             <div className="sheet-row"><span className="sheet-label">Membre depuis</span><span className="sheet-value">{formatDate(me.registeredAt)}</span></div>
+            {/* Entreprise de rattachement. Déterminante : catalogue, clients et
+                cours de formation sont isolés par entreprise. Deux comptes ne
+                partagent leurs données que sous le MÊME identifiant — un simple
+                homonyme (deux « BestaSolar ») reste étanche. Sans cette ligne,
+                rien dans l'app ne permettait de le constater. */}
+            {user.org && (
+              <>
+                <div className="sheet-row">
+                  <span className="sheet-label"><Building2 size={14} /> Entreprise</span>
+                  <span className="sheet-value">{user.org.name}</span>
+                </div>
+                <div className="field-hint profile-org-id">Identifiant : {user.org.id}</div>
+              </>
+            )}
           </>
         )}
       </div>
 
+      {/* Progression de MES clients : le commercial suit l'avancement de ses
+          affaires sans ouvrir le kanban — y compris quand c'est le gérant qui
+          les a fait progresser, ou quand sa demande attend une validation. */}
       <div className="card my-partner-section">
-        <div className="card-title">Historique récent</div>
-        {myComs.length === 0 && wonLeads.length === 0 && (
-          <div className="text-sm text-secondary">Aucune activité pour le moment.</div>
-        )}
-        {myComs.slice(0, 5).map((c) => (
-          <div key={c.id} className="sheet-row">
-            <span className="sheet-label"><Wallet size={14} /> Commission niveau {c.level} · {formatDate(c.createdAt)}</span>
-            <span className="sheet-value">{formatCFA(c.amount)} <span className={`badge ${c.status === 'payée' ? 'badge-success' : 'badge-warning'}`}>{c.status === 'payée' ? 'Payée' : 'En attente'}</span></span>
-          </div>
-        ))}
-        {wonLeads.slice(0, 3).map((l) => (
+        <div className="card-title">Mes clients en cours ({mesClients.length})</div>
+        {mesClients.length ? mesClients.map((l) => (
           <div key={l.id} className="sheet-row">
-            <span className="sheet-label"><Trophy size={14} /> {l.name} · {formatDate(l.wonAt)}</span>
-            <span className="sheet-value amount">{formatCFA(l.estimatedValue)}</span>
+            <span className="sheet-label">{l.name}</span>
+            <span className="sheet-value">
+              <StageBadge stage={stageInfo(l)} />
+              {l.estimatedValue > 0 && ` ${formatCFA(l.estimatedValue)}`}
+            </span>
           </div>
-        ))}
+        )) : <div className="text-sm text-secondary">Aucun client en cours pour le moment.</div>}
       </div>
     </>
   );

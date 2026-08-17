@@ -49,8 +49,40 @@ describe('calculateSystemSize', () => {
   });
 
   it('choisit un onduleur avec 20 % de marge', () => {
-    // besoin ~2424 W -> +20% = 2909 W -> premier onduleur >= 2909 = 5 kVA
-    expect(sizing.inverter.capacity).toBe(5);
+    // Sans pic déclaré, la puissance PV posée sert de repère :
+    // 4 panneaux × 620 Wc = 2 480 W ; +20 % = 2 976 W -> 3 kVA (3 000 W).
+    expect(sizing.inverter.capacity).toBe(3);
+  });
+
+  it('ne rejette pas une sortie onduleur quand le pic n’est pas mesuré', () => {
+    // En saisie directe ou par facture, il n’y a pas de liste d’appareils :
+    // le pic est inconnu. Deux Deye 12 kVA peuvent donc être retenus selon
+    // leurs limites PV cumulées, sans erreur de sortie basée sur les panneaux.
+    const deuxDeye = [{ id: 'deye-12', capacity: 12, maxPower: 12000, maxPvPower: 12000 }];
+    const resultat = calculateSystemSize(
+      { day: 60, night: 40 }, 'off-grid', 5, undefined, 1,
+      { peakLoad: 0, inverters: deuxDeye, configures: deuxDeye },
+    );
+    expect(resultat.inverterQuantite).toBe(2);
+    expect(resultat.inverterTientPic).toBe(true);
+    expect(resultat.inverterSuffisant).toBe(true);
+  });
+
+  it('sans pic mesuré, la puissance PV guide quand même le CHOIX du calibre', () => {
+    // L'indulgence du verdict ne doit pas neutraliser la sélection : sinon le
+    // plus petit onduleur du catalogue est retenu pour n'importe quel besoin.
+    const gamme = [
+      { id: 'p1', capacity: 1, maxPvPower: 1300 },
+      { id: 'p6', capacity: 6, maxPvPower: 7800 },
+      { id: 'p12', capacity: 12, maxPvPower: 15600 },
+    ];
+    const petit = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, undefined, 1,
+      { peakLoad: 0, inverters: gamme });
+    const gros = calculateSystemSize({ day: 30, night: 20 }, 'off-grid', 5.5, undefined, 1,
+      { peakLoad: 0, inverters: gamme });
+    // 2 480 Wc posés → 1 kVA insuffisant ; 23 500 Wc → il faut le plus grand.
+    expect(petit.inverter.capacity).toBe(6);
+    expect(gros.inverter.capacity).toBe(12);
   });
 
   it('off-grid : prévoit des batteries ; on-grid : aucune', () => {
@@ -62,6 +94,26 @@ describe('calculateSystemSize', () => {
 
   it('garde au moins un panneau pour une conso minime', () => {
     expect(calculateSystemSize({ day: 0, night: 0.1 }, 'on-grid', 5.5).numberOfPanels).toBe(1);
+  });
+
+  it('autonomie batterie : les panneaux grandissent avec les nuits couvertes (off-grid/hybride)', () => {
+    // Un parc batterie taillé pour 2 nuits doit pouvoir se recharger en une
+    // journée même après une nuit blanche : les panneaux sont donc dimensionnés
+    // sur (jour + nuit × nuits d'autonomie), pas seulement sur jour + nuit.
+    const uneNuit = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, undefined, 1);
+    const deuxNuits = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5, undefined, 2);
+    expect(deuxNuits.requiredPanelPower).toBeCloseTo(uneNuit.requiredPanelPower + (5 / SIZING_PARAMS.panelEfficiency / 5.5) * 1000, 5);
+    expect(deuxNuits.numberOfPanels).toBeGreaterThan(uneNuit.numberOfPanels);
+    expect(deuxNuits.batteryCapacity).toBeCloseTo(uneNuit.batteryCapacity * 2, 5);
+
+    const hybride2 = calculateSystemSize({ day: 5, night: 5 }, 'hybrid', 5.5, undefined, 2);
+    const hybride1 = calculateSystemSize({ day: 5, night: 5 }, 'hybrid', 5.5, undefined, 1);
+    expect(hybride2.requiredPanelPower).toBeGreaterThan(hybride1.requiredPanelPower);
+
+    // Sans batterie, l'autonomie n'a pas de sens : les panneaux ne bougent pas.
+    const onGrid1 = calculateSystemSize({ day: 5, night: 5 }, 'on-grid', 5.5, undefined, 1);
+    const onGrid2 = calculateSystemSize({ day: 5, night: 5 }, 'on-grid', 5.5, undefined, 2);
+    expect(onGrid2.requiredPanelPower).toBeCloseTo(onGrid1.requiredPanelPower, 5);
   });
 });
 
@@ -91,9 +143,9 @@ describe('buildQuotation', () => {
     expect(sans.prestations).toHaveLength(1);
   });
 
-  it('privilégie le prix du catalogue produits quand fourni', () => {
+  it('privilégie le prix PUBLIC du catalogue produits quand fourni (jamais le prix technicien)', () => {
     const products = [{ category: 'panneaux', name: 'Panneau 550Wc', basePrice: 80000 }];
     const panneau = buildQuotation(sizing, { products }).components.find((c) => c.type === 'panneau');
-    expect(panneau.unitPrice).toBe(80000);
+    expect(panneau.unitPrice).toBe(Math.round(80000 * 1.1));
   });
 });

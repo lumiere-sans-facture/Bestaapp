@@ -13,7 +13,8 @@ const SAMPLE = [
  * données d'exemple, pas de génération PDF.
  */
 export default function FacturePreview({ company = {}, modele }) {
-  const bw = normalizeModele(modele || company.modeleDefaut) === 'sobre';
+  // « Classique » est le modèle noir et blanc ; Studio et Vague sont colorés.
+  const bw = normalizeModele(modele || company.modeleDefaut) === 'classique';
   const primary = bw ? '#212529' : (company.couleurPrimaire || '#0a2472');
   const secondary = bw ? '#5a606a' : (company.couleurSecondaire || '#f5a623');
   const name = company.nomEntreprise || 'Mon Entreprise';
@@ -58,7 +59,7 @@ export default function FacturePreview({ company = {}, modele }) {
         <div>
           <div className="fp-label">FACTURÉ À</div>
           <div className="fp-client">Client exemple</div>
-          <div className="fp-muted">Cotonou</div>
+          <div className="fp-muted">Lomé</div>
         </div>
         <div className="fp-meta">
           <div><span className="fp-muted">Numéro</span> <strong>FAC-2026-001</strong></div>

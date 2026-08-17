@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   detectBrand, parseKva, parseKwh,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog,
-  brandsOf, recommendInverterOption, suggestBatteryCombo,
+  brandsOf, suggestInverterFor, suggestBatteryCombo,
 } from '../solarSizing';
 
 const products = [
@@ -40,31 +40,39 @@ describe('parseKva / parseKwh', () => {
 });
 
 describe('inverterOptionsFromCatalog', () => {
-  it('ne garde que les onduleurs parsables, triés par capacité, avec marque et prix', () => {
+  it('ne garde que les onduleurs parsables, triés par capacité, avec marque et prix PUBLIC', () => {
     const opts = inverterOptionsFromCatalog(products);
     expect(opts.map((o) => o.capacity)).toEqual([3, 4.2, 6]);
-    expect(opts[2]).toMatchObject({ id: 'i1', brand: 'Growatt', capacity: 6, maxPower: 4800, price: 360000 });
+    // price = prix public (basePrice × 1,1), jamais le prix technicien —
+    // un devis client ne doit jamais montrer le prix de gros BestaSolar.
+    expect(opts[2]).toMatchObject({ id: 'i1', brand: 'Growatt', capacity: 6, maxPower: 6000, price: Math.round(360000 * 1.1) });
     expect(brandsOf(opts)).toEqual(['Felicity', 'Luxsun', 'Growatt']);
   });
 });
 
 describe('batteryOptionsFromCatalog', () => {
-  it('mappe capacité/prix depuis le catalogue', () => {
+  it('mappe capacité/prix PUBLIC depuis le catalogue', () => {
     const opts = batteryOptionsFromCatalog(products);
     expect(opts.map((o) => o.capacity)).toEqual([2.56, 5, 15]);
-    expect(opts.find((o) => o.id === 'b1')).toMatchObject({ brand: 'Taico', capacity: 5, price: 480000 });
+    expect(opts.find((o) => o.id === 'b1')).toMatchObject({ brand: 'Taico', capacity: 5, price: Math.round(480000 * 1.1) });
   });
 });
 
-describe('recommendInverterOption', () => {
-  it('choisit le plus petit onduleur couvrant la puissance + 20 %', () => {
-    const opts = inverterOptionsFromCatalog(products); // maxPower : 2400, 3360, 4800
-    expect(recommendInverterOption(opts, 2000).capacity).toBe(3); // 2000*1.2=2400 <= 2400
-    expect(recommendInverterOption(opts, 3000).capacity).toBe(6); // 3600 > 3360 (4.2kVA) → 6kVA (4800)
+describe('onduleurs du catalogue boutique : choix sur le pic', () => {
+  it('choisit le plus petit onduleur qui tient le pic + 20 %', () => {
+    const opts = inverterOptionsFromCatalog(products); // sorties : 3000, 4200, 6000
+    expect(suggestInverterFor(opts, { peakLoad: 2500 }).capacity).toBe(3); // 2500×1,2 = 3000 ≤ 3000
+    expect(suggestInverterFor(opts, { peakLoad: 3000 }).capacity).toBe(4.2); // 3600 ≤ 4200
   });
   it('repli sur le plus gros si aucun ne suffit', () => {
     const opts = inverterOptionsFromCatalog(products);
-    expect(recommendInverterOption(opts, 100000).capacity).toBe(6);
+    expect(suggestInverterFor(opts, { peakLoad: 100000 }).capacity).toBe(6);
+  });
+  it('la limite PV vient des onduleurs configurés (Plus › Onduleurs)', () => {
+    const opts = inverterOptionsFromCatalog(products);
+    // Le 3 kVA tiendrait le pic, mais il n'accepte que 3 900 Wc de panneaux.
+    const configures = [{ capacity: 3, maxPvPower: 3900 }, { capacity: 6, maxPvPower: 7800 }];
+    expect(suggestInverterFor(opts, { peakLoad: 1500, pvPower: 5000, configures }).capacity).toBe(6);
   });
 });
 

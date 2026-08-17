@@ -62,6 +62,47 @@ export const courseCounts = (course) => ({
   lecons: allLecons(course).length,
 });
 
+// ---- Garde-fous d'accès aux cours ----
+// Deux réglages posés par le gérant sur chaque cours :
+//   masque : le cours existe mais n'est visible que de ses gestionnaires
+//            (brouillon, contenu retiré sans suppression — la progression
+//            des membres est conservée pour un éventuel retour).
+//   acces  : 'tous' (défaut) ou 'pro' — réservé aux abonnés Devis Pro actifs.
+// Les cours existants n'ont aucun de ces champs : ils restent ouverts à tous.
+
+/** Le cours apparaît-il dans le catalogue de cet utilisateur ?
+ *  `gere` : vrai si l'utilisateur administre ce cours (gérant de l'org
+ *  propriétaire) — il voit alors aussi ses cours masqués. */
+export const coursVisible = (course, gere = false) => !course?.masque || gere;
+
+/** Le cours est-il verrouillé pour cet utilisateur (visible mais pas
+ *  ouvrable) ? Réservé Pro sans abonnement actif — le gestionnaire du cours
+ *  n'est jamais verrouillé. */
+export const coursVerrouille = (course, { proActif = false, gere = false } = {}) =>
+  course?.acces === 'pro' && !proActif && !gere;
+
+/**
+ * Action proposée par la carte d'un cours dans le catalogue.
+ *
+ * Le cas qui compte : un cours SANS aucune leçon. Il n'y a rien à suivre,
+ * mais son GESTIONNAIRE doit pouvoir l'ouvrir — c'est dans la vue du cours
+ * qu'on ajoute modules et leçons. Fermer la porte à tout le monde enfermait
+ * chaque cours neuf dans un cul-de-sac : créé, puis impossible à remplir.
+ *
+ * @returns {{etat:string, label:string, ouvrable:boolean}}
+ */
+export const actionCours = ({ verrouille = false, gere = false, lecons = 0, pct = 0, done = 0 } = {}) => {
+  if (verrouille) return { etat: 'verrouille', label: 'Réservé aux membres Pro', ouvrable: false };
+  if (!lecons) {
+    return gere
+      ? { etat: 'a-remplir', label: 'Ajouter le contenu', ouvrable: true }
+      : { etat: 'vide', label: 'Bientôt disponible', ouvrable: false };
+  }
+  if (pct >= 100) return { etat: 'termine', label: 'Revoir le cours', ouvrable: true };
+  if (done > 0) return { etat: 'en-cours', label: 'Continuer', ouvrable: true };
+  return { etat: 'a-demarrer', label: 'Commencer', ouvrable: true };
+};
+
 // ---- Sommaire minuté des vidéos (« Timer de la vidéo ») ----
 
 /** « mm:ss » ou « h:mm:ss » → secondes (NaN si illisible). */

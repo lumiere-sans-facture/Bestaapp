@@ -1,0 +1,55 @@
+<!-- Supabase → Authentication → Email Templates → « Reset password »
+     Objet à coller dans le champ « Subject » :
+       Réinitialiser votre mot de passe BestaSolar Pro
+
+     {{ .ConfirmationURL }} ramène vers l'app (voir § 10.4 de DEPLOIEMENT.md :
+     l'adresse doit figurer dans les « Redirect URLs » de Supabase, sinon le
+     lien arrive bien mais la page d'arrivée le refuse). -->
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#eceef2;padding:24px 0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+  <tr>
+    <td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:8px;overflow:hidden">
+        <tr>
+          <td style="background:#0a2472;padding:20px 28px">
+            <div style="color:#ffffff;font-size:18px;font-weight:600;letter-spacing:.4px">BestaSolar Pro</div>
+            <div style="color:#c7d2f0;font-size:12px;margin-top:2px">Lomé, Togo</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px">
+            <p style="margin:0 0 16px;font-size:16px;color:#1f2330">Bonjour,</p>
+            <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#3a3a3a">
+              Vous avez demandé à changer le mot de passe de votre compte
+              BestaSolar Pro. Choisissez-en un nouveau ici :
+            </p>
+            <table cellpadding="0" cellspacing="0" style="margin:0 0 20px">
+              <tr>
+                <td style="background:#f5a623;border-radius:6px">
+                  <a href="{{ .ConfirmationURL }}"
+                     style="display:inline-block;padding:13px 28px;color:#16223b;font-size:15px;font-weight:600;text-decoration:none">
+                    Choisir un nouveau mot de passe
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 6px;font-size:13px;color:#6b6b6b">
+              Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigateur :
+            </p>
+            <p style="margin:0 0 20px;font-size:12px;color:#0a2472;word-break:break-all">{{ .ConfirmationURL }}</p>
+            <p style="margin:0;font-size:13px;line-height:1.6;color:#6b6b6b">
+              Ce lien n'est utilisable qu'une fois et expire rapidement.
+              <strong>Si vous n'avez rien demandé</strong>, ignorez ce message :
+              votre mot de passe actuel reste valable et personne d'autre ne
+              peut le changer sans ce lien.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 28px;border-top:1px solid #e5e5e5;font-size:12px;color:#6b6b6b">
+            BestaSolar — Lomé, Togo
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

@@ -5,10 +5,28 @@ import { useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { pullAll, pushCollections, pushTombstone, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 
+// Filet de sécurité du temps réel : intervalle entre deux relectures du
+// serveur quand l'app est visible. Le temps réel reste le canal principal
+// (propagation immédiate) ; ce rappel régulier couvre ce qu'il peut manquer —
+// table absente de la publication `supabase_realtime`, connexion coupée,
+// téléphone sorti de veille. Sans lui, un kit ajouté par le gérant n'arrivait
+// au technicien qu'au prochain lancement de l'app.
+const INTERVALLE_RELECTURE = 60000;
+
 export function useRemoteSync(state, setState, stateRef) {
-  const syncedRef = useRef(null); // dernier état répliqué/reçu, par collection
+  const syncedRef = useRef(null); // dernier état RÉELLEMENT répliqué, par collection
   const lastPushAt = useRef(0);
+  const echecs = useRef(0);       // échecs consécutifs de push (délai croissant)
+  const retryTimer = useRef(null);
+  const [retryTick, setRetryTick] = useState(0); // relance un envoi échoué
   const [syncStatus, setSyncStatus] = useState(isSupabaseConfigured ? 'connecting' : 'local');
+  // Motif du dernier échec, affiché dans l'app : sans lui, « Serveur
+  // injoignable » n'aide personne à comprendre CE qui est refusé.
+  const [syncError, setSyncError] = useState(null);
+
+  // La relecture est déclenchée depuis un autre effet (filet de sécurité) :
+  // elle est donc exposée par une ref, remplie au montage.
+  const refreshRef = useRef(null);
 
   // ---- Pull initial + abonnement temps réel ----
   useEffect(() => {
@@ -25,8 +43,18 @@ export function useRemoteSync(state, setState, stateRef) {
         const localItems = stateRef.current[table] || [];
         const remoteMap = new Map(remoteItems.map((i) => [i.id, i]));
         const deletedIds = tombstones.get(table) || new Set();
-        const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id));
-        merged[table] = [...remoteItems, ...localOnly];
+        // `partage` : élément appartenant à l'organisation interne, reçu en
+        // lecture (catalogue, cours de formation). Absent de la réception, il
+        // a été retiré à la source — le conserver comme « créé hors-ligne »
+        // le figerait ici pour toujours, sans propriétaire pour le mettre à
+        // jour ni le supprimer.
+        const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id) && !i.partage);
+        // Rien à ajouter localement : on garde la RÉFÉRENCE reçue du serveur.
+        // Créer un nouveau tableau ferait croire à une modification locale, et
+        // l'app renverrait l'intégralité des 14 tables au serveur à CHAQUE
+        // ouverture — plusieurs mégaoctets pour un catalogue avec photos, d'où
+        // des envois qui n'aboutissent pas et une synchronisation bloquée.
+        merged[table] = localOnly.length ? [...remoteItems, ...localOnly] : remoteItems;
       }
       syncedRef.current = collections;
       setState(merged);
@@ -43,6 +71,7 @@ export function useRemoteSync(state, setState, stateRef) {
         console.error('Synchronisation Supabase impossible :', e.message);
       }
     };
+    refreshRef.current = refreshFromRemote;
 
     (async () => {
       try {
@@ -72,43 +101,138 @@ export function useRemoteSync(state, setState, stateRef) {
         });
       } catch (e) {
         console.error('Supabase indisponible, mode local :', e.message);
-        if (!cancelled) setSyncStatus('error');
+        if (!cancelled) { setSyncError(e.message); setSyncStatus('error'); }
       }
     })();
 
     return () => { cancelled = true; unsubscribe(); };
-  }, []);
+  // Dépendances volontairement vides : ce pull initial + abonnement temps réel
+  // ne doit s'exécuter QU'UNE FOIS par montage. setState est stable (useState)
+  // et stateRef est une ref — les inclure relancerait la souscription à chaque
+  // rendu, ce qui provoquerait des re-pulls en boucle.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Réplication des changements locaux ----
   // Push uniquement les collections modifiées ; les suppressions passent par tombstones.
+  //
+  // RÈGLE CRITIQUE : `syncedRef` n'est mis à jour qu'APRÈS un push réussi.
+  // Le marquer avant ferait passer pour répliquées des données restées locales :
+  // elles ne seraient jamais repoussées (perte silencieuse) et le voyant
+  // resterait au vert. En cas d'échec, le statut passe à « error » (visible) et
+  // le même envoi est retenté avec un délai croissant.
   useEffect(() => {
-    if (!isSupabaseConfigured || syncStatus !== 'online' || !syncedRef.current) return;
+    if (!isSupabaseConfigured || !syncedRef.current) return;
+    if (syncStatus !== 'online' && syncStatus !== 'error') return;
     const changed = {};
     const deletedByTable = {};
     for (const table of SYNCED_COLLECTIONS) {
       if (state[table] === syncedRef.current[table]) continue;
       changed[table] = state[table] || [];
-      // Détection des suppressions locales
-      const prevIds = new Set((syncedRef.current[table] || []).map((i) => i.id));
+      // Détection des suppressions locales. Les éléments PARTAGÉS en sont
+      // exclus : ils ne nous appartiennent pas, et un tombstone porte sur un
+      // id — il masquerait la ligne de l'organisation interne à la réception
+      // suivante, faisant disparaître un cours partagé pour tout le monde ici.
+      const prevIds = new Set((syncedRef.current[table] || []).filter((i) => !i.partage).map((i) => i.id));
       const nextIds = new Set((state[table] || []).map((i) => i.id));
       const deleted = [...prevIds].filter((id) => !nextIds.has(id));
       if (deleted.length) deletedByTable[table] = deleted;
     }
     if (!Object.keys(changed).length) return;
-    syncedRef.current = { ...syncedRef.current, ...changed };
+
+    let annule = false;
     lastPushAt.current = Date.now();
     const doSync = async () => {
+      const erreurs = [];
+      let reussies = [];
       try {
-        await pushCollections(changed);
-        for (const [table, ids] of Object.entries(deletedByTable)) {
-          for (const id of ids) await pushTombstone(table, id);
-        }
+        reussies = await pushCollections(changed);
       } catch (e) {
-        console.error('Réplication Supabase échouée :', e.message);
+        reussies = e.reussies || [];
+        erreurs.push(e.message);
       }
+      // Suppressions locales → tombstones, suivies PAR TABLE et tentées même
+      // si l'envoi des lignes a échoué (opérations indépendantes, upsert
+      // idempotent). Avant, un seul tombstone en échec faisait tout perdre :
+      // l'erreur n'ayant pas de `reussies`, AUCUNE table n'était acquise et
+      // l'intégralité repartait à chaque reprise — le volume ne redescendait
+      // jamais, voyant rouge en permanence.
+      const suppressionsEchouees = new Set();
+      for (const [table, ids] of Object.entries(deletedByTable)) {
+        for (const id of ids) {
+          try {
+            await pushTombstone(table, id);
+          } catch (e) {
+            suppressionsEchouees.add(table);
+            erreurs.push(`${table} (suppression) : ${e.message}`);
+            break;
+          }
+        }
+      }
+      if (annule) return;
+      // Une table n'est acquise que si ses lignes ET ses suppressions sont
+      // passées. L'acquérir avec un tombstone en échec ferait oublier la
+      // suppression (deletedByTable est recalculé depuis syncedRef) : l'item
+      // resterait sur le serveur et réapparaîtrait au pull suivant (zombie).
+      const acquises = reussies.filter((t) => !suppressionsEchouees.has(t));
+      if (acquises.length) {
+        const acquis = { ...syncedRef.current };
+        for (const t of acquises) if (changed[t]) acquis[t] = changed[t];
+        syncedRef.current = acquis;
+      }
+      if (!erreurs.length) {
+        // Réellement répliqué : on peut enfin considérer ces données à jour.
+        echecs.current = 0;
+        setSyncError(null);
+        setSyncStatus('online');
+        return;
+      }
+      console.error('Réplication Supabase échouée :', erreurs.join(' · '));
+      // Le voyant passe au rouge et l'envoi est REJOUÉ : les données locales
+      // restent marquées « à pousser » tant qu'elles ne sont pas arrivées.
+      echecs.current += 1;
+      const restantes = Object.keys(changed).filter((t) => !acquises.includes(t));
+      setSyncError(`${erreurs.join(' · ')}${restantes.length ? ` (en attente : ${restantes.join(', ')})` : ''}`);
+      setSyncStatus('error');
+      const delai = Math.min(60000, 5000 * 2 ** (echecs.current - 1));
+      clearTimeout(retryTimer.current);
+      retryTimer.current = setTimeout(() => setRetryTick((t) => t + 1), delai);
     };
     doSync();
-  }, [state, syncStatus]);
+    return () => { annule = true; };
+  }, [state, syncStatus, retryTick]);
 
-  return syncStatus;
+  // ---- Filet de sécurité : relecture régulière et au retour de l'app ----
+  // Le temps réel reste le canal principal, mais il ne garantit rien : une
+  // table oubliée dans la publication Supabase, un socket coupé ou un
+  // téléphone en veille et l'appareil ne voit plus rien arriver. Ici, il
+  // rattrape au plus tard en une minute, et immédiatement au retour à l'écran.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+    const relire = () => {
+      if (syncStatus !== 'online' || !syncedRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      // Jamais par-dessus un changement local pas encore répliqué : la
+      // réception remplace les items de même id et effacerait l'édition en
+      // cours d'envoi.
+      if (SYNCED_COLLECTIONS.some((t) => stateRef.current[t] !== syncedRef.current[t])) return;
+      // Ni dans la foulée de notre propre écriture (l'écho revient à peine).
+      if (Date.now() - lastPushAt.current < 2500) return;
+      refreshRef.current?.();
+    };
+    const timer = setInterval(relire, INTERVALLE_RELECTURE);
+    document.addEventListener('visibilitychange', relire);
+    window.addEventListener('online', relire);
+    window.addEventListener('focus', relire);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', relire);
+      window.removeEventListener('online', relire);
+      window.removeEventListener('focus', relire);
+    };
+  }, [syncStatus, stateRef]);
+
+  // Arrêt du minuteur de reprise au démontage (évite un setState post-unmount).
+  useEffect(() => () => clearTimeout(retryTimer.current), []);
+
+  return { syncStatus, syncError };
 }

@@ -24,10 +24,17 @@
   --error-light: #fee2e2;
   --error-text: #bb3535; /* texte rouge : AA sur blanc et --error-light */
   --success-text: #047857;
+  --warning-dark: #92400e;  /* texte orange foncé : AA sur --warning-light */
+  --info: #2563eb;
+  --info-light: rgba(59, 130, 246, 0.12);
   --border: #e5e7eb;
   --shadow: 0 2px 8px rgba(10, 36, 114, 0.08);
   --shadow-lg: 0 8px 30px rgba(10, 36, 114, 0.16);
   --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --control-h: 46px;      /* hauteur standard d'un champ / contrôle de formulaire */
   --sidebar-width: 264px;
   --tab-bar-height: 64px;
   /* Variante uniforme : une seule mise en page à toutes les largeurs. */
@@ -116,8 +123,9 @@ img { max-width: 100%; }
   border-radius: 12px; display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
-/* Logo de l'entreprise de l'abonné (mode Pro) : remplit la vignette. */
-.sidebar-logo img { width: 100%; height: 100%; object-fit: cover; background: white; }
+/* Logo de l'entreprise de l'abonné (mode Pro) : contenu, jamais recadré
+   (même traitement que .pro-preview-logo, .fp-logo et .product-image). */
+.sidebar-logo img { width: 100%; height: 100%; object-fit: contain; padding: 3px; background: white; }
 .sidebar-title { font-weight: 700; font-size: 1rem; }
 .sidebar-subtitle { font-size: 0.75rem; opacity: 0.6; }
 .sidebar-nav { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
@@ -209,11 +217,11 @@ img { max-width: 100%; }
 textarea.input { resize: vertical; }
 
 .badge {
-  display: inline-flex; align-items: center; padding: 4px 10px;
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
   border-radius: 6px; font-size: 0.75rem; font-weight: 500; white-space: nowrap;
 }
 .badge-success { background: var(--success-light); color: var(--success-text); }
-.badge-warning { background: var(--warning-light); color: #92400e; }
+.badge-warning { background: var(--warning-light); color: var(--warning-dark); }
 .badge-muted { background: var(--bg); color: var(--text-secondary); }
 .badge-info { background: rgba(26, 58, 140, 0.12); color: var(--primary-light); }
 .badge-danger { background: var(--error-light); color: var(--error-text); }
@@ -239,7 +247,7 @@ textarea.input { resize: vertical; }
   min-height: 100vh; min-height: 100dvh;
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
-  background: linear-gradient(160deg, var(--primary) 0%, var(--primary-light) 70%, #2a4aa0 100%);
+  background: linear-gradient(160deg, var(--primary) 0%, var(--primary-light) 100%);
 }
 .login-panel { width: 100%; max-width: 420px; }
 .login-header { text-align: center; margin-bottom: 28px; }
@@ -265,6 +273,23 @@ textarea.input { resize: vertical; }
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
   color: var(--text-muted); padding: 6px; display: flex;
 }
+.login-help { text-align: center; font-size: 0.8125rem; color: var(--text-secondary); margin-top: 14px; }
+/* Liens secondaires de l'écran d'entrée (mot de passe oublié, créer un compte). */
+.login-links { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.login-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: var(--tap); padding: 8px 6px;
+  font-size: 0.875rem; font-weight: 600; color: var(--primary);
+}
+.login-link:hover { text-decoration: underline; }
+form .login-link { width: 100%; margin-top: 4px; }
+.login-links .login-link { width: auto; margin-top: 0; }
+.login-version { text-align: center; font-size: 0.6875rem; color: rgba(255, 255, 255, 0.45); margin-top: 14px; letter-spacing: 0.03em; }
+.login-notice {
+  background: var(--success-light); color: var(--success-text);
+  padding: 12px; border-radius: 8px; text-align: center;
+  font-size: 0.875rem; margin-bottom: 16px;
+}
 .login-divider {
   display: flex; align-items: center; gap: 12px; margin: 20px 0;
   color: var(--text-muted); font-size: 0.75rem;
@@ -274,26 +299,6 @@ textarea.input { resize: vertical; }
 .quick-login-buttons .btn { flex: 1; justify-content: center; }
 
 /* ============ Tableau de bord ============ */
-
-.kpi-grid {
-  display: grid; grid-template-columns: repeat(2, 1fr);
-  gap: 12px; margin-bottom: 20px;
-}
-.kpi-card { background: white; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
-.kpi-card.highlight { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; }
-.kpi-card.highlight .kpi-value { color: white; }
-.kpi-card.highlight .kpi-label { color: rgba(255, 255, 255, 0.7); }
-.kpi-card.highlight .kpi-icon { background: rgba(255, 255, 255, 0.15); color: white; }
-.kpi-icon {
-  width: 38px; height: 38px; border-radius: 10px; margin-bottom: 10px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--bg); color: var(--primary);
-}
-.kpi-value { font-size: 1.375rem; font-weight: 700; color: var(--primary); overflow-wrap: anywhere; }
-.kpi-label { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 2px; }
-
-.dashboard-grid { display: flex; flex-direction: column; gap: 20px; }
-.dashboard-side { display: flex; flex-direction: column; gap: 20px; }
 
 .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 160px; }
 .bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; }
@@ -311,24 +316,7 @@ textarea.input { resize: vertical; }
 .legend-leads { background: var(--primary-light); }
 .legend-won { background: var(--success); }
 
-.alerts-list { display: flex; flex-direction: column; gap: 8px; }
-.alert-item {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 12px; background: white; border-radius: 10px; box-shadow: var(--shadow);
-}
-.alert-icon {
-  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-}
-.alert-icon.high { background: var(--error-light); color: var(--error-text); }
-.alert-icon.medium { background: var(--warning-light); color: #92400e; }
-.alert-message { font-size: 0.875rem; }
-
-.funnel-card { display: flex; flex-direction: column; gap: 12px; }
-.funnel-row { min-width: 0; }
-.funnel-header { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-.funnel-label { font-size: 0.8125rem; font-weight: 600; }
-.funnel-value { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
+/* Barre de progression générique (formation, cartes de cours). */
 .funnel-track { height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
 .funnel-bar { height: 100%; border-radius: 5px; min-width: 4px; transition: width 0.3s ease; }
 
@@ -354,9 +342,9 @@ textarea.input { resize: vertical; }
 }
 .stat-pill-label { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.25; }
 .stat-pill.is-primary .stat-pill-num { background: rgba(10, 36, 114, 0.1); color: var(--primary); }
-.stat-pill.is-info    .stat-pill-num { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.stat-pill.is-info    .stat-pill-num { background: var(--info-light); color: var(--info); }
 .stat-pill.is-accent  .stat-pill-num { background: var(--accent); color: var(--primary); }
-.stat-pill.is-warning .stat-pill-num { background: var(--warning-light); color: #92400e; }
+.stat-pill.is-warning .stat-pill-num { background: var(--warning-light); color: var(--warning-dark); }
 .stat-pill.is-success .stat-pill-num { background: var(--success-light); color: var(--success-text); }
 .stat-pill.is-error   .stat-pill-num { background: var(--error-light); color: var(--error-text); }
 
@@ -414,8 +402,8 @@ textarea.input { resize: vertical; }
   padding: 3px 7px; border-radius: 5px; flex-shrink: 0; min-width: 64px; text-align: center;
 }
 .sev-critique { background: var(--error-light); color: var(--error-text); }
-.sev-alerte   { background: var(--warning-light); color: #92400e; }
-.sev-info     { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.sev-alerte   { background: var(--warning-light); color: var(--warning-dark); }
+.sev-info     { background: var(--info-light); color: var(--info); }
 .alert-feed-text { min-width: 0; }
 .alert-feed-title { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
 .alert-feed-entity { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -437,14 +425,25 @@ textarea.input { resize: vertical; }
 
 /* ============ Pipeline (kanban, inspiré de Pipedrive) ============ */
 
-/* Validation des progressions par le gérant */
-.validation-bar {
-  margin: 0 16px 14px; padding: 12px 14px;
-  background: white; border-radius: var(--radius); box-shadow: var(--shadow);
-  border-left: 4px solid var(--warning);
+/* Alerte permanente : l'app ne peut plus enregistrer localement. Elle doit
+   rester visible tant que le problème dure (pas un toast éphémère). */
+.storage-alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: 0 0 12px; padding: 12px 14px;
+  background: #fef2f2; border: 1px solid #fecaca; border-left: 3px solid var(--danger);
+  border-radius: var(--radius-sm); color: #7f1d1d; font-size: 0.85rem; line-height: 1.4;
 }
-.validation-bar-title { display: flex; align-items: center; gap: 7px; font-size: 0.8125rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: #92400e; margin-bottom: 8px; }
-.validation-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.storage-alert svg { flex: none; margin-top: 1px; }
+.storage-alert .btn { flex: none; margin-left: auto; align-self: center; }
+/* Rappel d'abonnement : information, pas erreur — ton neutre puis orangé. */
+.abo-alert { background: var(--bg); border-color: var(--border); border-left-color: var(--primary); color: var(--text-primary); align-items: center; }
+.abo-alert.is-warning { background: #fffbeb; border-color: #fde68a; border-left-color: var(--warning, #f59e0b); color: #78350f; }
+
+/* Encart d'information contextuelle : .callout (fond teinté). */
+.validation-bar { margin: 0 16px 14px; padding: 12px 14px; background: var(--warning-light); border-radius: var(--radius); }
+.validation-bar-title { display: flex; align-items: center; gap: 7px; font-size: 0.8125rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: var(--warning-dark); margin-bottom: 8px; }
+.validation-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid rgba(146, 64, 14, 0.15); flex-wrap: wrap; }
+.validation-row .btn-won, .validation-row .btn-lost { background: white; }
 .validation-info { flex: 1; min-width: 220px; cursor: pointer; }
 .validation-lead { font-weight: 700; margin-right: 10px; }
 .validation-move { font-size: 0.875rem; color: var(--text-secondary); margin-right: 10px; }
@@ -456,14 +455,14 @@ textarea.input { resize: vertical; }
 .pending-chip {
   display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
   font-size: 0.6875rem; font-weight: 700;
-  background: var(--warning-light); color: #92400e;
+  background: var(--warning-light); color: var(--warning-dark);
   border-radius: 20px; padding: 2px 8px;
 }
 .pending-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
   background: var(--warning-light); border-radius: 10px; padding: 10px 13px; margin-bottom: 14px;
 }
-.pending-banner-text { display: flex; align-items: center; gap: 7px; font-size: 0.8438rem; color: #92400e; }
+.pending-banner-text { display: flex; align-items: center; gap: 7px; font-size: 0.8438rem; color: var(--warning-dark); }
 .pending-banner-actions { display: flex; gap: 8px; }
 
 .select-filter {
@@ -521,6 +520,41 @@ textarea.input { resize: vertical; }
 .kanban-card.dragging { opacity: 0.4; cursor: grabbing; }
 .kanban-card-title { font-size: 0.875rem; font-weight: 600; line-height: 1.3; }
 .kanban-card-contact { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+/* Affordance de déplacement : le bouton « ⋮ » ouvre le sélecteur d'étape
+   (le glisser HTML5 ne fonctionne pas au doigt). */
+.kanban-card-head { display: flex; align-items: flex-start; gap: 6px; }
+.kanban-card-head .kanban-card-title { flex: 1; min-width: 0; }
+.kanban-card-move {
+  position: relative; flex-shrink: 0;
+  width: 32px; height: 32px; margin: -6px -8px 0 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; color: var(--text-muted);
+}
+.kanban-card-move:hover { background: var(--bg); color: var(--primary); }
+.kanban-card-move::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); width: var(--tap); height: var(--tap);
+}
+/* L'absence de devis n'est pas un montant : style discret. */
+.kanban-card-value.none { color: var(--text-muted); font-weight: 500; }
+/* Filtre du gérant : sa propre ligne dans l'en-tête. */
+.pipeline-filter-row { margin-top: 10px; }
+
+/* Sélecteur d'étape (déplacement sans glisser) */
+.stage-picker { display: flex; flex-direction: column; gap: 8px; }
+.stage-picker-btn {
+  display: flex; align-items: center; gap: 10px; min-height: var(--tap);
+  padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+  background: white; font-weight: 600; font-size: 0.9375rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.stage-picker-btn:hover { border-color: var(--primary); background: rgba(10, 36, 114, 0.03); }
+.stage-picker-btn.won { border-color: var(--success); color: var(--success-text); }
+.stage-picker-btn.won:hover { background: var(--success-light); }
+.stage-picker-btn.lost { border-color: var(--error); color: var(--error-text); }
+.stage-picker-btn.lost:hover { background: var(--error-light); }
+.stage-picker-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.stage-move-btn { margin-bottom: 12px; }
 .kanban-card-footer {
   display: flex; justify-content: space-between; align-items: center;
   margin-top: 10px;
@@ -559,10 +593,11 @@ textarea.input { resize: vertical; }
 /* Stepper d'étapes en chevrons (fiche affaire) */
 .stage-stepper { display: flex; margin-bottom: 14px; }
 .stage-step {
-  flex: 1; min-width: 0; padding: 9px 4px 9px 10px;
+  flex: 1; min-width: 0; padding: 6px 6px 6px 12px; min-height: var(--tap);
+  display: flex; align-items: center; justify-content: center;
   background: var(--bg); color: var(--text-secondary);
-  font-size: 0.6875rem; font-weight: 600; text-align: center;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 0.75rem; font-weight: 600; text-align: center;
+  white-space: normal; line-height: 1.15; overflow-wrap: anywhere;
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
   margin-left: -4px; transition: background 0.15s ease, color 0.15s ease;
 }
@@ -572,11 +607,25 @@ textarea.input { resize: vertical; }
 .stage-step.current { background: var(--primary); color: white; }
 .stage-step:hover:not(.current) { background: var(--border); color: var(--text-primary); }
 .stage-step.reached:hover:not(.current) { background: var(--primary); color: white; }
+/* Barre de progression en consultation (affaire d'un autre compte, vue gérant) :
+   même lecture visuelle, mais rien n'est cliquable. */
+.stage-stepper.is-readonly .stage-step { cursor: default; }
+.stage-stepper.is-readonly .stage-step:hover:not(.current) { background: var(--bg); color: var(--text-secondary); }
+.stage-stepper.is-readonly .stage-step.reached:hover:not(.current) { background: var(--primary-light); color: white; }
+
+/* Ligne de fiche cliquable (naviguer vers une autre affaire du client) */
+.sheet-row-btn {
+  width: 100%; background: none; border: none; font: inherit; color: inherit;
+  text-align: left; cursor: pointer; border-radius: var(--radius-sm);
+}
+.sheet-row-btn:hover { background: var(--bg); }
 
 .outcome-actions { display: flex; gap: 10px; margin-bottom: 20px; }
 .outcome-actions .btn { flex: 1; }
-.btn-won { background: var(--success); color: white; }
-.btn-won:hover { background: #0da271; }
+/* Gagné / Perdu : deux issues de même poids visuel (le plein reste réservé
+   à l'action primaire d'un écran). */
+.btn-won { background: white; border: 1.5px solid var(--success); color: var(--success-text); }
+.btn-won:hover { background: var(--success-light); }
 .btn-lost { background: white; border: 1.5px solid var(--error); color: var(--error-text); }
 .btn-lost:hover { background: var(--error-light); }
 
@@ -716,6 +765,13 @@ textarea.input { resize: vertical; }
 .category-chip:hover { border-color: var(--primary); color: var(--primary); }
 .category-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
 
+.chip-selector { margin-top: 16px; }
+.chip-selector-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.8125rem; font-weight: 500; color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
 /* Grille boutique : 2 colonnes sur mobile, façon e-commerce */
 .products-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px;
@@ -848,19 +904,46 @@ textarea.input { resize: vertical; }
 @media (min-width: 1100px) { .course-grid { grid-template-columns: repeat(3, 1fr); } }
 .course-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .course-card-cover {
-  position: relative; height: 110px; flex-shrink: 0;
+  position: relative; height: 110px; flex-shrink: 0; overflow: hidden;
   background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 100%);
   color: rgba(255, 255, 255, 0.9);
   display: flex; align-items: center; justify-content: center;
 }
+/* Emblème du cours sans photo : un chapeau de diplômé posé sur une pastille,
+   pour que la couverture se lise comme une formation et non comme un fichier. */
+.course-cover-emblem {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  width: 58px; height: 58px; border-radius: 18px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  color: white;
+}
+/* Deux arcs très discrets derrière l'emblème : la couverture unie faisait
+   « champ vide ». Masqués dès qu'une photo prend la place. */
+.course-card-cover::before, .course-head-cover::before {
+  content: ''; position: absolute; inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.16) 0 34%, transparent 35%),
+    radial-gradient(circle at 6% 96%, rgba(255, 255, 255, 0.12) 0 26%, transparent 27%);
+}
+.course-card-cover.has-photo::before, .course-head-cover.has-photo::before { display: none; }
+.course-cover-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Voile bas sur les photos : sans lui, la durée et le crayon se perdent sur
+   un ciel clair. */
+.course-card-cover.has-photo::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.12) 34%, transparent 62%);
+}
 .course-cover-duration {
-  position: absolute; left: 12px; bottom: 10px;
+  position: absolute; left: 12px; bottom: 10px; z-index: 2;
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 0.6875rem; font-weight: 700; color: white;
   background: rgba(255, 255, 255, 0.16); border-radius: 20px; padding: 3px 9px;
 }
 .course-cover-edit {
-  position: absolute; top: 8px; right: 8px; padding: 6px;
+  position: absolute; top: 8px; right: 8px; padding: 6px; z-index: 2;
   color: white; background: rgba(255, 255, 255, 0.14); border-radius: 8px;
   display: flex; cursor: pointer;
 }
@@ -875,6 +958,13 @@ textarea.input { resize: vertical; }
 .course-card-pct { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); min-width: 34px; text-align: right; }
 
 .course-head { margin: 2px 0 14px; }
+/* Bandeau du cours ouvert : la même couverture qu'au catalogue, en plus bas. */
+.course-head-cover {
+  position: relative; overflow: hidden; height: 92px; margin-bottom: 10px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 100%);
+  display: flex; align-items: center; justify-content: center;
+}
 .course-head-title { font-weight: 700; font-size: 1.125rem; }
 .course-head-progress { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
 .course-head-progress .funnel-track { flex: 1; max-width: 340px; }
@@ -949,6 +1039,69 @@ textarea.input { resize: vertical; }
   .school-side { position: sticky; top: 16px; }
 }
 
+/* Carte Diagnostic (menu Plus, gérant) */
+.diag-ok { display: inline-flex; align-items: center; gap: 5px; color: var(--success); font-weight: 600; }
+.diag-partiel { display: inline-flex; align-items: center; gap: 5px; color: var(--warning-text, var(--accent-dark)); font-weight: 600; }
+
+/* Écran d'erreur applicatif */
+.ecran-erreur {
+  max-width: 420px; margin: 0 auto; padding: 40px 20px;
+  min-height: 100dvh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; gap: 10px;
+}
+.ecran-erreur-icone {
+  width: 62px; height: 62px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--error-light); color: var(--error-text); margin-bottom: 4px;
+}
+.ecran-erreur-titre { font-weight: 700; font-size: 1.125rem; }
+/* Un code destiné à être lu à voix haute : chasse fixe, bien détaché. */
+.ecran-erreur-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.08em;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 16px; margin-top: 6px; user-select: all;
+}
+.ecran-erreur .btn { margin-top: 6px; }
+
+/* Moyens de paiement (espace gérant) */
+.callout.callout-danger { background: var(--error-light); }
+.callout.callout-danger .callout-title { color: var(--error-text); }
+.paiement-card { margin-bottom: 12px; }
+.paiement-card.actif { border-left: 3px solid var(--success); }
+.paiement-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.paiement-etat { display: flex; color: var(--text-muted); }
+.paiement-card.actif .paiement-etat { color: var(--success); }
+.paiement-card-titre { flex: 1; min-width: 0; }
+.paiement-nom { font-weight: 700; }
+.paiement-champs { margin-bottom: 6px; }
+/* Une clé se lit caractère par caractère : chasse fixe, jamais coupée en deux. */
+.paiement-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8125rem; word-break: break-all; }
+.paiement-note { margin: 6px 0 2px; }
+.paiement-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.paiement-supprimer:hover { border-color: var(--error); color: var(--error-text); }
+
+/* Bac à sable KKiaPay : numéros de test, cliquables pour remplir le champ. */
+.kkiapay-sandbox {
+  margin-top: 10px; padding: 10px 12px;
+  border: 1px dashed var(--border); border-radius: 10px; background: var(--bg);
+}
+.kkiapay-sandbox-titre {
+  display: flex; align-items: center; gap: 5px; margin-bottom: 8px;
+  font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-secondary);
+}
+.kkiapay-sandbox-liste { display: flex; flex-direction: column; gap: 6px; }
+.kkiapay-sandbox-num {
+  display: flex; flex-direction: column; gap: 1px; text-align: left;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: white; cursor: pointer; transition: border-color 0.15s ease;
+}
+.kkiapay-sandbox-num:hover:not(:disabled) { border-color: var(--primary); }
+.kkiapay-sandbox-num:disabled { cursor: default; }
+.kkiapay-sandbox-numero { font-weight: 700; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.kkiapay-sandbox-scenario { font-size: 0.6875rem; color: var(--text-secondary); }
+
 /* Fiche produit (gestion catalogue) */
 .photo-field { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 18px; }
 .photo-preview {
@@ -961,13 +1114,29 @@ textarea.input { resize: vertical; }
 .photo-preview img { width: 100%; height: 100%; object-fit: contain; background: white; }
 .photo-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.8125rem; }
 .photo-input { display: none; }
+/* Couverture de cours : une photo de couverture se recadre (cover), là où une
+   photo de produit doit rester entière (contain). */
+.photo-preview-cover { padding: 0; }
+.photo-preview-cover img { object-fit: cover; background: var(--bg); }
+.course-cover-apercu {
+  width: 100%; height: 100%; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; color: white;
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 100%);
+}
+.photo-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.photo-retirer:hover { border-color: var(--error); color: var(--error-text); }
+.photo-hint { text-align: center; margin-top: 2px; }
 /* Une colonne partout ; les paires courtes et jumelles utilisent .form-pair. */
 .form-row-2 { display: block; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.wizard-form, .sheet-body form, .pro-company-form { max-width: var(--form-max); }
+.sheet-body form, .pro-company-form { max-width: var(--form-max); }
 .delete-product-btn { margin-top: 10px; }
 .product-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
-.product-unavailable { opacity: 0.65; }
+/* Rupture : on grise par les couleurs, pas par l'opacité — le badge et le
+   prix restent au contraste AA. */
+.product-unavailable .product-name { color: var(--text-secondary); }
+.product-unavailable .product-price { color: var(--text-secondary); }
+.product-unavailable .product-image { filter: grayscale(1); opacity: 0.7; }
 .product-image {
   width: 100%; height: 110px;
   object-fit: contain; /* image entière, jamais recadrée */
@@ -982,16 +1151,12 @@ textarea.input { resize: vertical; }
   font-size: 0.75rem; font-weight: 500; padding: 4px 10px; border-radius: 6px; white-space: nowrap;
 }
 .stock-badge.in-stock { background: var(--success-light); color: var(--success-text); }
-.stock-badge.low { background: var(--warning-light); color: #92400e; }
+.stock-badge.low { background: var(--warning-light); color: var(--warning-dark); }
 .stock-badge.out { background: var(--error-light); color: var(--error-text); }
 
 /* ============ Devis ============ */
 
 .devis-list, .partners-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
-.devis-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.devis-card-lead { font-weight: 600; }
-.devis-card-total { font-size: 1.125rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
-.devis-card-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; color: var(--text-secondary); }
 /* Barre filtres + tri des listes */
 .list-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .list-toolbar .categories-scroll { flex: 1; margin-bottom: 0; }
@@ -1030,6 +1195,8 @@ textarea.input { resize: vertical; }
   background: var(--bg); color: var(--primary);
 }
 .devis-mode-icon.solar { background: var(--warning-light); color: var(--accent-dark); }
+/* Cartes des nouveaux parcours : billet (facture CEET) et goutte (pompage). */
+.devis-mode-icon.pompe { background: rgba(26, 58, 140, 0.12); color: var(--primary-light); }
 .devis-mode-title { font-size: 1.0625rem; font-weight: 600; }
 .devis-mode-desc { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5; }
 
@@ -1049,16 +1216,25 @@ textarea.input { resize: vertical; }
 }
 .appliance-delete { color: var(--error-text); padding: 4px; display: flex; border-radius: 6px; }
 .appliance-delete:hover { background: var(--error-light); }
-.appliance-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Qté, puissance, h jour, h nuit sur une seule ligne ; seul un écran
+   de téléphone étroit repasse en 2×2 (repli déjà utilisé ailleurs). */
+.appliance-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .appliance-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.6875rem; color: var(--text-secondary); }
 .appliance-field span { display: inline-flex; align-items: center; gap: 3px; }
 .appliance-field input { width: 100%; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.875rem; background: white; }
 .appliance-field input:focus { border-color: var(--primary); }
 .appliance-row-consumption { display: flex; gap: 16px; margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); }
 .appliance-row-consumption span { display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 430px) {
+  .appliance-fields { grid-template-columns: repeat(2, 1fr); }
+}
 
-/* 2×2 à toutes les largeurs, jamais étiré. */
-.consumption-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg); border-radius: 10px; padding: 14px 12px; max-width: var(--form-max); }
+/* Une seule ligne quel que soit le nombre de statistiques (3 ou 4 avec
+   le pic) ; le mobile étroit garde son repli 2×2. */
+.consumption-summary { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; background: var(--bg); border-radius: 10px; padding: 14px 12px; }
+@media (max-width: 430px) {
+  .consumption-summary { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+}
 .consumption-summary .consumption-stat { min-width: 0; }
 .consumption-summary svg { flex-shrink: 0; }
 .consumption-stat { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
@@ -1073,6 +1249,14 @@ textarea.input { resize: vertical; }
 .sun-hours-field { margin-top: 16px; margin-bottom: 0; }
 .sun-hours-manual { margin-top: 8px; }
 .field-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; }
+/* Récupération du sommaire YouTube : bouton + retour d'état sur une ligne. */
+.sommaire-auto { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.sommaire-auto-etat { font-size: 0.75rem; color: var(--text-muted); }
+.sommaire-auto-etat.ok { color: var(--success-text); }
+.sommaire-auto-etat.echec, .sommaire-auto-etat.vide { color: var(--warning-dark, #92400e); }
+/* Identifiant d'entreprise : long et sans espaces, il doit pouvoir se couper
+   plutôt que déborder de la carte (comparaison entre deux comptes). */
+.profile-org-id { overflow-wrap: anywhere; }
 
 /* Localisation (dimensionnement solaire) — géoloc + recherche + données NASA/PVGIS */
 .geo-locator { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -1103,9 +1287,9 @@ textarea.input { resize: vertical; }
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   flex-wrap: wrap; margin-bottom: 14px;
 }
-.solar-card-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #92400e; }
+.solar-card-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--warning-dark); }
 .solar-source {
-  font-size: 0.6875rem; color: #92400e; background: rgba(245, 166, 35, 0.25);
+  font-size: 0.6875rem; color: var(--warning-dark); background: rgba(245, 166, 35, 0.25);
   padding: 3px 8px; border-radius: 6px; white-space: nowrap;
 }
 .solar-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -1172,8 +1356,12 @@ textarea.input { resize: vertical; }
 .roi-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; font-size: 0.8125rem; color: var(--text-secondary); }
 .roi-note strong { color: var(--accent-dark); }
 
-.wizard { max-width: 920px; margin: 0 auto; width: 100%; }
-.steps-indicator { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
+/* Pleine largeur comme les autres pages (page-content la borne déjà à
+   --content-max) : le wizard ne rajoute plus sa propre limite. */
+.wizard { width: 100%; }
+.steps-indicator { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
+/* Progression nommée sous les pastilles : « Étape 2 sur 4 · Consommation ». */
+.steps-label { text-align: center; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; }
 .step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); transition: all 0.2s ease; }
 .step-dot.active { background: var(--primary); width: 28px; border-radius: 5px; }
 .step-dot.completed { background: var(--success); }
@@ -1205,6 +1393,29 @@ textarea.input { resize: vertical; }
 .lead-select-item.selected { background: rgba(10, 36, 114, 0.06); box-shadow: inset 3px 0 0 var(--primary); }
 .lead-select-name { font-size: 0.875rem; font-weight: 500; }
 .lead-select-value { font-size: 0.75rem; color: var(--text-secondary); }
+
+/* Lien produit boutique ↔ ligne de kit, avec recherche (Mes kits). */
+.product-link-row { display: flex; gap: 8px; align-items: center; }
+.product-link-trigger {
+  flex: 1; min-width: 0; text-align: left; padding: 10px 12px;
+  border: 1.5px solid var(--border); border-radius: 10px; background: white;
+  font-size: 0.875rem; color: var(--text-primary); transition: border-color 0.15s ease;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.product-link-trigger:hover { border-color: var(--primary); }
+.product-link-search { max-width: none; margin-bottom: 8px; }
+.product-link-search .search-input { border: 1.5px solid var(--border); }
+.product-link-results { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+.product-link-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 10px 12px; text-align: left; font-size: 0.875rem;
+  border-bottom: 1px solid var(--border); transition: background 0.15s ease;
+}
+.product-link-option:last-child { border-bottom: none; }
+.product-link-option:hover { background: var(--bg); }
+.product-link-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.product-link-option-price { flex-shrink: 0; font-size: 0.8125rem; color: var(--text-secondary); }
+.product-link-empty { padding: 14px; font-size: 0.8125rem; color: var(--text-secondary); text-align: center; }
 
 .product-select-item {
   display: flex; align-items: center; gap: 12px;
@@ -1304,7 +1515,7 @@ textarea.input { resize: vertical; }
   background: var(--bg); color: var(--primary);
 }
 .menu-item-icon.success { background: var(--success-light); color: var(--success-text); }
-.menu-item-icon.warning { background: var(--warning-light); color: #92400e; }
+.menu-item-icon.warning { background: var(--warning-light); color: var(--warning-dark); }
 .menu-item-icon.danger { background: var(--error-light); color: var(--error-text); }
 .menu-item-info { flex: 1; }
 .menu-item-title { font-size: 0.9375rem; font-weight: 500; }
@@ -1324,8 +1535,10 @@ textarea.input { resize: vertical; }
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 0.875rem; color: var(--text-secondary); margin: 10px 0 16px;
 }
-.profile-stats { display: flex; justify-content: center; gap: 32px; padding-top: 16px; border-top: 1px solid var(--border); }
-.profile-stat-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+/* Grille de 3 : les montants ne se cassent plus sur deux lignes (l'unité vit
+   dans le libellé). */
+.profile-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+.profile-stat-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); overflow-wrap: anywhere; }
 .profile-stat-label { font-size: 0.75rem; color: var(--text-muted); }
 
 .partners-list, .commissions-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
@@ -1380,6 +1593,8 @@ textarea.input { resize: vertical; }
   padding: 11px 14px; margin-bottom: 14px; font-size: 0.875rem;
 }
 .pro-alert svg { color: var(--accent-dark); flex-shrink: 0; }
+/* Variante informative (rappel de conformité) : ton neutre, pas d'alarme. */
+.pro-alert.is-info { background: var(--bg); border-color: var(--border); color: var(--text-primary); }
 .pro-alert span { flex: 1; min-width: 180px; }
 .pro-tabs { margin-bottom: 14px; }
 .pro-actions-row { display: flex; gap: 10px; margin-bottom: 4px; }
@@ -1396,23 +1611,24 @@ textarea.input { resize: vertical; }
 .pro-preview-line { height: 3px; }
 .pro-preview-meta { padding: 8px 14px; font-size: 0.71875rem; color: var(--text-secondary); background: white; }
 .pro-logo-row { margin-bottom: 14px; }
-.pro-color-input { height: 46px; padding: 4px; cursor: pointer; }
-
-/* Lignes de facture */
-/* Chaque ligne est une carte : désignation pleine largeur, puis Qté / P.U. */
-.facture-ligne {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-  position: relative;
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: 10px; margin-bottom: 8px;
-  max-width: var(--form-max);
+.pro-color-input { height: var(--control-h); padding: 4px; cursor: pointer; }
+/* Couleurs de marque : valeur hex visible (communicable à un imprimeur). */
+.color-input-row { display: flex; align-items: center; gap: 10px; }
+.color-input-row .pro-color-input { width: 64px; flex-shrink: 0; }
+.color-hex { font-size: 0.8125rem; color: var(--text-secondary); }
+.colors-detected-note {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  font-size: 0.8125rem; color: var(--success-text); font-weight: 600; margin-top: 6px;
 }
-.facture-ligne .input:first-child { grid-column: 1 / -1; padding-right: 40px; }
-.facture-qty, .facture-pu { width: 100%; }
-.facture-ligne .cart-row-remove { position: absolute; top: 12px; right: 8px; }
+.colors-undo { color: var(--primary); font-weight: 600; text-decoration: underline; padding: 8px 4px; }
+/* Champ invalide + message d'erreur dans le design de l'app. */
+.input.invalid { border-color: var(--error); }
+.field-error { font-size: 0.75rem; color: var(--error-text); margin-top: 6px; }
+/* L'aperçu en direct reste borné à la largeur du formulaire. */
+.pro-preview-wrap { max-width: var(--form-max); }
+
+/* Lignes de facture : voir .doc-line (éditeur partagé LigneEditor). */
 .facture-add-ligne { margin-bottom: 14px; }
-.pro-tva-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; margin: 4px 0 14px; cursor: pointer; }
-.pro-tva-toggle input { width: 17px; height: 17px; accent-color: var(--primary); }
 
 /* Lecteur vidéo intégré (formation) */
 .video-embed {
@@ -1445,13 +1661,135 @@ textarea.input { resize: vertical; }
 
 /* Espace partenaire personnel */
 .my-affiliate-box { margin-bottom: 0; }
-.my-partner-kpis { margin-top: 16px; }
+
+/* Tuiles de l'espace partenaire : icône, montant, libellé — en colonne, pour
+   que « 150 000 F » tienne sur une ligne (la pastille ronde de .stat-pill est
+   calibrée pour des compteurs à deux chiffres). */
+.partner-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; margin-top: 16px;
+}
+.kpi-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.kpi-icon {
+  width: 34px; height: 34px; border-radius: var(--radius-sm);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--primary);
+}
+.kpi-value { font-size: 1.375rem; font-weight: 700; line-height: 1.15; }
+.kpi-label { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.25; }
+.kpi-card.is-primary .kpi-icon { background: rgba(10, 36, 114, 0.1); color: var(--primary); }
+.kpi-card.is-info    .kpi-icon { background: var(--info-light); color: var(--info); }
+.kpi-card.is-success .kpi-icon { background: var(--success-light); color: var(--success-text); }
+/* Ce qui reste à encaisser : l'information nº 1 de l'écran. */
+.kpi-card.is-highlight { background: var(--primary); }
+.kpi-card.is-highlight .kpi-value { color: #fff; }
+.kpi-card.is-highlight .kpi-label { color: rgba(255, 255, 255, 0.8); }
+.kpi-card.is-highlight .kpi-icon { background: rgba(255, 255, 255, 0.18); color: #fff; }
 .my-partner-section { margin-top: 16px; }
 .my-partner-subtitle { margin-top: 18px; }
 .momo-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 .momo-input-row { display: flex; gap: 8px; }
 .momo-input-row .input { flex: 1; }
 .momo-input-row .btn { flex-shrink: 0; }
+
+/* « Mes kits » : compositions solaires modifiables par le gérant. */
+.kits-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.kit-card { padding: 14px 16px; }
+.kit-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.kit-card-ident { min-width: 0; }
+.kit-card-name { display: flex; align-items: center; gap: 7px; font-weight: 600; }
+.kit-card-meta { margin-top: 3px; font-size: 0.8125rem; color: var(--text-secondary); }
+.kit-card-price { flex-shrink: 0; font-size: 1.125rem; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
+.kit-card-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.kit-card-lines { font-size: 0.75rem; color: var(--text-secondary); }
+.kit-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+/* La case « prestation » range la ligne du bon côté du devis : cible large. */
+.kit-line-labor {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  font-size: 0.8125rem; color: var(--text-secondary); cursor: pointer;
+}
+.kit-line-labor input { width: 18px; height: 18px; flex-shrink: 0; }
+.kit-form-total {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 16px 0 12px; padding: 12px 14px;
+  background: var(--bg); border-radius: var(--radius); font-size: 1rem;
+}
+@media (max-width: 430px) {
+  .kit-card-foot { flex-direction: column; align-items: stretch; }
+  .kit-card-actions { justify-content: flex-end; }
+}
+
+/* Demande de paiement des commissions (« retrait »). */
+.retrait-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 12px; padding: 12px 16px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-left: 3px solid var(--primary); border-radius: var(--radius);
+}
+.retrait-bar-text { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; min-width: 0; }
+.retrait-bar .btn { flex-shrink: 0; }
+.retrait-min-note { margin-top: 6px; }
+.retrait-choix { display: grid; gap: 6px; margin-bottom: 12px; }
+.retrait-ligne {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 0.875rem;
+}
+.retrait-ligne.is-on { border-color: var(--primary); background: rgba(10, 36, 114, 0.04); }
+.retrait-ligne input { width: 18px; height: 18px; flex-shrink: 0; }
+.retrait-ligne-info { flex: 1; min-width: 0; }
+.retrait-ligne-montant { flex-shrink: 0; font-weight: 700; white-space: nowrap; }
+.retrait-total {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; margin-bottom: 16px;
+  background: var(--bg); border-radius: var(--radius); font-size: 1rem;
+}
+@media (max-width: 430px) {
+  .retrait-bar { flex-direction: column; align-items: stretch; }
+  .retrait-bar .btn { width: 100%; }
+}
+
+/* Sections repliables (details/summary) : évitent la page sans fin quand
+   chaque rubrique est vide ou très longue. */
+.accordion { margin-top: 12px; padding: 0; }
+.accordion-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; min-height: 52px;
+  cursor: pointer; list-style: none; user-select: none;
+  border-radius: var(--radius);
+}
+.accordion-head::-webkit-details-marker { display: none; }
+.accordion-head:hover { background: var(--bg); }
+.accordion-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.accordion-title {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  font-size: 0.9375rem; font-weight: 600;
+}
+.accordion-icon { flex-shrink: 0; color: var(--primary); }
+.accordion-count {
+  flex-shrink: 0; min-width: 24px; padding: 1px 7px;
+  background: var(--bg); border-radius: var(--radius-pill);
+  font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-align: center;
+}
+.accordion-resume {
+  flex-shrink: 0; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary);
+}
+.accordion-chevron { flex-shrink: 0; color: var(--text-secondary); transition: transform 0.18s ease; }
+.accordion[open] > .accordion-head .accordion-chevron { transform: rotate(180deg); }
+.accordion[open] > .accordion-head { border-radius: var(--radius) var(--radius) 0 0; }
+.accordion-body { padding: 12px 16px 16px; border-top: 1px solid var(--border); }
+.accordion-body > .sheet-row:first-child { padding-top: 0; }
+@media (prefers-reduced-motion: reduce) { .accordion-chevron { transition: none; } }
+/* Écrans étroits : le résumé cède la place au titre — les montants clés sont
+   déjà dans les tuiles du haut. */
+@media (max-width: 430px) { .accordion-resume { display: none; } }
 
 /* Indicateur de synchronisation */
 .sync-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 4px; vertical-align: middle; }
@@ -1460,12 +1798,28 @@ textarea.input { resize: vertical; }
 .sync-error { background: var(--error); }
 .sync-local { background: var(--text-muted); }
 @keyframes sync-pulse { 50% { opacity: 0.35; } }
+/* Colonne, et non ligne : le motif de l'échec se place SOUS l'état. En
+   inline-flex centré, il partait à droite de la pastille, comprimé dans la
+   pilule — donc illisible, alors que c'est le seul diagnostic dont dispose
+   l'utilisateur. max-width : un message serveur verbeux ne doit pas non plus
+   étirer la page. */
 .sync-status-row {
-  display: inline-flex; align-items: center; gap: 7px;
-  margin-top: 10px; padding: 5px 12px;
+  display: inline-flex; flex-direction: column; align-items: flex-start;
+  margin-top: 10px; padding: 5px 12px; max-width: 100%;
   background: var(--bg); border-radius: 14px;
   font-size: 0.75rem; color: var(--text-secondary);
 }
+/* Motif de l'échec de synchronisation, lisible sans ouvrir la console. */
+.sync-status-line { display: flex; align-items: center; gap: 8px; }
+.sync-status-detail {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 4px; padding-left: 16px; max-width: 100%;
+  font-size: 0.72rem; line-height: 1.35; color: var(--danger);
+  overflow-wrap: anywhere;
+}
+.sync-status-detail-text { flex: 1; min-width: 0; }
+/* Cible tactile confortable malgré la petite taille de texte du bloc. */
+.sync-status-copy { flex-shrink: 0; min-height: 32px; }
 .sync-status-row .sync-dot { margin-left: 0; }
 .partner-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .partner-avatar {
@@ -1486,6 +1840,50 @@ textarea.input { resize: vertical; }
 .commission-amount { font-size: 1.125rem; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
 .commission-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); }
 
+/* Carte de commission — le liseré dit le NIVEAU : orange N1, vert N2.
+   L'état de paiement n'emprunte plus ces couleurs : une commission réglée
+   passe en RETRAIT (fond gris, montant estompé) et n'a plus d'action de
+   paiement, seulement son reçu. */
+.commission-card { padding: 14px 16px; border-left: 3px solid var(--accent); }
+.commission-card.niveau-2 { border-left-color: var(--success); }
+.commission-card.is-payee { background: var(--bg); box-shadow: none; }
+.commission-card.is-payee .commission-lead,
+.commission-card.is-payee .commission-amount { color: var(--text-secondary); }
+/* Demandée : la carte reste lisible (l'argent est encore dû) mais son pied
+   n'offre plus d'action — le règlement passe par la demande. */
+.commission-card.is-demandee { border-style: dashed; }
+.commission-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.commission-ident { min-width: 0; }
+.commission-sub {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-top: 4px; font-size: 0.8125rem; color: var(--text-secondary);
+}
+/* NIVEAU de parrainage : ORANGE pour le niveau 1, VERT pour le niveau 2.
+   Sur une commission, ces deux couleurs ne disent QUE le niveau — jamais
+   l'état de paiement, qui se lit au poids de la carte et à son action.
+   Mélanger les deux langages faisait lire le niveau dans le liseré d'état.
+   Le texte (N1 / N2) porte l'information à lui seul. */
+.chip-level {
+  flex-shrink: 0; padding: 1px 8px; border-radius: var(--radius-pill);
+  background: var(--bg); color: var(--text-secondary);
+  font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em;
+}
+.chip-level.n1 { background: var(--warning-light); color: var(--warning-dark); }
+.chip-level.n2 { background: var(--success-light); color: var(--success-text); }
+.commission-ref { font-size: 0.75rem; color: var(--text-muted); }
+.commission-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.commission-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.commission-date { font-size: 0.75rem; color: var(--text-secondary); min-width: 0; }
+.commission-foot .btn { flex-shrink: 0; }
+/* Écran étroit : l'action passe en pleine largeur, sous la date. */
+@media (max-width: 430px) {
+  .commission-foot { flex-direction: column; align-items: stretch; gap: 8px; }
+  .commission-foot .btn { width: 100%; }
+}
+
 .commissions-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .com-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .sync-result-note {
@@ -1493,17 +1891,21 @@ textarea.input { resize: vertical; }
   border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
   font-size: 0.875rem; font-weight: 500;
 }
-.commission-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.commission-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .commission-total-card { border-radius: var(--radius); padding: 14px 16px; }
 .commission-total-card.pending { background: var(--warning-light); }
 .commission-total-card.paid { background: var(--success-light); }
+/* Demandées : ni à payer, ni payées — en attente d'une DÉCISION. Teinte
+   neutre, volontairement à l'écart de l'ambre et du vert. */
+.commission-total-card.asked { background: var(--bg); border: 1px solid var(--border); }
+.commission-total-card.asked .commission-total-value { color: var(--primary); }
 .commission-total-value { font-size: 1.125rem; font-weight: 700; }
-.commission-total-card.pending .commission-total-value { color: #92400e; }
+.commission-total-card.pending .commission-total-value { color: var(--warning-dark); }
 .commission-total-card.paid .commission-total-value { color: var(--success-text); }
 .commission-total-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
 
 .partner-stat.pending { background: var(--warning-light); }
-.partner-stat.pending .partner-stat-value { color: #92400e; }
+.partner-stat.pending .partner-stat-value { color: var(--warning-dark); }
 .pay-all-btn { margin-top: 10px; }
 
 /* ============================================================
@@ -1512,7 +1914,6 @@ textarea.input { resize: vertical; }
 
 @media (min-width: 640px) {
   .cart-bar { left: auto; right: 24px; width: 380px; }
-  .kpi-grid { grid-template-columns: repeat(4, 1fr); }
   .devis-mode-grid { grid-template-columns: 1fr 1fr; }
   .sizing-grid { grid-template-columns: repeat(4, 1fr); }
 }
@@ -1545,7 +1946,6 @@ textarea.input { resize: vertical; }
   .kanban-column { flex: 1 1 0; min-width: 200px; }
   .drag-zones { left: var(--sidebar-width); padding: 16px 32px; }
 
-  .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; align-items: start; }
   .cart-bar { bottom: 24px; right: 32px; }
   .bar-chart { height: 220px; }
 
@@ -1575,12 +1975,17 @@ textarea.input { resize: vertical; }
 .doc-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 4px 0 16px; }
 .doc-summary-card { background: white; border-radius: var(--radius); padding: 12px 16px; box-shadow: var(--shadow); }
 .doc-summary-value { font-size: 1.125rem; font-weight: 700; overflow-wrap: anywhere; }
-.doc-summary-card.due .doc-summary-value { color: #92400e; }
+.doc-summary-card.due .doc-summary-value { color: var(--warning-dark); }
 .doc-summary-card.paid .doc-summary-value { color: var(--success-text); }
 .doc-summary-card.late .doc-summary-value { color: var(--error-text); }
 .doc-summary-card.late:not(.is-empty) { cursor: pointer; box-shadow: inset 0 0 0 1.5px var(--error-light), var(--shadow); }
 .doc-summary-card.late.is-empty .doc-summary-value { color: var(--text-secondary); }
 .doc-summary-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+/* La carte « En retard » est cliquable : on le dit, on ne le suggère plus. */
+.doc-summary-link {
+  display: inline-flex; align-items: center; gap: 2px; margin-top: 4px;
+  font-size: 0.6875rem; font-weight: 700; color: var(--error-text);
+}
 
 /* Fiche client Pro : bilan (facturé / encaissé / reste dû) + historique */
 .client-bilan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
@@ -1648,10 +2053,14 @@ textarea.input { resize: vertical; }
 .flat-row-date { font-size: 0.8125rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .flat-badge { flex-shrink: 0; padding: 3px 11px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; background: rgba(10, 36, 114, 0.1); color: var(--primary); }
 .flat-badge.success { background: var(--success-light); color: var(--success-text); }
-.flat-badge.warning { background: var(--warning-light); color: #92400e; }
+.flat-badge.warning { background: var(--warning-light); color: var(--warning-dark); }
 .flat-badge.muted { background: var(--bg); color: var(--text-secondary); }
 .flat-badge.info { background: rgba(26, 58, 140, 0.12); color: var(--primary-light); }
 .flat-badge.danger { background: var(--error-light); color: var(--error-text); }
+/* Badges d'accès des cours de formation. L'icône s'aligne sur le texte. */
+.badge-cours-pro { background: var(--warning-light); color: var(--warning-dark); }
+.badge-cours-masque { background: var(--bg); color: var(--text-secondary); }
+.badge-cours-pro svg, .badge-cours-masque svg { vertical-align: -1.5px; margin-right: 3px; }
 .flat-row-amount { flex-shrink: 0; font-size: 1rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; text-align: right; }
 .flat-amount-unit { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-left: 4px; }
 
@@ -1705,6 +2114,113 @@ textarea.input { resize: vertical; }
   padding: 3px 9px; border-radius: 20px;
 }
 
+/* ============ Primitives transverses (revue de design) ============ */
+
+/* Segmented : choix exclusif à n options, colonnes égales (modèle de document,
+   TVA…). Remplace les détournements de .client-type-toggle à 2 colonnes. */
+.segmented { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+.segmented-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); padding: 10px 8px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: white;
+  font-weight: 500; font-size: 0.9375rem; color: var(--text-secondary); text-align: center;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.segmented-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+
+/* Callout : encart d'attention dans le flux (fond teinté, sans bordure gauche). */
+.callout { background: var(--warning-light); border-radius: var(--radius); padding: 12px 14px; }
+.callout-title {
+  display: flex; align-items: center; gap: 7px; font-size: 0.8125rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.03em; color: var(--warning-dark);
+}
+
+/* Case à cocher confortable (44 px), pour tout réglage binaire non exclusif. */
+.checkbox-row { display: flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 8px 0; font-size: 0.875rem; cursor: pointer; }
+.checkbox-row input { width: 22px; height: 22px; accent-color: var(--primary); flex-shrink: 0; }
+
+/* Barre d'enregistrement collante des grands formulaires. */
+.form-actions-sticky {
+  position: sticky; bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px));
+  z-index: 20; margin-top: 16px;
+  background: var(--bg-card); border-top: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 12px 16px; display: flex; gap: 12px; align-items: center;
+  box-shadow: 0 -4px 16px rgba(10, 36, 114, 0.08);
+}
+@media (min-width: 1024px) { .form-actions-sticky { bottom: 0; } }
+.form-dirty-note { font-size: 0.8125rem; color: var(--warning-dark); font-weight: 600; }
+
+/* Actions de formulaire : primaire pleine largeur d'abord, secondaire compact. */
+.form-actions { display: flex; gap: 10px; margin-top: 14px; }
+.form-actions .btn-block { flex: 1; width: auto; }
+
+/* Liste de caractéristiques (fiche produit). */
+.spec-list { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 0 0 16px; }
+.spec-list li { display: flex; gap: 8px; align-items: baseline; font-size: 0.875rem; }
+.spec-list li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--primary-light); flex-shrink: 0; transform: translateY(-2px); }
+
+/* Bloc copiable (numéro de paiement, code d'affiliation…). */
+.copy-block {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--bg); border: 1.5px dashed var(--border); border-radius: 10px;
+  padding: 12px 14px; margin: 10px 0 14px;
+}
+.copy-block-value { font-size: 1rem; font-weight: 700; color: var(--primary); overflow-wrap: anywhere; }
+
+/* Zone destructive en pied de panneau. */
+.danger-zone { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+/* Toast : confirmation éphémère en pied d'écran (remplace window.alert). */
+.toast-region {
+  position: fixed; left: 12px; right: 12px; z-index: 200;
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+@media (min-width: 640px) { .toast-region { left: auto; right: 24px; width: 360px; } }
+@media (min-width: 1024px) { .toast-region { bottom: 24px; } }
+.toast {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--primary-dark); color: white;
+  border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow-lg);
+  font-size: 0.875rem; font-weight: 500;
+  animation: toast-in 0.2s ease;
+}
+.toast svg { flex-shrink: 0; color: var(--success); }
+.toast.error { background: var(--error-text); }
+.toast.error svg { color: white; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* Éditeur de lignes de document (facture, devis) : une carte par ligne,
+   libellés visibles — remplace le markup dupliqué .facture-ligne. */
+.doc-line {
+  position: relative; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px; margin-bottom: 8px; max-width: var(--form-max);
+}
+.doc-line-designation { margin-bottom: 10px; }
+.doc-line-designation .input { padding-right: 44px; }
+/* Sélecteur descendant volontaire : la règle d'élargissement des zones de
+   contact (« .cart-row-remove { position: relative } », plus bas dans le
+   fichier) l'emportait à égalité de spécificité et renvoyait ce bouton dans
+   le flux — il s'intercalait alors entre la désignation et les quantités,
+   dans TOUS les éditeurs de lignes (factures, devis Pro, kits). */
+.doc-line .doc-line-remove { position: absolute; top: 12px; right: 8px; }
+.doc-line-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Ligne à trois champs (kits : quantité, unité, prix) : le prix, seul sur
+   sa rangée, prend toute la largeur plutôt que de flotter à moitié. */
+.doc-line-field.is-wide { grid-column: 1 / -1; }
+.doc-line-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--text-secondary); }
+.doc-line-subtotal { font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px; text-align: right; }
+
+/* Bouton retour intégré à l'en-tête de page. */
+.page-back-icon {
+  width: var(--tap); height: var(--tap); flex-shrink: 0; margin-left: -10px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; color: inherit;
+}
+.page-back-icon:hover { background: rgba(255, 255, 255, 0.12); }
+@media (min-width: 1024px) { .page-back-icon:hover { background: var(--bg); } }
+
 /* ============ Cibles tactiles : 44 px à TOUTES les largeurs ============
    Une souris ne souffre pas d'un bouton confortable ; l'inverse n'est pas vrai. */
 .btn-sm, .category-chip, .select-filter, .sort-select, .client-type-btn,
@@ -1721,9 +2237,6 @@ textarea.input { resize: vertical; }
   content: ''; position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%); width: var(--tap); height: var(--tap);
 }
-.stage-step { padding-top: 13px; padding-bottom: 13px; }
-.pro-tva-toggle { padding: 8px 0; }
-.pro-tva-toggle input { width: 22px; height: 22px; }
 .geo-manual summary { padding: 12px 4px; }
 /* Les listes restent bornées, jamais étirées. */
 .flat-list, .doc-list, .clients-list { max-width: var(--content-max); }
@@ -1735,3 +2248,34 @@ textarea.input { resize: vertical; }
   /* Le bouton d'action reste à droite quand le retour est masqué. */
   .partners-toolbar, .commissions-toolbar { justify-content: flex-end; }
 }
+
+
+/* Lecteur Formation : disposition guidée, inspirée d'un espace de cours. */
+.school-layout { gap: 20px; }
+.school-side { gap: 10px; }
+.school-profile-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 16px 16px; text-align: center; }
+.school-profile-avatar { display: flex; align-items: center; justify-content: center; width: 54px; height: 54px; margin: 0 auto 9px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; font-size: 1.125rem; font-weight: 800; }
+.school-profile-name { font-size: .9375rem; font-weight: 800; overflow-wrap: anywhere; }
+.school-profile-caption { margin-top: 3px; color: var(--text-secondary); font-size: .75rem; }
+.school-profile-progress { display: flex; align-items: center; gap: 8px; margin-top: 15px; font-size: .75rem; font-weight: 800; color: var(--primary); }
+.school-profile-progress .funnel-track { flex: 1; }
+.school-program-title { padding: 6px 4px 2px; font-size: .75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.school-content { padding: clamp(18px, 3vw, 34px); }
+.school-content-title { font-size: clamp(1.45rem, 3vw, 2.15rem); text-align: center; margin-bottom: 8px; }
+.school-content-description { max-width: 720px; margin: 0 auto 22px; text-align: center; color: var(--text-secondary); font-size: 1rem; line-height: 1.55; }
+.video-chapters { border: 1px solid rgba(10, 36, 114, .24); border-radius: 0; padding: 0 10px 10px; margin: 0 0 18px; }
+.video-chapters-title { margin: 0 -10px 8px; padding: 10px 12px; background: var(--primary-light); color: white; font-size: .875rem; text-transform: none; letter-spacing: 0; }
+.video-chapter { padding: 6px; }
+.video-chapter-time { background: transparent; padding: 0; color: var(--text-primary); font-size: .875rem; }
+.video-chapter.active .video-chapter-time { background: transparent; color: var(--primary); }
+.lesson-action { margin-top: 20px; border: 1px solid rgba(245, 166, 35, .42); background: #fffdf7; }
+.lesson-action-label { padding: 10px 13px; background: var(--accent); color: var(--primary-dark); font-weight: 800; }
+.lesson-action h3 { margin: 18px 18px 8px; text-align: center; font-size: 1.15rem; }
+.lesson-action-content { padding: 0 18px 8px; }
+.lesson-action .lecon-texte p, .lesson-action .lecon-texte li { font-size: .9rem; }
+.lesson-next-card { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; margin-top: 20px; padding: 15px; border: 1px solid var(--border); background: white; border-radius: var(--radius); cursor: pointer; color: var(--text-primary); transition: border-color .15s, background .15s; }
+.lesson-next-card:hover { border-color: var(--primary); background: rgba(10,36,114,.03); }
+.lesson-next-label { color: var(--text-secondary); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.lesson-next-cta { display: inline-flex; align-items: center; gap: 3px; margin-top: 3px; color: var(--primary); font-size: .8125rem; font-weight: 800; }
+.lesson-action-input { margin-top: 8px; }
+@media (min-width: 900px) { .school-layout { grid-template-columns: 320px minmax(0, 1fr); } .school-side { top: 84px; } }

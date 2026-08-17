@@ -1,5 +1,5 @@
 // Catalogue partenaire officiel Besta Solar 2026 — généré depuis le PDF du catalogue.
-// Les prix sont les prix partenaire (basePrice) ; le prix public est +15 %.
+// Les prix sont les prix partenaire (basePrice) ; le prix public est +10 % (utils/price.js).
 export const catalogueProducts = [
   { id: 'prod-marstek-2000w', name: 'Générateur Marstek 2000W', description: 'Station S2000F 2042Wh · prises 2400W onde sinusoïdale pure, USB-C 100W + 45W, 2× USB-A 18W, 12V CC 120W', basePrice: 550000, category: 'generateurs', stock: 5, image: '/products/marstek-2000w.jpg' },
   { id: 'cat-p2r1', name: 'Onduleur Hybride 12kva Growatt', description: 'Modèle SPE 12000 ES · Efficacité de charge 95% · Prend en charge en parallèle 6 · Garantie 2 ans', basePrice: 725000, category: 'onduleurs', stock: 10, image: '/products/cat-p2r1.jpg' },

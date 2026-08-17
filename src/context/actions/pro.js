@@ -1,6 +1,8 @@
 // Domaine Devis Pro (abonnement premium 5 000 F/mois) : abonnements + paiements
 // Mobile Money, identité d'entreprise du technicien et facturation.
 import { defaultEcheance } from '../../utils/paiement';
+import { abonnementApresPaiement } from '../../utils/verificationPaiement';
+import { prochainNumeroFacture } from '../../utils/facture';
 
 export function createProActions(setState) {
   return {
@@ -30,6 +32,41 @@ export function createProActions(setState) {
         };
       }),
 
+    // Paiement CONFIRMÉ PAR LE SERVEUR (api/paiement/verifier) : l'abonnement
+    // est déjà actif en base. On applique le même résultat localement, avec
+    // les mêmes identifiants que le serveur (`pay-<transaction>`), pour que la
+    // réplication fasse converger les deux au lieu de créer un doublon ou de
+    // renvoyer un « en attente » qui écraserait l'activation.
+    activerAbonnementVerifie: (userId, { reference, montant, dateFin }) =>
+      setState((s) => {
+        const subId = `sub-${userId}`;
+        const existant = (s.subscriptions || []).find((x) => x.id === subId);
+        const base = existant || {
+          id: subId, userId, type: 'devis_pro', dateDebut: null, dateFin: null,
+          montant: montant || 5000, recurrence: 'mensuel', lastPaymentAt: null,
+        };
+        const maintenant = new Date().toISOString();
+        // La date de fin fait autorité côté serveur : la recalculer ici
+        // risquerait un jour d'écart selon l'horloge de l'appareil.
+        const sub = {
+          ...base, status: 'actif',
+          dateDebut: base.dateDebut || maintenant,
+          dateFin: dateFin || base.dateFin,
+          lastPaymentAt: maintenant,
+        };
+        const payId = `pay-${reference}`;
+        const paiement = {
+          id: payId, subscriptionId: subId, userId, montant: montant || 5000,
+          methode: 'kkiapay', phone: '', referenceTransaction: reference,
+          statut: 'confirme', verifieServeur: true, date: maintenant,
+        };
+        return {
+          ...s,
+          subscriptions: [sub, ...(s.subscriptions || []).filter((x) => x.id !== subId)],
+          subscriptionPayments: [paiement, ...(s.subscriptionPayments || []).filter((p) => p.id !== payId)],
+        };
+      }),
+
     // Validation manuelle par le gérant : +30 jours à partir d'aujourd'hui
     // (ou de la fin actuelle si l'abonnement court encore).
     confirmSubscriptionPayment: (paymentId) =>
@@ -42,19 +79,12 @@ export function createProActions(setState) {
           subscriptionPayments: s.subscriptionPayments.map((p) =>
             p.id === paymentId ? { ...p, statut: 'confirme' } : p
           ),
-          subscriptions: (s.subscriptions || []).map((sub) => {
-            if (sub.id !== payment.subscriptionId) return sub;
-            const base = sub.dateFin && new Date(sub.dateFin).getTime() > now
-              ? new Date(sub.dateFin).getTime()
-              : now;
-            return {
-              ...sub,
-              status: 'actif',
-              dateDebut: sub.dateDebut || new Date(now).toISOString(),
-              dateFin: new Date(base + 30 * 86400000).toISOString(),
-              lastPaymentAt: new Date(now).toISOString(),
-            };
-          }),
+          // Même règle que la confirmation serveur : une seule fonction
+          // décide de l'échéance, donc jamais deux dates contradictoires
+          // selon la porte d'entrée du paiement.
+          subscriptions: (s.subscriptions || []).map((sub) =>
+            (sub.id === payment.subscriptionId ? abonnementApresPaiement(sub, now) : sub)
+          ),
         };
       }),
 
@@ -75,6 +105,32 @@ export function createProActions(setState) {
         };
       }),
 
+    // Agrégateurs de paiement (KkiaPay, CinetPay, FedaPay…).
+    // Ne transitent ici que des valeurs PUBLIQUES : clé publique, mode,
+    // activation. Une clé privée ou secrète finirait dans localStorage puis
+    // dans Supabase, lisible par tout membre de l'organisation — elle reste
+    // en variable d'environnement serveur. Le refus est appliqué en amont
+    // par problemeConfig() (utils/paiementProviders.js).
+    savePaiementConfig: (config) =>
+      setState((s) => {
+        const liste = s.paiementConfigs || [];
+        const id = config.id || crypto.randomUUID();
+        const ligne = { ...config, id, majLe: new Date().toISOString() };
+        // Un seul agrégateur encaisse à la fois : activer celui-ci désactive
+        // les autres, sinon deux configurations actives se disputeraient le
+        // paiement et le client partirait chez l'un ou l'autre au hasard.
+        const autres = liste
+          .filter((c) => c.id !== id)
+          .map((c) => (ligne.actif ? { ...c, actif: false } : c));
+        return { ...s, paiementConfigs: [ligne, ...autres] };
+      }),
+
+    deletePaiementConfig: (id) =>
+      setState((s) => ({
+        ...s,
+        paiementConfigs: (s.paiementConfigs || []).filter((c) => c.id !== id),
+      })),
+
     // Identité de l'entreprise du technicien (logo, couleurs, coordonnées)
     saveCompany: (userId, data) =>
       setState((s) => {
@@ -90,9 +146,10 @@ export function createProActions(setState) {
       setState((s) => {
         const companies = s.companies || [];
         const company = companies.find((c) => c.userId === facture.userId);
-        const counter = (company?.factureCounter || 0) + 1;
         const prefix = company?.facturePrefix || 'FAC';
-        const numero = `${prefix}-${new Date().getFullYear()}-${String(counter).padStart(3, '0')}`;
+        // Numéro déduit des factures existantes (répliquées) ET du compteur :
+        // deux appareils hors-ligne ne produisent plus le même numéro.
+        const { numero, rang: counter } = prochainNumeroFacture(s.factures, facture.userId, company || {});
         const createdAt = new Date().toISOString();
         created = {
           ...facture,

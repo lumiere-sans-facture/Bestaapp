@@ -76,6 +76,6 @@ describe('relanceMessage / whatsappLink', () => {
     expect(msg).toContain('Kossi');
   });
   it('normalise le numéro de téléphone dans le lien wa.me', () => {
-    expect(whatsappLink('+229 01 61 73 29 56', 'Bonjour')).toBe('https://wa.me/2290161732956?text=Bonjour');
+    expect(whatsappLink('+228 01 61 73 29 56', 'Bonjour')).toBe('https://wa.me/2280161732956?text=Bonjour');
   });
 });

@@ -1,6 +1,8 @@
 // Dimensionnement et chiffrage d'une installation solaire.
 // Logique portée depuis l'application besta-solar (calculations + pricing).
 // Toutes les valeurs monétaires sont en F CFA (XOF).
+import { prixPublic } from './price';
+import { resolveLignePrice } from './kits';
 
 // ---- Catalogue matériel ----
 
@@ -28,13 +30,19 @@ export const BATTERY_MODELS = [
   { id: 'bat-15.0', capacity: 15.0, voltage: 48, price: 5250000, brand: 'Pylontech', model: 'Force L3' },
 ];
 
-export const INVERTER_MODELS = [
-  { id: 'growatt-1k', brand: 'Growatt', model: 'SPF 1000TL', capacity: 1, maxPower: 800, price: 180000, efficiency: 95 },
-  { id: 'growatt-2k', brand: 'Growatt', model: 'SPF 2000TL', capacity: 2, maxPower: 1600, price: 280000, efficiency: 95 },
-  { id: 'growatt-3k', brand: 'Growatt', model: 'SPF 3000TL', capacity: 3, maxPower: 2400, price: 380000, efficiency: 95 },
-  { id: 'growatt-5k', brand: 'Growatt', model: 'SPF 5000TL', capacity: 5, maxPower: 4000, price: 580000, efficiency: 96 },
-  { id: 'growatt-8k', brand: 'Growatt', model: 'SPF 8000TL', capacity: 8, maxPower: 6400, price: 980000, efficiency: 96 },
-  { id: 'growatt-10k', brand: 'Growatt', model: 'SPF 10000TL', capacity: 10, maxPower: 8000, price: 1300000, efficiency: 96 },
+// Onduleur RECOMMANDÉ sur la fiche de dimensionnement (étude technique du
+// besoin, indépendante du kit facturé) — pas la liste configurable « Plus ›
+// Onduleurs » (data/inverters.js), qui sert elle à remplacer l'onduleur d'un
+// kit dans le DEVIS. Gamme générique, non liée aux kits/marques réels.
+// maxPower = puissance de sortie continue (W). Un hybride étiqueté « n kVA »
+// délivre n kW (voir FACTEUR_PUISSANCE).
+const SIZING_SHEET_INVERTERS = [
+  { id: 'growatt-1k', brand: 'Growatt', model: 'SPF 1000TL', capacity: 1, maxPower: 1000, price: 180000, efficiency: 95 },
+  { id: 'growatt-2k', brand: 'Growatt', model: 'SPF 2000TL', capacity: 2, maxPower: 2000, price: 280000, efficiency: 95 },
+  { id: 'growatt-3k', brand: 'Growatt', model: 'SPF 3000TL', capacity: 3, maxPower: 3000, price: 380000, efficiency: 95 },
+  { id: 'growatt-5k', brand: 'Growatt', model: 'SPF 5000TL', capacity: 5, maxPower: 5000, price: 580000, efficiency: 96 },
+  { id: 'growatt-8k', brand: 'Growatt', model: 'SPF 8000TL', capacity: 8, maxPower: 8000, price: 980000, efficiency: 96 },
+  { id: 'growatt-10k', brand: 'Growatt', model: 'SPF 10000TL', capacity: 10, maxPower: 10000, price: 1300000, efficiency: 96 },
 ];
 
 // ---- Options matériel dérivées du catalogue boutique ----
@@ -54,24 +62,30 @@ export const parseKwh = (name = '') => { const m = name.match(/(\d+(?:[.,]\d+)?)
 /** Puissance crête d'un panneau depuis sa désignation : « … 580W » → 580. */
 export const parsePanelWc = (name = '') => { const m = String(name).match(/(\d{3,4})\s*w(?:c|atts?)?\b/i); return m ? Number(m[1]) : null; };
 
-/** Onduleurs boutique → { id, brand, model, capacity (kVA), maxPower (W), price }. */
+/**
+ * Onduleurs boutique → { id, brand, model, capacity (kVA), maxPower (W), price }.
+ * price = prix PUBLIC (jamais le prix technicien sur un devis client).
+ */
 export const inverterOptionsFromCatalog = (products = []) =>
   products
     .filter((p) => p.category === 'onduleurs')
     .map((p) => {
       const capacity = parseKva(p.name);
-      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, maxPower: Math.round(capacity * 800), price: p.basePrice } : null;
+      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, maxPower: Math.round(capacity * 1000 * FACTEUR_PUISSANCE), price: prixPublic(p.basePrice) } : null;
     })
     .filter(Boolean)
     .sort((a, b) => a.capacity - b.capacity);
 
-/** Batteries boutique → { id, brand, model, capacity (kWh), price }. */
+/**
+ * Batteries boutique → { id, brand, model, capacity (kWh), price }.
+ * price = prix PUBLIC (jamais le prix technicien sur un devis client).
+ */
 export const batteryOptionsFromCatalog = (products = []) =>
   products
     .filter((p) => p.category === 'batteries')
     .map((p) => {
       const capacity = parseKwh(p.name);
-      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, price: p.basePrice } : null;
+      return capacity ? { id: p.id, brand: detectBrand(p.name), model: p.name, capacity, price: prixPublic(p.basePrice) } : null;
     })
     .filter(Boolean)
     .sort((a, b) => a.capacity - b.capacity);
@@ -79,9 +93,161 @@ export const batteryOptionsFromCatalog = (products = []) =>
 /** Marques distinctes d'une liste d'options, dans l'ordre d'apparition. */
 export const brandsOf = (options = []) => [...new Set(options.map((o) => o.brand))];
 
-/** Onduleur conseillé : le plus petit couvrant la puissance requise + 20 %. */
-export const recommendInverterOption = (options = [], requiredPower = 0) =>
-  options.find((o) => o.maxPower >= requiredPower * SIZING_PARAMS.inverterMargin) || options[options.length - 1] || null;
+// ---- Choix de l'onduleur ----
+// Deux critères, dans cet ordre :
+//   1. le PIC DE CONSOMMATION — l'onduleur doit pouvoir alimenter toutes les
+//      charges en même temps, marge de sécurité comprise. C'est le critère
+//      principal : un onduleur qui ne tient pas le pic disjoncte, quelle que
+//      soit la taille du champ PV ;
+//   2. la PUISSANCE PV INSTALLÉE — elle doit rester sous la limite d'entrée PV
+//      du modèle (« Max. PV Input Power », renseignée dans Plus › Onduleurs).
+
+// Puissance apparente (kVA) → puissance active (W). Les onduleurs hybrides
+// vendus sur le marché ouest-africain sont étiquetés en kVA mais délivrent
+// autant de kW : un « 8 kVA » tient 8 000 W. Retenir 0,8 (le facteur de
+// puissance théorique) faisait passer ces modèles pour sous-dimensionnés et
+// poussait à commander un calibre au-dessus, inutilement.
+// Un modèle qui ferait exception se renseigne par sa puissance de sortie
+// réelle (maxPower) dans Plus › Onduleurs — elle prime toujours.
+export const FACTEUR_PUISSANCE = 1;
+
+/**
+ * Désignation d'un onduleur, sans redite. Les modèles configurés s'appellent
+ * déjà « Onduleur hybride 6kVA » et ceux du catalogue boutique portent en plus
+ * la marque : préfixer aveuglément produisait « Onduleur hybride 6kVA Deye
+ * Onduleur hybride 6kVA » sur les lignes de devis.
+ */
+export const designationOnduleur = (inv) => {
+  if (!inv) return '';
+  const modele = String(inv.model || '').trim();
+  const marque = String(inv.brand || '').trim();
+  const base = /onduleur/i.test(modele)
+    ? modele
+    : `Onduleur hybride ${inv.capacity}kVA${modele ? ` ${modele}` : ''}`;
+  const dejaLa = marque && new RegExp(marque.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(base);
+  return marque && !dejaLa ? `${base} ${marque}` : base;
+};
+
+/** Puissance de sortie continue (W) d'un onduleur, depuis ses kVA à défaut. */
+export const puissanceSortie = (inv) => (Number(inv?.maxPower) > 0
+  ? Number(inv.maxPower)
+  : Math.round((Number(inv?.capacity) || 0) * 1000 * FACTEUR_PUISSANCE));
+
+/**
+ * Limite d'entrée PV (Wc) d'un onduleur. Celle du modèle si elle est connue,
+ * sinon celle d'un onduleur CONFIGURÉ de même calibre (Plus › Onduleurs) —
+ * c'est là que l'entreprise tient les vraies valeurs constructeur.
+ * 0 = inconnue : aucune contrainte ne peut être vérifiée.
+ */
+export const limitePv = (inv, configures = []) => {
+  if (Number(inv?.maxPvPower) > 0) return Number(inv.maxPvPower);
+  const meme = configures.find((o) => Number(o.capacity) === Number(inv?.capacity) && Number(o.maxPvPower) > 0);
+  return meme ? Number(meme.maxPvPower) : 0;
+};
+
+/**
+ * Onduleur adapté : le plus petit modèle qui tient le pic de consommation ET
+ * accepte la puissance PV installée. Si aucun ne convient, le plus grand
+ * disponible (mieux vaut le moins insuffisant que rien).
+ * @param {Array} options     modèles candidats
+ * @param {number} peakLoad   pic de consommation (W). 0 = non déclaré (saisie
+ *   directe) : la puissance PV sert alors de repère, faute de mieux.
+ * @param {number} pvPower    puissance PV installée (Wc)
+ * @param {Array} configures  onduleurs configurés, pour retrouver une limite PV
+ */
+/** Puissance de sortie que l'onduleur doit fournir (W) : pic × marge. */
+export const sortieOnduleurRequise = (peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin) =>
+  (peakLoad > 0 ? peakLoad : pvPower) * margin;
+
+// Calibres du marché (kVA). Sert à annoncer le calibre NÉCESSAIRE même quand
+// l'entreprise n'a encore configuré aucun onduleur de cette taille : une étude
+// technique doit dire la vérité, pas se limiter au stock du moment.
+export const CALIBRES_KVA = [1, 2, 3, 3.5, 5, 6, 8, 10, 12, 15, 20, 30];
+
+/** Plus petit calibre commercial dont la sortie couvre `sortieW`. */
+export const calibreRequis = (sortieW) => CALIBRES_KVA.find((k) => k * 1000 * FACTEUR_PUISSANCE >= sortieW)
+  || Math.ceil(sortieW / (1000 * FACTEUR_PUISSANCE));
+
+/**
+ * Critère servant à CHOISIR un onduleur. Sans pic mesuré (saisie directe ou
+ * facture), la puissance PV posée en tient lieu : c'est un repère imparfait,
+ * mais s'en priver ferait retenir le plus petit modèle du catalogue pour une
+ * installation de plusieurs dizaines de kWh. Le VERDICT affiché, lui, reste
+ * indulgent (voir onduleurTientLePic) : on ne reproche pas à un onduleur de
+ * ne pas tenir un pic que personne n'a mesuré.
+ */
+const critereDeChoix = (critere = {}) => (critere.peakLoad > 0
+  ? critere
+  : { ...critere, peakLoad: critere.pvPower || 0 });
+
+/** L'onduleur tient-il le pic de consommation, marge comprise ? */
+export const onduleurTientLePic = (inv, { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin } = {}) =>
+  // En saisie directe/facture, aucun appareil n'est listé : on ne connaît pas
+  // le pic réel. La puissance PV reste un repère pour CHOISIR un calibre, mais
+  // ne peut pas déclencher un refus « puissance de sortie » fictif.
+  !!inv && (peakLoad <= 0 || puissanceSortie(inv) >= sortieOnduleurRequise(peakLoad, pvPower, margin));
+
+/** Son entrée PV (MPPT) accepte-t-elle les panneaux posés ? Une limite
+ *  inconnue ne peut pas être contredite : elle ne bloque pas. */
+export const onduleurAccepteLePv = (inv, { pvPower = 0, configures = [] } = {}) => {
+  if (!inv) return false;
+  const pv = limitePv(inv, configures);
+  return !pv || pv >= pvPower;
+};
+
+/** L'onduleur retenu tient-il vraiment le besoin (pic ET entrée PV) ? */
+export const onduleurSuffisant = (inv, critere = {}) =>
+  onduleurTientLePic(inv, critere) && onduleurAccepteLePv(inv, critere);
+
+// Au-delà d'un seul appareil, on met deux onduleurs identiques EN PARALLÈLE :
+// puissance de sortie et entrée PV s'additionnent. Deux au maximum — au-delà,
+// l'installation change de nature (triphasé, armoire dédiée) et se chiffre sur
+// place.
+export const MAX_ONDULEURS = 2;
+
+/** Un même modèle en `n` exemplaires : puissances cumulées. */
+export const onduleursEnParallele = (inv, n = 1, configures = []) => {
+  if (!inv || n <= 1) return inv;
+  const pv = limitePv(inv, configures);
+  return { ...inv, maxPower: puissanceSortie(inv) * n, maxPvPower: pv ? pv * n : 0 };
+};
+
+/**
+ * Onduleur(s) à retenir, par ESCALADE — jamais plus de deux appareils :
+ *   1. le modèle préféré (celui du kit) en 1 exemplaire ;
+ *   2. ce même modèle en 2 exemplaires ;
+ *   3. les modèles de la liste en 1 exemplaire, du plus petit au plus grand ;
+ *   4. ces mêmes modèles en 2 exemplaires.
+ * Doubler le modèle du kit avant d'en changer garde la cohérence du kit ; à
+ * l'inverse, un modèle supérieur seul est préféré à deux petits en parallèle.
+ * @returns {{modele:object, quantite:number, suffisant:boolean}|null}
+ */
+export const resoudreOnduleur = (options = [], critere = {}, { prefere = null } = {}) => {
+  const choix = critereDeChoix(critere);
+  const liste = [...options].sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
+  const escalade = [
+    ...(prefere ? [{ modele: prefere, quantite: 1 }, { modele: prefere, quantite: MAX_ONDULEURS }] : []),
+    ...liste.map((o) => ({ modele: o, quantite: 1 })),
+    ...liste.map((o) => ({ modele: o, quantite: MAX_ONDULEURS })),
+  ];
+  if (!escalade.length) return null;
+  const convient = ({ modele, quantite }) =>
+    onduleurSuffisant(onduleursEnParallele(modele, quantite, choix.configures), choix);
+  const choisi = escalade.find(convient);
+  return choisi ? { ...choisi, suffisant: true } : { ...escalade[escalade.length - 1], suffisant: false };
+};
+
+export const suggestInverterFor = (options = [], { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin, configures = [] } = {}) => {
+  if (!options.length) return null;
+  const besoinSortie = (peakLoad > 0 ? peakLoad : pvPower) * margin;
+  const parTaille = [...options].sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
+  const tientLePic = (o) => puissanceSortie(o) >= besoinSortie;
+  // Priorité aux modèles dont la limite PV est CONNUE et suffisante : un
+  // modèle non renseigné ne doit pas passer devant un modèle vérifié.
+  return parTaille.find((o) => tientLePic(o) && limitePv(o, configures) >= pvPower)
+    || parTaille.find((o) => tientLePic(o) && !limitePv(o, configures))
+    || parTaille[parTaille.length - 1];
+};
 
 /** Combinaison de batteries (glouton) approchant la capacité requise. */
 export const suggestBatteryCombo = (options = [], requiredCapacity = 0) => {
@@ -99,16 +265,40 @@ export const suggestBatteryCombo = (options = [], requiredCapacity = 0) => {
   return combo;
 };
 
+// Type de support des panneaux (structure de montage rails galvanisé).
+// Prix calculé au panneau, pas en forfait fixe — il dépend du terrain.
+export const MOUNTING_TYPES = [
+  { id: 'tole', label: 'Tôle', pricePerPanel: 10000 },
+  { id: 'dalle', label: 'Dalle', pricePerPanel: 27000 },
+  { id: 'sol', label: 'Au sol', pricePerPanel: 32000 },
+];
+export const DEFAULT_MOUNTING_TYPE = 'tole';
+const MOUNTING_LINE_RE = /structure de montage/i;
+
 export const SYSTEM_TYPES = [
   { id: 'off-grid', label: 'Autonome (off-grid)', help: 'Sans raccordement réseau, batteries pour toute la nuit' },
   { id: 'hybrid', label: 'Hybride', help: 'Réseau + batteries (80% des besoins nuit stockés)' },
   { id: 'on-grid', label: 'Raccordé réseau (on-grid)', help: 'Injection réseau, sans batterie' },
 ];
 
+// Nombre de nuits sans soleil que le parc batterie doit couvrir. 1 nuit =
+// hypothèse standard ; 1,5 et 2 nuits ajoutent une marge pour les journées
+// nuageuses consécutives (le parc batterie grandit d'autant).
+export const DEFAULT_AUTONOMY_NIGHTS = 1;
+export const AUTONOMY_OPTIONS = [
+  { value: 1, label: '1 nuit' },
+  { value: 1.5, label: '1,5 nuit' },
+  { value: 2, label: '2 nuits' },
+];
+
 export const INSTALLATION_COST_PER_PANEL = 10000;
 export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
-export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PVGIS indisponibles
+// Repli (Togo) si données NASA/PVGIS indisponibles — heures de pic du PIRE
+// MOIS (saison des pluies), pas la moyenne annuelle : le système doit tenir
+// toute l'année, juillet-août compris. 4,3 h = pire mois mesuré (NASA) à
+// Lomé, la zone la moins ensoleillée du pays — prudent partout ailleurs.
+export const DEFAULT_PEAK_SUN_HOURS = 4.3;
 
 // Hypothèses de dimensionnement — exportées pour être affichées telles quelles
 // sur la fiche de dimensionnement (ne pas dupliquer ces valeurs ailleurs).
@@ -120,7 +310,7 @@ export const DEFAULT_PEAK_SUN_HOURS = 5.0; // repli (Bénin) si données NASA/PV
 // des ≥ 95 % annoncés : c'est une marge de sécurité maison qui préserve la
 // durée de vie du parc.
 export const SIZING_PARAMS = {
-  panelEfficiency: 0.75,    // rendement des panneaux appliqué au calcul
+  panelEfficiency: 0.85,    // rendement des panneaux appliqué au calcul
   batteryEfficiency: 0.95,  // rendement charge/décharge aller-retour (LiFePO4)
   depthOfDischarge: 0.8,    // profondeur de décharge retenue (marge de sécurité)
   hybridBatteryRatio: 0.8,  // part de la consommation nocturne stockée en hybride
@@ -130,11 +320,6 @@ export const SIZING_PARAMS = {
 export const SYSTEM_VOLTAGE = BATTERY_MODELS[0].voltage;
 
 // ---- Sélection des composants ----
-
-const findInverterForPower = (requiredPower) => {
-  const powerWithMargin = requiredPower * SIZING_PARAMS.inverterMargin;
-  return INVERTER_MODELS.find((inv) => inv.maxPower >= powerWithMargin) || INVERTER_MODELS[INVERTER_MODELS.length - 1];
-};
 
 // Combinaison optimale de batteries (du plus grand au plus petit module)
 const findOptimalBatteryCombination = (requiredCapacity) => {
@@ -174,30 +359,72 @@ const groupBatteries = (batteries) => {
  * @param {number} panelWc  puissance crête du panneau de référence (défaut :
  *   PANEL_REFERENCE_WC). L'espace Pro passe la puissance du panneau réellement
  *   vendu, pour que le devis livre bien la puissance calculée.
+ * @param {number} autonomyNights  nombre de nuits sans soleil couvertes par le
+ *   parc batterie (défaut : DEFAULT_AUTONOMY_NIGHTS, soit 1 nuit).
+ * @param {object} options
+ * @param {number} options.peakLoad   pic de consommation (W) — critère
+ *   PRINCIPAL du choix de l'onduleur : il doit tenir toutes les charges
+ *   allumées ensemble. Absent (saisie directe) : repli sur la puissance PV.
+ * @param {Array} options.inverters   modèles candidats. Sans eux, la gamme de
+ *   repli sert.
+ * @param {Array} options.configures  onduleurs configurés (Plus › Onduleurs) :
+ *   leurs limites d'entrée PV font foi quand les candidats n'en portent pas.
  */
 export const calculateSystemSize = (
   consumption,
   systemType,
   peakSunHours = DEFAULT_PEAK_SUN_HOURS,
   panelWc = PANEL_REFERENCE_WC,
+  autonomyNights = DEFAULT_AUTONOMY_NIGHTS,
+  { peakLoad = 0, inverters = [], configures = [] } = {},
 ) => {
   const { panelEfficiency, batteryEfficiency, depthOfDischarge, hybridBatteryRatio } = SIZING_PARAMS;
   const panelPower = Number(panelWc) > 0 ? Number(panelWc) : PANEL_REFERENCE_WC;
+  const nights = Number(autonomyNights) > 0 ? Number(autonomyNights) : DEFAULT_AUTONOMY_NIGHTS;
 
-  const totalDaily = consumption.day + consumption.night; // kWh
+  // Énergie nocturne à recharger : sur un système avec batterie, le parc doit
+  // pouvoir être rechargé en une journée même après une nuit blanche — les
+  // panneaux sont donc dimensionnés sur l'autonomie choisie (nuit × nombre de
+  // nuits), pas seulement sur la conso d'une nuit. Sans batterie (on-grid),
+  // l'autonomie n'a pas de sens : on garde la conso nocturne telle quelle.
+  const nightlyEnergy = consumption.night * nights; // kWh — couvre l'autonomie choisie
+  const nightEnergyForPanels = systemType === 'on-grid' ? consumption.night : nightlyEnergy;
+
+  const totalDaily = consumption.day + nightEnergyForPanels; // kWh à produire / jour
   const requiredDailyEnergy = totalDaily / panelEfficiency; // kWh
   const requiredPanelPower = (requiredDailyEnergy / peakSunHours) * 1000; // W
   const numberOfPanels = Math.max(1, Math.ceil(requiredPanelPower / panelPower));
 
-  const selectedInverter = findInverterForPower(requiredPanelPower);
+  // L'onduleur se choisit sur le PIC de consommation et sur la puissance PV
+  // RÉELLEMENT installée (panneaux entiers), pas sur la puissance calculée.
+  const installedPvPower = numberOfPanels * panelPower;
+  const critereOnduleur = { peakLoad, pvPower: installedPvPower, configures };
+  const resolution = inverters.length
+    ? resoudreOnduleur(inverters, critereOnduleur)
+    : resoudreOnduleur(SIZING_SHEET_INVERTERS, { peakLoad, pvPower: installedPvPower });
+  const selectedInverter = resolution?.modele || null;
+  const inverterQuantite = resolution?.quantite || 1;
+  // Aucun modèle disponible ne tient forcément le besoin : le repli renvoie le
+  // plus grand de la liste. Le dire explicitement — un onduleur sous-calibré
+  // présenté comme « recommandé » se solde par des disjonctions chez le client.
+  const inverterSortieRequise = sortieOnduleurRequise(peakLoad, installedPvPower);
+  const inverterCalibreRequis = calibreRequis(inverterSortieRequise);
+  const critereRetenu = inverters.length ? critereOnduleur : { peakLoad, pvPower: installedPvPower };
+  // Les vérifications portent sur l'ENSEMBLE retenu (un ou deux appareils en
+  // parallèle). Les deux causes d'insuffisance restent distinguées : le
+  // message doit désigner ce qui bloque — le pic ou l'entrée PV (MPPT).
+  const ensembleOnduleur = onduleursEnParallele(selectedInverter, inverterQuantite, critereRetenu.configures);
+  const inverterTientPic = onduleurTientLePic(ensembleOnduleur, critereRetenu);
+  const inverterAcceptePv = onduleurAccepteLePv(ensembleOnduleur, critereRetenu);
+  const inverterSuffisant = inverterTientPic && inverterAcceptePv;
 
   let batteryCapacity = 0;
   let batteries = [];
   if (systemType === 'off-grid') {
-    batteryCapacity = consumption.night / batteryEfficiency / depthOfDischarge;
+    batteryCapacity = nightlyEnergy / batteryEfficiency / depthOfDischarge;
     batteries = findOptimalBatteryCombination(batteryCapacity);
   } else if (systemType === 'hybrid') {
-    batteryCapacity = (consumption.night / batteryEfficiency / depthOfDischarge) * hybridBatteryRatio;
+    batteryCapacity = (nightlyEnergy / batteryEfficiency / depthOfDischarge) * hybridBatteryRatio;
     batteries = findOptimalBatteryCombination(batteryCapacity);
   }
 
@@ -205,13 +432,23 @@ export const calculateSystemSize = (
     numberOfPanels,
     panelWc: panelPower, // puissance crête du panneau de référence retenu
     requiredPanelPower, // W — utile pour filtrer les onduleurs par marque
+    installedPvPower,   // W — puissance PV réellement posée (panneaux entiers)
+    peakLoad,           // W — pic de consommation ayant servi au choix onduleur
     panelCapacity: (numberOfPanels * panelPower) / 1000, // kWc
     inverter: selectedInverter,
+    inverterQuantite,        // 1 ou 2 appareils identiques en parallèle
+    inverterSortieRequise,   // W  — puissance de sortie exigée (pic × marge)
+    inverterCalibreRequis,   // kVA — calibre du marché à retenir
+    inverterSuffisant,       // false = aucun modèle disponible ne convient
+    inverterTientPic,        // false = puissance de sortie insuffisante
+    inverterAcceptePv,       // false = entrée PV (MPPT) trop faible
+    inverterPvMax: limitePv(ensembleOnduleur, critereRetenu.configures || []),
     batteryCapacity,
     batteries: groupBatteries(batteries),
     estimatedProduction: (numberOfPanels * panelPower * peakSunHours * 365) / 1000, // kWh/an
     systemType,
     peakSunHours,
+    autonomyNights: nights,
   };
 };
 
@@ -220,13 +457,14 @@ export const calculateSystemSize = (
 import { TVA_RATE } from '../config/company';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
-// Retourne le prix du premier panneau trouvé, ou PANEL_SPEC.price par défaut.
+// Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
+// sur un devis client), ou PANEL_SPEC.price par défaut si aucun produit.
 const panelPriceFromCatalog = (products = []) => {
   const p = products.find((pr) => pr.category === 'panneaux');
-  return p ? p.basePrice : PANEL_SPEC.price;
+  return p ? prixPublic(p.basePrice) : PANEL_SPEC.price;
 };
 
-// Extrait le prix d'un onduleur depuis le catalogue par capacité (kVA).
+// Extrait le prix PUBLIC d'un onduleur depuis le catalogue par capacité (kVA).
 // Recherche la capacité (ex. "5kva") dans le nom du produit, prend le plus proche.
 const inverterPriceFromCatalog = (products = [], capacityKva) => {
   const inverters = products.filter((p) => p.category === 'onduleurs');
@@ -239,10 +477,10 @@ const inverterPriceFromCatalog = (products = [], capacityKva) => {
   if (!withCap.length) return null;
   withCap.sort((a, b) => a.cap - b.cap);
   const match = withCap.find((p) => p.cap >= capacityKva) || withCap[withCap.length - 1];
-  return match.basePrice;
+  return prixPublic(match.basePrice);
 };
 
-// Extrait le prix d'une batterie depuis le catalogue par capacité (kWh).
+// Extrait le prix PUBLIC d'une batterie depuis le catalogue par capacité (kWh).
 // Retourne le prix unitaire de la batterie la plus proche en capacité.
 const batteryPriceFromCatalog = (products = [], capacityKwh) => {
   const bats = products.filter((p) => p.category === 'batteries');
@@ -253,7 +491,7 @@ const batteryPriceFromCatalog = (products = [], capacityKwh) => {
   }).filter(Boolean);
   if (!withCap.length) return null;
   withCap.sort((a, b) => Math.abs(a.cap - capacityKwh) - Math.abs(b.cap - capacityKwh));
-  return withCap[0].basePrice;
+  return prixPublic(withCap[0].basePrice);
 };
 
 /**
@@ -352,19 +590,123 @@ export const buildQuotation = (sizing, { products = [], includeMaintenance = tru
 };
 
 /**
+ * Kit suggéré parmi une liste : le plus petit dont la batterie COUVRE le
+ * besoin calculé (jamais moins — un client sous-équipé se retrouve à sec).
+ * Ex. besoin 11 kWh → kit 12 ou 15 kWh, jamais un kit 10 kWh même plus proche
+ * en valeur absolue. Si aucun kit n'atteint le besoin, repli sur le plus
+ * proche disponible (mieux vaut le plus proche que rien).
+ * @param {Array} kits  liste de kits ({ id, battery, ... })
+ * @param {number} batteryNeed  capacité batterie requise (kWh)
+ * @returns {object|null}  le kit suggéré, ou null si la liste est vide
+ */
+export const suggestKitForBattery = (kits = [], batteryNeed = 0) => {
+  if (!kits.length) return null;
+  const need = Number(batteryNeed) || 0;
+  const suffisants = kits.filter((k) => k.battery >= need);
+  const pool = suffisants.length ? suffisants : kits;
+  return [...pool].sort((a, b) => Math.abs(a.battery - need) - Math.abs(b.battery - need))[0];
+};
+
+const PANEL_LINE_RE = /panneau/i;
+const ONDULEUR_LINE_RE = /onduleur/i;
+
+/**
  * Devis à partir d'un kit préconfiguré : toutes les lignes du kit, sans calcul
  * de composition. « Main d'œuvre » → prestation, le reste → équipements.
  * Prix tout compris (sans TVA) : HT = TTC, comme les devis kit de référence.
  * Format aligné sur buildQuotation pour réutiliser l'affichage et le PDF.
+ *
+ * La ligne « Structure de montage » du kit est recalculée sur le type de
+ * support choisi (tôle / dalle / au sol) × le nombre de panneaux réellement
+ * posés — son prix fixe dans data/kits.js n'est qu'un repli si le kit n'en a pas.
+ * @param {boolean} includeMounting  si false, la ligne « Structure de
+ *   montage » est retirée du devis (client qui a déjà son support, ou pose
+ *   sans structure) plutôt que recalculée.
+ * @param {object|null} sizing  résultat de calculateSystemSize() du besoin
+ *   client. Si le kit suggéré (choisi sur sa batterie) a moins de panneaux
+ *   que ce que le besoin exige à SA puissance crête, la quantité de panneaux
+ *   du devis est complétée automatiquement (jamais réduite en dessous du
+ *   nombre de panneaux du kit).
+ * @param {Array} inverters  liste d'onduleurs configurés (Plus › Onduleurs).
+ *   Si l'onduleur du kit (sa capacité kVA, cherchée dans cette liste) n'a pas
+ *   une puissance PV max suffisante pour le besoin, la ligne « Onduleur » est
+ *   remplacée par le plus petit onduleur configuré qui convient — jamais un
+ *   plus faible. Sans correspondance dans la liste (capacité inconnue), la
+ *   ligne du kit reste inchangée : impossible de vérifier sans donnée.
+ * @param {Array} products  catalogue boutique. Une ligne de kit LIÉE à un
+ *   produit (productId, réglé depuis « Mes kits ») suit son prix public
+ *   ACTUEL plutôt que le prix figé à la composition du kit — modifier le prix
+ *   en Boutique se répercute alors automatiquement, ici et sur les devis.
  */
-export const buildKitQuotation = (kit) => {
-  const toItem = (l, type) => ({
-    type, name: l.designation, quantity: l.qty, unit: l.unit,
-    unitPrice: l.pu, totalPrice: l.qty * l.pu,
-  });
-  const components = kit.lines.filter((l) => !l.labor).map((l) => toItem(l, 'kit'));
-  const prestations = kit.lines.filter((l) => l.labor).map((l) => toItem(l, 'prestation'));
-  const total = kit.lines.reduce((s, l) => s + l.qty * l.pu, 0);
+export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = []) => {
+  const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
+  // Nombre de panneaux réellement nécessaires, à la puissance crête DU KIT —
+  // le kit est choisi sur sa batterie, pas sur son nombre de panneaux, donc
+  // il peut en manquer pour couvrir le besoin réel (ex. besoin 16 panneaux,
+  // kit à batterie suffisante mais composé pour 12).
+  const neededPanels = sizing?.requiredPanelPower && kit.panelW
+    ? Math.max(kit.panels, Math.ceil(sizing.requiredPanelPower / kit.panelW))
+    : kit.panels;
+  const withPanels = kit.lines.map((l) => (
+    PANEL_LINE_RE.test(l.designation) && neededPanels > l.qty ? { ...l, qty: neededPanels } : l
+  ));
+
+  // Onduleur : celui du kit ne convient peut-être pas — soit il ne tient pas
+  // le pic de consommation du client, soit il n'accepte pas les panneaux
+  // désormais complétés. On ne peut le vérifier que si sa capacité kVA
+  // correspond à un onduleur configuré (donc aux caractéristiques connues).
+  const currentSpec = inverters.find((o) => o.capacity === kit.inverter);
+  const pvPose = sizing?.installedPvPower || (neededPanels * (kit.panelW || 0));
+  const critere = { peakLoad: sizing?.peakLoad || 0, pvPower: pvPose, configures: inverters };
+  // Escalade : l'onduleur du kit d'abord, doublé si besoin, puis un modèle
+  // supérieur, doublé à son tour — deux appareils au maximum.
+  const retenu = currentSpec ? resoudreOnduleur(inverters, critere, { prefere: currentSpec }) : null;
+  const change = retenu && (retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
+  const inverterSuggested = change ? { ...retenu.modele, quantite: retenu.quantite } : null;
+  // productId retiré sur les lignes remplacées : elles ne représentent plus
+  // le produit boutique éventuellement lié, `pu` (fixé ci-dessous) prime.
+  const withInverter = inverterSuggested
+    ? withPanels.map((l) => (
+        ONDULEUR_LINE_RE.test(l.designation)
+          ? { ...l, productId: null, designation: designationOnduleur(inverterSuggested), qty: inverterSuggested.quantite, unit: 'pcs', pu: inverterSuggested.price }
+          : l
+      ))
+    : withPanels;
+
+  // Structure de montage : la ligne est TOUJOURS présente quand le support est
+  // inclus, qu'elle figure ou non dans la composition du kit. Certains kits
+  // n'en portent pas (kits 20 et 32 kWh du catalogue) : se contenter de
+  // recalculer une ligne existante rendait alors le choix « tôle / dalle / au
+  // sol » sans effet, et le devis sortait sans structure.
+  const ligneSupport = {
+    designation: `Structure de montage PV rails galvanisé (${mounting.label})`,
+    qty: neededPanels,
+    unit: 'pcs',
+    pu: mounting.pricePerPanel,
+    productId: null,
+  };
+  const aUnSupport = withInverter.some((l) => MOUNTING_LINE_RE.test(l.designation));
+  let lines;
+  if (!includeMounting) {
+    lines = withInverter.filter((l) => !MOUNTING_LINE_RE.test(l.designation));
+  } else if (aUnSupport) {
+    // productId retiré : la ligne ne représente plus le produit boutique lié.
+    lines = withInverter.map((l) => (MOUNTING_LINE_RE.test(l.designation) ? { ...l, ...ligneSupport } : l));
+  } else {
+    // Insérée juste avant la main d'œuvre, à sa place naturelle dans le devis.
+    const iMainDoeuvre = withInverter.findIndex((l) => l.labor);
+    const place = iMainDoeuvre === -1 ? withInverter.length : iMainDoeuvre;
+    lines = [...withInverter.slice(0, place), ligneSupport, ...withInverter.slice(place)];
+  }
+  // Prix résolu ligne par ligne : celui du produit boutique lié s'il existe
+  // encore (suit ses changements de prix), sinon le prix figé de la ligne.
+  const toItem = (l, type) => {
+    const unitPrice = resolveLignePrice(l, products);
+    return { type, name: l.designation, quantity: l.qty, unit: l.unit, unitPrice, totalPrice: l.qty * unitPrice };
+  };
+  const components = lines.filter((l) => !l.labor).map((l) => toItem(l, 'kit'));
+  const prestations = lines.filter((l) => l.labor).map((l) => toItem(l, 'prestation'));
+  const total = lines.reduce((s, l) => s + l.qty * resolveLignePrice(l, products), 0);
   return {
     components, prestations,
     equipmentCost: components.reduce((s, c) => s + c.totalPrice, 0),
@@ -372,6 +714,14 @@ export const buildKitQuotation = (kit) => {
     maintenanceCost: 0,
     subtotalHT: total,
     tva: 0,
+    mountingType: mounting.id,
+    panelsIncluded: neededPanels,
+    inverterSuggested: inverterSuggested
+      ? {
+          id: inverterSuggested.id, brand: inverterSuggested.brand, model: inverterSuggested.model,
+          capacity: inverterSuggested.capacity, quantite: inverterSuggested.quantite,
+        }
+      : null,
     total,
     roi: 0,
     kitId: kit.id,

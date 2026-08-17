@@ -172,7 +172,7 @@ export function renderStudio({ kind, data }) {
   </div>` : ''}
 
   <div class="pied push">
-    <span>${esc(e.name)}${e.rccm ? ` · RCCM ${esc(e.rccm)}` : ''}${e.ifu ? ` · IFU ${esc(e.ifu)}` : ''}</span>
+    <span>${esc(e.name)}${e.rccm ? ` · RCCM ${esc(e.rccm)}` : ''}${e.ifu ? ` · NIF ${esc(e.ifu)}` : ''}</span>
     <span>${esc(e.website || e.email || '')}${total > 1 ? ` · Page ${i + 1} / ${total}` : ''}</span>
   </div>
 </section>`;

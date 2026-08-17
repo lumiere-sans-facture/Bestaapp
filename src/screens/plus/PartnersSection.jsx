@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick, Search } from 'lucide-react';
-import { useData } from '../../context/DataContext';
-import { formatCFA, formatDate, initials } from '../../utils/format';
+import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick, Search, Star } from 'lucide-react';
+import { useData, COMMISSION_RATES } from '../../context/DataContext';
+import { formatCFA, formatDate, initials, formatTaux } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS, getActiveRef } from '../../utils/referral';
 import Sheet from '../../components/Sheet';
+import ConfirmSheet from '../../components/ConfirmSheet';
+import { useToast } from '../../components/Toast';
 import Field from '../../components/Field';
+import EmptyState from '../../components/EmptyState';
 import StageBadge from '../../components/StageBadge';
 
 const EMPTY_FORM = { name: '', phone: '', momoNumber: '', sponsorId: '', status: 'actif', tier: 'standard' };
@@ -25,6 +28,8 @@ export default function PartnersSection({ onBack }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all | actif | inactif
   const [sortBy, setSortBy] = useState('nom');
+  const [payAllAsk, setPayAllAsk] = useState(null); // { partner, amount } en attente de confirmation
+  const toast = useToast();
 
   const selected = partners.find((p) => p.id === selectedId);
 
@@ -34,7 +39,7 @@ export default function PartnersSection({ onBack }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.prompt('Copiez le lien :', partnerLink(code));
+      toast(`Copie impossible — lien : ${partnerLink(code)}`, { type: 'error' });
     }
   };
 
@@ -88,12 +93,7 @@ export default function PartnersSection({ onBack }) {
     setEditing(null);
   };
 
-  const handlePayAll = (partner, amount) => {
-    const via = partner.momoNumber ? ` via Mobile Money (${partner.momoNumber})` : '';
-    if (window.confirm(`Payer toutes les commissions en attente de ${partner.name} (${formatCFA(amount)})${via} ?`)) {
-      payAllCommissionsForPartner(partner.id);
-    }
-  };
+  const handlePayAll = (partner, amount) => setPayAllAsk({ partner, amount });
 
   // Parrains proposés dans le formulaire : tout le monde sauf soi-même
   // et ses propres filleuls (évite les boucles de parrainage).
@@ -157,9 +157,9 @@ export default function PartnersSection({ onBack }) {
         </div>
       )}
       {visiblePartners.length === 0 && (
-        <div className="empty-state card">
+        <EmptyState card>
           {partners.length ? 'Aucun partenaire ne correspond à ce filtre.' : 'Aucun partenaire pour le moment.'}
-        </div>
+        </EmptyState>
       )}
       <div className="partners-list">
         {visiblePartners.map((partner) => {
@@ -176,7 +176,7 @@ export default function PartnersSection({ onBack }) {
                 <div className="partner-info">
                   <div className="partner-name">
                     {partner.name} <span className="partner-code-chip">{partner.code}</span>
-                    {partner.tier === 'or' && <span className="tier-badge">⭐ OR</span>}
+                    {partner.tier === 'or' && <span className="tier-badge"><Star size={11} /> OR</span>}
                   </div>
                   <div className="partner-type">
                     {sponsor ? <><Network size={12} /> Filleul de {sponsor.name}</> : <><Users size={12} /> Tête de réseau</>}
@@ -255,19 +255,25 @@ export default function PartnersSection({ onBack }) {
                 {st.conversions.length > 0 && (
                   <div className="referral-history">
                     {st.conversions.map((r) => (
-                      <div key={r.id} className="sheet-row">
-                        <span className="sheet-label">
-                          {REFERRAL_TYPE_LABELS[r.type]}{r.leadId && getLeadById(r.leadId) ? ` — ${getLeadById(r.leadId).name}` : ''}
-                          <span className="text-secondary"> · {formatDate(r.createdAt)}</span>
-                        </span>
-                        <span className="sheet-value">
-                          {r.amount ? `${formatCFA(r.amount)} ` : ''}
-                          {r.status === 'en_attente' ? (
-                            <button className="btn btn-sm btn-outline" onClick={() => updateReferralStatus(r.id, 'validé')}>Valider</button>
-                          ) : (
-                            <span className={`badge ${r.status === 'validé' ? 'badge-success' : 'badge-muted'}`}>{r.status}</span>
-                          )}
-                        </span>
+                      <div key={r.id}>
+                        <div className="sheet-row">
+                          <span className="sheet-label">
+                            {REFERRAL_TYPE_LABELS[r.type]}{r.leadId && getLeadById(r.leadId) ? ` — ${getLeadById(r.leadId).name}` : ''}
+                            <span className="text-secondary"> · {formatDate(r.createdAt)}</span>
+                          </span>
+                          <span className="sheet-value">
+                            {r.amount ? `${formatCFA(r.amount)} ` : ''}
+                            <span className={`badge ${r.status === 'validé' ? 'badge-success' : r.status === 'en_attente' ? 'badge-warning' : 'badge-muted'}`}>
+                              {r.status === 'en_attente' ? 'En attente' : r.status}
+                            </span>
+                          </span>
+                        </div>
+                        {/* La validation vit sur sa propre ligne (cible tactile pleine largeur) */}
+                        {r.status === 'en_attente' && (
+                          <button className="btn btn-outline btn-block" onClick={() => updateReferralStatus(r.id, 'validé')}>
+                            <Check size={15} /> Valider ce parrainage
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -310,7 +316,7 @@ export default function PartnersSection({ onBack }) {
               </div>
 
               <div className="sheet-section">
-                <div className="sheet-section-title">Affaires apportées — niveau 1 (3 %)</div>
+                <div className="sheet-section-title">Affaires apportées — niveau 1 ({formatTaux(COMMISSION_RATES[1])})</div>
                 {st.l1Leads.length ? st.l1Leads.map((l) => (
                   <div key={l.id} className="sheet-row">
                     <span className="sheet-label">{l.name}</span>
@@ -323,7 +329,7 @@ export default function PartnersSection({ onBack }) {
               </div>
 
               <div className="sheet-section">
-                <div className="sheet-section-title">Affaires de ses filleuls — niveau 2 (1,5 %)</div>
+                <div className="sheet-section-title">Affaires de ses filleuls — niveau 2 ({formatTaux(COMMISSION_RATES[2])})</div>
                 {st.l2Leads.length ? st.l2Leads.map((l) => (
                   <div key={l.id} className="sheet-row">
                     <span className="sheet-label">{l.name} <span className="text-secondary">via {getPartnerById(l.parrainL1)?.name}</span></span>
@@ -350,10 +356,10 @@ export default function PartnersSection({ onBack }) {
             <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Mamadou Balogun" />
           </Field>
           <Field label="Téléphone *">
-            <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+            <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
           </Field>
           <Field label="Numéro Mobile Money (paiement des commissions)">
-            <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+229 ..." />
+            <input className="input" type="tel" value={form.momoNumber} onChange={(e) => setForm({ ...form, momoNumber: e.target.value })} placeholder="+228 ..." />
           </Field>
           <Field label="Parrain (recruteur)">
             <select className="input" value={form.sponsorId} onChange={(e) => setForm({ ...form, sponsorId: e.target.value })}>
@@ -372,7 +378,7 @@ export default function PartnersSection({ onBack }) {
             <Field label="Niveau de partenariat">
               <select className="input" value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value })}>
                 <option value="standard">Standard</option>
-                <option value="or">Or ⭐</option>
+                <option value="or">Or</option>
               </select>
             </Field>
           </div>
@@ -381,6 +387,18 @@ export default function PartnersSection({ onBack }) {
           </button>
         </form>
       </Sheet>
+
+      {/* Confirmation du paiement global des commissions en attente */}
+      <ConfirmSheet
+        open={!!payAllAsk}
+        onClose={() => setPayAllAsk(null)}
+        onConfirm={() => payAllCommissionsForPartner(payAllAsk.partner.id)}
+        title="Payer les commissions"
+        message={payAllAsk
+          ? `Payer toutes les commissions en attente de ${payAllAsk.partner.name} (${formatCFA(payAllAsk.amount)})${payAllAsk.partner.momoNumber ? ` via Mobile Money (${payAllAsk.partner.momoNumber})` : ''} ?`
+          : ''}
+        confirmLabel="Payer"
+      />
     </>
   );
 }

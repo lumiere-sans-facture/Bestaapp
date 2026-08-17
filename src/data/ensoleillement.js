@@ -1,20 +1,28 @@
-// Référentiel d'ensoleillement : heures de pic solaire (peak sun hours)
-// moyennes annuelles par ville du Bénin. Valeurs indicatives, ajustables.
+// Référentiel d'ensoleillement : heures de pic solaire (peak sun hours) du
+// PIRE MOIS de l'année par ville du Togo — pas la moyenne annuelle. Un
+// système taillé sur la moyenne manque d'énergie chaque saison des pluies
+// (juillet-août, ciel couvert) ; taillé sur le pire mois, il tient toute
+// l'année. Valeurs calées sur les données satellite NASA POWER (pire mois
+// mesuré : 4,3 h à Lomé) — la recherche en ligne d'une ville donne toujours
+// la valeur exacte du point ; cette table est le repli hors-ligne. Le
+// gradient sud → nord suit l'éloignement de la côte (moins de nébulosité).
 export const ENSOLEILLEMENT = [
-  { city: 'Cotonou', psh: 4.8 },
-  { city: 'Porto-Novo', psh: 4.9 },
-  { city: 'Lokossa', psh: 4.9 },
-  { city: 'Abomey / Bohicon', psh: 5.1 },
-  { city: 'Dassa-Zoumè', psh: 5.2 },
-  { city: 'Savè', psh: 5.3 },
-  { city: 'Parakou', psh: 5.4 },
-  { city: 'Djougou', psh: 5.5 },
-  { city: 'Natitingou', psh: 5.7 },
-  { city: 'Kandi', psh: 5.8 },
-  { city: 'Malanville', psh: 6.0 },
+  { city: 'Lomé', psh: 4.3 },
+  { city: 'Aného', psh: 4.3 },
+  { city: 'Tsévié', psh: 4.3 },
+  { city: 'Kpalimé', psh: 4.2 },
+  { city: 'Notsè', psh: 4.3 },
+  { city: 'Atakpamé', psh: 4.4 },
+  { city: 'Sotouboua', psh: 4.5 },
+  { city: 'Sokodé', psh: 4.5 },
+  { city: 'Bassar', psh: 4.5 },
+  { city: 'Kara', psh: 4.6 },
+  { city: 'Niamtougou', psh: 4.6 },
+  { city: 'Mango', psh: 4.7 },
+  { city: 'Dapaong', psh: 4.8 },
 ];
 
-export const DEFAULT_CITY = 'Parakou';
+export const DEFAULT_CITY = 'Lomé';
 
 export const pshForCity = (city) =>
   ENSOLEILLEMENT.find((e) => e.city === city)?.psh ?? null;

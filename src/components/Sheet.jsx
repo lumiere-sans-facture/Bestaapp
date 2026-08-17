@@ -18,6 +18,13 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
   const sheetRef = useRef(null);
   const previouslyFocused = useRef(null);
   const titleId = useId();
+  // `onClose` est presque toujours une fonction anonyme, donc RECRÉÉE à chaque
+  // rendu du parent. La garder en dépendance de l'effet ci-dessous relançait
+  // celui-ci à la moindre frappe : son nettoyage rendait le focus au bouton
+  // déclencheur, et le champ en cours de saisie le perdait à chaque caractère.
+  // On passe donc par une référence, stable par construction.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (open) {
@@ -38,7 +45,7 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
 
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !node) return;
@@ -67,7 +74,8 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
       // Restaure le focus là où l'utilisateur l'avait (si l'élément existe encore).
       previouslyFocused.current?.focus?.();
     };
-  }, [open, onClose]);
+    // Volontairement sur `open` SEUL : voir onCloseRef plus haut.
+  }, [open]);
 
   if (!open) return null;
 

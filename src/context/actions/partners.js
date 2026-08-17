@@ -1,7 +1,7 @@
 // Domaine programme d'affiliation : réseau de partenaires, validation des
 // conversions et paiement des commissions de parrainage.
 import { generatePartnerCode } from '../../utils/referral';
-import { missingCommissionsForLead, reconcileMissingCommissions } from '../../utils/commissionSync';
+import { missingCommissionsForLead, reconcileMissingCommissions, rattacherCommissionsClient } from '../../utils/commissionSync';
 import { COMMISSION_RATES, partnerFromActiveRef } from './shared';
 
 export function createPartnerActions(setState) {
@@ -29,13 +29,37 @@ export function createPartnerActions(setState) {
 
     // Chaque utilisateur de l'app (technicien ou gérant) dispose de son propre
     // profil partenaire, créé automatiquement à la première visite de son espace.
+    //
+    // Le parrain se note de DEUX façons, et les deux comptent :
+    //  - `sponsorId` quand son profil partenaire vit dans la même organisation
+    //    (réseau interne monté par le gérant) ;
+    //  - `sponsorCode` sinon. À l'inscription sur la plateforme, le parrain est
+    //    dans une AUTRE organisation : aucun `sponsorId` local ne peut le
+    //    désigner. Sans le code, le niveau 2 n'a plus aucun support et la
+    //    commission de 1,5 % n'est jamais attribuée.
     ensurePartnerForUser: (user) =>
       setState((s) => {
-        if (s.partners.some((p) => p.userId === user.id)) return s;
+        const codeOrg = (user.org?.referred_by || '').trim().toUpperCase() || null;
+        const existant = s.partners.find((p) => p.userId === user.id);
+        if (existant) {
+          // Réparation des profils créés avant que le code d'organisation ne
+          // soit connu : sans parrain, aucune commission de niveau 2.
+          if (!codeOrg || existant.sponsorId || existant.sponsorCode) return s;
+          const local = s.partners.find((p) => p.code === codeOrg && p.id !== existant.id);
+          return {
+            ...s,
+            partners: s.partners.map((p) => (p.id === existant.id
+              ? { ...p, sponsorCode: codeOrg, sponsorId: local?.id || null }
+              : p)),
+          };
+        }
         // Rattachement automatique : si un lien de parrainage (?ref=…) est
         // actif sur l'appareil à la création du profil, son propriétaire
         // devient le parrain — sans saisie manuelle.
         const refPartner = partnerFromActiveRef(s.partners);
+        const parrain = (refPartner && refPartner.userId !== user.id ? refPartner : null)
+          || (codeOrg ? s.partners.find((p) => p.code === codeOrg) : null)
+          || null;
         return {
           ...s,
           partners: [
@@ -49,7 +73,8 @@ export function createPartnerActions(setState) {
               photo: '',
               zone: '',
               tier: 'standard',
-              sponsorId: refPartner && refPartner.userId !== user.id ? refPartner.id : null,
+              sponsorId: parrain?.id || null,
+              sponsorCode: parrain?.code || codeOrg,
               status: 'actif',
               registeredAt: new Date().toISOString().slice(0, 10),
               code: generatePartnerCode(user.name, s.partners.map((p) => p.code).filter(Boolean)),
@@ -88,28 +113,71 @@ export function createPartnerActions(setState) {
     // relancer ne crée jamais de doublon.
     syncCommissions: () =>
       setState((s) => {
+        const today = new Date().toISOString().slice(0, 10);
+        // 1) Réparer les doublons déjà enregistrés (commission « niveau
+        // client » sur une piste dont un devis est gagné).
+        let commissions = s.commissions;
+        for (const d of (s.devis || []).filter((x) => x.stage === 'gagne' && x.type !== 'pro')) {
+          commissions = rattacherCommissionsClient(commissions, d);
+        }
+        // 2) Créer les commissions manquantes sur les affaires validées.
         const created = reconcileMissingCommissions(
-          { leads: s.leads, devis: s.devis, partners: s.partners, commissions: s.commissions, referrals: s.referrals },
+          { leads: s.leads, devis: s.devis, partners: s.partners, commissions, referrals: s.referrals },
           COMMISSION_RATES,
-          new Date().toISOString().slice(0, 10)
+          today
         );
-        return created.length ? { ...s, commissions: [...created, ...s.commissions] } : s;
+        const next = created.length ? [...created, ...commissions] : commissions;
+        return next === s.commissions ? s : { ...s, commissions: next };
       }),
 
-    addCommission: (commission) =>
-      setState((s) => ({
-        ...s,
-        commissions: [
-          {
-            ...commission,
-            id: crypto.randomUUID(),
-            status: 'en_attente',
-            paidAt: null,
-            createdAt: new Date().toISOString().slice(0, 10),
-          },
-          ...s.commissions,
-        ],
-      })),
+    // Commission attribuée à la main. Le bénéficiaire peut être un partenaire
+    // (partnerId) OU un membre de l'équipe (beneficiaire = { userId, name }) :
+    // dans ce cas son profil partenaire est créé à la volée s'il n'en a pas
+    // encore — toute l'équipe est ainsi commissionnable.
+    addCommission: ({ beneficiaire, ...commission }) =>
+      setState((s) => {
+        let partners = s.partners;
+        let partnerId = commission.partnerId || null;
+        if (!partnerId && beneficiaire?.userId) {
+          const existant = partners.find((p) => p.userId === beneficiaire.userId);
+          if (existant) {
+            partnerId = existant.id;
+          } else {
+            partnerId = `p-user-${beneficiaire.userId}`;
+            partners = [
+              {
+                id: partnerId,
+                userId: beneficiaire.userId,
+                name: beneficiaire.name || 'Membre de l’équipe',
+                phone: beneficiaire.phone || '',
+                email: beneficiaire.email || '',
+                momoNumber: '', photo: '', zone: '', tier: 'standard',
+                sponsorId: null,
+                status: 'actif',
+                registeredAt: new Date().toISOString().slice(0, 10),
+                code: generatePartnerCode(beneficiaire.name || 'Membre', partners.map((p) => p.code).filter(Boolean)),
+              },
+              ...partners,
+            ];
+          }
+        }
+        if (!partnerId) return s;
+        return {
+          ...s,
+          partners,
+          commissions: [
+            {
+              ...commission,
+              partnerId,
+              id: crypto.randomUUID(),
+              status: 'en_attente',
+              paidAt: null,
+              createdAt: new Date().toISOString().slice(0, 10),
+            },
+            ...s.commissions,
+          ],
+        };
+      }),
 
     // Paiement tracé (norme comptable) : mode de règlement, référence de la
     // transaction (n° Mobile Money…), payeur et note sont archivés sur la commission.

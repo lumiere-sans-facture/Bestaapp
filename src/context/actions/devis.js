@@ -1,17 +1,108 @@
-// Domaine devis : création (avec attribution d'affiliation) et marquage Pro.
-import { newReferral, partnerFromActiveRef } from './shared';
+// Domaine devis : création (avec attribution d'affiliation), marquage Pro et
+// SUIVI DEVIS PAR DEVIS — chaque devis est une affaire à part entière, avec sa
+// propre étape, sa propre issue (gagné/perdu) et sa propre commission. L'étape
+// du client en est la synthèse (la plus avancée de ses devis).
+// Comme pour les pistes, un commercial DEMANDE le changement d'étape et le
+// gérant valide : la commission ne naît qu'à la validation.
+import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
+import { missingCommissionsForDevis, rattacherCommissionsClient } from '../../utils/commissionSync';
+import { suivre, EVENEMENTS } from '../../lib/analytique';
+import { devisStage, etapeDuClient, prochainNumeroDevis } from '../../utils/affaires';
+
+// L'issue d'un devis met à jour la fiche du CLIENT : son activité (indicateur
+// « affaire inactive depuis N jours ») et son étape de synthèse — la plus
+// avancée de ses devis. Le kanban suit les devis ; la fiche client, le tableau
+// de bord et l'espace partenaire raisonnent par client et doivent suivre.
+const majClient = (state, leadId, today) =>
+  state.leads.map((l) => {
+    if (l.id !== leadId) return l;
+    const etapes = state.devis
+      .filter((d) => d.leadId === leadId && d.type !== 'pro')
+      .map((d) => devisStage(d, l));
+    const synthese = etapeDuClient(etapes);
+    return {
+      ...l,
+      lastActivity: today,
+      ...(synthese && synthese !== l.stage
+        ? {
+            stage: synthese,
+            wonAt: synthese === 'gagne' ? l.wonAt || today : l.wonAt,
+            lostAt: synthese === 'perdu' ? today : null,
+          }
+        : {}),
+    };
+  });
 
 export function createDevisActions(setState) {
+  // Application effective du changement d'étape d'UNE affaire (devis) :
+  // le « gagné » génère les commissions de CE devis (3 % N1, 1,5 % N2) —
+  // deux devis gagnés d'un même client donnent bien deux commissions.
+  const devisStageState = (s, devisId, stage) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const d = s.devis.find((x) => x.id === devisId);
+    if (!d) return s;
+    const lead = s.leads.find((l) => l.id === d.leadId);
+    let commissions = s.commissions;
+    let referrals = s.referrals || [];
+    if (stage === 'gagne') {
+      // Une commission « niveau client » (sans devisId) devient caduque dès
+      // qu'un devis de ce client est gagné : la rémunération se fait alors
+      // devis par devis. Sans cela, conclure le client PUIS son devis payait
+      // deux fois la même vente.
+      const pool = rattacherCommissionsClient(s.commissions, d);
+      const generated = missingCommissionsForDevis(
+        { devis: d, lead, partners: s.partners, commissions: pool },
+        COMMISSION_RATES,
+        today
+      );
+      commissions = generated.length ? [...generated, ...pool] : pool;
+      // Affaire gagnée : les conversions d'affiliation encore en attente sur
+      // cette piste sont validées d'office (registre cohérent avec la commission).
+      referrals = referrals.map((r) =>
+        r.leadId === d.leadId && r.status === 'en_attente' ? { ...r, status: 'validé' } : r
+      );
+    }
+    const ns = {
+      ...s,
+      commissions,
+      referrals,
+      devis: s.devis.map((x) =>
+        x.id === devisId
+          ? {
+              ...x,
+              stage,
+              pendingStage: null,
+              wonAt: stage === 'gagne' ? today : x.wonAt,
+              lostAt: stage === 'perdu' ? today : null,
+              // Le montant de la vente est FIGÉ ici, une fois. Sans cela,
+              // corriger le devis après coup changerait rétroactivement le
+              // chiffre d'affaires ET la commission déjà versée au partenaire.
+              // Figé une seule fois : reconvertir un devis déjà vendu ne doit
+              // pas réécrire le montant sur lequel la commission a été calculée.
+              ...(stage === 'gagne' && x.montantVente == null
+                ? { montantVente: Number(x.total) || 0 }
+                : {}),
+            }
+          : x
+      ),
+    };
+    return { ...ns, leads: majClient(ns, d.leadId, today) };
+  };
+
   return {
     // Le devis porte la référence du partenaire apporteur : c'est par lui
     // que le parrainage est tracé. Sans partenaire explicite, l'attribution
     // d'affiliation active rattache le devis (conversion enregistrée au registre).
-    addDevis: (devis) =>
-      setState((s) => {
+    addDevis: (devis) => {
+      // Hors du réducteur : React peut le ré-exécuter (StrictMode), ce qui
+      // compterait l'événement deux fois. Aucune donnée client n'y transite —
+      // un montant et un type, rien d'autre.
+      suivre(EVENEMENTS.DEVIS_CREE, { total: Number(devis.total) || 0, type: devis.type || '' });
+      return setState((s) => {
         const now = new Date();
-        const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-        const counter = (s.devisCounter || 0) + 1;
-        const devisNumber = `BS-${dateStr}-${String(counter).padStart(4, '0')}`;
+        // Numéro DÉDUIT des devis existants (répliqués), pas d'un compteur
+        // local : deux appareils ne peuvent plus produire le même numéro.
+        const devisNumber = prochainNumeroDevis(s.devis, now);
         // Attribution automatique : partenaire choisi > parrain de la piste
         // > lien d'affiliation > profil partenaire du créateur du devis
         // (chaque devis a impérativement un apporteur).
@@ -36,16 +127,31 @@ export function createDevisActions(setState) {
         const partnerCode = s.partners.find((p) => p.id === partnerId)?.code || null;
         return {
           ...s,
-          devisCounter: counter,
+          // Conservé pour compatibilité des sauvegardes ; n'est plus la source
+          // de vérité de la numérotation.
+          devisCounter: (s.devisCounter || 0) + 1,
           referrals,
           devis: [
-            { ...devis, partnerId, partnerCode, id: crypto.randomUUID(), devisNumber, createdAt: now.toISOString() },
+            // L'affaire démarre où en est DÉJÀ le client (« Nouveau » pour une
+            // piste qui vient d'être créée), jamais directement à
+            // « Proposition » : émettre un devis ne fait sauter aucune des
+            // étapes réelles du parcours commercial (qualification, visite…).
+            // Un client déjà conclu (gagné/perdu) ne fait pas non plus naître
+            // un nouveau devis directement clos — il repart de « Nouveau ».
+            {
+              ...devis, partnerId, partnerCode,
+              stage: devis.stage
+                || (lead && lead.stage !== 'gagne' && lead.stage !== 'perdu' ? lead.stage : 'nouveau'),
+              id: crypto.randomUUID(), devisNumber, createdAt: now.toISOString(),
+            },
             ...s.devis,
           ],
           leads: s.leads.map((l) => {
             if (l.id !== devis.leadId) return l;
             // La valeur de l'affaire se déduit du devis (pas de saisie manuelle) ;
-            // le dernier devis créé fait référence.
+            // le dernier devis créé fait référence. L'ÉTAPE du client, elle,
+            // reste pilotée à la main dans le kanban — créer un devis ne fait
+            // jamais sauter une étape dans le dos du commercial.
             let next = devis.total > 0 ? { ...l, estimatedValue: devis.total } : l;
             if (partnerId && !l.parrainL1) {
               const sponsor = s.partners.find((p) => p.id === partnerId)?.sponsorId || null;
@@ -53,6 +159,70 @@ export function createDevisActions(setState) {
             }
             return next;
           }),
+        };
+      });
+    },
+
+    // ---- Suivi devis par devis : chaque devis a sa propre issue ----
+    // Le vendeur applique l'étape immédiatement — le « gagné » génère la
+    // commission de CE devis.
+    updateDevisStage: (devisId, stage) => setState((s) => devisStageState(s, devisId, stage)),
+
+    // Un commercial DEMANDE l'étape d'une affaire : le devis ne bouge pas, la
+    // demande attend la validation du gérant.
+    requestDevisStageChange: (devisId, stage, userId) =>
+      setState((s) => {
+        const d = s.devis.find((x) => x.id === devisId);
+        if (!d) return s;
+        return {
+          ...s,
+          devis: s.devis.map((x) =>
+            x.id === devisId
+              ? { ...x, pendingStage: { stage, requestedBy: userId, requestedAt: new Date().toISOString() } }
+              : x
+          ),
+          leads: s.leads.map((l) =>
+            l.id === d.leadId
+              ? {
+                  ...l,
+                  activities: [note(`Demande de passage du devis ${d.devisNumber || ''} à « ${STAGE_LABEL[stage] || stage} » — en attente de validation du gérant.`, userId), ...(l.activities || [])],
+                  lastActivity: new Date().toISOString().slice(0, 10),
+                }
+              : l
+          ),
+        };
+      }),
+
+    // Le gérant valide : l'étape s'applique, et le « gagné » crée la commission.
+    approveDevisStageChange: (devisId, approverId) =>
+      setState((s) => {
+        const d = s.devis.find((x) => x.id === devisId);
+        if (!d?.pendingStage) return s;
+        const { stage } = d.pendingStage;
+        const ns = devisStageState(s, devisId, stage);
+        return {
+          ...ns,
+          leads: ns.leads.map((l) =>
+            l.id === d.leadId
+              ? { ...l, activities: [note(`Passage du devis ${d.devisNumber || ''} à « ${STAGE_LABEL[stage] || stage} » validé par le gérant.`, approverId), ...(l.activities || [])] }
+              : l
+          ),
+        };
+      }),
+
+    // Le gérant refuse : l'affaire reste à son étape, la demande est levée.
+    rejectDevisStageChange: (devisId, approverId) =>
+      setState((s) => {
+        const d = s.devis.find((x) => x.id === devisId);
+        if (!d?.pendingStage) return s;
+        return {
+          ...s,
+          devis: s.devis.map((x) => (x.id === devisId ? { ...x, pendingStage: null } : x)),
+          leads: s.leads.map((l) =>
+            l.id === d.leadId
+              ? { ...l, activities: [note(`Demande de passage du devis ${d.devisNumber || ''} à « ${STAGE_LABEL[d.pendingStage.stage] || d.pendingStage.stage} » refusée par le gérant.`, approverId), ...(l.activities || [])] }
+              : l
+          ),
         };
       }),
 

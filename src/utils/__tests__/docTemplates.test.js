@@ -3,7 +3,7 @@ import { buildDocHtml, MODELS, modelsPour, normaliserModel } from '../docTemplat
 import { donneesDeDevis, donneesDeFacture, lignesDeDevis, totauxDe, nf, emetteurDe, eclaircir } from '../docTemplates/shared';
 import { COMPANY } from '../../config/company';
 
-const LEAD = { name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+229 94 22 33 44', address: 'Parakou' };
+const LEAD = { name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+228 94 22 33 44', address: 'Lomé' };
 
 // Devis solaire : lignes issues du chiffrage (composants + prestations).
 const DEVIS_SOLAIRE = {
@@ -26,7 +26,7 @@ const DEVIS_LIBRE = {
   devisNumber: 'BS-20260320-0011',
   createdAt: '2026-03-20T09:00:00.000Z',
   type: 'pro',
-  clientName: 'Felix Sossa', clientPhone: '+229 94 22 33 44', clientVille: 'Parakou',
+  clientName: 'Felix Sossa', clientPhone: '+228 94 22 33 44', clientVille: 'Lomé',
   lignes: [
     { designation: 'Batterie lithium 48V 100Ah', qty: 2, pu: 425000 },
     { designation: 'Coffret de protection DC/AC', qty: 1, pu: 85000 },
@@ -38,7 +38,7 @@ const FACTURE = {
   numero: 'FAC-2026-014',
   createdAt: '2026-03-22T09:00:00.000Z',
   echeance: '2026-04-21',
-  clientName: 'Felix Sossa', clientPhone: '+229 94 22 33 44', clientVille: 'Parakou',
+  clientName: 'Felix Sossa', clientPhone: '+228 94 22 33 44', clientVille: 'Lomé',
   lignes: [{ designation: 'Kit solaire 5 kWh', qty: 1, pu: 1200000 }],
   tva: 0, tvaActive: false, totalHT: 1200000, totalTTC: 1200000,
 };
@@ -68,7 +68,12 @@ describe('rendu des six combinaisons kind × model', () => {
         expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
         expect(html.length).toBeGreaterThan(2000);
         expect(html).toContain('<section class="page">');
-        expect(html).toContain('IBM+Plex+Sans');
+        // La police est SERVIE PAR L'APP : un document composé hors ligne doit
+        // être identique à celui composé en ligne. Une dépendance à Google
+        // Fonts faisait retomber le document en police système, sans bruit.
+        expect(html).toContain("@font-face");
+        expect(html).toContain('ibm-plex-sans-latin-600-normal.woff2');
+        expect(html).not.toContain('fonts.googleapis.com');
         expect(html).toContain('tabular-nums');
         expect(html).toContain('width: 794px; height: 1123px');
         expect(html).toContain('Imprimer / Exporter en PDF');
@@ -163,8 +168,8 @@ describe('unités et lisibilité', () => {
 describe('couleurs de marque de l’émetteur', () => {
   // Entreprise Pro avec sa propre identité visuelle (vert / rouge).
   const companyPro = {
-    nomEntreprise: 'Soleil du Borgou', telephone: '+229 97 00 00 00', email: 'contact@borgou.bj',
-    adresse: 'Parakou', couleurPrimaire: '#1b7a43', couleurSecondaire: '#d43518',
+    nomEntreprise: 'Soleil de la Kara', telephone: '+228 97 00 00 00', email: 'contact@kara.tg',
+    adresse: 'Lomé', couleurPrimaire: '#1b7a43', couleurSecondaire: '#d43518',
   };
   const facturePro = donneesDeFacture({
     facture: { numero: 'FAC-2026-020', createdAt: '2026-03-25T09:00:00.000Z', clientName: 'Client', lignes: [{ designation: 'Kit', qty: 1, pu: 500000 }] },

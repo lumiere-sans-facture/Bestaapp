@@ -41,8 +41,11 @@ export default function PaiementSheet({ open, onClose, facture, onSubmit }) {
 
       <form onSubmit={submit}>
         <Field label="Montant encaissé *">
-          <input className="input" type="number" min="1" max={reste} required value={montant}
+          <input className={`input${Number(montant) > reste ? ' invalid' : ''}`} type="number" min="1" max={reste} required value={montant}
             onChange={(e) => setMontant(e.target.value)} />
+          {Number(montant) > reste && (
+            <div className="field-error">Au-delà du reste dû — l'encaissement sera ramené à {formatCFA(reste)}.</div>
+          )}
         </Field>
         <div className="pay-quick">
           <button type="button" className="btn btn-sm btn-outline" onClick={() => setMontant(reste)}>Solde ({formatCFA(reste)})</button>

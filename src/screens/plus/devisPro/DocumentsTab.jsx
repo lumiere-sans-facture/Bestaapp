@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, Search, CheckCircle, Pencil, Wallet, Send } from 'lucide-react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, ChevronRight, Search, CheckCircle, Pencil, Wallet, Send } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
-import { formatCFA, formatDate, formatNombre as nf } from '../../../utils/format';
+import { formatCFA, formatDate } from '../../../utils/format';
 import { computeFactureTotals } from '../../../utils/facture';
 import {
   statutEffectif, STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE,
@@ -16,6 +16,8 @@ import PaiementSheet from './PaiementSheet';
 import ProDevisBuilder from './ProDevisBuilder';
 import ProSolarWizard from './ProSolarWizard';
 import Sheet from '../../../components/Sheet';
+import ConfirmSheet from '../../../components/ConfirmSheet';
+import { useToast } from '../../../components/Toast';
 import DevisEditSheet from '../../devis/DevisEditSheet';
 
 
@@ -46,6 +48,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const [editDevis, setEditDevis] = useState(null);
   const [factureEdit, setFactureEdit] = useState(null);
   const [payFacture, setPayFacture] = useState(null); // facture en cours d'encaissement
+  // Confirmation en cours : { title, message, confirmLabel, danger, action }.
+  const [confirm, setConfirm] = useState(null);
+  const toast = useToast();
 
   const myDevis = useMemo(() => devis.filter((d) => d.createdBy === user.id), [devis, user.id]);
   const myFactures = useMemo(() => (factures || []).filter((f) => f.userId === user.id), [factures, user.id]);
@@ -65,11 +70,11 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const SelecteurModele = () => (
     <div className="input-group">
       <span className="input-label" id="doc-modele-label">Modèle de document</span>
-      <div className="client-type-toggle" role="group" aria-labelledby="doc-modele-label">
+      <div className="segmented" role="group" aria-labelledby="doc-modele-label">
         {MODELES.map((m) => (
           <button
             key={m.id} type="button"
-            className={`client-type-btn ${modeleActif === m.id ? 'active' : ''}`}
+            className={`segmented-btn ${modeleActif === m.id ? 'active' : ''}`}
             aria-pressed={modeleActif === m.id}
             onClick={() => setModeleChoisi(m.id)}
           >
@@ -91,7 +96,18 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
 
   const convertDevis = (d) => {
     const existing = factureByDevis.get(d.id);
-    if (existing && !window.confirm(`Ce devis a déjà été converti en facture (${existing.numero}). Créer une nouvelle facture quand même ?`)) return;
+    if (existing) {
+      setConfirm({
+        title: 'Devis déjà facturé',
+        message: `Ce devis a déjà été converti en facture (${existing.numero}). Créer une nouvelle facture quand même ?`,
+        confirmLabel: 'Créer la facture',
+        action: () => doConvertDevis(d),
+      });
+      return;
+    }
+    doConvertDevis(d);
+  };
+  const doConvertDevis = (d) => {
     import('../../../utils/proDocPdf').then(({ devisToLignes }) => {
       const lead = getLeadById(d.leadId);
       const lignes = devisToLignes(d, products);
@@ -105,17 +121,20 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         clientVille: d.clientVille || lead?.address || '',
         lignes, ...totals, tvaActive, statut: 'emise', modele: modeleDefaut, devisId: d.id,
       });
+      toast('Facture créée depuis le devis.');
     });
   };
 
   // Marquer payée = solder la facture (statut + montant intégralement encaissé).
   const marquerPayee = (f) => updateFacture(f.id, { statut: 'payee', montantPaye: f.totalTTC });
 
-  // Relance WhatsApp : ouvre un message pré-rempli et trace la relance.
+  // Relance WhatsApp : ouvre un message pré-rempli, trace la relance et le dit
+  // (de retour dans l'app, l'utilisateur sait que c'est parti).
   const relancer = (f) => {
     const url = whatsappLink(f.clientPhone, relanceMessage(f, company));
     window.open(url, '_blank', 'noopener');
     addRelance(f.id, 'whatsapp');
+    toast(`Relance envoyée à ${f.clientName} sur WhatsApp.`);
   };
 
   const submitPaiement = (data) => {
@@ -216,6 +235,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
           onKeyDown={montantRetard > 0 ? (e) => cardKey(e, () => { switchTab('factures'); setStatusFilter('retard'); }) : undefined}>
           <div className="doc-summary-value">{formatCFA(montantRetard)}</div>
           <div className="doc-summary-label">En retard{enRetardList.length ? ` (${enRetardList.length})` : ''}</div>
+          {montantRetard > 0 && (
+            <span className="doc-summary-link">Voir les retards <ChevronRight size={12} /></span>
+          )}
         </div>
         <div className="doc-summary-card paid">
           <div className="doc-summary-value">{formatCFA(encaisse)}</div>
@@ -270,9 +292,10 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               const src = f.devisId && devisById.get(f.devisId);
               const eff = statutEffectif(f);
               const reste = resteAPayer(f);
-              const note = eff === 'retard' ? `Retard ${joursRetard(f)} j · reste ${nf(reste)} F`
-                : eff === 'partiel' ? `Reste ${nf(reste)} F`
+              const note = eff === 'retard' ? `Retard ${joursRetard(f)} j · reste ${formatCFA(reste)}`
+                : eff === 'partiel' ? `Reste ${formatCFA(reste)}`
                 : '';
+              const relance = f.derniereRelance ? ` · relancée le ${formatDate(f.derniereRelance)}` : '';
               return (
                 <div key={f.id} className="flat-row" role="button" tabIndex={0}
                   onClick={() => setActions({ kind: 'facture', doc: f })}
@@ -281,10 +304,10 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                     <div className="flat-row-title">{f.numero} - {f.clientName}</div>
                     <div className="flat-row-sub">
                       <span className={`flat-badge ${STATUT_EFFECTIF_BADGE[eff]}`}>{STATUT_EFFECTIF_LABEL[eff]}</span>
-                      <span className="flat-row-date">{note || formatDate(f.createdAt)}{src ? ` · ${src.devisNumber}` : ''}</span>
+                      <span className="flat-row-date">{note || formatDate(f.createdAt)}{src ? ` · ${src.devisNumber}` : ''}{relance}</span>
                     </div>
                   </div>
-                  <div className="flat-row-amount">{nf(f.totalTTC)}<span className="flat-amount-unit">F CFA</span></div>
+                  <div className="flat-row-amount">{formatCFA(f.totalTTC)}</div>
                 </div>
               );
             })}
@@ -318,7 +341,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                       <span className="flat-row-date">{formatDate(d.createdAt)}</span>
                     </div>
                   </div>
-                  <div className="flat-row-amount">{nf(d.total)}<span className="flat-amount-unit">F CFA</span></div>
+                  <div className="flat-row-amount">{formatCFA(d.total)}</div>
                 </div>
               );
             })}
@@ -385,9 +408,17 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               </button>
             )}
             {actionFacture.statut === 'brouillon' && (
-              <button className="btn btn-lost btn-block" onClick={() => { if (window.confirm('Supprimer ce brouillon ?')) runAction(() => deleteFacture(actionFacture.id)); }}>
-                <Trash2 size={16} /> Supprimer le brouillon
-              </button>
+              <div className="danger-zone">
+                <button className="btn btn-lost btn-block" onClick={() => setConfirm({
+                  title: 'Supprimer ce brouillon',
+                  message: `La facture ${actionFacture.numero} sera définitivement supprimée.`,
+                  confirmLabel: 'Supprimer',
+                  danger: true,
+                  action: () => runAction(() => deleteFacture(actionFacture.id)),
+                })}>
+                  <Trash2 size={16} /> Supprimer le brouillon
+                </button>
+              </div>
             )}
           </div>
           );
@@ -414,9 +445,17 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                 <button className="btn btn-won btn-block" onClick={() => runAction(() => updateDevis(actions.doc.id, { statut: 'finalise' }))}>
                   <CheckCircle size={16} /> Finaliser le devis
                 </button>
-                <button className="btn btn-lost btn-block" onClick={() => { if (window.confirm('Supprimer ce brouillon ?')) runAction(() => deleteDevis(actions.doc.id)); }}>
-                  <Trash2 size={16} /> Supprimer le brouillon
-                </button>
+                <div className="danger-zone">
+                  <button className="btn btn-lost btn-block" onClick={() => setConfirm({
+                    title: 'Supprimer ce brouillon',
+                    message: `Le devis ${actions.doc.devisNumber} sera définitivement supprimé.`,
+                    confirmLabel: 'Supprimer',
+                    danger: true,
+                    action: () => runAction(() => deleteDevis(actions.doc.id)),
+                  })}>
+                    <Trash2 size={16} /> Supprimer le brouillon
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -435,6 +474,16 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       <PaiementSheet open={!!payFacture} onClose={() => setPayFacture(null)} facture={payFactureLive} onSubmit={submitPaiement} />
 
       <DevisEditSheet open={!!editDevis} onClose={() => setEditDevis(null)} devis={editDevis} editableClient withTva />
+
+      <ConfirmSheet
+        open={!!confirm}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => confirm?.action()}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        danger={!!confirm?.danger}
+      />
     </>
   );
 }

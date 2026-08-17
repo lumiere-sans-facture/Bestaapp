@@ -4,20 +4,23 @@ import { Search, Plus, Pencil, Trash2, Camera, Check, ShoppingCart, FileText, Sm
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
+import KkiapayButton from '../components/KkiapayButton';
 import { formatCFA } from '../utils/format';
 import { fileToResizedDataUrl } from '../utils/image';
 import { extractPowerWatts, POWER_RANGES, PRICE_RANGES } from '../utils/power';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import ConfirmSheet from '../components/ConfirmSheet';
 import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
+import { useToast } from '../components/Toast';
 import { prixPublic, PUBLIC_MARKUP } from '../utils/price';
 
 const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', category: 'kits', image: '' };
 
 export default function Boutique() {
   const { user } = useAuth();
-  const { products, productCategories, addProduct, updateProduct, deleteProduct, addOrder } = useData();
+  const { products, productCategories, addProduct, updateProduct, deleteProduct, addOrder, marquerCommandePayee } = useData();
   const { items: cartItems, addItem, setQty, removeItem, clearCart, count } = useCart();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -31,14 +34,23 @@ export default function Boutique() {
   const [detailId, setDetailId] = useState(null);
   // Paiement en ligne : null fermé, 'form' saisie, sinon la commande confirmée
   const [payment, setPayment] = useState(null);
-  const [payForm, setPayForm] = useState({ operator: 'MTN MoMo', phone: '' });
+  const [payForm, setPayForm] = useState({ operator: 'T-Money (Yas)', phone: '' });
   const [justAdded, setJustAdded] = useState(null);
+  // Confirmations (remplacent window.confirm) : vidage du panier, suppression produit.
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const fileInputRef = useRef(null);
+  const toast = useToast();
 
   const detailProduct = products.find((p) => p.id === detailId);
 
   const isManager = user.role === 'gerant';
-  const getPrice = (basePrice) => (isManager ? prixPublic(basePrice) : basePrice);
+  // La boutique est accessible aux techniciens : ils peuvent donc également
+  // payer leur panier en ligne. La commande garde l'identité de l'acheteur,
+  // ce qui permet son suivi, quelle que soit son organisation.
+  const canPayOnline = true;
+  // Prix PUBLIC toujours — même prix que sur un devis, peu importe le rôle.
+  const getPrice = (basePrice) => prixPublic(basePrice);
   const categoryLabel = (id) => productCategories.find((c) => c.id === id)?.label || '';
 
   const handleAddToCart = (product) => {
@@ -81,7 +93,7 @@ export default function Boutique() {
       const dataUrl = await fileToResizedDataUrl(file);
       setForm((f) => ({ ...f, image: dataUrl }));
     } catch {
-      alert("Impossible de lire cette image. Essayez avec une autre photo.");
+      toast('Impossible de lire cette image. Essayez avec une autre photo.', { type: 'error' });
     }
     e.target.value = '';
   };
@@ -101,13 +113,7 @@ export default function Boutique() {
     setEditing(null);
   };
 
-  const handleDelete = () => {
-    const product = products.find((p) => p.id === editing);
-    if (window.confirm(`Supprimer « ${product?.name} » du catalogue ?`)) {
-      deleteProduct(editing);
-      setEditing(null);
-    }
-  };
+  const handleDelete = () => setConfirmDelete(true);
 
   // Filtre + tri mémoïsés : ne recalcule (et ne relance les regex de puissance)
   // que si une entrée réelle change — pas sur l'ajout au panier ou l'ouverture
@@ -130,18 +136,37 @@ export default function Boutique() {
         return w !== null && w >= powerFilter.min && w < powerFilter.max;
       })
       .sort((a, b) => (a.stock === 0) - (b.stock === 0));
-  }, [products, selectedCategory, search, priceRange, powerRange, isManager]);
+  // getPrice n'est pas listé : il est stable (ne dépend d'aucun état) et
+  // serait recréé à chaque rendu, invalidant le mémo en vain.
+  }, [products, selectedCategory, search, priceRange, powerRange]);
 
   const handlePayOnline = () => {
-    setPayForm({ operator: 'MTN MoMo', phone: user.phone || '' });
+    setPayForm({ operator: 'T-Money (Yas)', phone: user.phone || '' });
     setCartOpen(false);
     setPayment('form');
   };
 
+  // Retour d'un paiement KKiaPay sur une commande. Le verdict vient du
+  // serveur, qui a comparé le montant reçu au TOTAL DE LA COMMANDE en base —
+  // pas à celui annoncé par cet écran.
+  const paiementCommande = (reference, verdict = {}) => {
+    if (verdict.refuse) {
+      toast(verdict.motif || 'Paiement non abouti.', { type: 'error' });
+      return;
+    }
+    if (!verdict.active) {
+      toast('Paiement enregistré — vérification par BestaSolar en attente.');
+      return;
+    }
+    marquerCommandePayee(payment.id, { reference, montant: verdict.montant || payment.total });
+    setPayment((o) => (o && o !== 'form' ? { ...o, paiement: { statut: 'verifie', reference } } : o));
+    toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — commande réglée.');
+  };
+
   const confirmPayment = (e) => {
     e.preventDefault();
-    // Stub Mobile Money : la commande est enregistrée « paiement initié ».
-    // Point d'accroche pour l'agrégateur réel (FedaPay / Kkiapay) : ici.
+    // La commande est créée AVANT le paiement : le serveur a besoin d'une
+    // commande en base pour connaître le montant à exiger.
     const order = addOrder({
       items: Object.entries(cartItems).map(([productId, qty]) => ({ productId, qty })),
       total: cartTotal,
@@ -157,7 +182,7 @@ export default function Boutique() {
     <div className="page">
       <PageHeader
         title="Boutique"
-        subtitle={isManager ? 'Prix public affiché' : 'Prix technicien affiché'}
+        subtitle="Prix public affiché"
         actions={
           <>
             <div className="search-box">
@@ -274,16 +299,44 @@ export default function Boutique() {
         <div className="devis-summary">
           <div className="devis-summary-row total"><span>Total</span><span>{formatCFA(cartTotal)}</span></div>
         </div>
+        {/* Une seule action primaire : le devis. Le vidage est un lien discret, confirmé. */}
         <div className="cart-actions">
-          <button className="btn btn-outline" onClick={() => { clearCart(); setCartOpen(false); }}>Vider</button>
-          <button className="btn btn-primary btn-block" onClick={handlePayOnline}>
-            <Smartphone size={17} /> Payer en ligne
-          </button>
           <button className="btn btn-accent btn-block" onClick={goToDevis}>
             <FileText size={17} /> Créer le devis
           </button>
+          {canPayOnline ? (
+            <button className="btn btn-outline btn-block" onClick={handlePayOnline}>
+              <Smartphone size={17} /> Commander et payer en ligne
+            </button>
+          ) : (
+            // Masquer le bouton sans rien dire faisait passer une règle
+            // métier pour une panne. Le motif compte plus que le bouton.
+            <div className="field-hint" style={{ textAlign: 'center' }}>
+              La commande en ligne encaisse pour BestaSolar : elle est réservée à son
+              équipe. {user.org?.name ? `Votre entreprise : ${user.org.name}.` : ''} Créez
+              un devis pour ce panier — le règlement se convient ensuite avec votre client.
+            </div>
+          )}
         </div>
+        <button
+          type="button"
+          className="btn btn-block text-danger"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => setConfirmClear(true)}
+        >
+          Vider le panier
+        </button>
       </Sheet>
+
+      <ConfirmSheet
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        onConfirm={() => { clearCart(); setCartOpen(false); }}
+        title="Vider le panier"
+        message="Tous les articles seront retirés du panier."
+        confirmLabel="Vider le panier"
+        danger
+      />
 
       {/* Fiche produit détaillée */}
       <Sheet
@@ -297,9 +350,11 @@ export default function Boutique() {
             <img src={detailProduct.image} alt={detailProduct.name} className="detail-image" />
             <div className="sheet-section">
               <div className="sheet-section-title">Caractéristiques</div>
-              {(detailProduct.description || '').split('·').map((spec, i) => spec.trim() && (
-                <div key={i} className="sheet-row"><span className="sheet-label">{spec.trim()}</span></div>
-              ))}
+              <ul className="spec-list">
+                {(detailProduct.description || '').split('·').map((spec, i) => spec.trim() && (
+                  <li key={i}>{spec.trim()}</li>
+                ))}
+              </ul>
               {extractPowerWatts(detailProduct.name) && (
                 <div className="sheet-row">
                   <span className="sheet-label">Puissance</span>
@@ -338,7 +393,7 @@ export default function Boutique() {
       <Sheet
         open={!!payment}
         onClose={() => setPayment(null)}
-        title={payment === 'form' ? 'Payer en ligne' : 'Paiement initié'}
+        title={payment === 'form' ? 'Commander et payer' : 'Commande enregistrée'}
         subtitle={payment === 'form' ? `Total : ${formatCFA(cartTotal)}` : undefined}
       >
         {payment === 'form' ? (
@@ -346,7 +401,7 @@ export default function Boutique() {
             <div className="input-group">
               <span className="input-label" id="bq-operator-label">Opérateur Mobile Money</span>
               <div className="client-type-toggle" role="group" aria-labelledby="bq-operator-label">
-                {['MTN MoMo', 'Moov Money'].map((op) => (
+                {['T-Money (Yas)', 'Flooz (Moov)'].map((op) => (
                   <button
                     key={op}
                     type="button"
@@ -360,27 +415,49 @@ export default function Boutique() {
               </div>
             </div>
             <Field label="Numéro Mobile Money *">
-              <input className="input" type="tel" required value={payForm.phone} onChange={(e) => setPayForm({ ...payForm, phone: e.target.value })} placeholder="+229 ..." />
+              <input className="input" type="tel" required value={payForm.phone} onChange={(e) => setPayForm({ ...payForm, phone: e.target.value })} placeholder="+228 ..." />
             </Field>
             <div className="devis-summary">
               <div className="devis-summary-row total"><span>Montant à payer</span><span>{formatCFA(cartTotal)}</span></div>
             </div>
             <div className="field-hint payment-stub-note">
-              Mode démonstration : la commande sera enregistrée « paiement initié ». L'encaissement réel Mobile Money (agrégateur FedaPay/Kkiapay) sera branché ici.
+              Rien n'est prélevé à cette étape : la commande est d'abord enregistrée.
+              Vous pourrez ensuite la régler en ligne, ou attendre l'appel de BestaSolar
+              sur ce numéro.
             </div>
             <button type="submit" className="btn btn-primary btn-block">
-              <Smartphone size={17} /> Payer {formatCFA(cartTotal)}
+              <Smartphone size={17} /> Continuer vers le paiement · {formatCFA(cartTotal)}
             </button>
           </form>
         ) : payment && (
           <div className="payment-confirm">
             <div className="payment-confirm-icon"><Check size={28} /></div>
             <div className="payment-confirm-title">Commande {payment.orderNumber}</div>
-            <p className="text-sm text-secondary">
-              Paiement de {formatCFA(payment.total)} initié via {payment.operator} ({payment.phone}).
-              Vous serez notifié à la confirmation de l'opérateur.
-            </p>
-            <button className="btn btn-primary btn-block" onClick={() => setPayment(null)}>Fermer</button>
+            {payment.paiement?.statut === 'verifie' ? (
+              <p className="text-sm text-secondary">
+                Commande de {formatCFA(payment.total)} <strong>réglée</strong> — paiement vérifié.
+                BestaSolar vous rappelle au {payment.phone} pour la livraison.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-secondary">
+                  Commande de {formatCFA(payment.total)} enregistrée. Réglez-la maintenant en ligne,
+                  ou attendez l'appel de BestaSolar au {payment.phone} ({payment.operator}).
+                </p>
+                {/* Le montant vient de la commande, pas du panier : celui-ci
+                    est déjà vidé, et c'est la commande qui fait foi. */}
+                <KkiapayButton
+                  phone={payment.phone}
+                  amount={payment.total}
+                  objet={{ type: 'commande', commandeId: payment.id }}
+                  label={`Payer maintenant · ${formatCFA(payment.total)}`}
+                  onPaid={paiementCommande}
+                  onNumero={(numero) => setPayment((o) => (o && o !== 'form' ? { ...o, phone: numero } : o))}
+                />
+              </>
+            )}
+            <button className="btn btn-outline btn-block" style={{ marginTop: 10 }}
+              onClick={() => setPayment(null)}>Fermer</button>
           </div>
         )}
       </Sheet>
@@ -446,6 +523,16 @@ export default function Boutique() {
           )}
         </form>
       </Sheet>
+
+      <ConfirmSheet
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => { deleteProduct(editing); setEditing(null); }}
+        title="Supprimer ce produit"
+        message={`« ${products.find((p) => p.id === editing)?.name || 'Ce produit'} » sera retiré du catalogue.`}
+        confirmLabel="Supprimer"
+        danger
+      />
     </div>
   );
 }

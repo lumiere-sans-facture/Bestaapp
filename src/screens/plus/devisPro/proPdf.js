@@ -46,7 +46,7 @@ export async function previewDocument(company, modele, lignes, kind = 'facture')
       date: maintenant.toISOString(),
       dateSecondaire: new Date(maintenant.getTime() + 30 * 86400000).toISOString(),
       emetteur: emetteurDe(company || {}),
-      client: { name: 'Client exemple', societe: '', phone: '+229 00 00 00 00', adresse: 'Cotonou' },
+      client: { name: 'Client exemple', societe: '', phone: '+228 00 00 00 00', adresse: 'Lomé' },
       lignes,
       totaux: totauxDe(lignes, { tva: 0, tvaActive: false }),
       apporteur: null,

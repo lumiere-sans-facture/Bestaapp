@@ -1,10 +1,13 @@
 import { Suspense } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User } from 'lucide-react';
+import AbonnementAlert from './AbonnementAlert';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { initials } from '../utils/format';
 import { SyncDot } from './SyncStatus';
 
 const publicNavItems = [
@@ -29,13 +32,20 @@ const proNavItems = [
 
 // Sous-sections de « Plus » remontées dans la barre latérale (desktop), par rôle.
 // « Mon profil » est rendu à part, en dernier, après le bouton « Passer en mode Pro ».
-const plusSections = (role) => [
-  ...(role === 'gerant' ? [
+// L'administration du SaaS n'est ouverte qu'à BestaSolar : le gérant d'une
+// autre entreprise verrait sinon un lien que l'écran lui refuse.
+const plusSections = (user) => [
+  ...(user.role === 'gerant' ? [
     { path: '/plus/team', label: 'Équipe', icon: Users },
     { path: '/plus/partners', label: 'Partenaires', icon: Share2 },
     { path: '/plus/orders', label: 'Commandes en ligne', icon: ShoppingCart },
     { path: '/plus/commissions', label: 'Commissions', icon: DollarSign },
-    { path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown },
+    { path: '/plus/kits', label: 'Mes kits', icon: Package },
+    { path: '/plus/inverters', label: 'Onduleurs', icon: Cpu },
+    { path: '/plus/pompekits', label: 'Kits pompage', icon: Droplets },
+    { path: '/plus/paiements', label: 'Moyens de paiement', icon: CreditCard },
+    ...(!isSupabaseConfigured || user.is_platform_admin
+      ? [{ path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown }] : []),
     { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },
   ] : []),
   { path: '/plus/formation', label: 'Formation', icon: GraduationCap },
@@ -44,7 +54,7 @@ const plusSections = (role) => [
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
-  const { getCompanyForUser } = useData();
+  const { getCompanyForUser, storageError } = useData();
   const { mode, setMode, proActive } = useMode();
   const navigate = useNavigate();
   const isPro = mode === 'pro';
@@ -77,7 +87,7 @@ export default function AppLayout() {
           </div>
           <div>
             <div className="sidebar-title">{isPro ? (company?.nomEntreprise || 'Espace Pro') : 'BestaSolar Pro'}</div>
-            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Parakou, Bénin'}</div>
+            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Lomé, Togo'}</div>
           </div>
         </div>
         <nav className="sidebar-nav" aria-label="Navigation principale">
@@ -94,7 +104,7 @@ export default function AppLayout() {
           ))}
           {!isPro && (
             <>
-              {plusSections(user.role).map((item) => (
+              {plusSections(user).map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -122,10 +132,10 @@ export default function AppLayout() {
             </button>
           )}
           <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{user.avatar}</div>
+            <div className="sidebar-user-avatar">{user.avatar || initials(user.name)}</div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{user.name} <SyncDot /></div>
-              <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Technicien'}</div>
+              <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'}</div>
             </div>
             <button className="sidebar-logout" onClick={logout} title="Déconnexion" aria-label="Déconnexion">
               <LogOut size={18} />
@@ -135,6 +145,20 @@ export default function AppLayout() {
       </aside>
 
       <main className="app-main">
+        {/* Stockage local saturé : l'app fonctionne encore à l'écran mais plus
+            rien n'est enregistré. Alerte permanente, jamais un simple toast. */}
+        {storageError && (
+          <div className="storage-alert" role="alert">
+            <AlertTriangle size={16} />
+            <span>
+              <strong>Enregistrement impossible sur cet appareil.</strong> La mémoire est
+              saturée (souvent à cause des photos du catalogue) ou vous naviguez en privé.
+              Vos dernières modifications ne seront pas conservées à la fermeture —
+              allégez les photos ou libérez de l'espace.
+            </span>
+          </div>
+        )}
+        <AbonnementAlert />
         <ChunkErrorBoundary>
           <Suspense fallback={<div className="splash-screen">Chargement…</div>}>
             <Outlet />

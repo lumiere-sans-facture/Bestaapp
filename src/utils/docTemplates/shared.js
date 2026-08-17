@@ -4,6 +4,7 @@
 // rendus partagent la même grille, la même typographie et les mêmes nombres.
 import { COMPANY } from '../../config/company';
 import { LOGO_BESTASOLAR } from '../../assets/logoBestaSolar';
+import { prixPublic } from '../price';
 
 // ---------------------------------------------------------------------------
 // Formatage
@@ -127,7 +128,7 @@ export function lignesDeDevis(devis = {}, products = []) {
     return {
       designation: produit?.name || 'Article',
       qty: Number(qty) || 0,
-      pu: Number((devis.unitPrices || {})[productId] ?? produit?.basePrice ?? 0),
+      pu: Number((devis.unitPrices || {})[productId] ?? (produit ? prixPublic(produit.basePrice) : 0)),
     };
   });
 }
@@ -208,7 +209,35 @@ export function paginer(lignes, { seule, premiere, suite, derniere }) {
 // ---------------------------------------------------------------------------
 
 /** Styles communs : page A4 fixe, typographie unique, règles d'impression. */
-export const CSS_BASE = `
+export // ---------------------------------------------------------------------------
+// POLICE DES DOCUMENTS — servie par l'APPLICATION, pas par Google Fonts.
+//
+// Les devis, factures et fiches de dimensionnement allaient chercher IBM Plex
+// Sans sur fonts.googleapis.com au moment de s'ouvrir. Quand cette requête
+// n'aboutit pas — réseau lent, coupé, ou Google inaccessible — le document se
+// compose en police système : le gérant voit alors « la police qui a changé »,
+// sans rien avoir touché, et sans savoir pourquoi.
+//
+// Les trois graisses sont maintenant dans public/fonts (71 Ko au total, sous-
+// ensemble latin). Un document composé hors ligne est identique à celui
+// composé en ligne — ce que le local-first exige.
+//
+// L'origine est explicite : un document écrit dans un onglet vierge
+// (window.open + document.write) a « about:blank » pour base, et une adresse
+// relative n'y désignerait rien.
+// ---------------------------------------------------------------------------
+const GRAISSES_DOCUMENT = [400, 500, 600];
+
+export function policeDocument() {
+  const origine = (typeof location !== 'undefined' && location.origin && location.origin !== 'null')
+    ? location.origin
+    : '';
+  const face = (poids) => `@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:${poids};`
+    + `font-display:swap;src:url('${origine}/fonts/ibm-plex-sans-latin-${poids}-normal.woff2') format('woff2')}`;
+  return `<style>${GRAISSES_DOCUMENT.map(face).join('')}</style>`;
+}
+
+const CSS_BASE = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'IBM Plex Sans', system-ui, sans-serif;
@@ -249,9 +278,7 @@ export const documentHtml = ({ titre, css, pages }) => `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(titre)}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+${policeDocument()}
 <style>${CSS_BASE}${css}</style>
 </head>
 <body>

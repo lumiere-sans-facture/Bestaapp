@@ -5,7 +5,7 @@ import { formatCFA, formatDate } from '../../utils/format';
 const STATUS = {
   initie: { label: 'Paiement initié', cls: 'badge-warning' },
   confirme: { label: 'Payée', cls: 'badge-success' },
-  livre: { label: 'Livrée', cls: 'badge-success' },
+  livre: { label: 'Livrée', cls: 'badge-info' },
   annule: { label: 'Annulée', cls: 'badge-muted' },
 };
 
@@ -36,7 +36,8 @@ export default function OrdersSection({ onBack }) {
                       {formatDate(o.createdAt)} · {o.operator} {o.phone} · par {getUserById(o.createdBy)?.name?.split(' ')[0] || '—'}
                     </div>
                   </div>
-                  <div className="commission-amount">{formatCFA(o.total)}</div>
+                  {/* Chiffre d'affaires : navy, pas le doré réservé aux commissions */}
+                  <div className="commission-amount" style={{ color: 'var(--primary)' }}>{formatCFA(o.total)}</div>
                 </div>
                 <div className="commission-meta">
                   <span>{o.items.reduce((s, it) => s + it.qty, 0)} article(s)</span>

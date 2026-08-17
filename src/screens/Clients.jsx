@@ -9,6 +9,7 @@ import Sheet from '../components/Sheet';
 import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
 import StageBadge from '../components/StageBadge';
+import ClientIdentityFields, { contactEffectif } from '../components/ClientIdentityFields';
 
 // Pas de « valeur estimée » à saisir : la valeur de l'affaire se déduit
 // automatiquement des devis créés pour le client.
@@ -18,39 +19,21 @@ const EMPTY_FORM = { name: '', contact: '', phone: '', address: '', notes: '', c
 function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIcon }) {
   return (
     <form onSubmit={onSubmit} className="form-grid">
-      <Field label="Entreprise / Client *">
-        <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Hôtel du Parc" />
-      </Field>
-      <Field label="Personne de contact *">
-        <input className="input" required value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Ex : M. Kossi Agboka" />
-      </Field>
+      <ClientIdentityFields
+        idPrefix="clients"
+        clientType={form.clientType}
+        onTypeChange={(clientType) => setForm({ ...form, clientType })}
+        name={form.name}
+        onNameChange={(name) => setForm({ ...form, name })}
+        contact={form.contact}
+        onContactChange={(contact) => setForm({ ...form, contact })}
+      />
       <Field label="Téléphone">
-        <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+229 ..." />
+        <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
       </Field>
       <Field label="Adresse">
         <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Quartier, ville" />
       </Field>
-      <div className="input-group">
-        <span className="input-label" id="clients-clienttype-label">Type de client</span>
-        <div className="client-type-toggle" role="group" aria-labelledby="clients-clienttype-label">
-          <button
-            type="button"
-            className={`client-type-btn ${form.clientType === 'particulier' ? 'active' : ''}`}
-            aria-pressed={form.clientType === 'particulier'}
-            onClick={() => setForm({ ...form, clientType: 'particulier' })}
-          >
-            <User size={16} /> Particulier
-          </button>
-          <button
-            type="button"
-            className={`client-type-btn ${form.clientType === 'entreprise' ? 'active' : ''}`}
-            aria-pressed={form.clientType === 'entreprise'}
-            onClick={() => setForm({ ...form, clientType: 'entreprise' })}
-          >
-            <Building2 size={16} /> Entreprise
-          </button>
-        </div>
-      </div>
       <Field label="Notes">
         <textarea className="input" rows="3" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Détails du besoin…" />
       </Field>
@@ -88,6 +71,9 @@ export default function Clients() {
     e.preventDefault();
     addLead({
       ...form,
+      // Un particulier EST son propre contact : pas de second champ à saisir,
+      // son nom sert aussi de personne à joindre partout ailleurs dans l'app.
+      contact: contactEffectif(form),
       estimatedValue: 0, // déduite automatiquement des devis du client
       assignedTo: user.id,
       parrainL1: null, // attribution automatique (lien d'affiliation) gérée par le store
@@ -110,7 +96,7 @@ export default function Clients() {
 
   const handleEdit = (e) => {
     e.preventDefault();
-    updateLead(editId, form);
+    updateLead(editId, { ...form, contact: contactEffectif(form) });
     setEditId(null);
     setForm(EMPTY_FORM);
   };
@@ -176,36 +162,47 @@ export default function Clients() {
       <Sheet open={!!selectedClient} onClose={() => setSelected(null)} title={selectedClient?.name || ''}>
         {selectedClient && (
           <>
-            <div className="sheet-row"><span className="sheet-label"><User size={14} /> Contact</span><span className="sheet-value">{selectedClient.contact}</span></div>
-            {selectedClient.phone && (
+            <div className="sheet-section">
+              <div className="sheet-section-title">Contact</div>
+              {/* Pour un particulier, le contact EST le client déjà nommé dans
+                  l'en-tête de la fiche : répéter son nom ici n'apprend rien. */}
+              {selectedClient.clientType === 'entreprise' && (
+                <div className="sheet-row"><span className="sheet-label"><User size={14} /> Contact</span><span className="sheet-value">{selectedClient.contact}</span></div>
+              )}
+              {selectedClient.phone && (
+                <div className="sheet-row">
+                  <span className="sheet-label"><Phone size={14} /> Téléphone</span>
+                  <a className="sheet-value sheet-link" href={`tel:${selectedClient.phone.replace(/\s/g, '')}`}>{selectedClient.phone}</a>
+                </div>
+              )}
+              {selectedClient.address && (
+                <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Adresse</span><span className="sheet-value">{selectedClient.address}</span></div>
+              )}
               <div className="sheet-row">
-                <span className="sheet-label"><Phone size={14} /> Téléphone</span>
-                <span className="sheet-value"><a href={`tel:${selectedClient.phone}`}>{selectedClient.phone}</a></span>
+                <span className="sheet-label">{selectedClient.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type</span>
+                <span className="sheet-value">{selectedClient.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
               </div>
-            )}
-            {selectedClient.address && (
-              <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Adresse</span><span className="sheet-value">{selectedClient.address}</span></div>
-            )}
-            <div className="sheet-row">
-              <span className="sheet-label">{selectedClient.clientType === 'entreprise' ? <Building2 size={14} /> : <User size={14} />} Type</span>
-              <span className="sheet-value">{selectedClient.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}</span>
             </div>
-            <div className="sheet-row">
-              <span className="sheet-label"><FolderKanban size={14} /> Étape</span>
-              <span className="sheet-value">
-                {(() => { const st = stageInfo(selectedClient); return st ? <StageBadge stage={st} /> : '—'; })()}
-              </span>
-            </div>
-            {selectedClient.estimatedValue > 0 && (
-              <div className="sheet-row"><span className="sheet-label">Valeur de l'affaire</span><span className="sheet-value amount">{formatCFA(selectedClient.estimatedValue)}</span></div>
-            )}
-            {apporteur && (
+
+            <div className="sheet-section">
+              <div className="sheet-section-title">Suivi commercial</div>
               <div className="sheet-row">
-                <span className="sheet-label"><UserCheck size={14} /> Apporteur</span>
-                <span className="sheet-value">{apporteur.name} <span className="partner-code-chip">{apporteur.code}</span></span>
+                <span className="sheet-label"><FolderKanban size={14} /> Étape</span>
+                <span className="sheet-value">
+                  {(() => { const st = stageInfo(selectedClient); return st ? <StageBadge stage={st} /> : '—'; })()}
+                </span>
               </div>
-            )}
-            <div className="sheet-row"><span className="sheet-label">Ajouté le</span><span className="sheet-value">{formatDate(selectedClient.createdAt)}</span></div>
+              {selectedClient.estimatedValue > 0 && (
+                <div className="sheet-row"><span className="sheet-label">Valeur de l'affaire</span><span className="sheet-value amount">{formatCFA(selectedClient.estimatedValue)}</span></div>
+              )}
+              {apporteur && (
+                <div className="sheet-row">
+                  <span className="sheet-label"><UserCheck size={14} /> Apporteur</span>
+                  <span className="sheet-value">{apporteur.name} <span className="partner-code-chip">{apporteur.code}</span></span>
+                </div>
+              )}
+              <div className="sheet-row"><span className="sheet-label">Ajouté le</span><span className="sheet-value">{formatDate(selectedClient.createdAt)}</span></div>
+            </div>
             {selectedClient.notes && <p className="text-sm text-secondary client-sheet-notes">{selectedClient.notes}</p>}
 
             <div className="client-sheet-actions">
@@ -220,7 +217,9 @@ export default function Clients() {
                   <MessageCircle size={16} /> WhatsApp
                 </a>
               )}
-              <button className="btn btn-outline" onClick={() => navigate('/pipeline')}>
+              {/* Le client est transmis au kanban via l'état de navigation
+                  (fiche à ouvrir à l'arrivée — branchement côté Pipeline à venir). */}
+              <button className="btn btn-outline" onClick={() => navigate('/pipeline', { state: { leadId: selectedClient.id } })}>
                 <FolderKanban size={16} /> Suivi commercial
               </button>
             </div>

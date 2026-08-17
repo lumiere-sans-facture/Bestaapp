@@ -1,16 +1,26 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
 import { ModeProvider, useMode } from './context/ModeContext';
+import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
 import AppLayout from './components/AppLayout';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import Login from './screens/Login';
+import { installerFiletsGlobaux } from './lib/rapportErreur';
+import { installerAnalytique, suivrePage } from './lib/analytique';
 
 // Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
 captureRefFromUrl();
+
+// Erreurs hors React (minuteurs, gestionnaires d'événements) et promesses
+// rejetées sans `catch` : installées au chargement, avant tout rendu.
+installerFiletsGlobaux();
+// Analytique : filets d'envoi (retour du réseau, fermeture de l'onglet).
+installerAnalytique();
 
 // Découpage par route : chaque écran est un chunk chargé à la demande, pour
 // alléger le bundle initial (parse/eval plus rapide au démarrage — déterminant
@@ -51,11 +61,32 @@ function usePreloadScreens() {
 }
 
 function AppRoutes() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, recovery } = useAuth();
+  const navigate = useNavigate();
+  // Page vue : UN SEUL point d'émission, à la racine des routes. Le chemin est
+  // normalisé (« /clients/c-4f2a » → « /clients/:id ») avant tout envoi.
+  const { pathname } = useLocation();
+  useEffect(() => { suivrePage(pathname); }, [pathname]);
+
+  // Une session neuve repart de l'accueil. L'app est une PAGE UNIQUE : sans
+  // cela, l'adresse ouverte par un compte survit à sa déconnexion et le compte
+  // suivant atterrit sur l'écran du précédent — un simple utilisateur se
+  // retrouvait sur une page d'administration du gérant.
+  const dernierCompte = useRef(null);
+  useEffect(() => {
+    const id = user?.id || null;
+    if (dernierCompte.current !== null && dernierCompte.current !== id) {
+      navigate('/', { replace: true });
+    }
+    dernierCompte.current = id;
+  }, [user?.id, navigate]);
 
   if (isLoading) {
     return <div className="splash-screen">Chargement…</div>;
   }
+
+  // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.
+  if (recovery) return <Login />;
 
   if (!user) return <Login />;
 
@@ -63,7 +94,9 @@ function AppRoutes() {
     <DataProvider>
       <ModeProvider>
         <CartProvider>
-          <ModeSwitch />
+          <ToastProvider>
+            <ModeSwitch />
+          </ToastProvider>
         </CartProvider>
       </ModeProvider>
     </DataProvider>
@@ -110,10 +143,14 @@ function ModeSwitch() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    // Le filet enveloppe TOUT, y compris les fournisseurs de contexte : une
+    // erreur dans l'un d'eux plantait l'app entière sans laisser de trace.
+    <AppErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </AppErrorBoundary>
   );
 }

@@ -96,7 +96,7 @@ export function renderClassique({ kind, data }) {
   <div class="entete-rang2">
     <div class="entete-legal">
       ${e.rccm ? `<div>RCCM : ${esc(e.rccm)}</div>` : ''}
-      ${e.ifu ? `<div>IFU : ${esc(e.ifu)}</div>` : ''}
+      ${e.ifu ? `<div>NIF : ${esc(e.ifu)}</div>` : ''}
     </div>
     <div style="min-width:280px">
       <div class="meta-ligne"><span class="ital">${L.numeroLabel}</span><span class="meta-val fort">${esc(data.numero || '—')}</span></div>

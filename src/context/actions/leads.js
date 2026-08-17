@@ -1,17 +1,14 @@
 // Domaine CRM : pistes commerciales. Le passage à « gagné » génère les
 // commissions de parrainage (couplage métier assumé piste → commission).
-// Les techniciens DEMANDENT un changement d'étape (pendingStage) ; le gérant
-// valide ou refuse — les commissions ne naissent qu'à la validation.
-import { COMMISSION_RATES, newReferral, partnerFromActiveRef } from './shared';
+// Les commerciaux DEMANDENT un changement d'étape (pendingStage) ; le gérant
+// valide ou refuse — les commissions ne naissent qu'à la validation. Le gérant
+// (et l'utilisateur seul dans son espace, faute de valideur) applique
+// directement.
+import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForLead } from '../../utils/commissionSync';
-import { stages, LOST_STAGE } from '../../data/seed';
-
-const STAGE_LABEL = Object.fromEntries([...stages, LOST_STAGE].map((st) => [st.id, st.label]));
-const note = (text, userId) => ({ id: crypto.randomUUID(), date: new Date().toISOString(), text, by: userId });
 
 export function createLeadActions(setState) {
-  // Application effective d'un changement d'étape (commissions comprises) —
-  // partagée entre le passage direct (gérant) et la validation d'une demande.
+  // Application effective d'un changement d'étape (commissions comprises).
   const stageState = (s, leadId, stage) => {
     const today = new Date().toISOString().slice(0, 10);
     const lead = s.leads.find((l) => l.id === leadId);
@@ -100,13 +97,29 @@ export function createLeadActions(setState) {
         ),
       })),
 
-    // Passage direct (gérant) : applique l'étape immédiatement — le « gagné »
-    // génère les commissions de parrainage (3 % N1, 1,5 % N2) si absentes.
-    updateLeadStage: (leadId, stage) => setState((s) => stageState(s, leadId, stage)),
+    // Le vendeur applique l'étape immédiatement — le « gagné » génère les
+    // commissions de parrainage (3 % N1, 1,5 % N2) si absentes. Le passage est
+    // TRACÉ dans l'activité du client (avec son auteur), pour que l'équipe
+    // sache qui a fait avancer l'affaire.
+    updateLeadStage: (leadId, stage, byUserId = null) =>
+      setState((s) => {
+        const avant = s.leads.find((l) => l.id === leadId);
+        if (!avant || avant.stage === stage) return stageState(s, leadId, stage);
+        const ns = stageState(s, leadId, stage);
+        if (!byUserId) return ns;
+        return {
+          ...ns,
+          leads: ns.leads.map((l) =>
+            l.id === leadId
+              ? { ...l, activities: [note(`Étape passée de « ${STAGE_LABEL[avant.stage] || avant.stage} » à « ${STAGE_LABEL[stage] || stage} ».`, byUserId), ...(l.activities || [])] }
+              : l
+          ),
+        };
+      }),
 
-    // Un technicien DEMANDE un changement d'étape : la piste ne bouge pas,
-    // la demande attend la validation du gérant (une nouvelle demande remplace
-    // la précédente).
+    // Un commercial DEMANDE un changement d'étape : la piste ne bouge pas, la
+    // demande attend la validation du gérant (une nouvelle demande remplace la
+    // précédente).
     requestStageChange: (leadId, stage, userId) =>
       setState((s) => ({
         ...s,
@@ -122,8 +135,8 @@ export function createLeadActions(setState) {
         ),
       })),
 
-    // Le gérant valide la demande : l'étape s'applique réellement
-    // (commissions comprises) et la validation est tracée dans l'activité.
+    // Le gérant valide : l'étape s'applique réellement (commissions comprises)
+    // et la validation est tracée dans l'activité du client.
     approveStageChange: (leadId, approverId) =>
       setState((s) => {
         const lead = s.leads.find((l) => l.id === leadId);

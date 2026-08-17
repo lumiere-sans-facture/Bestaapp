@@ -12,3 +12,11 @@ export const formatDate = (iso) =>
 
 export const initials = (name) =>
   name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+
+/**
+ * Taux de commission en pourcentage lisible : 0.03 → « 3 % », 0.015 → « 1,5 % ».
+ * Les libellés de l'interface DOIVENT passer par ici : écrits en dur, ils
+ * mentiraient aux partenaires au premier changement de barème.
+ */
+export const formatTaux = (rate) =>
+  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format((Number(rate) || 0) * 100)} %`;

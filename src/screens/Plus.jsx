@@ -1,14 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Phone, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
-import { formatCFA, formatDate } from '../utils/format';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchPlatformPayouts, decidePlatformPayout } from '../lib/remoteSync';
+import { formatCFA, formatDate, formatTaux } from '../utils/format';
+import { estProprietaireEspace } from '../utils/roles';
+import { configActive, providerById, MODE_LABEL } from '../utils/paiementProviders';
 import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
+import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
+import ConfirmSheet from '../components/ConfirmSheet';
+import { useToast } from '../components/Toast';
 import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
 import PartnersSection from './plus/PartnersSection';
@@ -18,30 +25,68 @@ import MyProfile from './plus/MyProfile';
 import TeamSection from './plus/TeamSection';
 import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
+import KitsSection from './plus/KitsSection';
+import PaiementsSection from './plus/PaiementsSection';
+import KkiapayButton from '../components/KkiapayButton';
+import InvertersSection from './plus/InvertersSection';
+import PompeKitsSection from './plus/PompeKitsSection';
 import { SyncStatusRow } from '../components/SyncStatus';
+import DiagnosticCard from '../components/DiagnosticCard';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
 import { reconcileMissingCommissions } from '../utils/commissionSync';
+import { MODES_RETRAIT, ETATS_COMMISSION, commissionsEngagees, etatCommission } from '../utils/payouts';
+import { suivre, EVENEMENTS } from '../lib/analytique';
 
 export default function Plus() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshOrg } = useAuth();
+  // Parrainage de l'entreprise : saisie une seule fois, puis verrouillé (serveur).
+  const [refInput, setRefInput] = useState('');
+  const [refSaving, setRefSaving] = useState(false);
   const { setMode, proActive } = useMode();
   const data = useData();
   const {
-    partners, commissions, leads, orders, devis, referrals,
+    partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team, teamChargee,
     getPartnerById, getLeadById,
-    payCommission, addCommission, syncCommissions,
-    getSubscriptionForUser, requestSubscription, importData,
+    payCommission, addCommission, syncCommissions, approvePayout, rejectPayout,
+    getSubscriptionForUser, requestSubscription, activerAbonnementVerifie, importData,
   } = data;
 
   const sub = getSubscriptionForUser(user.id);
   const subStatus = effectiveStatus(sub);
+  // Résumé de l'encaissement pour l'entrée de menu : quel agrégateur encaisse,
+  // et dans quel mode — « réel » ou « test » ne se devine pas.
+  const configPaiement = configActive(paiementConfigs);
+  const paiementActif = configPaiement
+    ? { nom: providerById(configPaiement.provider)?.nom || configPaiement.provider,
+        mode: (MODE_LABEL[configPaiement.mode] || configPaiement.mode).toLowerCase() }
+    : null;
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
+  // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
+  // est une page unique : se reconnecter ne change pas l'URL affichée). Un
+  // simple utilisateur restait ainsi sur l'écran des commissions du gérant,
+  // boutons « Payer » et « Commission manuelle » compris. L'autorisation se
+  // décide donc ici, à la section, pas au bouton.
+  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'backup'];
+  const sectionAutorisee = (tab) => {
+    if (!KNOWN_TABS.includes(tab)) return false;
+    if (tab === 'subsadmin') {
+      return user.role === 'gerant' && (!isSupabaseConfigured || !!user.is_platform_admin);
+    }
+    return !SECTIONS_GERANT.includes(tab) || user.role === 'gerant';
+  };
   const { section } = useParams();
   const navigate = useNavigate();
-  const activeTab = KNOWN_TABS.includes(section) ? section : 'menu';
+  // Repli immédiat sur le menu : aucun écran d'administration ne doit
+  // s'afficher, même le temps d'une redirection.
+  const activeTab = section && sectionAutorisee(section) ? section : 'menu';
+  // …et l'adresse est corrigée, pour ne pas laisser croire à un droit d'accès.
+  useEffect(() => {
+    if (section && !sectionAutorisee(section)) navigate('/plus', { replace: true });
+  }, [section, user.role, user.is_platform_admin]); // eslint-disable-line react-hooks/exhaustive-deps
   const setActiveTab = (x) => navigate(x === 'menu' ? '/plus' : `/plus/${x}`);
   const [comFilter, setComFilter] = useState('all');
   const [comPartner, setComPartner] = useState('all');
@@ -53,7 +98,18 @@ export default function Plus() {
   const [subSheetOpen, setSubSheetOpen] = useState(false);
   const [subForm, setSubForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
   const [subSent, setSubSent] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState(null); // sauvegarde lue, en attente de confirmation
+  // Demandes de paiement des partenaires : décision en cours (validation ou refus).
+  const [retraitAValider, setRetraitAValider] = useState(null);
+  const [retraitForm, setRetraitForm] = useState({ mode: 'momo', reference: '', note: '' });
+  const [retraitARefuser, setRetraitARefuser] = useState(null);
+  const [motifRefus, setMotifRefus] = useState('');
+  // Décision sur une demande d'un AUTRE compte : passe par le réseau (RPC).
+  // Empêche le double-clic et — surtout — n'annonce « payée » qu'une fois la
+  // confirmation du serveur reçue, jamais avant.
+  const [retraitEnCours, setRetraitEnCours] = useState(false);
   const fileRef = useRef(null);
+  const toast = useToast();
 
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
@@ -61,13 +117,41 @@ export default function Plus() {
     if (!file) return;
     try {
       const backup = await readBackupFile(file);
-      if (window.confirm('Importer cette sauvegarde remplacera les données actuelles. Continuer ?')) {
-        importData(backup);
-        window.alert('Sauvegarde restaurée avec succès.');
-      }
+      setPendingRestore(backup); // confirmation avant remplacement des données
     } catch (err) {
-      window.alert(err.message || 'Import impossible.');
+      toast(err.message || 'Import impossible.', { type: 'error' });
     }
+  };
+
+  const copyPayNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(PAY_NUMBER);
+      toast('Numéro copié.');
+    } catch {
+      toast(`Copie impossible — composez le ${PAY_NUMBER}.`, { type: 'error' });
+    }
+  };
+
+  // Retour d'un paiement KKiaPay. Trois issues bien distinctes : le serveur
+  // a confirmé (abonnement actif tout de suite), le serveur a REFUSÉ (rien
+  // n'est enregistré — sinon un paiement échoué laisserait une demande à
+  // valider), ou la vérification est indisponible (hors-ligne, serveur non
+  // configuré) et la validation manuelle du gérant reprend la main.
+  const paiementKkiapay = (reference, verdict = {}) => {
+    if (verdict.refuse) {
+      toast(verdict.motif || 'Paiement non abouti.', { type: 'error' });
+      return;
+    }
+    if (verdict.active) {
+      suivre(EVENEMENTS.PAIEMENT_VERIFIE, { objet: 'abonnement', montant: SUBSCRIPTION_PRICE });
+      activerAbonnementVerifie(user.id, { reference, montant: SUBSCRIPTION_PRICE, dateFin: verdict.dateFin });
+      setSubSent(true);
+      toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — abonnement activé.');
+      return;
+    }
+    requestSubscription(user.id, { ...subForm, methode: 'kkiapay', reference });
+    setSubSent(true);
+    toast('Paiement enregistré — vérification par le gérant en attente.');
   };
 
   const handleProClick = () => {
@@ -101,29 +185,145 @@ export default function Plus() {
     setSubSent(true);
   };
 
-  const userWonLeads = leads.filter((l) => l.assignedTo === user.id && l.stage === 'gagne');
-  const userWonValue = userWonLeads.reduce((sum, l) => sum + l.estimatedValue, 0);
-  const pendingCommissions = commissions.filter((c) => c.status === 'en_attente');
+  // Commissions de la PLATEFORME : une commission naît dans l'organisation de
+  // son bénéficiaire, donc celles des commerciaux des autres comptes sont
+  // invisibles ici — alors que c'est BestaSolar qui les doit. On les remonte.
+  const isAdminPlateforme = isSupabaseConfigured && !!user.is_platform_admin;
+  const [comExternes, setComExternes] = useState([]);
+  const [comRafraichir, setComRafraichir] = useState(0);
+  // Demandes de paiement des partenaires des AUTRES comptes : elles naissent
+  // dans leur organisation, la RLS les cache ici. Sans cette remontée, un
+  // commercial de la plateforme réclamerait son argent dans le vide.
+  const [retraitsExternes, setRetraitsExternes] = useState([]);
+  useEffect(() => {
+    if (!isAdminPlateforme) return;
+    fetchPlatformCommissions()
+      .then((list) => setComExternes((list || []).map((c) => ({ ...c, externe: true }))))
+      .catch(() => {});
+    fetchPlatformPayouts()
+      .then((list) => setRetraitsExternes((list || []).map((d) => ({ ...d, externe: true }))))
+      .catch(() => {});
+  }, [isAdminPlateforme, comRafraichir]);
+
+  const toutesCommissions = [...commissions, ...comExternes];
+  // Une commission engagée dans une demande n'est plus « à payer » : elle
+  // attend une DÉCISION, pas un virement. La laisser dans le lot payable
+  // permettrait de la régler à côté de la demande — donc deux fois.
+  const engagees = commissionsEngagees([...(payoutRequests || []), ...retraitsExternes]);
+  const etatDe = (c) => etatCommission(c, engagees);
+  const pendingCommissions = toutesCommissions.filter((c) => etatDe(c) === 'attente');
   const pendingTotal = pendingCommissions.reduce((sum, c) => sum + c.amount, 0);
-  const paidTotal = commissions.filter((c) => c.status === 'payée').reduce((sum, c) => sum + c.amount, 0);
+  const demandeesTotal = toutesCommissions.filter((c) => etatDe(c) === 'demandee').reduce((sum, c) => sum + c.amount, 0);
+  const paidTotal = toutesCommissions.filter((c) => c.status === 'payée').reduce((sum, c) => sum + c.amount, 0);
+  // Nom du bénéficiaire / du client : le profil partenaire et la piste vivent
+  // dans l'autre organisation, la vue plateforme les fournit déjà enrichis.
+  const nomPartenaire = (c) => getPartnerById(c.partnerId)?.name || c.partnerName || c.beneficiaire?.name || '—';
+  const nomClient = (c) => getLeadById(c.leadId)?.name || c.leadName || 'Commission manuelle';
+  // Devis d'origine : déjà fourni par la vue plateforme, à retrouver localement
+  // sinon — c'est lui qui rattache la commission à une affaire précise.
+  const numeroDevis = (c) =>
+    c.devisNumber || (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber : null);
+
+  // ---- Demandes de paiement (retraits) ----
+  const retraitsEnAttente = [
+    ...(payoutRequests || []).filter((d) => d.status === 'en_attente'),
+    ...retraitsExternes,
+  ];
+  const ouvrirValidation = (d) => {
+    setRetraitForm({ mode: d.methode || 'momo', reference: '', note: '' });
+    setRetraitAValider(d);
+  };
+  const validerRetrait = async (e) => {
+    e.preventDefault();
+    const d = retraitAValider;
+    // Compte local : la mutation est synchrone, aucune attente réseau —
+    // le succès est immédiat et certain.
+    if (!d.externe) {
+      approvePayout(d.id, { ...retraitForm, decidedBy: user.id });
+      setRetraitAValider(null);
+      toast('Paiement enregistré : les commissions couvertes passent « payées ».');
+      return;
+    }
+    // Compte d'une AUTRE organisation : ça part sur le réseau. Le message de
+    // succès n'apparaît qu'après confirmation du serveur — jamais avant,
+    // sinon un échec silencieux ferait croire à un versement qui n'a pas eu
+    // lieu, et la commission resterait « demandée » indéfiniment.
+    setRetraitEnCours(true);
+    try {
+      await decidePlatformPayout({ orgId: d.orgId, id: d.id, approuver: true, ...retraitForm });
+      setRetraitAValider(null);
+      toast('Paiement enregistré : les commissions couvertes passent « payées ».');
+    } catch (err) {
+      toast(`Règlement impossible : ${err.message}`, { type: 'error' });
+    } finally {
+      setRetraitEnCours(false);
+      setComRafraichir((n) => n + 1);
+    }
+  };
+  const refuserRetrait = async (e) => {
+    e.preventDefault();
+    if (!motifRefus.trim()) { toast('Indiquez le motif du refus.', { type: 'error' }); return; }
+    const d = retraitARefuser;
+    if (!d.externe) {
+      rejectPayout(d.id, { motif: motifRefus, decidedBy: user.id });
+      setRetraitARefuser(null);
+      setMotifRefus('');
+      toast('Demande refusée — le partenaire en est informé dans son espace.');
+      return;
+    }
+    setRetraitEnCours(true);
+    try {
+      await decidePlatformPayout({ orgId: d.orgId, id: d.id, approuver: false, motif: motifRefus });
+      setRetraitARefuser(null);
+      setMotifRefus('');
+      toast('Demande refusée — le partenaire en est informé dans son espace.');
+    } catch (err) {
+      toast(`Refus impossible : ${err.message}`, { type: 'error' });
+    } finally {
+      setRetraitEnCours(false);
+      setComRafraichir((n) => n + 1);
+    }
+  };
 
   const handlePay = (commission) => {
     setPayForm({ mode: 'momo', reference: '', note: '' });
     setPayCom(commission);
   };
 
-  const submitPayCom = (e) => {
+  const submitPayCom = async (e) => {
     e.preventDefault();
-    payCommission(payCom.id, { ...payForm, paidBy: user.id });
-    setPayCom(null);
+    if (!payCom.externe) {
+      payCommission(payCom.id, { ...payForm, paidBy: user.id });
+      setPayCom(null);
+      return;
+    }
+    // Même règle que pour les demandes de paiement : pas de confirmation
+    // avant que le serveur n'ait réellement acté le versement.
+    const c = payCom;
+    setRetraitEnCours(true);
+    try {
+      await payPlatformCommission({ orgId: c.orgId, id: c.id, ...payForm });
+      setPayCom(null);
+    } catch (err) {
+      toast(`Paiement impossible : ${err.message}`, { type: 'error' });
+    } finally {
+      setRetraitEnCours(false);
+      setComRafraichir((n) => n + 1);
+    }
   };
 
   // Reçu de paiement imprimable (commission payée).
   const openRecu = (commission) => {
     openHtmlDoc(buildRecuCommissionHtml({
       commission,
-      partner: getPartnerById(commission.partnerId),
-      lead: commission.leadId ? getLeadById(commission.leadId) : null,
+      partner: getPartnerById(commission.partnerId)
+        || (commission.externe
+          ? { name: commission.partnerName, code: commission.partnerCode, phone: commission.partnerPhone }
+          : commission.beneficiaire),
+      lead: getLeadById(commission.leadId)
+        || (commission.externe && commission.leadName
+          ? { name: commission.leadName, estimatedValue: Number(commission.leadValue) || 0 }
+          : null),
       payeur: commission.paidBy ? { name: (data.team || []).find((u) => u.id === commission.paidBy)?.name || user.name } : { name: user.name },
       rates: COMMISSION_RATES,
     }));
@@ -131,13 +331,16 @@ export default function Plus() {
 
   // Relevé imprimable de toutes les commissions d'un partenaire.
   const openReleve = (partnerId) => {
-    const partner = getPartnerById(partnerId);
+    const lignes = toutesCommissions.filter((c) => c.partnerId === partnerId);
+    const externe = lignes.find((c) => c.externe);
+    const partner = getPartnerById(partnerId)
+      || (externe ? { name: externe.partnerName, code: externe.partnerCode, phone: externe.partnerPhone } : null);
     if (!partner) return;
     openHtmlDoc(buildReleveCommissionsHtml({
       partner,
-      commissions: commissions.filter((c) => c.partnerId === partnerId)
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-      getLeadName: (leadId) => getLeadById(leadId)?.name,
+      commissions: lignes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+      getLeadName: (leadId) => getLeadById(leadId)?.name
+        || lignes.find((c) => c.leadId === leadId)?.leadName,
       rates: COMMISSION_RATES,
     }));
   };
@@ -160,8 +363,13 @@ export default function Plus() {
 
   const handleAddCommission = (e) => {
     e.preventDefault();
+    // Bénéficiaire : « user:<id> » pour un membre de l'équipe (son profil
+    // partenaire est créé au besoin), sinon l'id d'un partenaire externe.
+    const choix = newCommission.partnerId;
+    const membre = choix.startsWith('user:') ? team.find((u) => u.id === choix.slice(5)) : null;
     addCommission({
-      partnerId: newCommission.partnerId,
+      partnerId: membre ? null : choix,
+      beneficiaire: membre ? { userId: membre.id, name: membre.name, phone: membre.phone, email: membre.email } : null,
       leadId: newCommission.leadId || null,
       level: Number(newCommission.level),
       amount: Number(newCommission.amount) || 0,
@@ -184,10 +392,24 @@ export default function Plus() {
 
   const renderPartners = () => <PartnersSection onBack={() => setActiveTab('menu')} />;
 
-  const filteredCommissions = commissions
-    .filter((c) => comFilter === 'all' || c.status === comFilter)
+  // Le filtre par partenaire couvre aussi les apporteurs des autres comptes,
+  // sinon leurs commissions seraient impossibles à isoler et à relever.
+  const partenairesDuFiltre = [
+    ...partners.map((p) => ({ id: p.id, name: p.name, orgName: null })),
+    ...comExternes.reduce((acc, c) => {
+      if (c.partnerId && !acc.some((p) => p.id === c.partnerId)) {
+        acc.push({ id: c.partnerId, name: c.partnerName || c.partnerId, orgName: c.orgName });
+      }
+      return acc;
+    }, []),
+  ];
+
+  const ORDRE_ETAT = { attente: 0, demandee: 1, payee: 2 };
+  const filteredCommissions = toutesCommissions
+    .filter((c) => comFilter === 'all' || etatDe(c) === comFilter)
     .filter((c) => comPartner === 'all' || c.partnerId === comPartner)
-    .sort((a, b) => (a.status === 'en_attente' ? -1 : 1) - (b.status === 'en_attente' ? -1 : 1) || new Date(b.createdAt) - new Date(a.createdAt));
+    // À payer d'abord, puis les demandées, puis les réglées.
+    .sort((a, b) => ORDRE_ETAT[etatDe(a)] - ORDRE_ETAT[etatDe(b)] || new Date(b.createdAt) - new Date(a.createdAt));
 
   const renderCommissions = () => (
     <>
@@ -203,11 +425,55 @@ export default function Plus() {
         </div>
       </div>
       {syncMsg && <div className="sync-result-note">{syncMsg}</div>}
+
+      {/* DEMANDES DE PAIEMENT — ce que des partenaires attendent de vous.
+          En tête d'écran : c'est la seule chose ici qui exige une décision. */}
+      {retraitsEnAttente.length > 0 && (
+        <div className="validation-bar">
+          <div className="validation-bar-title">
+            <Banknote size={15} /> {retraitsEnAttente.length > 1
+              ? `${retraitsEnAttente.length} demandes de paiement`
+              : '1 demande de paiement'}
+          </div>
+          {retraitsEnAttente.map((d) => (
+            <div key={`${d.orgId || 'moi'}-${d.id}`} className="validation-row">
+              <div className="validation-info">
+                <span className="validation-lead">
+                  {d.partnerName || getPartnerById(d.partnerId)?.name || 'Partenaire'} — {formatCFA(d.amount)}
+                  {d.externe && d.orgName ? <span className="text-secondary"> · {d.orgName}</span> : null}
+                </span>
+                <span className="validation-move">
+                  {(d.commissionIds || []).length} commission{(d.commissionIds || []).length > 1 ? 's' : ''}
+                  {' · '}{MODES_RETRAIT[d.methode] || d.methode}
+                  {(d.telephone || d.partnerPhone) ? ` · ${d.telephone || d.partnerPhone}` : ''}
+                </span>
+                <span className="validation-by">
+                  demandé le {formatDate(d.requestedAt)}{d.note ? ` · « ${d.note} »` : ''}
+                </span>
+              </div>
+              <div className="validation-actions">
+                <button className="btn btn-sm btn-primary" onClick={() => ouvrirValidation(d)}>
+                  <CheckCircle size={14} /> Payer
+                </button>
+                <button className="btn btn-sm btn-lost" onClick={() => { setRetraitARefuser(d); setMotifRefus(''); }}>
+                  <X size={14} /> Refuser
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="commission-totals">
         <div className="commission-total-card pending">
           <div className="commission-total-value">{formatCFA(pendingTotal)}</div>
-          <div className="commission-total-label">{pendingCommissions.length} en attente</div>
+          <div className="commission-total-label">{pendingCommissions.length} à payer</div>
         </div>
+        {demandeesTotal > 0 && (
+          <div className="commission-total-card asked">
+            <div className="commission-total-value">{formatCFA(demandeesTotal)}</div>
+            <div className="commission-total-label">Demandées, à trancher</div>
+          </div>
+        )}
         <div className="commission-total-card paid">
           <div className="commission-total-value">{formatCFA(paidTotal)}</div>
           <div className="commission-total-label">Total payé</div>
@@ -215,14 +481,16 @@ export default function Plus() {
       </div>
       <div className="com-toolbar">
         <div className="categories-scroll">
-          {[['all', 'Toutes'], ['en_attente', 'En attente'], ['payée', 'Payées']].map(([id, label]) => (
+          {[['all', 'Toutes'], ['attente', 'À payer'], ['demandee', 'Demandées'], ['payee', 'Payées']].map(([id, label]) => (
             <button key={id} className={`category-chip ${comFilter === id ? 'active' : ''}`} aria-pressed={comFilter === id} onClick={() => setComFilter(id)}>{label}</button>
           ))}
         </div>
         <div className="com-partner-tools">
           <select className="input sort-select" value={comPartner} onChange={(e) => setComPartner(e.target.value)} aria-label="Filtrer par partenaire">
             <option value="all">Tous les partenaires</option>
-            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {partenairesDuFiltre.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}{p.orgName ? ` · ${p.orgName}` : ''}</option>
+            ))}
           </select>
           <button className="btn btn-sm btn-outline" disabled={comPartner === 'all'} onClick={() => openReleve(comPartner)}
             title={comPartner === 'all' ? 'Choisissez un partenaire pour générer son relevé' : 'Relevé de commissions imprimable'}>
@@ -232,30 +500,58 @@ export default function Plus() {
       </div>
       <div className="commissions-list">
         {filteredCommissions.map((commission) => (
-          <div key={commission.id} className="card commission-card">
-            <div className="commission-header">
-              <div>
-                <div className="commission-lead">{getLeadById(commission.leadId)?.name || 'Commission manuelle'}</div>
-                <div className="text-sm text-secondary">
-                  {getPartnerById(commission.partnerId)?.name} — Niveau {commission.level}
+          <div
+            key={`${commission.orgId || 'moi'}-${commission.id}`}
+            className={`card commission-card niveau-${commission.level} is-${etatDe(commission)}`}
+          >
+            <div className="commission-top">
+              <div className="commission-ident">
+                <div className="commission-lead">{nomClient(commission)}</div>
+                <div className="commission-sub">
+                  <span className={`chip-level n${commission.level}`}>
+                    N{commission.level} · {formatTaux(COMMISSION_RATES[commission.level])}
+                  </span>
+                  <span className="commission-partner">{nomPartenaire(commission)}</span>
+                  {numeroDevis(commission) && <span className="commission-ref">{numeroDevis(commission)}</span>}
+                  {commission.externe && commission.orgName && (
+                    <span className="commission-ref">{commission.orgName}</span>
+                  )}
                 </div>
               </div>
-              <div className="commission-amount">{formatCFA(commission.amount)}</div>
+              <div className="commission-right">
+                <div className="commission-amount">{formatCFA(commission.amount)}</div>
+                {/* Statut en NEUTRE : l'ambre et le vert sont réservés au
+                    niveau. Ce qui reste à payer se voit à son bouton plein. */}
+                {etatDe(commission) !== 'attente' && (
+                  <span className="badge badge-muted">
+                    {etatDe(commission) === 'payee' ? <Check size={11} /> : <Clock size={11} />}
+                    {ETATS_COMMISSION[etatDe(commission)]}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="commission-meta">
-              <span>
+            {/* Pied de carte : la date reste discrète, l'action se tient à
+                droite et garde sa largeur naturelle — étirée sur toute la
+                carte, elle se lisait comme un champ de saisie vide. */}
+            <div className="commission-foot">
+              <span className="commission-date">
                 {commission.status === 'payée'
                   ? `Payée le ${formatDate(commission.paidAt)} · ${PAY_MODE_LABEL[commission.payMode] || 'Mobile Money'}${commission.payRef ? ` · réf. ${commission.payRef}` : ''}`
                   : `Créée le ${formatDate(commission.createdAt)}`}
               </span>
-              {commission.status === 'payée' ? (
-                <span className="com-paid-actions">
-                  <button className="btn btn-sm btn-outline" onClick={() => openRecu(commission)}><Download size={14} /> Reçu</button>
-                  <span className="badge badge-success">Payée</span>
-                </span>
-              ) : (
-                <button className="btn btn-won btn-sm" onClick={() => handlePay(commission)}>
-                  <CheckCircle size={15} /> Payer…
+              {etatDe(commission) === 'payee' && (
+                <button className="btn btn-sm btn-outline" onClick={() => openRecu(commission)}>
+                  <Download size={14} /> Reçu
+                </button>
+              )}
+              {/* Engagée dans une demande : plus de règlement à l'unité. Elle
+                  se règle avec sa demande, sinon elle serait payée deux fois. */}
+              {etatDe(commission) === 'demandee' && (
+                <span className="commission-date">Incluse dans une demande de paiement</span>
+              )}
+              {etatDe(commission) === 'attente' && (
+                <button className="btn btn-sm btn-primary" onClick={() => handlePay(commission)}>
+                  <CheckCircle size={15} /> Payer {formatCFA(commission.amount)}
                 </button>
               )}
             </div>
@@ -322,6 +618,52 @@ export default function Plus() {
         </button>
       <div className="sync-inline"><SyncStatusRow /></div>
 
+      {/* Parrainage de l'entreprise : attribution unique, ensuite verrouillée
+          (seul BestaSolar peut la modifier, sur demande du partenaire).
+          Visible pour le gérant — ou l'utilisateur seul dans son espace. */}
+      {isSupabaseConfigured && user.org && estProprietaireEspace(user, team, teamChargee) && (
+        <div className="card">
+          <div className="sheet-section-title"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Parrainage</div>
+          {user.org.referred_by ? (
+            <>
+              <div className="sheet-row">
+                <span className="sheet-label">Parrainé par</span>
+                <span className="sheet-value"><span className="flat-badge">{user.org.referred_by}</span></span>
+              </div>
+              <div className="field-hint">Ce code est définitif — pour toute correction, le partenaire doit en faire la demande à BestaSolar.</div>
+            </>
+          ) : (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!refInput.trim()) return;
+                setRefSaving(true);
+                try {
+                  await setOrgReferral(refInput);
+                  await refreshOrg();
+                  toast('Code de parrainage enregistré.');
+                } catch (err) {
+                  toast(err.message || 'Attribution impossible.', { type: 'error' });
+                } finally {
+                  setRefSaving(false);
+                }
+              }}
+            >
+              <p className="text-sm text-secondary" style={{ marginBottom: 10 }}>
+                Un partenaire BestaSolar vous a recommandé ? Saisissez son code — attention,
+                ce choix est <strong>définitif</strong>.
+              </p>
+              <div className="momo-input-row">
+                <input className="input" value={refInput} onChange={(e) => setRefInput(e.target.value.toUpperCase())} placeholder="BESTA-…" aria-label="Code partenaire" />
+                <button type="submit" className="btn btn-primary" disabled={refSaving || !refInput.trim()}>
+                  {refSaving ? '…' : 'Attribuer'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
       {/* Sections thématiques */}
       <div className="plus-sections">
         {user.role === 'gerant' && (
@@ -329,10 +671,19 @@ export default function Plus() {
             <div className="plus-section-label">Gestion</div>
             <div className="plus-card card">
               <MenuItem icon={Users} title="Équipe" subtitle="Profils des techniciens et performances" onClick={() => setActiveTab('team')} />
-              <MenuItem icon={Users} tone="success" title="Partenaires" subtitle={`${partners.length} partenaires · réseau 2 niveaux`} onClick={() => setActiveTab('partners')} />
+              <MenuItem icon={Users} title="Partenaires" subtitle={`${partners.length} partenaires · réseau 2 niveaux`} onClick={() => setActiveTab('partners')} />
               <MenuItem icon={DollarSign} title="Commandes en ligne" subtitle={`${(orders || []).filter((o) => o.status === 'initie').length} à confirmer`} onClick={() => setActiveTab('orders')} />
-              <MenuItem icon={DollarSign} tone="warning" title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
-              <MenuItem icon={Crown} tone="warning" title="Abonnements Devis Pro" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
+              <MenuItem icon={DollarSign} title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
+              <MenuItem icon={Package} title="Mes kits" subtitle={`${(kits || []).length} kits proposés par l'assistant de devis`} onClick={() => setActiveTab('kits')} />
+              <MenuItem icon={Cpu} title="Onduleurs" subtitle={`${(inverters || []).length} onduleurs, suggérés si celui du kit ne suffit pas`} onClick={() => setActiveTab('inverters')} />
+              <MenuItem icon={Droplets} title="Kits pompage" subtitle={`${(pompeKits || []).length} kits proposés par l'assistant Pompe solaire`} onClick={() => setActiveTab('pompekits')} />
+              <MenuItem icon={CreditCard} title="Moyens de paiement" subtitle={paiementActif ? `${paiementActif.nom} · ${paiementActif.mode}` : 'Aucun agrégateur activé — Mobile Money manuel'} onClick={() => setActiveTab('paiements')} />
+              {/* Administration du SaaS : en mode backend, réservée à l'admin
+                  plateforme (le serveur refuse de toute façon l'activation
+                  d'un abonnement à quiconque d'autre). */}
+              {(!isSupabaseConfigured || user.is_platform_admin) && (
+                <MenuItem icon={Crown} title="Abonnements Devis Pro" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
+              )}
             </div>
           </div>
         )}
@@ -347,7 +698,7 @@ export default function Plus() {
         <div className="plus-section">
           <div className="plus-section-label">Apprendre & gagner</div>
           <div className="plus-card card">
-            <MenuItem icon={GraduationCap} tone="success" title="Formation" subtitle="Cours en ligne : modules, leçons et progression" onClick={() => setActiveTab('formation')} />
+            <MenuItem icon={GraduationCap} title="Formation" subtitle="Cours en ligne : modules, leçons et progression" onClick={() => setActiveTab('formation')} />
             <MenuItem icon={Share2} title="Mon espace partenaire" subtitle="Mon code, mon lien, mes commissions" onClick={() => setActiveTab('mypartner')} />
           </div>
         </div>
@@ -362,6 +713,10 @@ export default function Plus() {
             <MenuItem icon={LogOut} tone="danger" title="Déconnexion" subtitle="Quitter l'application" onClick={logout} />
           </div>
         </div>
+
+        {/* Réservé au gérant : lui seul peut agir sur la configuration du
+            suivi, et lui seul a besoin de savoir s'il est actif. */}
+        {user.role === 'gerant' && <DiagnosticCard />}
       </div>
     </div>
   );
@@ -371,13 +726,17 @@ export default function Plus() {
   const TAB_TITLES = {
     menu: 'Plus', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
-    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire',
+    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
+    paiements: 'Moyens de paiement',
     profile: 'Mon profil', backup: 'Sauvegarde',
   };
 
   return (
     <div className="page">
-      <PageHeader title={TAB_TITLES[activeTab] || 'Plus'} />
+      <PageHeader
+        title={TAB_TITLES[activeTab] || 'Plus'}
+        onBack={activeTab !== 'menu' ? () => navigate('/plus') : undefined}
+      />
       {/* La formation s'étale en large (catalogue + école) ; le reste garde la colonne étroite. */}
       <div className={`page-content ${activeTab === 'formation' ? 'page-content-wide' : 'page-content-narrow'}`}>
         {activeTab === 'menu' && renderMenu()}
@@ -385,6 +744,10 @@ export default function Plus() {
         {activeTab === 'commissions' && renderCommissions()}
         {activeTab === 'orders' && <OrdersSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'team' && <TeamSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'kits' && <KitsSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'inverters' && <InvertersSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'pompekits' && <PompeKitsSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'paiements' && <PaiementsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'subsadmin' && <SubscriptionsAdmin onBack={() => setActiveTab('menu')} />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
@@ -395,13 +758,27 @@ export default function Plus() {
       {/* Commission manuelle */}
       <Sheet open={showAddCommission} onClose={() => setShowAddCommission(false)} title="Commission manuelle">
         <form onSubmit={handleAddCommission} className="form-grid">
-          <Field label="Partenaire *">
+          <Field label="Bénéficiaire *">
             <select
               className="input" required value={newCommission.partnerId}
               onChange={(e) => setNewCommission({ ...newCommission, partnerId: e.target.value })}
             >
-              <option value="" disabled>Choisir un partenaire…</option>
-              {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="" disabled>Choisir un bénéficiaire…</option>
+              {/* Toute l'équipe est commissionnable : les membres sans profil
+                  partenaire en reçoivent un automatiquement à la création. */}
+              <optgroup label="Mon équipe">
+                {team.map((u) => (
+                  <option key={`u-${u.id}`} value={`user:${u.id}`}>
+                    {u.name}{u.role === 'gerant' ? ' (gérant)' : ''}
+                  </option>
+                ))}
+              </optgroup>
+              {partners.filter((p) => !p.userId || !team.some((u) => u.id === p.userId)).length > 0 && (
+                <optgroup label="Partenaires externes">
+                  {partners.filter((p) => !p.userId || !team.some((u) => u.id === p.userId))
+                    .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </optgroup>
+              )}
             </select>
           </Field>
           <Field label="Affaire liée (optionnel)">
@@ -424,8 +801,8 @@ export default function Plus() {
                 setNewCommission((c) => ({ ...c, level, amount: suggestAmount(c.leadId, level) || c.amount }));
               }}
             >
-              <option value={1}>Niveau 1 (3%)</option>
-              <option value={2}>Niveau 2 (1,5%)</option>
+              <option value={1}>Niveau 1 ({formatTaux(COMMISSION_RATES[1])})</option>
+              <option value={2}>Niveau 2 ({formatTaux(COMMISSION_RATES[2])})</option>
             </select>
           </Field>
           <Field label="Montant (F CFA) *">
@@ -464,8 +841,69 @@ export default function Plus() {
             <Field label="Note (facultatif)">
               <input className="input" value={payForm.note} onChange={(e) => setPayForm({ ...payForm, note: e.target.value })} />
             </Field>
-            <button type="submit" className="btn btn-won btn-block"><CheckCircle size={17} /> Confirmer le paiement</button>
+            <button type="submit" className="btn btn-primary btn-block" disabled={payCom?.externe && retraitEnCours}>
+              <CheckCircle size={17} /> {payCom?.externe && retraitEnCours ? 'Enregistrement…' : 'Confirmer le paiement'}
+            </button>
             <p className="field-hint">Le reçu imprimable reprendra le mode et la référence saisis.</p>
+          </form>
+        )}
+      </Sheet>
+
+      {/* Régler une demande de partenaire : la référence de transaction est ce
+          qui rend le versement traçable — elle part sur le reçu. */}
+      <Sheet open={!!retraitAValider} onClose={() => setRetraitAValider(null)} title="Régler la demande">
+        {retraitAValider && (
+          <form onSubmit={validerRetrait}>
+            <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{retraitAValider.partnerName || '—'}</span></div>
+            <div className="sheet-row"><span className="sheet-label">Montant demandé</span><span className="sheet-value amount">{formatCFA(retraitAValider.amount)}</span></div>
+            <div className="sheet-row">
+              <span className="sheet-label">Commissions couvertes</span>
+              <span className="sheet-value">{(retraitAValider.commissionIds || []).length}</span>
+            </div>
+            {(retraitAValider.telephone || retraitAValider.partnerPhone) && (
+              <div className="sheet-row"><span className="sheet-label">À verser sur</span><span className="sheet-value">{retraitAValider.telephone || retraitAValider.partnerPhone}</span></div>
+            )}
+            {retraitAValider.externe && retraitAValider.orgName && (
+              <div className="sheet-row"><span className="sheet-label">Entreprise</span><span className="sheet-value">{retraitAValider.orgName}</span></div>
+            )}
+            <Field label="Mode de règlement">
+              <select className="input" value={retraitForm.mode} onChange={(e) => setRetraitForm({ ...retraitForm, mode: e.target.value })}>
+                {Object.entries(MODES_RETRAIT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </Field>
+            <Field label="Référence de la transaction">
+              <input className="input" value={retraitForm.reference}
+                onChange={(e) => setRetraitForm({ ...retraitForm, reference: e.target.value })}
+                placeholder="N° de transaction MoMo, réf. virement…" />
+            </Field>
+            <button type="submit" className="btn btn-primary btn-block" disabled={retraitEnCours}>
+              <CheckCircle size={17} /> {retraitEnCours ? 'Enregistrement…' : `Confirmer le paiement de ${formatCFA(retraitAValider.amount)}`}
+            </button>
+            <p className="field-hint">
+              Les {(retraitAValider.commissionIds || []).length} commissions couvertes passeront « payées » —
+              elles ne pourront plus être demandées ni réglées une seconde fois.
+            </p>
+          </form>
+        )}
+      </Sheet>
+
+      {/* Refus : le motif est obligatoire. Un partenaire qui compte sur cet
+          argent doit savoir pourquoi il ne l'a pas. */}
+      <Sheet open={!!retraitARefuser} onClose={() => setRetraitARefuser(null)} title="Refuser la demande">
+        {retraitARefuser && (
+          <form onSubmit={refuserRetrait}>
+            <div className="sheet-row"><span className="sheet-label">Partenaire</span><span className="sheet-value">{retraitARefuser.partnerName || '—'}</span></div>
+            <div className="sheet-row"><span className="sheet-label">Montant</span><span className="sheet-value amount">{formatCFA(retraitARefuser.amount)}</span></div>
+            <Field label="Motif du refus *">
+              <input className="input" required value={motifRefus} onChange={(e) => setMotifRefus(e.target.value)}
+                placeholder="Ex : affaire encore non encaissée par le client" />
+            </Field>
+            <button type="submit" className="btn btn-lost btn-block" disabled={retraitEnCours}>
+              <X size={17} /> {retraitEnCours ? 'Enregistrement…' : 'Refuser la demande'}
+            </button>
+            <p className="field-hint">
+              Les commissions redeviennent disponibles : le partenaire pourra en refaire la demande.
+            </p>
           </form>
         )}
       </Sheet>
@@ -497,24 +935,61 @@ export default function Plus() {
             <div className="form-row-2">
               <Field label="Opérateur">
                 <select className="input" value={subForm.methode} onChange={(e) => setSubForm({ ...subForm, methode: e.target.value })}>
-                  <option value="momo">MTN MoMo</option>
-                  <option value="moov">Moov Money</option>
+                  <option value="momo">T-Money (Yas)</option>
+                  <option value="moov">Flooz (Moov)</option>
                 </select>
               </Field>
               <Field label="Votre numéro">
-                <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+229 ..." />
+                <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+228 ..." />
               </Field>
+            </div>
+            <p className="text-sm">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} par Mobile Money à ce numéro, puis validez :</p>
+            <div className="copy-block">
+              <span className="copy-block-value">{PAY_NUMBER}</span>
+              <button type="button" className="btn btn-sm btn-outline" onClick={copyPayNumber}>Copier</button>
             </div>
             <Field label="Référence de la transaction (optionnel)">
               <input className="input" value={subForm.reference} onChange={(e) => setSubForm({ ...subForm, reference: e.target.value })} placeholder="Ex : ID du transfert MoMo" />
-              <div className="field-hint">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} au +229 016 173 2956, puis validez.</div>
             </Field>
+            {/* Paiement en ligne : c'est ICI qu'un non-abonné passe, l'espace
+                Pro lui étant fermé tant qu'il n'a pas d'abonnement actif. */}
+            <KkiapayButton
+              phone={subForm.phone}
+              label="Payer avec KKiaPay (test)"
+              disabled={!subForm.phone}
+              onNumero={(numero) => setSubForm({ ...subForm, phone: numero })}
+              onPaid={(reference, verdict) => paiementKkiapay(reference, verdict)}
+            />
             <button type="submit" className="btn btn-accent btn-block btn-lg">
               <Crown size={18} /> S'abonner — {formatCFA(SUBSCRIPTION_PRICE)}/mois
             </button>
           </form>
         )}
       </Sheet>
+
+      {/* Confirmation avant restauration d'une sauvegarde (remplace les données) */}
+      <ConfirmSheet
+        open={!!pendingRestore}
+        onClose={() => setPendingRestore(null)}
+        onConfirm={() => {
+          importData(pendingRestore);
+          toast('Sauvegarde restaurée avec succès.');
+        }}
+        title="Restaurer la sauvegarde"
+        message={pendingRestore
+          ? [
+              `Sauvegarde du ${formatDate(pendingRestore.exportedAt)}.`,
+              'Toutes les données actuelles seront remplacées par celles du fichier.',
+              // En mode SaaS la restauration se réplique : ce qui a été créé
+              // depuis cette sauvegarde sera supprimé pour TOUTE l'équipe.
+              isSupabaseConfigured
+                ? 'Attention : cette restauration est synchronisée. Tout ce qui a été créé depuis cette date sera supprimé sur le serveur et sur les appareils de votre équipe.'
+                : 'Cette action ne peut pas être annulée.',
+            ].join(' ')
+          : ''}
+        confirmLabel="Restaurer"
+        danger
+      />
     </div>
   );
 }

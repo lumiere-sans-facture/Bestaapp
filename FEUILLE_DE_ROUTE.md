@@ -24,13 +24,18 @@ Priorités : **P0** = cœur du CDC, à faire en premier · **P1** = important ·
 
 > Le maillon central du CDC : « lors de la vente, l'agent saisit le numéro de devis pour rattacher la vente au bon technicien »
 
-- [ ] Statut sur chaque devis : **En cours / Converti en vente / Expiré**
-- [ ] Expiration automatique à la fin de validité (30 ou 60 j — décision D3)
-- [ ] Action « **Convertir en vente** » sur un devis (gérant) : passe la piste en Gagné, génère les commissions, fige le montant de vente
-- [ ] Recherche d'un devis par numéro au moment de la vente (déjà possible via la recherche — ajouter le bouton de conversion au résultat)
+- [x] Statut sur chaque devis : **En cours / Converti en vente / Expiré** (+ Brouillon, Perdu), filtrable
+- [x] Expiration automatique à la fin de validité — **30 jours**, décision D3 toujours ouverte ; l'état est
+      DÉDUIT (`utils/affaires.js`), jamais stocké, et chaque devis peut porter sa propre validité
+- [x] Compte à rebours « Expire dans N j » à sept jours de l'échéance
+- [x] Action « **Convertir en vente** » sur un devis (gérant) : passe l'affaire en Gagné, génère les
+      commissions, **fige le montant de vente** (éditer le devis ensuite ne change plus la commission)
+- [x] Recherche d'un devis par numéro au moment de la vente — le bouton de conversion est dans le panneau
+      du devis, atteint depuis le résultat de recherche
 - [ ] Le tableau de bord partenaire liste « devis convertis » avec la commission associée (§3.5.1)
 
-*Effort estimé : 1 session.*
+*Vérifié de bout en bout : `node e2e/devis-conversion.mjs` (devis créés par l'interface, temps avancé
+avec l'horloge simulée).*
 
 ## Phase 2 — Commissions niveau CDC 💰 P0
 
@@ -70,6 +75,8 @@ Priorités : **P0** = cœur du CDC, à faire en premier · **P1** = important ·
 - [ ] **Correspondance kits BestaSolar** : proposer automatiquement le kit du catalogue le plus adapté au dimensionnement, avec modèle et prix (§3.2.3)
 - [ ] **Autonomie** estimée (jours sans soleil) paramétrable
 - [ ] Choix **contrôleur MPPT/PWM** avec ampérage + **sections de câble (mm²)** recommandées
+- [x] **Historique de l'étude** : la liste des appareils, le mode de saisie et l'ensoleillement retenu sont
+      gardés avec le devis, rouvrables et modifiables (le devis est mis à jour, jamais dupliqué)
 - [ ] **Modèles de charges sauvegardés** (profils fréquents : maison type, boutique, congélateur…)
 - [ ] Ajouter les kits congélateurs de l'annexe 10.3 au catalogue (118 L → 318 L) quand les prix seront fournis
 

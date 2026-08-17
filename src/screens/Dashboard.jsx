@@ -1,4 +1,5 @@
 import { CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA } from '../utils/format';
@@ -12,7 +13,7 @@ import Ring from '../components/Ring';
 export default function Dashboard() {
   const { user } = useAuth();
   const {
-    products, stages, leadsForUser, devis, partners, commissions,
+    products, stages, leadsForUser, devis, commissions,
     productCategories, getSubscriptionForUser,
   } = useData();
 
@@ -65,13 +66,15 @@ export default function Dashboard() {
   const maxCat = Math.max(1, ...catData.map((c) => c.count));
 
   // ---- Bandeau de statistiques ----
+  // Chaque pastille renvoie vers l'écran concerné (le kanban, les devis, la
+  // boutique) — sans filtre à l'arrivée, ces écrans n'en proposant pas.
   const stats = [
-    { key: 'actives', value: openLeads.length, label: 'Pistes actives', tone: 'info' },
-    { key: 'new', value: newThisWeek, label: 'Nouvelles · 7j', tone: 'accent' },
-    { key: 'stale', value: staleLeads.length, label: 'À relancer', tone: 'warning' },
-    { key: 'won', value: wonThisMonth, label: 'Gagnées · ce mois', tone: 'success' },
-    { key: 'devis', value: devisThisMonth, label: 'Devis · ce mois', tone: 'primary' },
-    { key: 'stock', value: lowStock + outOfStock, label: 'Alertes stock', tone: 'error' },
+    { key: 'actives', value: openLeads.length, label: 'Pistes actives', tone: 'info', to: '/pipeline' },
+    { key: 'new', value: newThisWeek, label: 'Nouvelles · 7j', tone: 'accent', to: '/pipeline' },
+    { key: 'stale', value: staleLeads.length, label: 'À relancer', tone: 'warning', to: '/pipeline' },
+    { key: 'won', value: wonThisMonth, label: 'Gagnées · ce mois', tone: 'success', to: '/pipeline' },
+    { key: 'devis', value: devisThisMonth, label: 'Devis · ce mois', tone: 'primary', to: '/devis' },
+    { key: 'stock', value: lowStock + outOfStock, label: 'Alertes stock', tone: 'error', to: '/boutique' },
   ];
 
   // ---- Feed d'alertes (trié par sévérité) ----
@@ -90,9 +93,6 @@ export default function Dashboard() {
   if (user.role === 'gerant' && pendingComm.length)
     feed.push({ id: 'comm', sev: 'info', label: `${pendingComm.length} commission(s) à payer`, entity: formatCFA(pendingCommTotal) });
   // Demandes de progression des techniciens : à valider dans Suivi clients.
-  const pendingMoves = user.role === 'gerant' ? myLeads.filter((l) => l.pendingStage) : [];
-  if (pendingMoves.length)
-    feed.push({ id: 'moves', sev: 'alerte', label: `${pendingMoves.length} progression(s) client à valider`, entity: 'Suivi clients' });
   feed.sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev]);
   const feedTop = feed.slice(0, 6);
 
@@ -111,10 +111,10 @@ export default function Dashboard() {
         {/* Bandeau de statistiques */}
         <div className="stat-strip">
           {stats.map((s) => (
-            <div key={s.key} className={`stat-pill is-${s.tone}`}>
+            <Link key={s.key} to={s.to} className={`stat-pill is-${s.tone}`} style={{ textDecoration: 'none', color: 'inherit' }}>
               <span className="stat-pill-num">{s.value}</span>
               <span className="stat-pill-label">{s.label}</span>
-            </div>
+            </Link>
           ))}
         </div>
 
@@ -129,6 +129,8 @@ export default function Dashboard() {
             <div className="bar-chart bar-chart-lg">
               {monthlyData.map((m) => (
                 <div key={m.month} className="bar-group" title={`${m.month} : ${m.leads} piste(s) · ${m.won} gagnée(s) · CA ${formatCFA(m.revenue)}`}>
+                  {/* Valeurs lisibles sans survol (pistes · gagnées), en plus du title */}
+                  <span className="bar-sublabel" style={{ fontSize: 12, fontWeight: 700 }}>{m.leads} · {m.won}</span>
                   <div className="bar-wrapper">
                     <div className="bar bar-leads" style={{ height: `${(m.leads / maxBar) * 100}%` }} />
                     <div className="bar bar-won" style={{ height: `${(m.won / maxBar) * 100}%` }} />

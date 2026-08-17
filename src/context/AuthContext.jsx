@@ -1,35 +1,99 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { users } from '../data/seed';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { setContexteErreur } from '../lib/rapportErreur';
+import { setContexteAnalytique } from '../lib/analytique';
+import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
+import { getActiveRef } from '../utils/referral';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
+// Inscription en attente de confirmation d'email : on mémorise de quoi créer
+// l'organisation au premier login (le compte Auth existe, pas encore le profil).
+const PENDING_KEY = 'bestasolar_pending_signup';
 
+// select('*') : tolère l'ancien schéma (sans org_id / is_platform_admin)
+// comme le schéma multi-entreprise.
 const fetchProfile = async (email) => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, name, role, phone, avatar')
+    .select('*')
     .eq('email', email.toLowerCase())
     .single();
   if (error || !data) return null;
   return data;
 };
 
+const readPending = () => {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY)); } catch { return null; }
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // true après un clic sur le lien « mot de passe oublié » reçu par email :
+  // l'app demande alors le nouveau mot de passe avant tout le reste.
+  const [recovery, setRecovery] = useState(false);
+
+  // Attache l'organisation au profil (type interne/pro, nom, code d'invitation).
+  // user.org absent = ancien schéma mono-équipe ou mode local → comportement
+  // « interne » (CRM complet), comme avant.
+  const adoptProfile = async (profile) => {
+    setSyncOrg(profile?.org_id);
+    let org = null;
+    if (profile?.org_id) org = await fetchMyOrg();
+    // Le type (interne/pro) conditionne la sync du catalogue partagé.
+    setSyncOrg(profile?.org_id, org?.kind);
+    // Les rapports d'erreur portent désormais l'identifiant du compte et de
+    // l'entreprise (jamais le nom ni le téléphone) : sans eux, impossible de
+    // savoir qui est bloqué.
+    setContexteErreur({
+      userId: profile?.id || null,
+      orgId: profile?.org_id || null,
+      role: profile?.role || null,
+    });
+    setContexteAnalytique({ distinctId: profile?.id || null });
+    setUser(org ? { ...profile, org } : profile);
+  };
+
+  // Le compte Auth existe mais pas encore le profil : crée l'organisation (ou
+  // rejoint celle du code d'invitation) mémorisée à l'inscription.
+  const provisionProfile = async (email) => {
+    const pending = readPending();
+    if (!pending || pending.email?.toLowerCase() !== email.toLowerCase()) return null;
+    try {
+      if (pending.inviteCode) {
+        await supabase.rpc('signup_join_org', { p_invite_code: pending.inviteCode, p_user_name: pending.name, p_phone: pending.phone || '' });
+      } else {
+        await supabase.rpc('signup_create_org', {
+          p_org_name: pending.companyName,
+          p_user_name: pending.name,
+          p_ref_code: pending.refCode || null,
+          p_phone: pending.phone || '',
+        });
+      }
+      localStorage.removeItem(PENDING_KEY);
+      return await fetchProfile(email);
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (isSupabaseConfigured) {
       // Session Supabase persistée : restaurer le profil de l'équipe
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (session?.user?.email) {
-          const profile = await fetchProfile(session.user.email);
-          if (profile) setUser(profile);
+          const profile = (await fetchProfile(session.user.email)) || (await provisionProfile(session.user.email));
+          if (profile) await adoptProfile(profile);
         }
         setIsLoading(false);
       });
-      return;
+      // Lien de réinitialisation de mot de passe cliqué depuis l'email.
+      const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') setRecovery(true);
+      });
+      return () => sub.subscription.unsubscribe();
     }
     // Mode local (sans backend configuré)
     try {
@@ -45,12 +109,14 @@ export function AuthProvider({ children }) {
     if (isSupabaseConfigured) {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) return false;
-      const profile = await fetchProfile(email.trim());
+      const profile = (await fetchProfile(email.trim())) || (await provisionProfile(email.trim()));
       if (!profile) {
-        await supabase.auth.signOut();
-        return false;
+        // Compte Auth valide mais profil jamais créé (inscription interrompue,
+        // autre navigateur…) : on garde la session et on laisse l'écran de
+        // connexion proposer de terminer l'inscription.
+        return 'incomplete';
       }
-      setUser(profile);
+      await adoptProfile(profile);
       return true;
     }
     const found = users.find(
@@ -58,19 +124,121 @@ export function AuthProvider({ children }) {
     );
     if (!found) return false;
     const { password: _pw, ...safeUser } = found;
+    // Mode local (démo) : le contexte d'erreur se renseigne aussi ici, sinon
+    // un plantage en démonstration remonterait sans savoir qui l'a vécu.
+    setContexteErreur({ userId: safeUser.id, orgId: null, role: safeUser.role });
+    setContexteAnalytique({ distinctId: safeUser.id });
     setUser(safeUser);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(safeUser));
     return true;
   };
 
+  /**
+   * Inscription self-service (backend requis) — une seule page simple.
+   * Sans code d'invitation : espace personnel créé silencieusement (utilisateur
+   * classique) ; avec `inviteCode` (lien ?equipe=) : rejoint l'équipe.
+   * Retourne { ok, needsConfirmation, error }.
+   */
+  const signUp = async ({ email, password, name, phone, companyName, inviteCode, refCode }) => {
+    if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
+    // L'espace personnel porte le nom de l'utilisateur (renommable plus tard
+    // dans « Mon entreprise » de l'espace Pro).
+    if (!inviteCode && !companyName) companyName = name;
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { data: { name, phone: phone || '', companyName: companyName || null, inviteCode: inviteCode || null } },
+    });
+    if (error) return { ok: false, error: error.message };
+    // Si la confirmation d'email est activée, le profil sera créé au premier
+    // login : on mémorise l'entreprise / le code (invitation, parrainage) en attendant.
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, phone: phone || '', companyName, inviteCode, refCode: refCode || null }));
+    if (!data.session) return { ok: true, needsConfirmation: true };
+    const profile = await provisionProfile(email.trim());
+    if (!profile) return { ok: false, error: 'Compte créé mais profil introuvable — reconnectez-vous.' };
+    await adoptProfile(profile);
+    return { ok: true };
+  };
+
+  /**
+   * Termine une inscription interrompue : la session Auth existe déjà, il ne
+   * manque que le profil (et son entreprise ou son rattachement d'équipe).
+   */
+  const completeSignup = async ({ name, phone, companyName, inviteCode, refCode }) => {
+    if (!isSupabaseConfigured) return { ok: false };
+    if (!inviteCode && !companyName) companyName = name;
+    try {
+      if (inviteCode) {
+        await supabase.rpc('signup_join_org', { p_invite_code: inviteCode, p_user_name: name, p_phone: phone || '' });
+      } else {
+        await supabase.rpc('signup_create_org', {
+          p_org_name: companyName,
+          p_user_name: name,
+          // Code saisi dans le formulaire, sinon parrainage encore actif sur
+          // l'appareil (lien ?ref= cliqué) : conservé même quand l'inscription
+          // se termine à la connexion.
+          p_ref_code: refCode || getActiveRef()?.code || null,
+          p_phone: phone || '',
+        });
+      }
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const profile = session?.user?.email ? await fetchProfile(session.user.email) : null;
+    if (!profile) return { ok: false, error: 'Profil introuvable après création — réessayez.' };
+    localStorage.removeItem(PENDING_KEY);
+    await adoptProfile(profile);
+    return { ok: true };
+  };
+
+  /** Envoie l'email de réinitialisation (le lien ramène vers l'app). */
+  const resetPassword = async (email) => {
+    if (!isSupabaseConfigured) return { ok: false };
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    });
+    return { ok: !error, error: error?.message };
+  };
+
+  /** Définit le nouveau mot de passe après le clic sur le lien reçu. */
+  const updatePassword = async (newPassword) => {
+    if (!isSupabaseConfigured) return { ok: false };
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (!error) {
+      setRecovery(false);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        const profile = await fetchProfile(session.user.email);
+        if (profile) await adoptProfile(profile);
+      }
+    }
+    return { ok: !error, error: error?.message };
+  };
+
   const logout = () => {
     if (isSupabaseConfigured) supabase.auth.signOut();
+    // Le compte quitte l'app : les rapports suivants ne doivent plus lui être
+    // attribués.
+    setContexteErreur({ userId: null, orgId: null, role: null });
+    setContexteAnalytique({ distinctId: null });
     setUser(null);
+    setSyncOrg(null);
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  /** Recharge l'organisation attachée au profil (après attribution du parrainage…). */
+  const refreshOrg = async () => {
+    if (!isSupabaseConfigured) return;
+    const org = await fetchMyOrg();
+    if (org) {
+      setSyncOrg(org.id, org.kind);
+      setUser((u) => (u ? { ...u, org } : u));
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, signUp, completeSignup, resetPassword, updatePassword, refreshOrg, recovery }}>
       {children}
     </AuthContext.Provider>
   );
