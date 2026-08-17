@@ -316,6 +316,87 @@ réponse de PostHog :
 
 Côté PostHog, l'onglet *Activity* montre ensuite les événements en direct.
 
+## 10. E-mails du compte (SMTP Brevo)
+
+L'app envoie **deux e-mails**, tous deux par Supabase Auth : la confirmation
+d'inscription et le lien « mot de passe oublié » (`context/AuthContext.jsx`).
+
+⚠️ **Le serveur d'e-mail intégré de Supabase n'est pas fait pour la
+production.** Il est bridé à quelques envois par heure et expédie depuis un
+domaine Supabase : un technicien qui demande à réinitialiser son mot de passe
+peut ne jamais recevoir le message, sans qu'aucune erreur n'apparaisse nulle
+part. Tant qu'un SMTP maison n'est pas branché, cette porte est fragile.
+
+### 10.1 Côté Brevo
+
+1. *Senders, Domains & Dedicated IPs* → **valider le domaine** `bestasolar.com`
+   (ou au minimum l'adresse expéditrice).
+2. *SMTP & API* → **Generate a new SMTP key**. Noter le login (de la forme
+   `xxxxxxx@smtp-brevo.com`) et la clé.
+3. *Settings → Security → **Authorized IPs*** : **ne rien activer**.
+
+> ⚠️ **La restriction par IP casserait tout, silencieusement.** Ce ne sont ni
+> votre ordinateur ni votre téléphone qui se connectent à Brevo, mais les
+> serveurs de **Supabase** (e-mails du compte) et de **Vercel** (envois depuis
+> l'app). Leurs adresses IP sortantes changent d'un envoi à l'autre : aucune
+> liste ne peut les couvrir. Avec « Block unknown IP addresses » activé, les
+> e-mails partiraient un jour et seraient rejetés le lendemain. Laissez la
+> liste vide et le blocage désactivé.
+
+### 10.2 Enregistrements DNS
+
+Chez le registrar du domaine (ou dans Vercel → *Domains* → *DNS*), poser les
+trois enregistrements que Brevo affiche :
+
+| Type | Rôle | Sans lui |
+|---|---|---|
+| **SPF** (TXT) | autorise Brevo à écrire en votre nom | courrier en indésirables |
+| **DKIM** (TXT) | signature cryptographique du message | courrier en indésirables |
+| **DMARC** (TXT) | dit quoi faire d'un message non signé | usurpation possible |
+
+Aucun fournisseur ne rattrape leur absence : c'est ce qui décide qu'un e-mail
+arrive en boîte de réception plutôt qu'en spam.
+
+### 10.3 Côté Supabase
+
+*Project Settings → Authentication → SMTP Settings* → **Enable Custom SMTP** :
+
+| Champ | Valeur |
+|---|---|
+| Host | `smtp-relay.brevo.com` |
+| Port | `587` (STARTTLS) |
+| Username | le login `…@smtp-brevo.com` donné par Brevo |
+| Password | la **clé SMTP** Brevo (pas le mot de passe du compte) |
+| Sender email | une adresse du domaine validé, ex. `contact@bestasolar.com` |
+| Sender name | `BestaSolar` |
+
+Puis, dans *Authentication → Rate Limits*, relever la limite d'envoi : elle
+reste calée sur l'ancien service tant qu'on n'y touche pas.
+
+### 10.4 URL de retour — sinon le lien reçu ne marche pas
+
+`resetPassword()` demande à Supabase de renvoyer l'utilisateur vers
+`window.location.origin`. Cette adresse doit figurer dans
+*Authentication → URL Configuration* :
+
+- **Site URL** : l'adresse de production (ex. `https://app.bestasolar.com`)
+- **Redirect URLs** : y ajouter aussi les URL de préproduction Vercel et
+  `http://localhost:3000` pour les essais.
+
+Une adresse absente de cette liste fait échouer le lien **après** le clic —
+l'e-mail arrive, et c'est la page d'arrivée qui refuse.
+
+### 10.5 Vérifier
+
+1. Depuis l'écran de connexion, « Mot de passe oublié ».
+2. Brevo → *Transactional → Logs* : l'envoi doit y apparaître en `delivered`.
+   Un `blocked` ou `hard bounce` s'y explique en clair.
+3. Cliquer le lien reçu : il doit ouvrir l'app sur la saisie du nouveau mot de
+   passe. S'il renvoie une erreur, c'est le § 10.4.
+
+Les textes des deux e-mails sont dans `supabase/emails/` — à coller dans
+*Authentication → Email Templates*.
+
 ## Ce que fait l'app selon la configuration
 
 | | Sans backend (démo) | Backend configuré (SaaS) |
