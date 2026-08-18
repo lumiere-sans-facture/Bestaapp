@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-18
+- Inscription : CAPTCHA retiré (gardé sur mot de passe oublié et connexion après 3 échecs)
 - Connexion : le CAPTCHA n'apparaît plus qu'à partir du 3e échec sur un même email, moins de friction pour la saisie normale
 - Session : durée de vie (30 j) et inactivité (7 j) bornées côté app, en attendant le palier payant Supabase qui fait ça nativement
 - Connexion / inscription / mot de passe oublié : défi CAPTCHA (hCaptcha ou Turnstile) câblé, actif dès qu'une clé de site est renseignée

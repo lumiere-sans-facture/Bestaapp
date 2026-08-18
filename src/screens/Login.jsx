@@ -285,8 +285,7 @@ export default function Login() {
                 </div>
               </div>
             )}
-            {captchaField}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading || captchaBlocking}>
+            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
               {loading ? 'Création…' : 'Créer mon compte'}
             </button>
             {!teamCode && (
