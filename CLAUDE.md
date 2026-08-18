@@ -113,9 +113,14 @@ ET son projet Supabase :
 | `main` | projet *production* | base réelle | ce que voient les clients |
 
 - **Développer sur la branche de travail**, jamais directement sur `main`.
+- Pousser sur la branche redéploie l'app de **test**, et **rien d'autre** : la
+  production ne bouge pas tant que personne n'a fusionné. La fusion est le
+  bouton « go », délibéré, jamais automatique.
 - **Mettre en production** = fusionner la branche dans `main` et pousser ; Vercel
   déploie tout seul. La marche complète est dans la procédure `publier`
   (`.claude/skills/publier/`), et la liste de contrôle dans `RECETTE.md`.
+- **Correctif d'urgence** fait sur `main` : le répercuter aussitôt dans la
+  branche (`git merge main`), sinon la fusion suivante l'écraserait.
 - Ne pas créer de PR sans demande explicite.
 
 ⚠️ **Le code n'est que la moitié du déploiement.** Les scripts SQL de
