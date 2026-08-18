@@ -5,6 +5,8 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
 import { users } from '../data/seed';
 import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining } from '../utils/loginThrottle';
+import { isCaptchaConfigured } from '../lib/captcha';
+import CaptchaWidget from '../components/CaptchaWidget';
 
 /**
  * Écran d'entrée : connexion, et — quand le backend est configuré —
@@ -36,7 +38,21 @@ export default function Login() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
-  const switchView = (v) => { setView(v); setError(''); setNotice(''); };
+  // Jeton CAPTCHA (hCaptcha/Turnstile — vide si non configuré, voir
+  // lib/captcha.js). À usage unique côté Supabase : `captchaKey` force un
+  // nouveau défi (remontage du widget) après chaque tentative.
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaKey, setCaptchaKey] = useState(0);
+  const resetCaptcha = () => { setCaptchaToken(''); setCaptchaKey((k) => k + 1); };
+  // Le CAPTCHA n'a de sens qu'avec le backend Supabase (c'est lui qui le
+  // vérifie) : en mode local, ni affiché ni requis.
+  const captchaActive = isSupabaseConfigured && isCaptchaConfigured;
+  const captchaBlocking = captchaActive && !captchaToken;
+  const captchaField = captchaActive && (
+    <CaptchaWidget key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
+  );
+
+  const switchView = (v) => { setView(v); setError(''); setNotice(''); resetCaptcha(); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -49,7 +65,8 @@ export default function Login() {
       return;
     }
     setLoading(true);
-    const ok = await login(email, password);
+    const ok = await login(email, password, captchaToken);
+    resetCaptcha();
     if (ok === 'incomplete') {
       // Compte valide mais inscription jamais terminée (profil absent) :
       // on propose de la finir ici, sans repasser par la création de compte.
@@ -88,7 +105,9 @@ export default function Login() {
       email, password, name, phone,
       inviteCode: teamCode || null,
       refCode: teamCode ? null : refCode.trim() || null,
+      captchaToken,
     });
+    resetCaptcha();
     setLoading(false);
     if (!res.ok) { setError(res.error || 'Inscription impossible.'); return; }
     if (res.needsConfirmation) {
@@ -102,7 +121,8 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const res = await resetPassword(email);
+    const res = await resetPassword(email, captchaToken);
+    resetCaptcha();
     setLoading(false);
     if (!res.ok) { setError(res.error || 'Envoi impossible.'); return; }
     setNotice('Email envoyé ! Cliquez sur le lien reçu pour choisir un nouveau mot de passe.');
@@ -255,7 +275,8 @@ export default function Login() {
                 </div>
               </div>
             )}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+            {captchaField}
+            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading || captchaBlocking}>
               {loading ? 'Création…' : 'Créer mon compte'}
             </button>
             {!teamCode && (
@@ -276,7 +297,8 @@ export default function Login() {
               Saisissez votre email : vous recevrez un lien pour choisir un nouveau mot de passe.
             </p>
             {emailField}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+            {captchaField}
+            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading || captchaBlocking}>
               <KeyRound size={17} /> {loading ? 'Envoi…' : 'Envoyer le lien'}
             </button>
             <button type="button" className="login-link" onClick={() => switchView('login')}>
@@ -290,7 +312,8 @@ export default function Login() {
             {error && <div className="login-error">{error}</div>}
             {emailField}
             {passwordField()}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+            {captchaField}
+            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading || captchaBlocking}>
               {loading ? 'Connexion…' : 'Se connecter'}
             </button>
             {isSupabaseConfigured ? (

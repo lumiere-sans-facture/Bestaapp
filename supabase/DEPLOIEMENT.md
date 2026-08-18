@@ -74,6 +74,25 @@ droits, utiliser `temps-reel.sql`.
 - **Authentication → URL Configuration** :
   - *Site URL* : l'URL de production (`https://app.bestasolar.com`).
   - *Redirect URLs* : ajouter la même URL (nécessaire au lien « mot de passe oublié »).
+- **Authentication → Rate Limits** : resserrer la limite de tentatives de
+  connexion (`sign_in_attempts` — la valeur par défaut est large). C'est la
+  VRAIE limite anti-brute-force ; le compteur de l'écran de connexion
+  (`utils/loginThrottle.js`) n'est qu'une couche supplémentaire côté
+  navigateur, contournable par un appel direct à l'API.
+- **Authentication → Attack Protection → CAPTCHA protection** (recommandé) :
+  activer avec hCaptcha ou Cloudflare Turnstile, et coller la **clé secrète**
+  du fournisseur ici (jamais dans `.env` — elle reste côté Supabase). Puis,
+  dans Vercel, définir la **clé de site** (publique) correspondante :
+  `VITE_HCAPTCHA_SITE_KEY` ou `VITE_TURNSTILE_SITE_KEY` (une seule des deux —
+  voir `.env.example`). Sans cette variable, l'écran de connexion ne montre
+  aucun défi et l'appel Supabase échoue si la protection est activée côté
+  dashboard : les deux se branchent ensemble.
+- **Authentication → Sessions** : fixer une durée de vie de session
+  (« Time-box user sessions », ex. 30 jours) et un délai d'inactivité
+  (« Inactivity timeout », ex. 7 jours). Par défaut Supabase renouvelle le
+  jeton indéfiniment tant que l'appareil revient — sans ces deux réglages, une
+  session ouverte une fois ne se termine jamais toute seule. La déconnexion
+  (`AuthContext.logout`) révoque déjà la session côté serveur immédiatement.
 
 ## 4. Se déclarer admin plateforme (une fois)
 
@@ -429,6 +448,8 @@ Dans cet ordre, à chaque fois :
    *Redirect URLs* — avec **l'adresse propre à cet environnement**.
 3. Se déclarer admin plateforme (§ 4) : les comptes ne sont **pas** partagés
    entre les deux bases, c'est deux fois le même geste.
+4. *Rate Limits*, *Attack Protection* (CAPTCHA) et *Sessions* (§ 3) — sinon
+   l'environnement de test reste sans les mêmes garde-fous que la production.
 
 ⚠️ **Le piège de la mise en production.** Fusionner vers `main` déploie le
 CODE, pas le schéma. Du code neuf devant une base restée en arrière donne une

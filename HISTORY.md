@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-18
+- Connexion / inscription / mot de passe oublié : défi CAPTCHA (hCaptcha ou Turnstile) câblé, actif dès qu'une clé de site est renseignée
 - Connexion : verrouillage temporaire après 5 échecs (progressif jusqu'à 2 h) pour freiner le brute force à l'écran
 - Inscription : « email déjà utilisé » remplacé par un message générique, pour ne plus révéler les comptes existants
 

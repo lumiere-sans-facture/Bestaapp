@@ -116,9 +116,12 @@ export function AuthProvider({ children }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, captchaToken) => {
     if (isSupabaseConfigured) {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(), password,
+        options: captchaToken ? { captchaToken } : undefined,
+      });
       if (error) return false;
       const profile = (await fetchProfile(email.trim())) || (await provisionProfile(email.trim()));
       if (!profile) {
@@ -150,7 +153,7 @@ export function AuthProvider({ children }) {
    * classique) ; avec `inviteCode` (lien ?equipe=) : rejoint l'équipe.
    * Retourne { ok, needsConfirmation, error }.
    */
-  const signUp = async ({ email, password, name, phone, companyName, inviteCode, refCode }) => {
+  const signUp = async ({ email, password, name, phone, companyName, inviteCode, refCode, captchaToken }) => {
     if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
     // L'espace personnel porte le nom de l'utilisateur (renommable plus tard
     // dans « Mon entreprise » de l'espace Pro).
@@ -158,7 +161,10 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { name, phone: phone || '', companyName: companyName || null, inviteCode: inviteCode || null } },
+      options: {
+        data: { name, phone: phone || '', companyName: companyName || null, inviteCode: inviteCode || null },
+        ...(captchaToken ? { captchaToken } : null),
+      },
     });
     if (error) return { ok: false, error: sanitizeSignupError(error.message) };
     // Si la confirmation d'email est activée, le profil sera créé au premier
@@ -204,10 +210,11 @@ export function AuthProvider({ children }) {
   };
 
   /** Envoie l'email de réinitialisation (le lien ramène vers l'app). */
-  const resetPassword = async (email) => {
+  const resetPassword = async (email, captchaToken) => {
     if (!isSupabaseConfigured) return { ok: false };
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: window.location.origin,
+      ...(captchaToken ? { captchaToken } : null),
     });
     return { ok: !error, error: error?.message };
   };
