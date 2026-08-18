@@ -88,11 +88,17 @@ droits, utiliser `temps-reel.sql`.
   aucun défi et l'appel Supabase échoue si la protection est activée côté
   dashboard : les deux se branchent ensemble.
 - **Authentication → Sessions** : fixer une durée de vie de session
-  (« Time-box user sessions », ex. 30 jours) et un délai d'inactivité
-  (« Inactivity timeout », ex. 7 jours). Par défaut Supabase renouvelle le
-  jeton indéfiniment tant que l'appareil revient — sans ces deux réglages, une
-  session ouverte une fois ne se termine jamais toute seule. La déconnexion
-  (`AuthContext.logout`) révoque déjà la session côté serveur immédiatement.
+  (« Time-box user sessions ») et un délai d'inactivité (« Inactivity
+  timeout ») — **réservé au plan payant Supabase**. Par défaut, Supabase
+  renouvelle le jeton indéfiniment tant que l'appareil revient. Sans ce
+  palier, `utils/sessionLifetime.js` fait office de filet côté app : 30
+  jours d'âge absolu, 7 jours d'inactivité, revérifiés à chaque ouverture,
+  avec vraie déconnexion serveur (`signOut`) au dépassement — pas une
+  vraie limite serveur (un jeton volé continue de marcher directement
+  contre l'API), mais ça borne l'usage normal en attendant. Prendre le
+  palier payant rend ce filet redondant, sans besoin de le retirer. La
+  déconnexion (`AuthContext.logout`) révoque déjà la session côté serveur
+  immédiatement, indépendamment de ce qui précède.
 
 ## 4. Se déclarer admin plateforme (une fois)
 

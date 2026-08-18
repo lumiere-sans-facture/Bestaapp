@@ -5,6 +5,7 @@ import { setContexteErreur } from '../lib/rapportErreur';
 import { setContexteAnalytique } from '../lib/analytique';
 import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
 import { getActiveRef } from '../utils/referral';
+import { isSessionExpired, touchSession, clearSessionLifetime } from '../utils/sessionLifetime';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
@@ -92,11 +93,19 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (isSupabaseConfigured) {
-      // Session Supabase persistée : restaurer le profil de l'équipe
+      // Session Supabase persistée : restaurer le profil de l'équipe — sauf
+      // au-delà de la durée de vie ou de l'inactivité tolérées (palliatif à
+      // « Authentication → Sessions », payant, voir utils/sessionLifetime.js).
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (session?.user?.email) {
-          const profile = (await fetchProfile(session.user.email)) || (await provisionProfile(session.user.email));
-          if (profile) await adoptProfile(profile);
+          if (isSessionExpired()) {
+            clearSessionLifetime();
+            await supabase.auth.signOut();
+          } else {
+            touchSession();
+            const profile = (await fetchProfile(session.user.email)) || (await provisionProfile(session.user.email));
+            if (profile) await adoptProfile(profile);
+          }
         }
         setIsLoading(false);
       });
@@ -123,6 +132,7 @@ export function AuthProvider({ children }) {
         options: captchaToken ? { captchaToken } : undefined,
       });
       if (error) return false;
+      touchSession();
       const profile = (await fetchProfile(email.trim())) || (await provisionProfile(email.trim()));
       if (!profile) {
         // Compte Auth valide mais profil jamais créé (inscription interrompue,
@@ -171,6 +181,7 @@ export function AuthProvider({ children }) {
     // login : on mémorise l'entreprise / le code (invitation, parrainage) en attendant.
     localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, phone: phone || '', companyName, inviteCode, refCode: refCode || null }));
     if (!data.session) return { ok: true, needsConfirmation: true };
+    touchSession();
     const profile = await provisionProfile(email.trim());
     if (!profile) return { ok: false, error: 'Compte créé mais profil introuvable — reconnectez-vous.' };
     await adoptProfile(profile);
@@ -227,6 +238,7 @@ export function AuthProvider({ children }) {
       setRecovery(false);
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
+        touchSession();
         const profile = await fetchProfile(session.user.email);
         if (profile) await adoptProfile(profile);
       }
@@ -243,6 +255,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setSyncOrg(null);
     localStorage.removeItem(STORAGE_KEY);
+    clearSessionLifetime();
   };
 
   /** Recharge l'organisation attachée au profil (après attribution du parrainage…). */
