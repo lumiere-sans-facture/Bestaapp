@@ -79,14 +79,29 @@ droits, utiliser `temps-reel.sql`.
   VRAIE limite anti-brute-force ; le compteur de l'écran de connexion
   (`utils/loginThrottle.js`) n'est qu'une couche supplémentaire côté
   navigateur, contournable par un appel direct à l'API.
-- **Authentication → Attack Protection → CAPTCHA protection** (recommandé) :
-  activer avec hCaptcha ou Cloudflare Turnstile, et coller la **clé secrète**
-  du fournisseur ici (jamais dans `.env` — elle reste côté Supabase). Puis,
-  dans Vercel, définir la **clé de site** (publique) correspondante :
-  `VITE_HCAPTCHA_SITE_KEY` ou `VITE_TURNSTILE_SITE_KEY` (une seule des deux —
-  voir `.env.example`). Sans cette variable, l'écran de connexion ne montre
-  aucun défi et l'appel Supabase échoue si la protection est activée côté
-  dashboard : les deux se branchent ensemble.
+- **Authentication → Attack Protection → CAPTCHA protection** : laisser
+  **désactivé**, par choix — voir l'encadré ci-dessous.
+
+> **CAPTCHA : pourquoi désactivé côté Supabase alors que le widget existe.**
+> Le CAPTCHA de Supabase est tout-ou-rien : soit chaque appel de connexion
+> exige un jeton résolu (le défi doit alors s'afficher dès le premier
+> chargement du formulaire), soit aucun. Or l'écran de connexion n'affiche
+> le défi hCaptcha/Turnstile qu'à partir du **3e échec** sur un même email
+> (`CAPTCHA_AFTER_ATTEMPTS`, `utils/loginThrottle.js`) — moins de friction
+> pour la saisie normale. Choix assumé : Supabase reste désactivé, le
+> défi n'est qu'une friction ajoutée par l'écran (un script qui appelle
+> l'API directement, en contournant l'écran, ne le rencontre jamais). Ce
+> qui reste actif indépendamment, et protège vraiment : le verrouillage
+> progressif après 5 échecs (`loginThrottle.js`) et la limite par IP
+> ci-dessus (*Rate Limits*).
+>
+> Pour activer quand même une clé de site (`VITE_HCAPTCHA_SITE_KEY` ou
+> `VITE_TURNSTILE_SITE_KEY`, voir `.env.example`) sans le protéger côté
+> Supabase : le défi reste purement une friction d'écran. L'activer aussi
+> côté Supabase revient à l'exiger dès le premier essai — modifier alors
+> `CAPTCHA_AFTER_ATTEMPTS` à `0` dans `loginThrottle.js`, sinon les deux
+> premières tentatives échoueraient avec une erreur CAPTCHA au lieu du
+> message « Identifiants incorrects » habituel.
 - **Authentication → Sessions** : fixer une durée de vie de session
   (« Time-box user sessions ») et un délai d'inactivité (« Inactivity
   timeout ») — **réservé au plan payant Supabase**. Par défaut, Supabase

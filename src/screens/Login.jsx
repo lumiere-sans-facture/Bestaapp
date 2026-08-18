@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
 import { users } from '../data/seed';
-import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining } from '../utils/loginThrottle';
+import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining, CAPTCHA_AFTER_ATTEMPTS } from '../utils/loginThrottle';
 import { isCaptchaConfigured } from '../lib/captcha';
 import CaptchaWidget from '../components/CaptchaWidget';
 
@@ -46,9 +46,19 @@ export default function Login() {
   const resetCaptcha = () => { setCaptchaToken(''); setCaptchaKey((k) => k + 1); };
   // Le CAPTCHA n'a de sens qu'avec le backend Supabase (c'est lui qui le
   // vérifie) : en mode local, ni affiché ni requis.
-  const captchaActive = isSupabaseConfigured && isCaptchaConfigured;
-  const captchaBlocking = captchaActive && !captchaToken;
-  const captchaField = captchaActive && (
+  const captchaAvailable = isSupabaseConfigured && isCaptchaConfigured;
+  // Inscription / mot de passe oublié : affiché d'emblée dès qu'il est configuré.
+  const captchaBlocking = captchaAvailable && !captchaToken;
+  const captchaField = captchaAvailable && (
+    <CaptchaWidget key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
+  );
+  // Connexion : pas de défi tant que la saisie est correcte — seulement à
+  // partir du 3e échec sur cet email (moins de friction pour le cas normal,
+  // sans renoncer à la protection quand ça sent le script).
+  const loginAttempts = getLockState(email).count;
+  const loginCaptchaActive = captchaAvailable && loginAttempts >= CAPTCHA_AFTER_ATTEMPTS;
+  const loginCaptchaBlocking = loginCaptchaActive && !captchaToken;
+  const loginCaptchaField = loginCaptchaActive && (
     <CaptchaWidget key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
   );
 
@@ -312,8 +322,8 @@ export default function Login() {
             {error && <div className="login-error">{error}</div>}
             {emailField}
             {passwordField()}
-            {captchaField}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading || captchaBlocking}>
+            {loginCaptchaField}
+            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading || loginCaptchaBlocking}>
               {loading ? 'Connexion…' : 'Se connecter'}
             </button>
             {isSupabaseConfigured ? (
