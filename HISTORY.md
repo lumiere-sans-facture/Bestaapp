@@ -5,6 +5,10 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-18
+- Connexion : verrouillage temporaire après 5 échecs (progressif jusqu'à 2 h) pour freiner le brute force à l'écran
+- Inscription : « email déjà utilisé » remplacé par un message générique, pour ne plus révéler les comptes existants
+
 ## 2026-08-10
 - Ordre des scripts SQL : `temps-reel.sql` passe en dernier, et il est dit facultatif
 - Temps réel : une table qui coince n'interrompt plus l'inscription des suivantes

@@ -28,6 +28,17 @@ const readPending = () => {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY)); } catch { return null; }
 };
 
+// Certaines erreurs de Supabase Auth révèlent qu'un email est déjà inscrit
+// (« User already registered »…) : les remplacer par un message générique à
+// affichage conditionnel évite d'énumérer les comptes existants depuis
+// l'écran d'inscription, sans pour autant masquer les erreurs utiles
+// (mot de passe trop faible, email invalide…).
+const ACCOUNT_EXISTS_PATTERN = /already (registered|exists|been registered)|existe déjà/i;
+const sanitizeSignupError = (message) =>
+  ACCOUNT_EXISTS_PATTERN.test(message || '')
+    ? 'Inscription impossible. Si vous avez déjà un compte avec cet email, connectez-vous plutôt.'
+    : message;
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -149,7 +160,7 @@ export function AuthProvider({ children }) {
       password,
       options: { data: { name, phone: phone || '', companyName: companyName || null, inviteCode: inviteCode || null } },
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: sanitizeSignupError(error.message) };
     // Si la confirmation d'email est activée, le profil sera créé au premier
     // login : on mémorise l'entreprise / le code (invitation, parrainage) en attendant.
     localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, phone: phone || '', companyName, inviteCode, refCode: refCode || null }));

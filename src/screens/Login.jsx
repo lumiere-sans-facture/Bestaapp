@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
 import { users } from '../data/seed';
+import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining } from '../utils/loginThrottle';
 
 /**
  * Écran d'entrée : connexion, et — quand le backend est configuré —
@@ -40,19 +41,32 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    // Frein anti-brute-force côté écran (défense en profondeur — la limite
+    // qui compte vraiment est côté serveur, voir supabase/DEPLOIEMENT.md § 3).
+    const lock = getLockState(email);
+    if (lock.locked) {
+      setError(`Trop de tentatives. Réessayez dans ${formatLockRemaining(lock.remainingMs)}.`);
+      return;
+    }
     setLoading(true);
     const ok = await login(email, password);
     if (ok === 'incomplete') {
       // Compte valide mais inscription jamais terminée (profil absent) :
       // on propose de la finir ici, sans repasser par la création de compte.
+      clearAttempts(email);
       setLoading(false);
       switchView('complete');
       return;
     }
     if (!ok) {
-      setError('Email ou mot de passe incorrect');
+      const newLock = registerFailedAttempt(email);
+      setError(newLock.locked
+        ? `Trop de tentatives. Réessayez dans ${formatLockRemaining(newLock.remainingMs)}.`
+        : 'Email ou mot de passe incorrect');
       setLoading(false);
+      return;
     }
+    clearAttempts(email);
   };
 
   const handleComplete = async (e) => {
