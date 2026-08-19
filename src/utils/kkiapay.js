@@ -6,7 +6,7 @@
 //
 //  1. il attend le numéro AU FORMAT INTERNATIONAL, indicatif compris et sans
 //     « + » (« 22890123456 ») ; un numéro local à 8 chiffres est rejeté ;
-//  2. en SANDBOX, seuls les numéros de test de KKiaPay fonctionnent — tous
+//  2. en SANDBOX, seuls les numéros de test KKiaPay fonctionnent — tous
 //     béninois. Un vrai numéro togolais, même parfaitement écrit, échoue.
 //
 // D'où ce module : normaliser, puis dire précisément ce qui bloque AVANT
@@ -37,44 +37,7 @@ export const normaliserMomo = (saisie, indicatifDefaut = INDICATIF_DEFAUT) => {
 
 // Togo : 8 chiffres. Bénin : 10 chiffres depuis le 30 novembre 2024
 // (plan national ARCEP Bénin) — l'ancien format à 8 chiffres est refusé.
-const FORMAT_VALIDE = new RegExp(`^(${INDICATIFS.TG}\\d{8}|${INDICATIFS.BJ}\\d{10})// Paiement KKiaPay : préparation du numéro Mobile Money. Logique pure, sans
-// React ni réseau.
-//
-// Le widget KKiaPay refuse un numéro qu'il ne sait pas rattacher à un
-// opérateur, avec un laconique « numéro n'est pas valide ». Deux pièges :
-//
-//  1. il attend le numéro AU FORMAT INTERNATIONAL, indicatif compris et sans
-//     « + » (« 22890123456 ») ; un numéro local à 8 chiffres est rejeté ;
-//  2. en SANDBOX, seuls les numéros de test de KKiaPay fonctionnent — tous
-//     béninois. Un vrai numéro togolais, même parfaitement écrit, échoue.
-//
-// D'où ce module : normaliser, puis dire précisément ce qui bloque AVANT
-// d'ouvrir le widget, plutôt que de laisser l'utilisateur buter dessus.
-
-/** Indicatifs des pays desservis. Le Togo est le marché d'origine. */
-export const INDICATIFS = { TG: '228', BJ: '229' };
-export const INDICATIF_DEFAUT = INDICATIFS.TG;
-
-const CONNUS = Object.values(INDICATIFS);
-
-/**
- * Numéro saisi → format international sans « + » (« 22890123456 »).
- * Accepte « +228 90 12 34 56 », « 00228… », « 228… » et le local « 90123456 »
- * (l'indicatif par défaut est alors ajouté).
- * @returns {string} chaîne vide si la saisie ne contient aucun chiffre.
- */
-export const normaliserMomo = (saisie, indicatifDefaut = INDICATIF_DEFAUT) => {
-  let n = String(saisie || '').replace(/\D/g, '');
-  if (!n) return '';
-  n = n.replace(/^00+/, ''); // préfixe international composé « 00 »
-  // Aucun numéro local togolais ou béninois ne commence par 228/229 : un tel
-  // début ne peut être qu'un indicatif — à condition qu'il reste un numéro
-  // derrière, sinon c'est un local de 8 chiffres qui y ressemble.
-  if (CONNUS.some((i) => n.startsWith(i)) && n.length > 8) return n;
-  return `${indicatifDefaut}${n}`;
-};
-
-);
+const FORMAT_VALIDE = new RegExp(`^(${INDICATIFS.TG}\\d{8}|${INDICATIFS.BJ}\\d{10})$`);
 
 /** Le numéro respecte-t-il le plan actuel du Togo ou du Bénin ? */
 export const momoValide = (saisie, indicatifDefaut = INDICATIF_DEFAUT) =>
@@ -91,7 +54,7 @@ export const NUMEROS_TEST_SANDBOX = [
   { numero: '22997000003', operateur: 'MTN Bénin', scenario: 'Paiement refusé' },
 ];
 
-/** « 22997000000 » → « +229 97 00 00 00 » (lisible, et relisible à la saisie). */
+/** « 2290197000000 » → « +229 01 97 00 00 00 » (lisible à la saisie). */
 export const formatMomo = (numero) => {
   const n = String(numero || '').replace(/\D/g, '');
   if (!n) return '';
