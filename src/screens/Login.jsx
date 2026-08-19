@@ -5,15 +5,30 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
 import { users } from '../data/seed';
 import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining } from '../utils/loginThrottle';
-import { INDICATIFS, INDICATIF_DEFAUT } from '../utils/kkiapay';
+import { AsYouType, getCountries, getCountryCallingCode, isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js/min';
 
-// Pays desservis (voir utils/kkiapay.js) : l'inscrit choisit le sien plutôt
-// que de deviner un indicatif à partir de rien — le numéro de l'entreprise
-// elle-même est togolais pour les uns, béninois pour les autres.
-const PHONE_COUNTRIES = [
-  { code: INDICATIFS.TG, flag: '🇹🇬', label: 'Togo' },
-  { code: INDICATIFS.BJ, flag: '🇧🇯', label: 'Bénin' },
-];
+// Tous les pays sont disponibles. Togo et Bénin restent en tête : ce sont
+// les marchés de départ, sans enfermer un installateur étranger.
+const PRIORITY_COUNTRIES = ['TG', 'BJ'];
+const countryName = (() => {
+  try {
+    const labels = new Intl.DisplayNames(['fr'], { type: 'region' });
+    return (code) => labels.of(code) || code;
+  } catch {
+    return (code) => code;
+  }
+})();
+const countryFlag = (code) => String.fromCodePoint(...[...code].map((letter) => 127397 + letter.charCodeAt(0)));
+const PHONE_COUNTRIES = getCountries()
+  .map((code) => ({ code, dialCode: getCountryCallingCode(code), label: countryName(code) }))
+  .sort((a, b) => {
+    const rank = (code) => {
+      const index = PRIORITY_COUNTRIES.indexOf(code);
+      return index === -1 ? PRIORITY_COUNTRIES.length : index;
+    };
+    const priority = rank(a.code) - rank(b.code);
+    return priority || a.label.localeCompare(b.label, 'fr');
+  });
 
 /**
  * Écran d'entrée : connexion, et — quand le backend est configuré —
@@ -43,9 +58,10 @@ export default function Login() {
 
   // Inscription (une seule page simple : nom, téléphone, email, mot de passe)
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState(''); // numéro local, sans indicatif
-  const [phoneCountry, setPhoneCountry] = useState(INDICATIF_DEFAUT);
-  const fullPhone = () => (phone.trim() ? `+${phoneCountry} ${phone.trim()}` : '');
+  const [phone, setPhone] = useState(''); // numéro national, formaté au fil de la saisie
+  const [phoneCountry, setPhoneCountry] = useState('TG');
+  const fullPhone = () => parsePhoneNumberFromString(phone, phoneCountry)?.number || '';
+  const validPhone = () => isValidPhoneNumber(phone, phoneCountry);
 
   const switchView = (v) => { setView(v); setError(''); setNotice(''); };
 
@@ -83,6 +99,10 @@ export default function Login() {
   const handleComplete = async (e) => {
     e.preventDefault();
     setError('');
+    if (!validPhone()) {
+      setError('Saisissez un numéro valide pour le pays sélectionné.');
+      return;
+    }
     setLoading(true);
     const res = await completeSignup({ name, phone: fullPhone(), inviteCode: teamCode || null, refCode: teamCode ? null : refCode.trim() || null });
     setLoading(false);
@@ -94,6 +114,10 @@ export default function Login() {
     e.preventDefault();
     setError('');
     if (password.length < 8) { setError('Le mot de passe doit faire au moins 8 caractères.'); return; }
+    if (!validPhone()) {
+      setError('Saisissez un numéro valide pour le pays sélectionné.');
+      return;
+    }
     setLoading(true);
     const res = await signUp({
       email, password, name, phone: fullPhone(),
@@ -200,7 +224,7 @@ export default function Login() {
           onChange={(e) => setPhoneCountry(e.target.value)}
         >
           {PHONE_COUNTRIES.map((c) => (
-            <option key={c.code} value={c.code}>{c.flag} +{c.code}</option>
+            <option key={c.code} value={c.code}>{countryFlag(c.code)} {c.label} (+{c.dialCode})</option>
           ))}
         </select>
         <input
@@ -208,9 +232,10 @@ export default function Login() {
           className="input"
           type="tel"
           required
+          inputMode="tel"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="90 XX XX XX"
+          onChange={(e) => setPhone(new AsYouType(phoneCountry).input(e.target.value))}
+          placeholder="Numéro sans l’indicatif"
           autoComplete="tel-national"
         />
       </div>
