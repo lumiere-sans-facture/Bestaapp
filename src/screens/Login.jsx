@@ -18,7 +18,6 @@ const countryName = (() => {
     return (code) => code;
   }
 })();
-const countryFlag = (code) => String.fromCodePoint(...[...code].map((letter) => 127397 + letter.charCodeAt(0)));
 const PHONE_COUNTRIES = getCountries()
   .map((code) => ({ code, dialCode: getCountryCallingCode(code), label: countryName(code) }))
   .sort((a, b) => {
@@ -61,7 +60,13 @@ export default function Login() {
   const [phone, setPhone] = useState(''); // numéro national, formaté au fil de la saisie
   const [phoneCountry, setPhoneCountry] = useState('TG');
   const fullPhone = () => parsePhoneNumberFromString(phone, phoneCountry)?.number || '';
-  const validPhone = () => isValidPhoneNumber(phone, phoneCountry);
+  const phoneError = () => {
+    const parsed = parsePhoneNumberFromString(phone, phoneCountry);
+    if (!parsed || !isValidPhoneNumber(phone, phoneCountry)) return 'Saisissez un numéro valide pour le pays sélectionné.';
+    // ARCEP Bénin : le plan national est à 10 chiffres depuis le 30 novembre 2024.
+    if (phoneCountry === 'BJ' && parsed.nationalNumber.length !== 10) return 'Au Bénin, le numéro doit comporter 10 chiffres.';
+    return '';
+  };
 
   const switchView = (v) => { setView(v); setError(''); setNotice(''); };
 
@@ -99,8 +104,9 @@ export default function Login() {
   const handleComplete = async (e) => {
     e.preventDefault();
     setError('');
-    if (!validPhone()) {
-      setError('Saisissez un numéro valide pour le pays sélectionné.');
+    const phoneProblem = phoneError();
+    if (phoneProblem) {
+      setError(phoneProblem);
       return;
     }
     setLoading(true);
@@ -114,8 +120,9 @@ export default function Login() {
     e.preventDefault();
     setError('');
     if (password.length < 8) { setError('Le mot de passe doit faire au moins 8 caractères.'); return; }
-    if (!validPhone()) {
-      setError('Saisissez un numéro valide pour le pays sélectionné.');
+    const phoneProblem = phoneError();
+    if (phoneProblem) {
+      setError(phoneProblem);
       return;
     }
     setLoading(true);
@@ -224,7 +231,7 @@ export default function Login() {
           onChange={(e) => setPhoneCountry(e.target.value)}
         >
           {PHONE_COUNTRIES.map((c) => (
-            <option key={c.code} value={c.code}>{countryFlag(c.code)} {c.label} (+{c.dialCode})</option>
+            <option key={c.code} value={c.code}>{c.label}</option>
           ))}
         </select>
         <input
