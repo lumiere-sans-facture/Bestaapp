@@ -35,11 +35,48 @@ export const normaliserMomo = (saisie, indicatifDefaut = INDICATIF_DEFAUT) => {
   return `${indicatifDefaut}${n}`;
 };
 
-// Togo : 8 chiffres. Bénin : 8 chiffres historiques, 10 depuis le passage à
-// l'indicatif interne « 01 » — les deux circulent encore.
-const FORMAT_VALIDE = new RegExp(`^(${INDICATIFS.TG}\\d{8}|${INDICATIFS.BJ}(\\d{8}|\\d{10}))$`);
+// Togo : 8 chiffres. Bénin : 10 chiffres depuis le 30 novembre 2024
+// (plan national ARCEP Bénin) — l'ancien format à 8 chiffres est refusé.
+const FORMAT_VALIDE = new RegExp(`^(${INDICATIFS.TG}\\d{8}|${INDICATIFS.BJ}\\d{10})// Paiement KKiaPay : préparation du numéro Mobile Money. Logique pure, sans
+// React ni réseau.
+//
+// Le widget KKiaPay refuse un numéro qu'il ne sait pas rattacher à un
+// opérateur, avec un laconique « numéro n'est pas valide ». Deux pièges :
+//
+//  1. il attend le numéro AU FORMAT INTERNATIONAL, indicatif compris et sans
+//     « + » (« 22890123456 ») ; un numéro local à 8 chiffres est rejeté ;
+//  2. en SANDBOX, seuls les numéros de test de KKiaPay fonctionnent — tous
+//     béninois. Un vrai numéro togolais, même parfaitement écrit, échoue.
+//
+// D'où ce module : normaliser, puis dire précisément ce qui bloque AVANT
+// d'ouvrir le widget, plutôt que de laisser l'utilisateur buter dessus.
 
-/** Le numéro a-t-il une longueur plausible pour le Togo ou le Bénin ? */
+/** Indicatifs des pays desservis. Le Togo est le marché d'origine. */
+export const INDICATIFS = { TG: '228', BJ: '229' };
+export const INDICATIF_DEFAUT = INDICATIFS.TG;
+
+const CONNUS = Object.values(INDICATIFS);
+
+/**
+ * Numéro saisi → format international sans « + » (« 22890123456 »).
+ * Accepte « +228 90 12 34 56 », « 00228… », « 228… » et le local « 90123456 »
+ * (l'indicatif par défaut est alors ajouté).
+ * @returns {string} chaîne vide si la saisie ne contient aucun chiffre.
+ */
+export const normaliserMomo = (saisie, indicatifDefaut = INDICATIF_DEFAUT) => {
+  let n = String(saisie || '').replace(/\D/g, '');
+  if (!n) return '';
+  n = n.replace(/^00+/, ''); // préfixe international composé « 00 »
+  // Aucun numéro local togolais ou béninois ne commence par 228/229 : un tel
+  // début ne peut être qu'un indicatif — à condition qu'il reste un numéro
+  // derrière, sinon c'est un local de 8 chiffres qui y ressemble.
+  if (CONNUS.some((i) => n.startsWith(i)) && n.length > 8) return n;
+  return `${indicatifDefaut}${n}`;
+};
+
+);
+
+/** Le numéro respecte-t-il le plan actuel du Togo ou du Bénin ? */
 export const momoValide = (saisie, indicatifDefaut = INDICATIF_DEFAUT) =>
   FORMAT_VALIDE.test(normaliserMomo(saisie, indicatifDefaut));
 
@@ -80,7 +117,7 @@ export const problemeNumero = (saisie, { sandbox = false } = {}) => {
   const brut = String(saisie || '').replace(/\D/g, '');
   if (!brut) return 'Renseignez votre numéro Mobile Money avant de payer.';
   if (!momoValide(saisie))
-    return 'Numéro Mobile Money incomplet : 8 chiffres au Togo (ex. 90 12 34 56), indicatif +228 ou +229 accepté.';
+    return 'Numéro Mobile Money incomplet : 8 chiffres au Togo (ex. 90 12 34 56) ou 10 chiffres au Bénin (préfixe 01), indicatif +228 ou +229 accepté.';
   if (sandbox && !estNumeroTest(saisie))
     return 'Mode test : KKiaPay n’accepte que ses numéros de test (voir la liste sous le bouton). Un vrai numéro sera refusé.';
   return null;
