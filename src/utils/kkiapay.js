@@ -6,7 +6,7 @@
 //
 //  1. il attend le numéro AU FORMAT INTERNATIONAL, indicatif compris et sans
 //     « + » (« 22890123456 ») ; un numéro local à 8 chiffres est rejeté ;
-//  2. en SANDBOX, seuls les numéros de test de KKiaPay fonctionnent — tous
+//  2. en SANDBOX, seuls les numéros de test KKiaPay fonctionnent — tous
 //     béninois. Un vrai numéro togolais, même parfaitement écrit, échoue.
 //
 // D'où ce module : normaliser, puis dire précisément ce qui bloque AVANT
@@ -35,11 +35,11 @@ export const normaliserMomo = (saisie, indicatifDefaut = INDICATIF_DEFAUT) => {
   return `${indicatifDefaut}${n}`;
 };
 
-// Togo : 8 chiffres. Bénin : 8 chiffres historiques, 10 depuis le passage à
-// l'indicatif interne « 01 » — les deux circulent encore.
-const FORMAT_VALIDE = new RegExp(`^(${INDICATIFS.TG}\\d{8}|${INDICATIFS.BJ}(\\d{8}|\\d{10}))$`);
+// Togo : 8 chiffres. Bénin : 10 chiffres depuis le 30 novembre 2024
+// (plan national ARCEP Bénin) — l'ancien format à 8 chiffres est refusé.
+const FORMAT_VALIDE = new RegExp(`^(${INDICATIFS.TG}\\d{8}|${INDICATIFS.BJ}\\d{10})$`);
 
-/** Le numéro a-t-il une longueur plausible pour le Togo ou le Bénin ? */
+/** Le numéro respecte-t-il le plan actuel du Togo ou du Bénin ? */
 export const momoValide = (saisie, indicatifDefaut = INDICATIF_DEFAUT) =>
   FORMAT_VALIDE.test(normaliserMomo(saisie, indicatifDefaut));
 
@@ -54,7 +54,7 @@ export const NUMEROS_TEST_SANDBOX = [
   { numero: '22997000003', operateur: 'MTN Bénin', scenario: 'Paiement refusé' },
 ];
 
-/** « 22997000000 » → « +229 97 00 00 00 » (lisible, et relisible à la saisie). */
+/** « 2290197000000 » → « +229 01 97 00 00 00 » (lisible à la saisie). */
 export const formatMomo = (numero) => {
   const n = String(numero || '').replace(/\D/g, '');
   if (!n) return '';
@@ -79,8 +79,10 @@ export const estNumeroTest = (saisie) => {
 export const problemeNumero = (saisie, { sandbox = false } = {}) => {
   const brut = String(saisie || '').replace(/\D/g, '');
   if (!brut) return 'Renseignez votre numéro Mobile Money avant de payer.';
-  if (!momoValide(saisie))
-    return 'Numéro Mobile Money incomplet : 8 chiffres au Togo (ex. 90 12 34 56), indicatif +228 ou +229 accepté.';
+  // Kkiapay conserve encore ses numéros de SANDBOX historiques à 8 chiffres.
+  // Cette exception ne vaut jamais pour un paiement réel.
+  if (!momoValide(saisie) && !(sandbox && estNumeroTest(saisie)))
+    return 'Numéro Mobile Money incomplet : 8 chiffres au Togo (ex. 90 12 34 56) ou 10 chiffres au Bénin (préfixe 01), indicatif +228 ou +229 accepté.';
   if (sandbox && !estNumeroTest(saisie))
     return 'Mode test : KKiaPay n’accepte que ses numéros de test (voir la liste sous le bouton). Un vrai numéro sera refusé.';
   return null;
