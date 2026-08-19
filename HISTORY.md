@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-18
+- CAPTCHA retiré entièrement (connexion, inscription, mot de passe oublié) : Supabase ne peut pas le réserver à la connexion sans casser l'inscription — la protection réelle reste le verrouillage progressif et les Rate Limits Supabase
 - Inscription : CAPTCHA retiré (gardé sur mot de passe oublié et connexion après 3 échecs)
 - Connexion : le CAPTCHA n'apparaît plus qu'à partir du 3e échec sur un même email, moins de friction pour la saisie normale
 - Session : durée de vie (30 j) et inactivité (7 j) bornées côté app, en attendant le palier payant Supabase qui fait ça nativement

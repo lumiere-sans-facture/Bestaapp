@@ -1,12 +1,11 @@
 // Frein de connexion : ralentit les essais automatisés depuis l'écran de
 // connexion. Défense en profondeur seulement — le vrai rempart contre le
-// brute force est côté serveur (limite par IP + CAPTCHA de Supabase Auth,
+// brute force est côté serveur (Authentication → Rate Limits de Supabase,
 // voir supabase/DEPLOIEMENT.md § 3) : un appel direct à l'API Supabase,
 // hors de cet écran, n'est pas soumis à ce compteur, qui vit dans le
 // localStorage de l'appareil.
 const KEY = 'bestasolar_login_throttle';
 const MAX_ATTEMPTS = 5;
-export const CAPTCHA_AFTER_ATTEMPTS = 3; // dès ce nombre d'échecs, exiger un CAPTCHA
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000; // fenêtre glissante de 15 min
 const BASE_LOCKOUT_MS = 15 * 60 * 1000; // premier verrou : 15 min
 const MAX_LOCKOUT_MS = 2 * 60 * 60 * 1000; // plafond : 2 h
@@ -21,12 +20,11 @@ const writeAll = (all) => {
   try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* stockage indisponible */ }
 };
 
-/** Verrou et échecs en cours pour cet email : { locked, remainingMs, count }. */
+/** Verrou en cours pour cet email : { locked, remainingMs }. */
 export const getLockState = (email) => {
   const entry = readAll()[keyFor(email)];
   const remainingMs = entry?.lockedUntil ? entry.lockedUntil - Date.now() : 0;
-  const count = entry?.count || 0;
-  return remainingMs > 0 ? { locked: true, remainingMs, count } : { locked: false, remainingMs: 0, count };
+  return remainingMs > 0 ? { locked: true, remainingMs } : { locked: false, remainingMs: 0 };
 };
 
 /**
