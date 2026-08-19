@@ -92,7 +92,11 @@ export default function Login() {
     setLoading(false);
     if (!res.ok) { setError(res.error || 'Inscription impossible.'); return; }
     if (res.needsConfirmation) {
-      setNotice('Compte créé ! Vérifiez votre boîte mail pour confirmer votre adresse, puis connectez-vous.');
+      // Formulation volontairement double : Supabase renvoie ce même succès
+      // que l'email soit neuf ou déjà pris (anti-énumération des comptes,
+      // voir AuthContext.sanitizeSignupError) — impossible de savoir lequel
+      // s'est produit, donc le message couvre les deux sans jamais trancher.
+      setNotice('Si cette adresse est nouvelle, un e-mail de confirmation vient d’être envoyé. Si vous avez déjà un compte, connectez-vous directement ou utilisez « Mot de passe oublié ».');
       setView('login');
     }
     // Sinon : la session est ouverte, l'app monte toute seule.
