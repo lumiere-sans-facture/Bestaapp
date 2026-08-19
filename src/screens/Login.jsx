@@ -22,10 +22,12 @@ const countryFlag = (code) => String.fromCodePoint(...[...code].map((letter) => 
 const PHONE_COUNTRIES = getCountries()
   .map((code) => ({ code, dialCode: getCountryCallingCode(code), label: countryName(code) }))
   .sort((a, b) => {
-    const priority = PRIORITY_COUNTRIES.indexOf(a.code) - PRIORITY_COUNTRIES.indexOf(b.code);
-    if (priority !== 0) return priority;
-    if (PRIORITY_COUNTRIES.includes(a.code)) return a.label.localeCompare(b.label, 'fr');
-    return a.label.localeCompare(b.label, 'fr');
+    const rank = (code) => {
+      const index = PRIORITY_COUNTRIES.indexOf(code);
+      return index === -1 ? PRIORITY_COUNTRIES.length : index;
+    };
+    const priority = rank(a.code) - rank(b.code);
+    return priority || a.label.localeCompare(b.label, 'fr');
   });
 
 /**
