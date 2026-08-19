@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-18
+- Inscription : numéro de téléphone avec choix du pays (Togo +228 / Bénin +229) plutôt qu'un indicatif deviné
 - Inscription : message de succès reformulé pour orienter aussi qui a déjà un compte (connexion / mot de passe oublié), sans révéler si l'email existe déjà
 - CAPTCHA retiré entièrement (connexion, inscription, mot de passe oublié) : Supabase ne peut pas le réserver à la connexion sans casser l'inscription — la protection réelle reste le verrouillage progressif et les Rate Limits Supabase
 - Inscription : CAPTCHA retiré (gardé sur mot de passe oublié et connexion après 3 échecs)

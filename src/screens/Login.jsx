@@ -5,6 +5,15 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
 import { users } from '../data/seed';
 import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining } from '../utils/loginThrottle';
+import { INDICATIFS, INDICATIF_DEFAUT } from '../utils/kkiapay';
+
+// Pays desservis (voir utils/kkiapay.js) : l'inscrit choisit le sien plutôt
+// que de deviner un indicatif à partir de rien — le numéro de l'entreprise
+// elle-même est togolais pour les uns, béninois pour les autres.
+const PHONE_COUNTRIES = [
+  { code: INDICATIFS.TG, flag: '🇹🇬', label: 'Togo' },
+  { code: INDICATIFS.BJ, flag: '🇧🇯', label: 'Bénin' },
+];
 
 /**
  * Écran d'entrée : connexion, et — quand le backend est configuré —
@@ -34,7 +43,9 @@ export default function Login() {
 
   // Inscription (une seule page simple : nom, téléphone, email, mot de passe)
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(''); // numéro local, sans indicatif
+  const [phoneCountry, setPhoneCountry] = useState(INDICATIF_DEFAUT);
+  const fullPhone = () => (phone.trim() ? `+${phoneCountry} ${phone.trim()}` : '');
 
   const switchView = (v) => { setView(v); setError(''); setNotice(''); };
 
@@ -73,7 +84,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const res = await completeSignup({ name, phone, inviteCode: teamCode || null, refCode: teamCode ? null : refCode.trim() || null });
+    const res = await completeSignup({ name, phone: fullPhone(), inviteCode: teamCode || null, refCode: teamCode ? null : refCode.trim() || null });
     setLoading(false);
     if (!res.ok) setError(res.error || 'Impossible de terminer l’inscription.');
     // Succès : l'app monte toute seule (profil chargé).
@@ -85,7 +96,7 @@ export default function Login() {
     if (password.length < 8) { setError('Le mot de passe doit faire au moins 8 caractères.'); return; }
     setLoading(true);
     const res = await signUp({
-      email, password, name, phone,
+      email, password, name, phone: fullPhone(),
       inviteCode: teamCode || null,
       refCode: teamCode ? null : refCode.trim() || null,
     });
@@ -178,6 +189,34 @@ export default function Login() {
     </div>
   );
 
+  const phoneField = (idPrefix) => (
+    <div className="input-group">
+      <label className="input-label" htmlFor={`${idPrefix}-phone`}>Numéro de téléphone</label>
+      <div className="phone-field">
+        <select
+          className="input phone-field-country"
+          aria-label="Pays"
+          value={phoneCountry}
+          onChange={(e) => setPhoneCountry(e.target.value)}
+        >
+          {PHONE_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.flag} +{c.code}</option>
+          ))}
+        </select>
+        <input
+          id={`${idPrefix}-phone`}
+          className="input"
+          type="tel"
+          required
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="90 XX XX XX"
+          autoComplete="tel-national"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="login-screen">
       <div className="login-panel">
@@ -209,11 +248,7 @@ export default function Login() {
               <input id="complete-name" className="input" required value={name}
                 onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
             </div>
-            <div className="input-group">
-              <label className="input-label" htmlFor="complete-phone">Numéro de téléphone</label>
-              <input id="complete-phone" className="input" type="tel" required value={phone}
-                onChange={(e) => setPhone(e.target.value)} placeholder="+228 90 XX XX XX" autoComplete="tel" />
-            </div>
+            {phoneField('complete')}
             {!teamCode && (
               <div className="input-group">
                 <label className="input-label" htmlFor="complete-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
@@ -240,11 +275,7 @@ export default function Login() {
               <input id="signup-name" className="input" required value={name}
                 onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
             </div>
-            <div className="input-group">
-              <label className="input-label" htmlFor="signup-phone">Numéro de téléphone</label>
-              <input id="signup-phone" className="input" type="tel" required value={phone}
-                onChange={(e) => setPhone(e.target.value)} placeholder="+228 90 XX XX XX" autoComplete="tel" />
-            </div>
+            {phoneField('signup')}
             {emailField}
             {passwordField('Mot de passe (8 caractères min.)', 'new-password')}
             {!teamCode && (

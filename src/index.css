@@ -267,6 +267,9 @@ textarea.input { resize: vertical; }
   font-size: 0.875rem; margin-bottom: 16px;
 }
 .input-with-icon { position: relative; }
+.phone-field { display: flex; gap: 8px; }
+.phone-field-country { flex: 0 0 106px; padding-left: 8px; padding-right: 4px; }
+.phone-field .input:not(.phone-field-country) { flex: 1; min-width: 0; }
 .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
 .input-has-icon { padding-left: 42px; padding-right: 42px; }
 .input-password-toggle {
