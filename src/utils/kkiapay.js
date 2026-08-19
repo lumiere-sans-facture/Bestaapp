@@ -79,7 +79,9 @@ export const estNumeroTest = (saisie) => {
 export const problemeNumero = (saisie, { sandbox = false } = {}) => {
   const brut = String(saisie || '').replace(/\D/g, '');
   if (!brut) return 'Renseignez votre numéro Mobile Money avant de payer.';
-  if (!momoValide(saisie))
+  // Kkiapay conserve encore ses numéros de SANDBOX historiques à 8 chiffres.
+  // Cette exception ne vaut jamais pour un paiement réel.
+  if (!momoValide(saisie) && !(sandbox && estNumeroTest(saisie)))
     return 'Numéro Mobile Money incomplet : 8 chiffres au Togo (ex. 90 12 34 56) ou 10 chiffres au Bénin (préfixe 01), indicatif +228 ou +229 accepté.';
   if (sandbox && !estNumeroTest(saisie))
     return 'Mode test : KKiaPay n’accepte que ses numéros de test (voir la liste sous le bouton). Un vrai numéro sera refusé.';
