@@ -2,10 +2,11 @@ import { Suspense } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, Moon, MonitorSmartphone, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
+import { useTheme } from '../context/ThemeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { initials } from '../utils/format';
 import { SyncDot } from './SyncStatus';
@@ -56,6 +57,7 @@ export default function AppLayout() {
   const { user, logout } = useAuth();
   const { getCompanyForUser, storageError } = useData();
   const { mode, setMode, proActive } = useMode();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const isPro = mode === 'pro';
   const navItems = isPro ? proNavItems : publicNavItems;
@@ -126,6 +128,27 @@ export default function AppLayout() {
           )}
         </nav>
         <div className="sidebar-footer">
+          {/* Réglage d'apparence : reste en barre latérale, la page « Plus »
+              masque sa version mobile sur desktop (voir .plus-sections). */}
+          <div className="sidebar-theme-toggle" role="group" aria-label="Apparence">
+            {[
+              ['clair', Sun, 'Clair'],
+              ['sombre', Moon, 'Sombre'],
+              ['systeme', MonitorSmartphone, 'Système'],
+            ].map(([id, Icon, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={theme === id ? 'active' : ''}
+                aria-pressed={theme === id}
+                title={label}
+                aria-label={label}
+                onClick={() => setTheme(id)}
+              >
+                <Icon size={16} />
+              </button>
+            ))}
+          </div>
           {isPro && (
             <button className="btn btn-accent btn-block sidebar-pro-btn" onClick={() => setMode('public')}>
               <ArrowLeft size={16} /> Revenir au mode public

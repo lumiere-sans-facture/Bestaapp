@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Sun, Moon, MonitorSmartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
+import { useTheme } from '../context/ThemeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchPlatformPayouts, decidePlatformPayout } from '../lib/remoteSync';
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
@@ -43,6 +44,7 @@ export default function Plus() {
   const [refInput, setRefInput] = useState('');
   const [refSaving, setRefSaving] = useState(false);
   const { setMode, proActive } = useMode();
+  const { theme, setTheme } = useTheme();
   const data = useData();
   const {
     partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team, teamChargee,
@@ -700,6 +702,31 @@ export default function Plus() {
           <div className="plus-card card">
             <MenuItem icon={GraduationCap} title="Formation" subtitle="Cours en ligne : modules, leçons et progression" onClick={() => setActiveTab('formation')} />
             <MenuItem icon={Share2} title="Mon espace partenaire" subtitle="Mon code, mon lien, mes commissions" onClick={() => setActiveTab('mypartner')} />
+          </div>
+        </div>
+
+        {/* Réglage d'appareil (pas une donnée métier) : stocké en local,
+            jamais répliqué — voir context/ThemeContext.jsx. */}
+        <div className="plus-section">
+          <div className="plus-section-label">Apparence</div>
+          <div className="plus-card card">
+            <div className="theme-toggle">
+              {[
+                ['clair', Sun, 'Clair'],
+                ['sombre', Moon, 'Sombre'],
+                ['systeme', MonitorSmartphone, 'Système'],
+              ].map(([id, Icon, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`category-chip theme-toggle-btn ${theme === id ? 'active' : ''}`}
+                  aria-pressed={theme === id}
+                  onClick={() => setTheme(id)}
+                >
+                  <Icon size={16} /> {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-20
+- Apparence : mode clair / sombre / système, réglable depuis Plus → Apparence (mobile) ou la barre latérale (desktop), sans backend — préférence d'appareil posée avant le premier rendu (pas de clignotement)
 - Devis : bouton « Relancer par WhatsApp » sur les affaires en cours, message pré-rempli et trace de la dernière relance
 - Notifications : cloche dans l'en-tête, sur tous les écrans — reprend le flux d'alertes du tableau de bord (pistes sans activité, devis sans suite, abonnement, commissions à payer)
 

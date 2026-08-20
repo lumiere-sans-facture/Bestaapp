@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
 import { ModeProvider, useMode } from './context/ModeContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
 import AppLayout from './components/AppLayout';
@@ -146,11 +147,13 @@ export default function App() {
     // Le filet enveloppe TOUT, y compris les fournisseurs de contexte : une
     // erreur dans l'un d'eux plantait l'app entière sans laisser de trace.
     <AppErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </AppErrorBoundary>
   );
 }
