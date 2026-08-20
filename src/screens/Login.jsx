@@ -396,12 +396,6 @@ export default function Login() {
               <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
                 {loading ? 'Création…' : 'Créer mon compte'}
               </button>
-              {!teamCode && (
-                <div className="field-hint" style={{ textAlign: 'center' }}>
-                  Gratuit : tableau de bord, suivi clients, boutique, formations, espace partenaire.
-                  L'option Devis Pro (documents à votre identité) : 5 000 F/mois.
-                </div>
-              )}
               <button type="button" className="login-link" onClick={() => switchView('login')}>
                 <ChevronLeft size={14} /> J'ai déjà un compte — me connecter
               </button>
@@ -459,10 +453,11 @@ export default function Login() {
       {/* Volet de marque : purement illustratif, masqué sur mobile (voir CSS). */}
       <div className="login-right" aria-hidden="true">
         <div className="login-right-content">
-          <h2 className="login-right-title">Votre activité solaire, pilotée de bout en bout</h2>
+          <h2 className="login-right-title">Un dimensionnement solaire exceptionnel</h2>
           <p className="login-right-text">
-            Pipeline commercial, devis en quelques minutes, boutique et commissions
-            partenaires — même hors connexion. Pensé pour le terrain, à Lomé et au-delà.
+            Renseignez les appareils du client : l'app calcule la puissance, la
+            batterie et l'onduleur adaptés, puis génère une fiche de dimensionnement
+            complète et détaillée — prête à partager, en quelques minutes.
           </p>
         </div>
       </div>
