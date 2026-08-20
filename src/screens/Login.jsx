@@ -10,17 +10,25 @@ import { AsYouType, getCountries, getCountryCallingCode, isValidPhoneNumber, par
 // Tous les pays sont disponibles. Togo et Bénin restent en tête : ce sont
 // les marchés de départ, sans enfermer un installateur étranger.
 const PRIORITY_COUNTRIES = ['TG', 'BJ'];
-const countryName = (() => {
+const countryNames = (() => {
   try {
-    const labels = new Intl.DisplayNames(['fr'], { type: 'region' });
-    return (code) => labels.of(code) || code;
+    const french = new Intl.DisplayNames(['fr'], { type: 'region' });
+    const english = new Intl.DisplayNames(['en'], { type: 'region' });
+    return (code) => {
+      const frenchName = french.of(code) || code;
+      const englishName = english.of(code) || frenchName;
+      // Le format reprend le modèle fourni : anglais suivi du nom français
+      // lorsqu'ils diffèrent (Benin (Bénin), Senegal (Sénégal)…).
+      if (code === 'CI') return 'Côte d’Ivoire (Ivory Coast)';
+      return englishName === frenchName ? frenchName : `${englishName} (${frenchName})`;
+    };
   } catch {
     return (code) => code;
   }
 })();
 const countryFlag = (code) => String.fromCodePoint(...[...code].map((letter) => 127397 + letter.charCodeAt(0)));
 const PHONE_COUNTRIES = getCountries()
-  .map((code) => ({ code, dialCode: getCountryCallingCode(code), label: countryName(code) }))
+  .map((code) => ({ code, dialCode: getCountryCallingCode(code), label: countryNames(code) }))
   .sort((a, b) => {
     const rank = (code) => {
       const index = PRIORITY_COUNTRIES.indexOf(code);
@@ -239,7 +247,7 @@ export default function Login() {
             onChange={(e) => setPhoneCountry(e.target.value)}
           >
             {PHONE_COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.label}</option>
+              <option key={c.code} value={c.code}>{countryFlag(c.code)} {c.label} +{c.dialCode}</option>
             ))}
           </select>
         </div>
