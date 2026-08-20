@@ -7,7 +7,7 @@ import { useCart } from '../context/CartContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchAdminPublicDevis } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
-import { etatDevis, ETAT_DEVIS_LABEL, joursAvantExpiration, dateExpiration } from '../utils/affaires';
+import { etatDevis, ETAT_DEVIS_LABEL, joursAvantExpiration, dateExpiration, estDevisSansSuite } from '../utils/affaires';
 import { dimensionnementRejouable, resumeDimensionnement } from '../utils/dimensionnement';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
@@ -58,8 +58,9 @@ export default function Devis() {
   // 'list' | 'create'  (le choix du type + les assistants vivent dans DevisCreator)
   const [view, setView] = useState(fromCart || initialLeadId ? 'create' : 'list');
   const [search, setSearch] = useState('');
-  // all | brouillon | en-cours | converti | expire | solar | manual
-  const [typeFilter, setTypeFilter] = useState('all');
+  // all | brouillon | en-cours | converti | expire | sans-suite | solar | manual
+  // Arrivée depuis le tableau de bord (pastille « Devis sans suite ») : le filtre est présélectionné.
+  const [typeFilter, setTypeFilter] = useState(location.state?.typeFilter || 'all');
   const [confirmVente, setConfirmVente] = useState(null);
   // Étude solaire rouverte pour ajustement : l'assistant repart des saisies
   // enregistrées et MET À JOUR le devis au lieu d'en créer un second.
@@ -103,6 +104,7 @@ export default function Devis() {
       if (typeFilter === 'all') return true;
       if (typeFilter === 'solar') return d.type === 'solar';
       if (typeFilter === 'manual') return d.type !== 'solar';
+      if (typeFilter === 'sans-suite') return estDevisSansSuite(d, d._externe ? null : getLeadById(d.leadId));
       // Les autres puces filtrent sur l'ÉTAT commercial, qui se déduit de la
       // validité du devis — voir utils/affaires.js.
       return etatDevis(d, d._externe ? null : getLeadById(d.leadId)) === typeFilter;
@@ -162,7 +164,7 @@ export default function Devis() {
             <>
             <div className="list-toolbar">
               <div className="categories-scroll">
-                {[['all', 'Tous'], ['en-cours', 'En cours'], ['converti', 'Convertis'], ['expire', 'Expirés'], ['brouillon', 'Brouillons'], ['solar', 'Solaires'], ['manual', 'Manuels']].map(([id, label]) => (
+                {[['all', 'Tous'], ['en-cours', 'En cours'], ['sans-suite', 'Sans suite'], ['converti', 'Convertis'], ['expire', 'Expirés'], ['brouillon', 'Brouillons'], ['solar', 'Solaires'], ['manual', 'Manuels']].map(([id, label]) => (
                   <button key={id} className={`category-chip ${typeFilter === id ? 'active' : ''}`} aria-pressed={typeFilter === id} onClick={() => setTypeFilter(id)}>{label}</button>
                 ))}
               </div>

@@ -7,6 +7,7 @@ import { computeMonthlyStats } from '../utils/stats';
 import { effectiveStatus, daysLeft } from '../utils/subscription';
 import { isSameMonth, ageInDays } from '../utils/date';
 import { SEV_LABEL, SEV_ORDER } from '../utils/alerts';
+import { devisSansSuite } from '../utils/affaires';
 import PageHeader from '../components/PageHeader';
 import Ring from '../components/Ring';
 
@@ -43,12 +44,10 @@ export default function Dashboard() {
   const myDevis = user.role === 'gerant' ? (devis || []) : (devis || []).filter((d) => d.createdBy === user.id);
   const devisThisMonth = myDevis.filter((d) => sameMonth(d.createdAt)).length;
 
-  // ---- Stock ----
-  const outOfStock = products.filter((p) => p.stock === 0).length;
-  const lowStock = products.filter((p) => p.stock > 0 && p.stock <= 5).length;
-  const stockHealth = products.length
-    ? Math.round((products.filter((p) => p.stock > 5).length / products.length) * 100)
-    : 0;
+  // ---- Devis sans suite & transformation ----
+  const sansSuite = devisSansSuite(myDevis, myLeads);
+  const devisAcceptesMois = myDevis.filter((d) => d.stage === 'gagne' && sameMonth(d.wonAt)).length;
+  const conversionDevis = devisThisMonth > 0 ? Math.round((devisAcceptesMois / devisThisMonth) * 100) : null;
 
   // ---- Réseau / abonnement ----
   const pendingComm = (commissions || []).filter((c) => c.status === 'en_attente');
@@ -74,15 +73,16 @@ export default function Dashboard() {
     { key: 'stale', value: staleLeads.length, label: 'À relancer', tone: 'warning', to: '/pipeline' },
     { key: 'won', value: wonThisMonth, label: 'Gagnées · ce mois', tone: 'success', to: '/pipeline' },
     { key: 'devis', value: devisThisMonth, label: 'Devis · ce mois', tone: 'primary', to: '/devis' },
-    { key: 'stock', value: lowStock + outOfStock, label: 'Alertes stock', tone: 'error', to: '/boutique' },
+    {
+      key: 'sansSuite', value: sansSuite.length, label: 'Devis sans suite',
+      tone: sansSuite.length > 0 ? 'warning' : 'neutral', to: '/devis', state: { typeFilter: 'sans-suite' },
+    },
   ];
 
   // ---- Feed d'alertes (trié par sévérité) ----
   const feed = [];
-  products.filter((p) => p.stock === 0).slice(0, 3).forEach((p) =>
-    feed.push({ id: `oos-${p.id}`, sev: 'critique', label: 'Rupture de stock', entity: p.name }));
-  products.filter((p) => p.stock > 0 && p.stock <= 5).slice(0, 3).forEach((p) =>
-    feed.push({ id: `low-${p.id}`, sev: 'alerte', label: `Stock faible — ${p.stock} restant(s)`, entity: p.name }));
+  sansSuite.slice(0, 3).forEach(({ devis: d, lead, jours }) =>
+    feed.push({ id: `sansSuite-${d.id}`, sev: 'alerte', label: `Devis sans suite depuis ${jours} j`, entity: lead?.name || d.devisNumber }));
   staleLeads.slice(0, 4).forEach((l) => {
     const age = ageDays(l.lastActivity);
     const label = Number.isFinite(age) ? `Sans activité depuis ${Math.round(age)} j` : 'Aucune activité enregistrée';
@@ -111,7 +111,7 @@ export default function Dashboard() {
         {/* Bandeau de statistiques */}
         <div className="stat-strip">
           {stats.map((s) => (
-            <Link key={s.key} to={s.to} className={`stat-pill is-${s.tone}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Link key={s.key} to={s.to} state={s.state} className={`stat-pill is-${s.tone}`} style={{ textDecoration: 'none', color: 'inherit' }}>
               <span className="stat-pill-num">{s.value}</span>
               <span className="stat-pill-label">{s.label}</span>
             </Link>
@@ -185,13 +185,15 @@ export default function Dashboard() {
                 <div className="ring-label">Taux de conversion</div>
               </div>
               <div className="ring-item">
-                <Ring value={stockHealth} color="var(--success)"><span className="ring-value">{stockHealth}%</span></Ring>
-                <div className="ring-label">Stock disponible</div>
+                <Ring value={conversionDevis ?? 0} color="var(--success)">
+                  <span className="ring-value">{conversionDevis == null ? '—' : `${conversionDevis}%`}</span>
+                </Ring>
+                <div className="ring-label">Transformation devis → commande</div>
               </div>
             </div>
             <div className="ring-legend">
-              <span className="legend-item"><span className="stat-dot" style={{ background: 'var(--success)' }} /> {products.length - outOfStock} en stock</span>
-              <span className="legend-item"><span className="stat-dot" style={{ background: 'var(--error)' }} /> {outOfStock} rupture(s)</span>
+              <span className="legend-item"><span className="stat-dot" style={{ background: 'var(--success)' }} /> {devisAcceptesMois} accepté(s)</span>
+              <span className="legend-item"><span className="stat-dot" style={{ background: 'var(--primary)' }} /> {devisThisMonth} émis</span>
             </div>
           </div>
 

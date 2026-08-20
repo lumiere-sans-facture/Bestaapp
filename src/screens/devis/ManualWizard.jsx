@@ -107,7 +107,7 @@ export default function ManualWizard({ onDone, initialItems, initialLeadId = nul
           <div>
             <div className="wizard-step-title">Ajoutez des produits</div>
             <div className="products-select">
-              {products.filter((p) => p.stock > 0).map((product) => {
+              {products.filter((p) => !p.suiviStock || p.stock > 0).map((product) => {
                 const qty = items[product.id];
                 return (
                   <div key={product.id} className={`product-select-item ${qty ? 'selected' : ''}`}>

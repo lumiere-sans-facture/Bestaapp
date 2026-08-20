@@ -350,6 +350,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 .stat-pill.is-warning .stat-pill-num { background: var(--warning-light); color: var(--warning-dark); }
 .stat-pill.is-success .stat-pill-num { background: var(--success-light); color: var(--success-text); }
 .stat-pill.is-error   .stat-pill-num { background: var(--error-light); color: var(--error-text); }
+.stat-pill.is-neutral .stat-pill-num { background: var(--bg); color: var(--text-secondary); }
 
 /* Rangée 2 colonnes (empilée sur mobile) */
 .dash-row { display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px; }
@@ -1150,12 +1151,6 @@ form .login-link { width: 100%; margin-top: 4px; }
 .product-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; padding-top: 10px; }
 .product-price { font-size: 0.9375rem; font-weight: 700; color: var(--primary); }
 .product-price-alt { font-size: 0.6875rem; color: var(--text-muted); }
-.stock-badge {
-  font-size: 0.75rem; font-weight: 500; padding: 4px 10px; border-radius: 6px; white-space: nowrap;
-}
-.stock-badge.in-stock { background: var(--success-light); color: var(--success-text); }
-.stock-badge.low { background: var(--warning-light); color: var(--warning-dark); }
-.stock-badge.out { background: var(--error-light); color: var(--error-text); }
 
 /* ============ Devis ============ */
 
