@@ -93,7 +93,7 @@ export default function AppLayout() {
           </div>
         ) : (
           <div className="sidebar-brand sidebar-brand-public">
-            <img src="/besta-solar-pro-logo.png" alt="BestaSolar Pro" className="sidebar-brand-logo" />
+            <img src="/besta-solar-pro-logo-blanc.png" alt="BestaSolar Pro" className="sidebar-brand-logo" />
             <div className="sidebar-subtitle">Lomé, Togo</div>
           </div>
         )}

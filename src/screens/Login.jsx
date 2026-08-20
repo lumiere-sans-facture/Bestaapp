@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, ChevronDown, Handshake } from 'lucide-react';
+import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, ChevronDown, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
@@ -308,9 +308,8 @@ export default function Login() {
     <div className="login-screen">
       <div className="login-panel">
         <div className="login-header">
-          <div className="login-logo-plate">
-            <img src="/besta-solar-pro-logo.png" alt="BestaSolar Pro" className="login-logo-img" />
-          </div>
+          <div className="logo-icon"><Sun size={32} /></div>
+          <h1 className="login-title">BestaSolar Pro</h1>
           <p className="login-subtitle">CRM solaire — Lomé, Togo</p>
         </div>
 
