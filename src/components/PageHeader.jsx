@@ -1,4 +1,5 @@
 import { ChevronLeft } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 export default function PageHeader({ title, subtitle, children, actions, onBack }) {
   return (
@@ -14,7 +15,10 @@ export default function PageHeader({ title, subtitle, children, actions, onBack 
           {subtitle && <div className="page-subtitle">{subtitle}</div>}
           {children}
         </div>
-        {actions && <div className="page-header-actions">{actions}</div>}
+        <div className="page-header-actions">
+          {actions}
+          <NotificationBell />
+        </div>
       </div>
     </header>
   );

@@ -103,6 +103,20 @@ img { max-width: 100%; }
 .page-subtitle { font-size: 0.8125rem; opacity: 0.75; margin-top: 2px; }
 .page-header-actions { display: flex; align-items: center; gap: 10px; }
 
+/* Cloche de notifications (dans le bandeau d'en-tête, sur fond --primary) */
+.notif-bell {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 50%; border: none;
+  background: rgba(255, 255, 255, 0.12); color: white; cursor: pointer; flex-shrink: 0;
+}
+.notif-bell:hover { background: rgba(255, 255, 255, 0.2); }
+.notif-badge {
+  position: absolute; top: -2px; right: -2px; min-width: 17px; height: 17px;
+  padding: 0 4px; border-radius: 999px; background: var(--error); color: white;
+  font-size: 0.625rem; font-weight: 700; line-height: 17px; text-align: center;
+  border: 2px solid var(--primary);
+}
+
 .pipeline-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 0.8125rem; opacity: 0.9; }
 .pipeline-stat strong { font-weight: 600; }
 

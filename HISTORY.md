@@ -5,6 +5,10 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-20
+- Devis : bouton « Relancer par WhatsApp » sur les affaires en cours, message pré-rempli et trace de la dernière relance
+- Notifications : cloche dans l'en-tête, sur tous les écrans — reprend le flux d'alertes du tableau de bord (pistes sans activité, devis sans suite, abonnement, commissions à payer)
+
 ## 2026-08-18
 - Tableau de bord : le suivi de stock disparaît, remplacé par « Devis sans suite » et « Transformation devis → commande » — deux indicateurs commerciaux, cliquables vers la liste filtrée
 - Boutique : les champs stock passent derrière un interrupteur par produit (« Suivre le stock »), désactivé par défaut — plus de décrément automatique à la confirmation de commande

@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   buildAffaires, devisStage, devisDuClient,
   dateExpiration, joursAvantExpiration, etatDevis, devisAExpirer, montantVente,
-  estDevisSansSuite, devisSansSuite,
+  estDevisSansSuite, devisSansSuite, devisRelanceMessage,
 } from '../affaires';
 import { missingCommissionsForDevis, reconcileMissingCommissions } from '../commissionSync';
+import { COMPANY } from '../../config/company';
 
 const RATES = { 1: 0.03, 2: 0.015 };
 
@@ -332,6 +333,28 @@ describe('cycle de vie d’un devis', () => {
       ];
       expect(devisSansSuite(liste, leads, 7, LE_15).map((x) => x.devis.id))
         .toEqual(['quatorze-jours', 'neuf-jours']);
+    });
+  });
+
+  describe('devisRelanceMessage', () => {
+    it("reprend le nom du client, le numéro, le montant et la date d'expiration", () => {
+      const devis = devisDu('2026-08-01', { devisNumber: 'BS-20260801-0001', total: 1500000 });
+      const msg = devisRelanceMessage(devis, { name: 'Awa Koffi' });
+      expect(msg).toContain('Bonjour Awa Koffi,');
+      expect(msg).toContain('BS-20260801-0001');
+      expect(msg).toContain('1 500 000');
+      expect(msg).toContain('31/08/2026');
+      expect(msg).toContain(COMPANY.name);
+    });
+
+    it('retombe sur le nom client du devis puis sur un générique, sans piste', () => {
+      expect(devisRelanceMessage({ total: 1000, clientName: 'Jean Client' })).toContain('Bonjour Jean Client,');
+      expect(devisRelanceMessage({ total: 1000 })).toContain('Bonjour Cher client,');
+    });
+
+    it("omet la ligne d'échéance quand le devis n'est pas datable", () => {
+      const msg = devisRelanceMessage({ total: 1000 });
+      expect(msg).not.toContain('reste valable');
     });
   });
 });

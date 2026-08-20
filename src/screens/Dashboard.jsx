@@ -4,9 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { formatCFA } from '../utils/format';
 import { computeMonthlyStats } from '../utils/stats';
-import { effectiveStatus, daysLeft } from '../utils/subscription';
 import { isSameMonth, ageInDays } from '../utils/date';
-import { SEV_LABEL, SEV_ORDER } from '../utils/alerts';
+import { SEV_LABEL, buildAlertFeed } from '../utils/alerts';
 import { devisSansSuite } from '../utils/affaires';
 import PageHeader from '../components/PageHeader';
 import Ring from '../components/Ring';
@@ -51,10 +50,7 @@ export default function Dashboard() {
 
   // ---- Réseau / abonnement ----
   const pendingComm = (commissions || []).filter((c) => c.status === 'en_attente');
-  const pendingCommTotal = pendingComm.reduce((s, c) => s + (c.amount || 0), 0);
   const sub = getSubscriptionForUser(user.id);
-  const subStatus = sub ? effectiveStatus(sub) : null;
-  const subDays = sub ? daysLeft(sub) : null;
 
   // ---- Séries ----
   const monthlyData = computeMonthlyStats(myLeads);
@@ -79,21 +75,8 @@ export default function Dashboard() {
     },
   ];
 
-  // ---- Feed d'alertes (trié par sévérité) ----
-  const feed = [];
-  sansSuite.slice(0, 3).forEach(({ devis: d, lead, jours }) =>
-    feed.push({ id: `sansSuite-${d.id}`, sev: 'alerte', label: `Devis sans suite depuis ${jours} j`, entity: lead?.name || d.devisNumber }));
-  staleLeads.slice(0, 4).forEach((l) => {
-    const age = ageDays(l.lastActivity);
-    const label = Number.isFinite(age) ? `Sans activité depuis ${Math.round(age)} j` : 'Aucune activité enregistrée';
-    feed.push({ id: `stale-${l.id}`, sev: 'alerte', label, entity: l.name });
-  });
-  if (sub && subStatus === 'actif' && subDays != null && subDays <= 7)
-    feed.push({ id: 'sub', sev: 'info', label: `Abonnement Devis Pro expire dans ${subDays} j`, entity: 'À renouveler' });
-  if (user.role === 'gerant' && pendingComm.length)
-    feed.push({ id: 'comm', sev: 'info', label: `${pendingComm.length} commission(s) à payer`, entity: formatCFA(pendingCommTotal) });
-  // Demandes de progression des techniciens : à valider dans Suivi clients.
-  feed.sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev]);
+  // ---- Feed d'alertes (partagé avec la cloche de notifications) ----
+  const feed = buildAlertFeed({ user, staleLeads, sansSuite, sub, pendingComm });
   const feedTop = feed.slice(0, 6);
 
   const perfBars = [
@@ -153,15 +136,21 @@ export default function Dashboard() {
             </div>
             {feedTop.length ? (
               <div className="alert-feed">
-                {feedTop.map((a) => (
-                  <div key={a.id} className="alert-feed-row">
-                    <span className={`alert-badge sev-${a.sev}`}>{SEV_LABEL[a.sev]}</span>
-                    <div className="alert-feed-text">
-                      <div className="alert-feed-title">{a.label}</div>
-                      <div className="alert-feed-entity">{a.entity}</div>
-                    </div>
-                  </div>
-                ))}
+                {feedTop.map((a) => {
+                  const Row = a.to ? Link : 'div';
+                  const rowProps = a.to
+                    ? { to: a.to, state: a.state, style: { textDecoration: 'none', color: 'inherit' } }
+                    : {};
+                  return (
+                    <Row key={a.id} className="alert-feed-row" {...rowProps}>
+                      <span className={`alert-badge sev-${a.sev}`}>{SEV_LABEL[a.sev]}</span>
+                      <div className="alert-feed-text">
+                        <div className="alert-feed-title">{a.label}</div>
+                        <div className="alert-feed-entity">{a.entity}</div>
+                      </div>
+                    </Row>
+                  );
+                })}
               </div>
             ) : (
               <div className="alert-empty">

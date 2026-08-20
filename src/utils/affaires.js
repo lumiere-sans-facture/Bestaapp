@@ -6,6 +6,8 @@
 // La numérotation des documents est déduite de l'existant : un compteur local
 // n'est pas répliqué et produirait des numéros en double entre appareils.
 import { DAY_MS, ageInDays } from './date';
+import { formatCFA } from './format';
+import { COMPANY } from '../config/company';
 
 /** Étape d'un devis : la sienne, sinon celle de son client (devis créés avant
  *  le suivi par devis), sinon « nouveau » — jamais « proposition » par défaut :
@@ -231,6 +233,19 @@ export function estDevisSansSuite(devis, lead = null, seuil = SEUIL_SANS_SUITE_J
   if (!envoye || ageInDays(envoye, maintenant) <= seuil) return false;
   const { derniereRelance } = devis;
   return !derniereRelance || new Date(derniereRelance) <= new Date(envoye);
+}
+
+/** Message de relance pré-rempli (WhatsApp/SMS), en français, pour un devis sans suite. */
+export function devisRelanceMessage(devis, lead = null) {
+  const nom = lead?.name || devis?.clientName || 'Cher client';
+  const fin = dateExpiration(devis);
+  const lines = [
+    `Bonjour ${nom},`,
+    `Votre devis ${devis?.devisNumber || ''} d'un montant de ${formatCFA(devis?.total)} est toujours disponible.`,
+  ];
+  if (fin) lines.push(`Il reste valable jusqu'au ${new Date(`${fin}T00:00:00`).toLocaleDateString('fr-FR')}.`);
+  lines.push('N’hésitez pas à nous recontacter pour toute question.', 'Merci de votre confiance,', COMPANY.name);
+  return lines.join('\n');
 }
 
 /**
