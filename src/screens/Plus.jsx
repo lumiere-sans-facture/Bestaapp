@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Sun, Moon, MonitorSmartphone } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Sun, Moon, MonitorSmartphone, Palette } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -38,6 +38,8 @@ import { reconcileMissingCommissions } from '../utils/commissionSync';
 import { MODES_RETRAIT, ETATS_COMMISSION, commissionsEngagees, etatCommission } from '../utils/payouts';
 import { suivre, EVENEMENTS } from '../lib/analytique';
 
+const THEME_LABEL = { clair: 'Clair', sombre: 'Sombre', systeme: 'Système' };
+
 export default function Plus() {
   const { user, logout, refreshOrg } = useAuth();
   // Parrainage de l'entreprise : saisie une seule fois, puis verrouillé (serveur).
@@ -45,6 +47,7 @@ export default function Plus() {
   const [refSaving, setRefSaving] = useState(false);
   const { setMode, proActive } = useMode();
   const { theme, setTheme } = useTheme();
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const data = useData();
   const {
     partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team, teamChargee,
@@ -705,35 +708,13 @@ export default function Plus() {
           </div>
         </div>
 
-        {/* Réglage d'appareil (pas une donnée métier) : stocké en local,
-            jamais répliqué — voir context/ThemeContext.jsx. */}
-        <div className="plus-section">
-          <div className="plus-section-label">Apparence</div>
-          <div className="plus-card card">
-            <div className="theme-toggle">
-              {[
-                ['clair', Sun, 'Clair'],
-                ['sombre', Moon, 'Sombre'],
-                ['systeme', MonitorSmartphone, 'Système'],
-              ].map(([id, Icon, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={`category-chip theme-toggle-btn ${theme === id ? 'active' : ''}`}
-                  aria-pressed={theme === id}
-                  onClick={() => setTheme(id)}
-                >
-                  <Icon size={16} /> {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
         <div className="plus-section">
           <div className="plus-section-label">Compte</div>
           <div className="plus-card card">
             <MenuItem icon={User} title="Mon profil" subtitle="Voir vos informations" onClick={() => setActiveTab('profile')} />
+            {/* Réglage d'appareil (pas une donnée métier) : stocké en local,
+                jamais répliqué — voir context/ThemeContext.jsx. */}
+            <MenuItem icon={Palette} title="Apparence" subtitle={THEME_LABEL[theme]} onClick={() => setAppearanceOpen(true)} />
             {user.role === 'gerant' && (
               <MenuItem icon={DatabaseBackup} title="Sauvegarde des données" subtitle="Exporter / restaurer toutes les données" onClick={() => setActiveTab('backup')} />
             )}
@@ -745,6 +726,25 @@ export default function Plus() {
             suivi, et lui seul a besoin de savoir s'il est actif. */}
         {user.role === 'gerant' && <DiagnosticCard />}
       </div>
+      <Sheet open={appearanceOpen} onClose={() => setAppearanceOpen(false)} title="Apparence">
+        <div className="theme-toggle">
+          {[
+            ['clair', Sun, 'Clair'],
+            ['sombre', Moon, 'Sombre'],
+            ['systeme', MonitorSmartphone, 'Système'],
+          ].map(([id, Icon, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={`category-chip theme-toggle-btn ${theme === id ? 'active' : ''}`}
+              aria-pressed={theme === id}
+              onClick={() => setTheme(id)}
+            >
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+        </div>
+      </Sheet>
     </div>
   );
 
