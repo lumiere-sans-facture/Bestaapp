@@ -90,13 +90,25 @@ export default function Login() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState(''); // numéro national, formaté au fil de la saisie
   const [phoneCountry, setPhoneCountry] = useState('TG');
-  const fullPhone = () => parsePhoneNumberFromString(phone, phoneCountry)?.number || '';
+  const nationalPhoneDigits = () => phone.replace(/\D/g, '');
+  const fullPhone = () => {
+    // Le plan de numérotation béninois est passé à 10 chiffres en 2024.
+    // On ne s'appuie pas sur des métadonnées de bibliothèque éventuellement
+    // anciennes pour enregistrer un numéro Bénin pourtant valide.
+    if (phoneCountry === 'BJ') return nationalPhoneDigits() ? `+229${nationalPhoneDigits()}` : '';
+    return parsePhoneNumberFromString(phone, phoneCountry)?.number || '';
+  };
   const selectedPhoneCountry = PHONE_COUNTRIES.find((country) => country.code === phoneCountry) || PHONE_COUNTRIES[0];
   const phoneError = () => {
+    const digits = nationalPhoneDigits();
+    // ARCEP Bénin : le plan national est à 10 chiffres depuis le 30 novembre 2024.
+    // Cette règle est volontairement vérifiée avant libphonenumber-js, dont
+    // certaines versions continuent de connaître l'ancien format à 8 chiffres.
+    if (phoneCountry === 'BJ') {
+      return digits.length === 10 ? '' : 'Au Bénin, le numéro doit comporter exactement 10 chiffres.';
+    }
     const parsed = parsePhoneNumberFromString(phone, phoneCountry);
     if (!parsed || !isValidPhoneNumber(phone, phoneCountry)) return 'Saisissez un numéro valide pour le pays sélectionné.';
-    // ARCEP Bénin : le plan national est à 10 chiffres depuis le 30 novembre 2024.
-    if (phoneCountry === 'BJ' && parsed.nationalNumber.length !== 10) return 'Au Bénin, le numéro doit comporter 10 chiffres.';
     return '';
   };
 
@@ -297,10 +309,11 @@ export default function Login() {
           inputMode="tel"
           value={phone}
           onChange={(e) => setPhone(new AsYouType(phoneCountry).input(e.target.value))}
-          placeholder="Numéro sans l’indicatif"
+          placeholder={phoneCountry === 'BJ' ? '10 chiffres, sans l’indicatif' : 'Numéro sans l’indicatif'}
           autoComplete="tel-national"
         />
       </div>
+      {phoneCountry === 'BJ' && <div className="field-hint">Bénin : saisissez exactement 10 chiffres, sans +229.</div>}
     </div>
   );
 
