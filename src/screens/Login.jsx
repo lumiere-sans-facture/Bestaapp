@@ -239,7 +239,7 @@ export default function Login() {
             onChange={(e) => setPhoneCountry(e.target.value)}
           >
             {PHONE_COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.label}</option>
+              <option key={c.code} value={c.code}>{countryFlag(c.code)} {c.label} +{c.dialCode}</option>
             ))}
           </select>
         </div>
