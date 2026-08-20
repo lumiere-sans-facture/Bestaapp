@@ -9,6 +9,7 @@ import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
 import AppLayout from './components/AppLayout';
 import AppErrorBoundary from './components/AppErrorBoundary';
+import LoadingShell from './components/LoadingShell';
 import Login from './screens/Login';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
 import { installerAnalytique, suivrePage } from './lib/analytique';
@@ -83,7 +84,7 @@ function AppRoutes() {
   }, [user?.id, navigate]);
 
   if (isLoading) {
-    return <div className="splash-screen">Chargement…</div>;
+    return <LoadingShell />;
   }
 
   // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.

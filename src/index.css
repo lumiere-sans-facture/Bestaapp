@@ -142,6 +142,29 @@ img { max-width: 100%; }
   height: 100vh; background: var(--primary); color: white; font-size: 1.25rem;
 }
 
+/* Lecteur d'écran seul — l'état de chargement (squelette) est décoratif,
+   sa description textuelle reste annoncée sans occuper l'écran. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* Squelette de chargement : reprend la forme du contenu à venir (voir
+   components/LoadingShell.jsx) plutôt qu'un plein écran qui efface la
+   barre latérale et l'en-tête pendant l'attente. `--inverse` pour les
+   blocs posés sur une surface colorée (en-tête, barre latérale). */
+.skeleton {
+  display: block; border-radius: 6px; background-color: var(--border);
+  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.5) 50%, transparent 100%);
+  background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-inverse {
+  background-color: rgba(255, 255, 255, 0.16);
+  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
+}
+@keyframes skeleton-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
 /* ============ Structure générale ============ */
 
 .app-shell { min-height: 100vh; min-height: 100dvh; }
@@ -2115,6 +2138,9 @@ form .login-link { width: 100%; margin-top: 4px; }
     border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 30;
   }
+  /* Le squelette « inverse » (LoadingShell) suppose un en-tête coloré —
+     invisible sur ce fond clair, il repasse en variante normale ici. */
+  .page-header .skeleton-inverse { background-color: var(--border); background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.6) 50%, transparent 100%); }
   .page-title { font-size: 1.375rem; }
   .page-subtitle { color: var(--text-secondary); opacity: 1; }
   .pipeline-stats { opacity: 1; color: var(--text-secondary); }
