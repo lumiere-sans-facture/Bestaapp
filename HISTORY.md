@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-20
+- Paramètres : nouvel écran qui réunit tout ce qui se règle (profil, abonnement, apparence, moyens de paiement, sauvegarde, administration, diagnostic) — la barre latérale et le menu « Plus » n'énumèrent plus que le travail quotidien
 - Plus → Compte : « Apparence » devient une ligne comme les autres (icône, sous-titre = thème actuel, flèche), le réglage s'ouvre dans une fiche au lieu d'être toujours affiché
 - Chargement : l'écran plein « Chargement… » cède la place à un squelette animé qui reprend la forme de l'app (barre latérale, en-tête) — la structure reste visible tout de suite, seul le contenu se dessine en attendant
 - Connexion (inscription) : bandeau tarifs/fonctionnalités retiré sous « Créer mon compte » ; texte du volet de marque recentré sur le dimensionnement solaire (fiche complète générée en quelques minutes)

@@ -1,14 +1,13 @@
 import { Suspense } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
 import SkeletonPageContent from './SkeletonPageContent';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, Moon, MonitorSmartphone, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, DatabaseBackup, GraduationCap, Share2, User, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, Moon, MonitorSmartphone, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { useTheme } from '../context/ThemeContext';
-import { isSupabaseConfigured } from '../lib/supabase';
 import { initials } from '../utils/format';
 import { SyncDot } from './SyncStatus';
 
@@ -36,6 +35,10 @@ const proNavItems = [
 // « Mon profil » est rendu à part, en dernier, après le bouton « Passer en mode Pro ».
 // L'administration du SaaS n'est ouverte qu'à BestaSolar : le gérant d'une
 // autre entreprise verrait sinon un lien que l'écran lui refuse.
+// Ce qui se RÈGLE (profil, apparence, abonnement, moyens de paiement,
+// sauvegarde, administration) n'est plus énuméré ici : tout est réuni sous
+// « Paramètres », rendu en dernier. La barre latérale ne liste donc que le
+// travail quotidien.
 const plusSections = (user) => [
   ...(user.role === 'gerant' ? [
     { path: '/plus/team', label: 'Équipe', icon: Users },
@@ -45,14 +48,14 @@ const plusSections = (user) => [
     { path: '/plus/kits', label: 'Mes kits', icon: Package },
     { path: '/plus/inverters', label: 'Onduleurs', icon: Cpu },
     { path: '/plus/pompekits', label: 'Kits pompage', icon: Droplets },
-    { path: '/plus/paiements', label: 'Moyens de paiement', icon: CreditCard },
-    ...(!isSupabaseConfigured || user.is_platform_admin
-      ? [{ path: '/plus/subsadmin', label: 'Abonnements Pro', icon: Crown }] : []),
-    { path: '/plus/backup', label: 'Sauvegarde', icon: DatabaseBackup },
   ] : []),
   { path: '/plus/formation', label: 'Formation', icon: GraduationCap },
   { path: '/plus/mypartner', label: 'Mon espace partenaire', icon: Users },
 ];
+
+// Écrans atteints depuis « Paramètres » (voir screens/Plus.jsx) : l'entrée
+// de la barre latérale y reste allumée.
+const SETTINGS_PATHS = ['/plus/profile', '/plus/backup', '/plus/paiements', '/plus/subsadmin'];
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
@@ -60,6 +63,7 @@ export default function AppLayout() {
   const { mode, setMode, proActive } = useMode();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const isPro = mode === 'pro';
   const navItems = isPro ? proNavItems : publicNavItems;
   // Barre latérale publique : « Plus » n'y figure pas (toutes ses entrées y
@@ -126,9 +130,15 @@ export default function AppLayout() {
                 <Crown size={20} strokeWidth={2} />
                 <span>Passer en mode Pro</span>
               </button>
-              <NavLink to="/plus/profile" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-                <User size={20} strokeWidth={2} />
-                <span>Mon profil</span>
+              {/* Reste allumé sur les écrans ouverts DEPUIS les paramètres
+                  (profil, sauvegarde, moyens de paiement, abonnements) —
+                  sinon aucune entrée de la barre latérale n'y est active. */}
+              <NavLink
+                to="/plus/parametres"
+                className={({ isActive }) => `sidebar-link ${isActive || SETTINGS_PATHS.includes(pathname) ? 'active' : ''}`}
+              >
+                <Settings size={20} strokeWidth={2} />
+                <span>Paramètres</span>
               </NavLink>
             </>
           )}
