@@ -79,19 +79,24 @@ export default function AppLayout() {
     <div className="app-shell">
       {/* Barre latérale — visible uniquement sur grand écran */}
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="sidebar-logo">
-            {isPro
-              ? (company?.logo
+        {isPro ? (
+          <div className="sidebar-brand">
+            <div className="sidebar-logo">
+              {company?.logo
                 ? <img src={company.logo} alt={`Logo ${company.nomEntreprise || 'entreprise'}`} />
-                : <Crown size={22} />)
-              : <Sun size={22} />}
+                : <Crown size={22} />}
+            </div>
+            <div>
+              <div className="sidebar-title">{company?.nomEntreprise || 'Espace Pro'}</div>
+              <div className="sidebar-subtitle">Espace Pro</div>
+            </div>
           </div>
-          <div>
-            <div className="sidebar-title">{isPro ? (company?.nomEntreprise || 'Espace Pro') : 'BestaSolar Pro'}</div>
-            <div className="sidebar-subtitle">{isPro ? 'Espace Pro' : 'Lomé, Togo'}</div>
+        ) : (
+          <div className="sidebar-brand sidebar-brand-public">
+            <img src="/besta-solar-pro-logo.png" alt="BestaSolar Pro" className="sidebar-brand-logo" />
+            <div className="sidebar-subtitle">Lomé, Togo</div>
           </div>
-        </div>
+        )}
         <nav className="sidebar-nav" aria-label="Navigation principale">
           {sidebarItems.map((item) => (
             <NavLink

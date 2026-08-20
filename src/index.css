@@ -219,6 +219,10 @@ img { max-width: 100%; }
 .sidebar-logo img { width: 100%; height: 100%; object-fit: contain; padding: 3px; background: white; }
 .sidebar-title { font-weight: 700; font-size: 1rem; }
 .sidebar-subtitle { font-size: 0.75rem; opacity: 0.6; }
+/* Marque BestaSolar (hors mode Pro) : le logo (texte marine + orange) n'a
+   pas de contraste sur --primary-dark sans cette plaque blanche. */
+.sidebar-brand-public { flex-direction: column; align-items: flex-start; gap: 8px; }
+.sidebar-brand-logo { display: block; width: 100%; max-width: 176px; height: auto; background: white; border-radius: 8px; padding: 8px 10px; }
 .sidebar-nav { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
 .sidebar-link {
   display: flex; align-items: center; gap: 12px;
@@ -368,14 +372,15 @@ textarea.input { resize: vertical; }
 }
 .login-panel { width: 100%; max-width: 420px; }
 .login-header { text-align: center; margin-bottom: 28px; }
-.logo-icon {
-  width: 72px; height: 72px; margin: 0 auto;
-  background: var(--accent); color: var(--primary-dark);
-  border-radius: 20px; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 8px 24px rgba(245, 166, 35, 0.3);
+/* Plaque blanche : le logo (texte marine + orange) n'a pas de contraste sur
+   le dégradé --primary de l'écran de connexion sans ce fond. */
+.login-logo-plate {
+  display: inline-flex; margin: 0 auto; padding: 12px 18px;
+  background: white; border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(6, 21, 64, 0.25);
 }
-.login-title { font-size: 1.75rem; font-weight: 700; color: white; margin-top: 16px; }
-.login-subtitle { font-size: 0.875rem; color: rgba(255, 255, 255, 0.7); }
+.login-logo-img { display: block; height: 34px; width: auto; }
+.login-subtitle { font-size: 0.875rem; color: rgba(255, 255, 255, 0.7); margin-top: 16px; }
 .login-form { padding: 24px; }
 .login-form-title { font-size: 1.25rem; font-weight: 600; text-align: center; margin-bottom: 20px; }
 .login-error {
