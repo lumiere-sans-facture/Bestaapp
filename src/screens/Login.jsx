@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, ChevronDown, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -26,7 +26,6 @@ const countryNames = (() => {
     return (code) => code;
   }
 })();
-const countryFlag = (code) => String.fromCodePoint(...[...code].map((letter) => 127397 + letter.charCodeAt(0)));
 const PHONE_COUNTRIES = getCountries()
   .map((code) => ({ code, dialCode: getCountryCallingCode(code), label: countryNames(code) }))
   .sort((a, b) => {
@@ -37,6 +36,19 @@ const PHONE_COUNTRIES = getCountries()
     const priority = rank(a.code) - rank(b.code);
     return priority || a.label.localeCompare(b.label, 'fr');
   });
+
+function CountryFlag({ country }) {
+  return (
+    <img
+      className="phone-country-flag"
+      src={`https://flagcdn.com/w40/${country.toLowerCase()}.png`}
+      width="20"
+      height="15"
+      alt=""
+      aria-hidden="true"
+    />
+  );
+}
 
 /**
  * Écran d'entrée : connexion, et — quand le backend est configuré —
@@ -63,6 +75,16 @@ export default function Login() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [countryMenuOpen, setCountryMenuOpen] = useState(false);
+  const countryMenuRef = useRef(null);
+
+  useEffect(() => {
+    const closeCountryMenu = (event) => {
+      if (!countryMenuRef.current?.contains(event.target)) setCountryMenuOpen(false);
+    };
+    document.addEventListener('mousedown', closeCountryMenu);
+    return () => document.removeEventListener('mousedown', closeCountryMenu);
+  }, []);
 
   // Inscription (une seule page simple : nom, téléphone, email, mot de passe)
   const [name, setName] = useState('');
@@ -234,22 +256,38 @@ export default function Login() {
     <div className="input-group">
       <label className="input-label" htmlFor={`${idPrefix}-phone`}>Numéro de téléphone</label>
       <div className="phone-field">
-        <div className="phone-field-country-wrap">
-          <div className="phone-field-country-display" aria-hidden="true">
-            <span className="phone-field-flag">{countryFlag(selectedPhoneCountry.code)}</span>
-            <span>+{selectedPhoneCountry.dialCode}</span>
-            <ChevronDown size={16} />
-          </div>
-          <select
-            className="phone-field-country"
-            aria-label="Pays"
-            value={phoneCountry}
-            onChange={(e) => setPhoneCountry(e.target.value)}
+        <div className="phone-field-country-wrap" ref={countryMenuRef}>
+          <button
+            type="button"
+            className="phone-field-country-trigger"
+            aria-label={`Pays : ${selectedPhoneCountry.label}, +${selectedPhoneCountry.dialCode}`}
+            aria-expanded={countryMenuOpen}
+            aria-haspopup="listbox"
+            aria-controls={`${idPrefix}-country-options`}
+            onClick={() => setCountryMenuOpen((open) => !open)}
           >
-            {PHONE_COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>{countryFlag(c.code)} {c.label} +{c.dialCode}</option>
-            ))}
-          </select>
+            <CountryFlag country={selectedPhoneCountry.code} />
+            <span>+{selectedPhoneCountry.dialCode}</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </button>
+          {countryMenuOpen && (
+            <div id={`${idPrefix}-country-options`} className="phone-field-country-menu" role="listbox" aria-label="Choisir un pays">
+              {PHONE_COUNTRIES.map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  className="phone-field-country-option"
+                  role="option"
+                  aria-selected={c.code === phoneCountry}
+                  onClick={() => { setPhoneCountry(c.code); setCountryMenuOpen(false); }}
+                >
+                  <CountryFlag country={c.code} />
+                  <span className="phone-field-country-name">{c.label}</span>
+                  <span className="phone-field-country-code">+{c.dialCode}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <input
           id={`${idPrefix}-phone`}
