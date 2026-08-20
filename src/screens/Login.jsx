@@ -453,11 +453,12 @@ export default function Login() {
       {/* Volet de marque : purement illustratif, masqué sur mobile (voir CSS). */}
       <div className="login-right" aria-hidden="true">
         <div className="login-right-content">
-          <h2 className="login-right-title">Un dimensionnement solaire exceptionnel</h2>
+          <h2 className="login-right-title">Le CRM solaire qui va plus loin</h2>
           <p className="login-right-text">
-            Renseignez les appareils du client : l'app calcule la puissance, la
-            batterie et l'onduleur adaptés, puis génère une fiche de dimensionnement
-            complète et détaillée — prête à partager, en quelques minutes.
+            Pipeline commercial, devis en quelques minutes, boutique et commissions
+            partenaires — avec un outil de dimensionnement exceptionnel qui calcule
+            puissance, batterie et onduleur, puis génère une fiche complète prête à
+            partager.
           </p>
         </div>
       </div>
