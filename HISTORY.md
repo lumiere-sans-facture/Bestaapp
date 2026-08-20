@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-20
+- Connexion : nouvelle mise en page à deux volets sur grand écran (formulaire à gauche, présentation de l'app à droite) — repli sur le formulaire seul en dessous de 900px
 - Logo officiel BestaSolar Pro : barre latérale (mode public, version blanche sans plaque) et documents imprimables (devis, factures) ; devient aussi le favicon et l'icône iOS (icône « B » dédiée) — écran de connexion inchangé (icône Sun)
 - Apparence : clair par défaut (ne suit plus l'OS tant que « Système » n'est pas choisi exprès) ; la page de connexion reste toujours claire, quel que soit le thème réglé sur l'appareil
 - Apparence : mode clair / sombre / système, réglable depuis Plus → Apparence (mobile) ou la barre latérale (desktop), sans backend — préférence d'appareil posée avant le premier rendu (pas de clignotement)

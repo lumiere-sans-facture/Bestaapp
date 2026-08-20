@@ -306,138 +306,152 @@ export default function Login() {
 
   return (
     <div className="login-screen">
-      <div className="login-panel">
-        <div className="login-header">
-          <div className="logo-icon"><Sun size={32} /></div>
-          <h1 className="login-title">BestaSolar Pro</h1>
-          <p className="login-subtitle">CRM solaire — Lomé, Togo</p>
-        </div>
+      <div className="login-left">
+        <div className="login-panel">
+          <div className="login-header">
+            <div className="logo-icon"><Sun size={22} /></div>
+            <div>
+              <h1 className="login-title">BestaSolar Pro</h1>
+              <p className="login-subtitle">CRM solaire — Lomé, Togo</p>
+            </div>
+          </div>
 
-        {/* Lien « mot de passe oublié » cliqué : définir le nouveau mot de passe. */}
-        {recovery ? (
-          <form className="login-form card" onSubmit={handleRecovery}>
-            <h2 className="login-form-title">Nouveau mot de passe</h2>
-            {error && <div className="login-error">{error}</div>}
-            {passwordField('Choisissez un nouveau mot de passe', 'new-password')}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              {loading ? 'Enregistrement…' : 'Enregistrer et continuer'}
-            </button>
-          </form>
-        ) : view === 'complete' && isSupabaseConfigured ? (
-          <form className="login-form card" onSubmit={handleComplete}>
-            <h2 className="login-form-title">Terminer l'inscription</h2>
-            <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
-              Votre compte existe — une dernière étape :
-            </p>
-            {error && <div className="login-error">{error}</div>}
-            <div className="input-group">
-              <label className="input-label" htmlFor="complete-name">Votre nom complet</label>
-              <input id="complete-name" className="input" required value={name}
-                onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
-            </div>
-            {phoneField('complete')}
-            {!teamCode && (
+          {/* Lien « mot de passe oublié » cliqué : définir le nouveau mot de passe. */}
+          {recovery ? (
+            <form className="login-form" onSubmit={handleRecovery}>
+              <h2 className="login-form-title">Nouveau mot de passe</h2>
+              {error && <div className="login-error">{error}</div>}
+              {passwordField('Choisissez un nouveau mot de passe', 'new-password')}
+              <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+                {loading ? 'Enregistrement…' : 'Enregistrer et continuer'}
+              </button>
+            </form>
+          ) : view === 'complete' && isSupabaseConfigured ? (
+            <form className="login-form" onSubmit={handleComplete}>
+              <h2 className="login-form-title">Terminer l'inscription</h2>
+              <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
+                Votre compte existe — une dernière étape :
+              </p>
+              {error && <div className="login-error">{error}</div>}
               <div className="input-group">
-                <label className="input-label" htmlFor="complete-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
-                <input id="complete-ref" className="input" value={refCode}
-                  onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
+                <label className="input-label" htmlFor="complete-name">Votre nom complet</label>
+                <input id="complete-name" className="input" required value={name}
+                  onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
               </div>
-            )}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              {loading ? 'Finalisation…' : "Terminer et entrer dans l'app"}
-            </button>
-          </form>
-        ) : view === 'signup' && isSupabaseConfigured ? (
-          <form className="login-form card" onSubmit={handleSignup}>
-            <h2 className="login-form-title">Créer un compte</h2>
-            {error && <div className="login-error">{error}</div>}
-            {teamCode && (
-              <div className="login-notice">
-                <UserPlus size={14} style={{ verticalAlign: -2, marginRight: 5 }} />
-                Vous rejoignez une équipe (invitation {teamCode}).
-              </div>
-            )}
-            <div className="input-group">
-              <label className="input-label" htmlFor="signup-name">Votre nom complet</label>
-              <input id="signup-name" className="input" required value={name}
-                onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
-            </div>
-            {phoneField('signup')}
-            {emailField}
-            {passwordField('Mot de passe (8 caractères min.)', 'new-password')}
-            {!teamCode && (
+              {phoneField('complete')}
+              {!teamCode && (
+                <div className="input-group">
+                  <label className="input-label" htmlFor="complete-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
+                  <input id="complete-ref" className="input" value={refCode}
+                    onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
+                </div>
+              )}
+              <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+                {loading ? 'Finalisation…' : "Terminer et entrer dans l'app"}
+              </button>
+            </form>
+          ) : view === 'signup' && isSupabaseConfigured ? (
+            <form className="login-form" onSubmit={handleSignup}>
+              <h2 className="login-form-title">Créer un compte</h2>
+              {error && <div className="login-error">{error}</div>}
+              {teamCode && (
+                <div className="login-notice">
+                  <UserPlus size={14} style={{ verticalAlign: -2, marginRight: 5 }} />
+                  Vous rejoignez une équipe (invitation {teamCode}).
+                </div>
+              )}
               <div className="input-group">
-                <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
-                <input id="signup-ref" className="input" value={refCode}
-                  onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
-                <div className="field-hint">
-                  {refFromLink
-                    ? "Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli."
-                    : 'Un partenaire BestaSolar vous a recommandé l’app ? Saisissez son code — sinon laissez vide (attribuable une seule fois plus tard, dans Plus → Parrainage).'}
+                <label className="input-label" htmlFor="signup-name">Votre nom complet</label>
+                <input id="signup-name" className="input" required value={name}
+                  onChange={(e) => setName(e.target.value)} placeholder="Prénom et nom" />
+              </div>
+              {phoneField('signup')}
+              {emailField}
+              {passwordField('Mot de passe (8 caractères min.)', 'new-password')}
+              {!teamCode && (
+                <div className="input-group">
+                  <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
+                  <input id="signup-ref" className="input" value={refCode}
+                    onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
+                  <div className="field-hint">
+                    {refFromLink
+                      ? "Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli."
+                      : 'Un partenaire BestaSolar vous a recommandé l’app ? Saisissez son code — sinon laissez vide (attribuable une seule fois plus tard, dans Plus → Parrainage).'}
+                  </div>
                 </div>
-              </div>
-            )}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              {loading ? 'Création…' : 'Créer mon compte'}
-            </button>
-            {!teamCode && (
-              <div className="field-hint" style={{ textAlign: 'center' }}>
-                Gratuit : tableau de bord, suivi clients, boutique, formations, espace partenaire.
-                L'option Devis Pro (documents à votre identité) : 5 000 F/mois.
-              </div>
-            )}
-            <button type="button" className="login-link" onClick={() => switchView('login')}>
-              <ChevronLeft size={14} /> J'ai déjà un compte — me connecter
-            </button>
-          </form>
-        ) : view === 'forgot' && isSupabaseConfigured ? (
-          <form className="login-form card" onSubmit={handleForgot}>
-            <h2 className="login-form-title">Mot de passe oublié</h2>
-            {error && <div className="login-error">{error}</div>}
-            <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
-              Saisissez votre email : vous recevrez un lien pour choisir un nouveau mot de passe.
-            </p>
-            {emailField}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              <KeyRound size={17} /> {loading ? 'Envoi…' : 'Envoyer le lien'}
-            </button>
-            <button type="button" className="login-link" onClick={() => switchView('login')}>
-              <ChevronLeft size={14} /> Retour à la connexion
-            </button>
-          </form>
-        ) : (
-          <form className="login-form card" onSubmit={handleSubmit}>
-            <h2 className="login-form-title">Connexion</h2>
-            {notice && <div className="login-notice">{notice}</div>}
-            {error && <div className="login-error">{error}</div>}
-            {emailField}
-            {passwordField()}
-            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              {loading ? 'Connexion…' : 'Se connecter'}
-            </button>
-            {isSupabaseConfigured ? (
-              <div className="login-links">
-                <button type="button" className="login-link" onClick={() => switchView('forgot')}>Mot de passe oublié ?</button>
-                <button type="button" className="login-link" onClick={() => switchView('signup')}>Créer un compte</button>
-              </div>
-            ) : (
-              <div className="login-help">Mot de passe oublié ? Contactez votre gérant.</div>
-            )}
-            {/* Accès démo : outil de développement, jamais livré dans l'APK. */}
-            {import.meta.env.DEV && !isSupabaseConfigured && (
-              <>
-                <div className="login-divider"><span>Accès démo</span></div>
-                <div className="quick-login-buttons">
-                  <button type="button" className="btn btn-outline" onClick={() => handleQuickLogin('gerant')}>Gérant</button>
-                  <button type="button" className="btn btn-outline" onClick={() => handleQuickLogin('technicien')}>Technicien</button>
+              )}
+              <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+                {loading ? 'Création…' : 'Créer mon compte'}
+              </button>
+              {!teamCode && (
+                <div className="field-hint" style={{ textAlign: 'center' }}>
+                  Gratuit : tableau de bord, suivi clients, boutique, formations, espace partenaire.
+                  L'option Devis Pro (documents à votre identité) : 5 000 F/mois.
                 </div>
-              </>
-            )}
-          </form>
-        )}
-        {/* Version du build : diagnostic des appareils restés sur une vieille
-            version en cache (doit correspondre au dernier déploiement). */}
-        <div className="login-version">version {__APP_VERSION__} · {__APP_ENV__}</div>
+              )}
+              <button type="button" className="login-link" onClick={() => switchView('login')}>
+                <ChevronLeft size={14} /> J'ai déjà un compte — me connecter
+              </button>
+            </form>
+          ) : view === 'forgot' && isSupabaseConfigured ? (
+            <form className="login-form" onSubmit={handleForgot}>
+              <h2 className="login-form-title">Mot de passe oublié</h2>
+              {error && <div className="login-error">{error}</div>}
+              <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
+                Saisissez votre email : vous recevrez un lien pour choisir un nouveau mot de passe.
+              </p>
+              {emailField}
+              <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+                <KeyRound size={17} /> {loading ? 'Envoi…' : 'Envoyer le lien'}
+              </button>
+              <button type="button" className="login-link" onClick={() => switchView('login')}>
+                <ChevronLeft size={14} /> Retour à la connexion
+              </button>
+            </form>
+          ) : (
+            <form className="login-form" onSubmit={handleSubmit}>
+              <h2 className="login-form-title">Connexion</h2>
+              {notice && <div className="login-notice">{notice}</div>}
+              {error && <div className="login-error">{error}</div>}
+              {emailField}
+              {passwordField()}
+              <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+                {loading ? 'Connexion…' : 'Se connecter'}
+              </button>
+              {isSupabaseConfigured ? (
+                <div className="login-links">
+                  <button type="button" className="login-link" onClick={() => switchView('forgot')}>Mot de passe oublié ?</button>
+                  <button type="button" className="login-link" onClick={() => switchView('signup')}>Créer un compte</button>
+                </div>
+              ) : (
+                <div className="login-help">Mot de passe oublié ? Contactez votre gérant.</div>
+              )}
+              {/* Accès démo : outil de développement, jamais livré dans l'APK. */}
+              {import.meta.env.DEV && !isSupabaseConfigured && (
+                <>
+                  <div className="login-divider"><span>Accès démo</span></div>
+                  <div className="quick-login-buttons">
+                    <button type="button" className="btn btn-outline" onClick={() => handleQuickLogin('gerant')}>Gérant</button>
+                    <button type="button" className="btn btn-outline" onClick={() => handleQuickLogin('technicien')}>Technicien</button>
+                  </div>
+                </>
+              )}
+            </form>
+          )}
+          {/* Version du build : diagnostic des appareils restés sur une vieille
+              version en cache (doit correspondre au dernier déploiement). */}
+          <div className="login-version">version {__APP_VERSION__} · {__APP_ENV__}</div>
+        </div>
+      </div>
+      {/* Volet de marque : purement illustratif, masqué sur mobile (voir CSS). */}
+      <div className="login-right" aria-hidden="true">
+        <div className="login-right-content">
+          <h2 className="login-right-title">Votre activité solaire, pilotée de bout en bout</h2>
+          <p className="login-right-text">
+            Pipeline commercial, devis en quelques minutes, boutique et commissions
+            partenaires — même hors connexion. Pensé pour le terrain, à Lomé et au-delà.
+          </p>
+        </div>
       </div>
     </div>
   );
