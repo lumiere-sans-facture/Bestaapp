@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, Handshake } from 'lucide-react';
+import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, ChevronDown, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
@@ -18,6 +18,7 @@ const countryName = (() => {
     return (code) => code;
   }
 })();
+const countryFlag = (code) => String.fromCodePoint(...[...code].map((letter) => 127397 + letter.charCodeAt(0)));
 const PHONE_COUNTRIES = getCountries()
   .map((code) => ({ code, dialCode: getCountryCallingCode(code), label: countryName(code) }))
   .sort((a, b) => {
@@ -60,6 +61,7 @@ export default function Login() {
   const [phone, setPhone] = useState(''); // numéro national, formaté au fil de la saisie
   const [phoneCountry, setPhoneCountry] = useState('TG');
   const fullPhone = () => parsePhoneNumberFromString(phone, phoneCountry)?.number || '';
+  const selectedPhoneCountry = PHONE_COUNTRIES.find((country) => country.code === phoneCountry) || PHONE_COUNTRIES[0];
   const phoneError = () => {
     const parsed = parsePhoneNumberFromString(phone, phoneCountry);
     if (!parsed || !isValidPhoneNumber(phone, phoneCountry)) return 'Saisissez un numéro valide pour le pays sélectionné.';
@@ -224,16 +226,23 @@ export default function Login() {
     <div className="input-group">
       <label className="input-label" htmlFor={`${idPrefix}-phone`}>Numéro de téléphone</label>
       <div className="phone-field">
-        <select
-          className="input phone-field-country"
-          aria-label="Pays"
-          value={phoneCountry}
-          onChange={(e) => setPhoneCountry(e.target.value)}
-        >
-          {PHONE_COUNTRIES.map((c) => (
-            <option key={c.code} value={c.code}>{c.label}</option>
-          ))}
-        </select>
+        <div className="phone-field-country-wrap">
+          <div className="phone-field-country-display" aria-hidden="true">
+            <span className="phone-field-flag">{countryFlag(selectedPhoneCountry.code)}</span>
+            <span>+{selectedPhoneCountry.dialCode}</span>
+            <ChevronDown size={16} />
+          </div>
+          <select
+            className="phone-field-country"
+            aria-label="Pays"
+            value={phoneCountry}
+            onChange={(e) => setPhoneCountry(e.target.value)}
+          >
+            {PHONE_COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>{c.label}</option>
+            ))}
+          </select>
+        </div>
         <input
           id={`${idPrefix}-phone`}
           className="input"
