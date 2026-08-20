@@ -349,6 +349,18 @@ textarea.input { resize: vertical; }
 /* ============ Connexion ============ */
 
 .login-screen {
+  /* Toujours clair, quel que soit le thème choisi dans l'app (voir
+     .theme-toggle) : personne n'est encore connecté ici pour l'avoir
+     réglé, et la page d'accueil ne doit pas dépendre d'une préférence
+     posée par un compte différent sur cet appareil. Redéfinit les jetons
+     de surface en valeurs claires — un enfant du <html data-theme="dark">
+     hérite normalement de ce bloc, sa propre déclaration prime. */
+  --primary: #0a2472; --primary-light: #1a3a8c; --primary-ink: #0a2472;
+  --success-ink: #047857; --error-ink: #bb3535; --warning-ink: #92400e; --info: #2563eb;
+  --bg: #f4f6fb; --bg-card: #ffffff;
+  --text-primary: #1a1a2e; --text-secondary: #676d7b; --text-muted: #9ca3af;
+  --border: #e5e7eb;
+  --shadow: 0 2px 8px rgba(10, 36, 114, 0.08); --shadow-lg: 0 8px 30px rgba(10, 36, 114, 0.16);
   min-height: 100vh; min-height: 100dvh;
   display: flex; align-items: center; justify-content: center;
   padding: 24px;

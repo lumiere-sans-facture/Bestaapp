@@ -14,11 +14,11 @@
       (function () {
         try {
           var t = localStorage.getItem('bestasolar_theme');
-          // Un choix explicite (clair/sombre) prime sur la préférence système,
-          // y compris quand il la contredit — sinon « Clair » choisi sur un
-          // système en sombre clignote en sombre le temps que React monte.
-          var sombre = t === 'sombre' || (t !== 'clair' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          if (t === 'clair' || t === 'sombre') document.documentElement.dataset.theme = sombre ? 'dark' : 'light';
+          // Par défaut (aucune clé) et pour un choix explicite « clair » :
+          // toujours clair, même sur un système resté en sombre — l'app ne
+          // suit l'OS que si « Système » a été choisi EXPRÈS.
+          var sombre = t === 'sombre' || (t === 'systeme' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (t === 'sombre' || !t || t === 'clair') document.documentElement.dataset.theme = sombre ? 'dark' : 'light';
           else if (sombre) document.documentElement.dataset.theme = 'dark';
         } catch (e) { /* localStorage indisponible (navigation privée stricte) : reste clair */ }
       })();

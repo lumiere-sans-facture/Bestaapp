@@ -24,12 +24,15 @@ const appliquerAuDocument = (theme) => {
 };
 
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState(() => localStorage.getItem(STORAGE_KEY) || 'systeme');
+  // Par défaut, toujours clair — l'app ne se met JAMAIS en sombre toute
+  // seule en suivant l'OS ; « Système » reste un choix explicite de
+  // l'utilisateur, pas le point de départ.
+  const [theme, setThemeState] = useState(() => localStorage.getItem(STORAGE_KEY) || 'clair');
 
   useEffect(() => { appliquerAuDocument(theme); }, [theme]);
 
-  // Thème « système » : suit un changement de préférence OS en direct,
-  // sans attendre un rechargement de la page.
+  // Thème « système » (choisi explicitement) : suit un changement de
+  // préférence OS en direct, sans attendre un rechargement de la page.
   useEffect(() => {
     if (theme !== 'systeme') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -38,10 +41,12 @@ export function ThemeProvider({ children }) {
     return () => mq.removeEventListener('change', onChange);
   }, [theme]);
 
+  // Toujours écrit en toutes lettres — y compris « clair », le défaut :
+  // sans ça, un « système » choisi puis reparti en « clair » retomberait,
+  // absence de clé oblige, sur le défaut redevenu ambigu.
   const setTheme = useCallback((t) => {
     setThemeState(t);
-    if (t === 'systeme') localStorage.removeItem(STORAGE_KEY);
-    else localStorage.setItem(STORAGE_KEY, t);
+    localStorage.setItem(STORAGE_KEY, t);
   }, []);
 
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
