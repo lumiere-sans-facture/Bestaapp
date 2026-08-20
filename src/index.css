@@ -373,7 +373,22 @@ textarea.input { resize: vertical; }
 }
 .input-with-icon { position: relative; }
 .phone-field { display: flex; gap: 8px; }
-.phone-field-country { flex: 0 0 106px; padding-left: 8px; padding-right: 4px; }
+.phone-field-country-wrap { position: relative; flex: 0 0 112px; min-width: 0; }
+.phone-field-country-display {
+  position: absolute; inset: 0; display: flex; align-items: center; gap: 6px;
+  padding: 12px 9px; border: 1.5px solid var(--border); border-radius: 10px;
+  background: var(--bg-card); color: var(--text-primary); white-space: nowrap;
+  pointer-events: none;
+}
+.phone-field-country-display svg { margin-left: auto; color: var(--text-secondary); }
+.phone-field-flag { font-size: 1.125rem; line-height: 1; }
+.phone-field-country {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  opacity: 0; cursor: pointer;
+}
+.phone-field-country-wrap:focus-within .phone-field-country-display {
+  border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
 .phone-field .input:not(.phone-field-country) { flex: 1; min-width: 0; }
 .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
 .input-has-icon { padding-left: 42px; padding-right: 42px; }
