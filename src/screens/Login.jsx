@@ -234,7 +234,6 @@ export default function Login() {
           required
         />
       </div>
-      {phoneCountry === 'BJ' && <div className="field-hint">Bénin : saisissez exactement 10 chiffres, sans +229.</div>}
     </div>
   );
 
@@ -314,6 +313,7 @@ export default function Login() {
           autoComplete="tel-national"
         />
       </div>
+      {phoneCountry === 'BJ' && <div className="field-hint">Bénin : saisissez exactement 10 chiffres, sans +229.</div>}
     </div>
   );
 
