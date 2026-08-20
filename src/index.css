@@ -103,19 +103,24 @@ img { max-width: 100%; }
 .page-subtitle { font-size: 0.8125rem; opacity: 0.75; margin-top: 2px; }
 .page-header-actions { display: flex; align-items: center; gap: 10px; }
 
-/* Cloche de notifications (dans le bandeau d'en-tête, sur fond --primary) */
+/* Cloche de notifications (dans le bandeau d'en-tête). Sur mobile, l'en-tête
+   est sur fond --primary (icône blanche) ; sur desktop, il passe en blanc
+   (voir @media 1024px plus bas) — `color: inherit` suit l'un ou l'autre,
+   comme .page-back-icon juste en dessous. */
 .notif-bell {
   position: relative; display: flex; align-items: center; justify-content: center;
   width: 38px; height: 38px; border-radius: 50%; border: none;
-  background: rgba(255, 255, 255, 0.12); color: white; cursor: pointer; flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.12); color: inherit; cursor: pointer; flex-shrink: 0;
 }
 .notif-bell:hover { background: rgba(255, 255, 255, 0.2); }
+@media (min-width: 1024px) { .notif-bell:hover { background: var(--bg); } }
 .notif-badge {
   position: absolute; top: -2px; right: -2px; min-width: 17px; height: 17px;
   padding: 0 4px; border-radius: 999px; background: var(--error); color: white;
   font-size: 0.625rem; font-weight: 700; line-height: 17px; text-align: center;
   border: 2px solid var(--primary);
 }
+@media (min-width: 1024px) { .notif-badge { border-color: white; } }
 
 .pipeline-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 0.8125rem; opacity: 0.9; }
 .pipeline-stat strong { font-weight: 600; }
