@@ -133,6 +133,8 @@ function ModeSwitch() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/clients" element={<Clients />} />
+        {/* Fiche client plein écran : même écran, piloté par l'URL (comme /plus/:section). */}
+        <Route path="/clients/:id" element={<Clients />} />
         <Route path="/boutique" element={<Boutique />} />
         <Route path="/devis" element={<Devis />} />
         <Route path="/plus" element={<Plus />} />
