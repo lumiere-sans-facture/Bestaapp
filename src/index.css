@@ -1711,6 +1711,46 @@ form .login-link { width: 100%; margin-top: 4px; }
 .plus-grid { display: flex; flex-direction: column; gap: 16px; }
 .plus-card { padding: 0; overflow: hidden; }
 
+/* Paramètres : colonne dédiée et centrée, commune au menu et à toutes ses
+   sous-pages. Les réglages restent faciles à parcourir sur grand écran sans
+   s'étirer sur les 1200 px réservés aux écrans métier. */
+.settings-shell .page-header-inner,
+.settings-shell .page-content { max-width: 980px; }
+.settings-shell .back-to-plus { display: none; }
+.settings-shell .partners-toolbar { justify-content: flex-end; }
+
+.settings-page { gap: 26px; padding-bottom: 32px; }
+.settings-page .plus-section { width: 100%; min-width: 0; }
+.settings-page .plus-section-label {
+  padding: 0 2px 9px; color: var(--text-secondary);
+}
+.settings-page .plus-card {
+  display: grid; gap: 12px; padding: 0; overflow: visible;
+  background: transparent; box-shadow: none;
+}
+.settings-page .plus-card .menu-item {
+  min-height: 82px; padding: 17px 20px;
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--bg-card); box-shadow: var(--shadow);
+  text-align: left; transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.settings-page .plus-card .menu-item:last-child { border: 1px solid var(--border); }
+.settings-page .plus-card .menu-item:hover {
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+  background: var(--bg-card); box-shadow: var(--shadow-lg); transform: translateY(-1px);
+}
+.settings-page .menu-item-icon { width: 42px; height: 42px; border-radius: 11px; }
+.settings-page .menu-item-title { font-size: 1rem; font-weight: 650; }
+.settings-page .menu-item-subtitle { margin-top: 3px; line-height: 1.35; }
+.settings-page .menu-item-arrow { margin-left: 8px; }
+
+@media (max-width: 639px) {
+  .settings-page { gap: 22px; }
+  .settings-page .plus-card { gap: 10px; }
+  .settings-page .plus-card .menu-item { min-height: 74px; padding: 14px; }
+  .settings-page .menu-item-icon { width: 40px; height: 40px; }
+}
+
 /* Sélecteur de thème (Plus → Apparence) : 3 puces à parts égales. */
 .theme-toggle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px; }
 .theme-toggle-btn { display: flex; align-items: center; justify-content: center; gap: 6px; text-align: center; }
