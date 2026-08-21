@@ -3,11 +3,10 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
 import SkeletonPageContent from './SkeletonPageContent';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Sun, Moon, MonitorSmartphone, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
-import { useTheme } from '../context/ThemeContext';
 import { initials } from '../utils/format';
 import { SyncDot } from './SyncStatus';
 
@@ -55,13 +54,12 @@ const plusSections = (user) => [
 
 // Écrans atteints depuis « Paramètres » (voir screens/Plus.jsx) : l'entrée
 // de la barre latérale y reste allumée.
-const SETTINGS_PATHS = ['/plus/profile', '/plus/backup', '/plus/paiements', '/plus/subsadmin'];
+const SETTINGS_PATHS = ['/plus/profile', '/plus/apparence', '/plus/backup', '/plus/paiements', '/plus/subsadmin'];
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const { getCompanyForUser, storageError } = useData();
   const { mode, setMode, proActive } = useMode();
-  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isPro = mode === 'pro';
@@ -144,27 +142,8 @@ export default function AppLayout() {
           )}
         </nav>
         <div className="sidebar-footer">
-          {/* Réglage d'apparence : reste en barre latérale, la page « Plus »
-              masque sa version mobile sur desktop (voir .plus-sections). */}
-          <div className="sidebar-theme-toggle" role="group" aria-label="Apparence">
-            {[
-              ['clair', Sun, 'Clair'],
-              ['sombre', Moon, 'Sombre'],
-              ['systeme', MonitorSmartphone, 'Système'],
-            ].map(([id, Icon, label]) => (
-              <button
-                key={id}
-                type="button"
-                className={theme === id ? 'active' : ''}
-                aria-pressed={theme === id}
-                title={label}
-                aria-label={label}
-                onClick={() => setTheme(id)}
-              >
-                <Icon size={16} />
-              </button>
-            ))}
-          </div>
+          {/* Le réglage d'apparence a quitté la barre latérale : il vit dans
+              Paramètres → Apparence (/plus/apparence), avec la densité. */}
           {isPro && (
             <button className="btn btn-accent btn-block sidebar-pro-btn" onClick={() => setMode('public')}>
               <ArrowLeft size={16} /> Revenir au mode public

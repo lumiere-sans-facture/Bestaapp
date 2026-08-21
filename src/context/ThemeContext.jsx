@@ -1,10 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-// Préférence d'apparence : « clair », « sombre » ou « système » (suit l'OS).
-// Un réglage d'appareil, pas une donnée métier — stocké en local uniquement,
-// jamais répliqué par Supabase (voir remoteSync.js : rien à voir ici).
+// Préférences d'apparence : thème (« clair », « sombre » ou « système », qui
+// suit l'OS) et densité de l'interface (« compact », « defaut », « confortable »).
+// Des réglages d'APPAREIL, pas des données métier — stockés en local uniquement,
+// jamais répliqués par Supabase (voir remoteSync.js : rien à voir ici).
 const STORAGE_KEY = 'bestasolar_theme';
+const DENSITY_KEY = 'bestasolar_densite';
 const THEME_COLOR = { clair: '#0a2472', sombre: '#0b1020' };
+const DENSITES = ['compact', 'defaut', 'confortable'];
 
 const ThemeContext = createContext(null);
 
@@ -28,8 +31,20 @@ export function ThemeProvider({ children }) {
   // seule en suivant l'OS ; « Système » reste un choix explicite de
   // l'utilisateur, pas le point de départ.
   const [theme, setThemeState] = useState(() => localStorage.getItem(STORAGE_KEY) || 'clair');
+  const [density, setDensityState] = useState(() => {
+    const saved = localStorage.getItem(DENSITY_KEY);
+    return DENSITES.includes(saved) ? saved : 'defaut';
+  });
 
   useEffect(() => { appliquerAuDocument(theme); }, [theme]);
+
+  // `data-density` n'est posé que hors du défaut : sans attribut, le CSS
+  // garde les espacements de base (voir « Densité de l'interface » dans index.css).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (density === 'defaut') delete root.dataset.density;
+    else root.dataset.density = density;
+  }, [density]);
 
   // Thème « système » (choisi explicitement) : suit un changement de
   // préférence OS en direct, sans attendre un rechargement de la page.
@@ -49,7 +64,17 @@ export function ThemeProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, t);
   }, []);
 
-  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
+  const setDensity = useCallback((d) => {
+    if (!DENSITES.includes(d)) return;
+    setDensityState(d);
+    localStorage.setItem(DENSITY_KEY, d);
+  }, []);
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme, density, setDensity }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

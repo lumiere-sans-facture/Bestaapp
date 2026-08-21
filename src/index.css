@@ -48,6 +48,7 @@
   --radius-lg: 16px;
   --radius-pill: 999px;
   --control-h: 46px;      /* hauteur standard d'un champ / contrôle de formulaire */
+  --card-pad: 16px;       /* marge intérieure d'une carte — varie avec la densité */
   --sidebar-width: 264px;
   --tab-bar-height: 64px;
   /* Variante uniforme : une seule mise en page à toutes les largeurs. */
@@ -57,6 +58,18 @@
   --tap: 44px;            /* cible tactile minimale, souris comprise */
 }
 @media (min-width: 1024px) { :root { --page-pad: 32px; } }
+
+/* ============================================================
+   Densité de l'interface — réglée dans Paramètres → Apparence
+   (context/ThemeContext.jsx pose `data-density` sur <html>).
+
+   Ne touche QUE des jetons d'espacement, jamais --page-pad : celui-ci est
+   redéfini plus haut dans une media query sur `:root`, qu'un sélecteur
+   `:root[data-density]` (plus spécifique) écraserait — la marge de page
+   desktop retomberait alors à sa valeur mobile.
+   ============================================================ */
+:root[data-density="compact"] { --card-pad: 11px; --control-h: 40px; }
+:root[data-density="confortable"] { --card-pad: 22px; --control-h: 52px; }
 
 /* ============================================================
    Thème sombre — voir context/ThemeContext.jsx pour le réglage
@@ -264,20 +277,6 @@ img { max-width: 100%; }
 .sidebar-pro-link:hover { background: rgba(245, 166, 35, 0.12); color: var(--accent-light); }
 .sidebar-footer { padding: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 .sidebar-pro-btn { margin-bottom: 12px; }
-/* Réglage d'apparence : la barre latérale reste sur --primary-dark quel que
-   soit le thème (couleur de marque, voir le bloc [data-theme] plus haut) —
-   ces boutons suivent donc son langage blanc-sur-sombre, jamais les jetons
-   --text-*/--bg-card qui, eux, varient avec le thème choisi ici même. */
-.sidebar-theme-toggle {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px;
-}
-.sidebar-theme-toggle button {
-  display: flex; align-items: center; justify-content: center;
-  padding: 8px; border-radius: 8px; color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.06); transition: background 0.15s ease, color 0.15s ease;
-}
-.sidebar-theme-toggle button:hover { background: rgba(255, 255, 255, 0.12); color: white; }
-.sidebar-theme-toggle button.active { background: var(--accent); color: var(--primary-dark); }
 .sidebar-user { display: flex; align-items: center; gap: 10px; }
 .sidebar-user-avatar {
   width: 38px; height: 38px; flex-shrink: 0;
@@ -318,7 +317,7 @@ img { max-width: 100%; }
 
 /* ============ Composants de base ============ */
 
-.card { background: var(--bg-card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+.card { background: var(--bg-card); border-radius: var(--radius); padding: var(--card-pad); box-shadow: var(--shadow); }
 .card-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 14px; }
 .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
 
@@ -380,7 +379,7 @@ textarea.input { resize: vertical; }
 
 .login-screen {
   /* Toujours clair, quel que soit le thème choisi dans l'app (voir
-     .theme-toggle) : personne n'est encore connecté ici pour l'avoir
+     Paramètres → Apparence) : personne n’est encore connecté ici pour l’avoir
      réglé, et la page d'accueil ne doit pas dépendre d'une préférence
      posée par un compte différent sur cet appareil. Redéfinit les jetons
      de surface en valeurs claires — un enfant du <html data-theme="dark">
@@ -1711,9 +1710,35 @@ form .login-link { width: 100%; margin-top: 4px; }
 .plus-grid { display: flex; flex-direction: column; gap: 16px; }
 .plus-card { padding: 0; overflow: hidden; }
 
-/* Sélecteur de thème (Plus → Apparence) : 3 puces à parts égales. */
-.theme-toggle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px; }
-.theme-toggle-btn { display: flex; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+/* ============ Paramètres → Apparence ============
+   Cartes d'option à parts égales (thème, densité) : une colonne en mobile,
+   trois dès 600px — trois cartes côte à côte sur un téléphone n'ont plus la
+   place d'afficher leur description. */
+.appearance-group { margin-bottom: 16px; }
+.appearance-group-title { display: flex; align-items: center; gap: 8px; font-size: 0.9375rem; font-weight: 700; }
+.appearance-group-title svg { color: var(--primary-ink); flex-shrink: 0; }
+.appearance-group-hint { font-size: 0.8125rem; color: var(--text-secondary); margin: 6px 0 16px; }
+.appearance-options { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 600px) { .appearance-options { grid-template-columns: repeat(3, 1fr); } }
+.appearance-option {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 20px 14px; border-radius: var(--radius); text-align: center;
+  border: 1.5px solid var(--border); background: var(--bg-card); color: var(--text-primary);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.appearance-option:hover { border-color: var(--primary); transform: translateY(-2px); }
+/* Option retenue : bordure ET pastille cochée — la couleur seule ne suffit
+   pas à distinguer l'état choisi (mêmes exigences que .tab-item.active). */
+.appearance-option.active { border-color: var(--primary); border-width: 2px; background: var(--bg); }
+.appearance-option-icon { color: var(--primary-ink); margin-bottom: 2px; }
+.appearance-option-label { font-size: 0.9375rem; font-weight: 600; }
+.appearance-option-desc { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; }
+.appearance-option-check {
+  position: absolute; top: 10px; right: 10px;
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); color: white;
+}
 
 /* Carte d'accès Pro du menu « Plus » */
 .pro-cta {

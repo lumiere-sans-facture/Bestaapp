@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Sun, Moon, MonitorSmartphone, Palette, Settings } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -28,6 +28,7 @@ import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import KitsSection from './plus/KitsSection';
 import PaiementsSection from './plus/PaiementsSection';
+import AppearanceSection from './plus/AppearanceSection';
 import KkiapayButton from '../components/KkiapayButton';
 import InvertersSection from './plus/InvertersSection';
 import PompeKitsSection from './plus/PompeKitsSection';
@@ -46,8 +47,7 @@ export default function Plus() {
   const [refInput, setRefInput] = useState('');
   const [refSaving, setRefSaving] = useState(false);
   const { setMode, proActive } = useMode();
-  const { theme, setTheme } = useTheme();
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const { theme } = useTheme();
   const data = useData();
   const {
     partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team, teamChargee,
@@ -68,7 +68,7 @@ export default function Plus() {
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'parametres', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
@@ -95,7 +95,7 @@ export default function Plus() {
   const setActiveTab = (x) => navigate(x === 'menu' ? '/plus' : `/plus/${x}`);
   // Sections ouvertes DEPUIS « Paramètres » : leur retour y revient, sinon on
   // retomberait sur le menu « Plus » sans jamais pouvoir enchaîner deux réglages.
-  const SECTIONS_PARAMETRES = ['profile', 'backup', 'paiements', 'subsadmin'];
+  const SECTIONS_PARAMETRES = ['profile', 'apparence', 'backup', 'paiements', 'subsadmin'];
   const retourDepuis = (tab) => (SECTIONS_PARAMETRES.includes(tab) ? 'parametres' : 'menu');
   const [comFilter, setComFilter] = useState('all');
   const [comPartner, setComPartner] = useState('all');
@@ -640,7 +640,7 @@ export default function Plus() {
         <div className="plus-card card">
           {/* Réglage d'appareil (pas une donnée métier) : stocké en local,
               jamais répliqué — voir context/ThemeContext.jsx. */}
-          <MenuItem icon={Palette} title="Apparence" subtitle={`Thème et mode d'affichage · ${THEME_LABEL[theme]}`} onClick={() => setAppearanceOpen(true)} />
+          <MenuItem icon={Palette} title="Apparence" subtitle={`Thème et mode d'affichage · ${THEME_LABEL[theme]}`} onClick={() => setActiveTab('apparence')} />
         </div>
       </div>
 
@@ -667,26 +667,6 @@ export default function Plus() {
       {/* Réservé au gérant : lui seul peut agir sur la configuration du
           suivi, et lui seul a besoin de savoir s'il est actif. */}
       {user.role === 'gerant' && <DiagnosticCard />}
-
-      <Sheet open={appearanceOpen} onClose={() => setAppearanceOpen(false)} title="Apparence">
-        <div className="theme-toggle">
-          {[
-            ['clair', Sun, 'Clair'],
-            ['sombre', Moon, 'Sombre'],
-            ['systeme', MonitorSmartphone, 'Système'],
-          ].map(([id, Icon, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`category-chip theme-toggle-btn ${theme === id ? 'active' : ''}`}
-              aria-pressed={theme === id}
-              onClick={() => setTheme(id)}
-            >
-              <Icon size={16} /> {label}
-            </button>
-          ))}
-        </div>
-      </Sheet>
     </div>
   );
 
@@ -803,24 +783,31 @@ export default function Plus() {
   // Le titre de page suit la sous-section : arriver sur /plus/commissions
   // depuis la barre latérale doit afficher « Commissions », pas « Plus ».
   const TAB_TITLES = {
-    menu: 'Plus', parametres: 'Paramètres', partners: 'Partenaires', commissions: 'Commissions',
+    menu: 'Plus', parametres: 'Paramètres', apparence: 'Apparence', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
     subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
     paiements: 'Moyens de paiement',
     profile: 'Mon profil', backup: 'Sauvegarde',
   };
 
+  // Sous-titre d'en-tête, pour les écrans qui en portent un.
+  const TAB_SUBTITLES = {
+    parametres: 'Gérez votre compte et vos préférences',
+    apparence: 'Personnalisez l’apparence de l’application',
+  };
+
   return (
     <div className="page">
       <PageHeader
         title={TAB_TITLES[activeTab] || 'Plus'}
-        subtitle={activeTab === 'parametres' ? 'Gérez votre compte et vos préférences' : undefined}
+        subtitle={TAB_SUBTITLES[activeTab]}
         onBack={activeTab !== 'menu' ? () => setActiveTab(retourDepuis(activeTab)) : undefined}
       />
       {/* La formation s'étale en large (catalogue + école) ; le reste garde la colonne étroite. */}
       <div className={`page-content ${activeTab === 'formation' ? 'page-content-wide' : 'page-content-narrow'}`}>
         {activeTab === 'menu' && renderMenu()}
         {activeTab === 'parametres' && renderParametres()}
+        {activeTab === 'apparence' && <AppearanceSection />}
         {activeTab === 'partners' && renderPartners()}
         {activeTab === 'commissions' && renderCommissions()}
         {activeTab === 'orders' && <OrdersSection onBack={() => setActiveTab('menu')} />}
