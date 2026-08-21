@@ -1,7 +1,7 @@
 // État applicatif : forme initiale, chargement depuis localStorage (avec
 // migrations de seed) et persistance. Aucune dépendance React — logique pure.
 import * as seed from '../data/seed';
-import { SOLAR_KITS } from '../data/kits';
+import { SOLAR_KITS, KITS_DOTES_AVANT_REGISTRE } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
 import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -34,6 +34,9 @@ export const buildInitialState = () => ({
   // démarrer à zéro le rendrait inutilisable. Ils appartiennent ensuite à
   // l'entreprise, qui les modifie depuis « Mes kits ».
   kits: SOLAR_KITS,
+  // Kits officiels déjà dotés : mémorisé pour ne doter chaque kit qu'UNE FOIS
+  // — un kit supprimé par le gérant ne doit jamais réapparaître.
+  kitsDotes: SOLAR_KITS.map((k) => k.id),
   // Onduleurs proposés en alternative quand celui d'un kit ne prend pas assez
   // de panneaux pour le besoin calculé — même logique de dotation que les kits.
   inverters: INVERTER_MODELS,
@@ -95,6 +98,16 @@ export const loadState = (scope = null) => {
       // jamais réinjecter ensuite, sinon un kit supprimé par le gérant
       // reviendrait à chaque ouverture de l'application.
       if (!Array.isArray(saved.kits)) saved.kits = SOLAR_KITS;
+      // Dotation des NOUVEAUX kits officiels (même principe que les cours) :
+      // un kit ajouté par une mise à jour rejoint les états existants, une
+      // seule fois — sans quoi il resterait invisible pour tous ceux qui ont
+      // déjà ouvert l'application, et sans ressusciter un kit supprimé.
+      const kitsDotes = new Set(saved.kitsDotes || KITS_DOTES_AVANT_REGISTRE);
+      const nouveauxKits = SOLAR_KITS.filter(
+        (k) => !kitsDotes.has(k.id) && !(saved.kits || []).some((x) => x.id === k.id)
+      );
+      if (nouveauxKits.length) saved.kits = [...(saved.kits || []), ...nouveauxKits];
+      saved.kitsDotes = [...new Set([...kitsDotes, ...SOLAR_KITS.map((k) => k.id)])];
       // Migration « Onduleurs » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.inverters)) saved.inverters = INVERTER_MODELS;
       // Migration « Kits pompage » : même principe, dotation une seule fois.

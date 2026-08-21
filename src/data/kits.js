@@ -65,6 +65,30 @@ export const SOLAR_KITS = [
     ]),
   },
   {
+    id: 'kit-16kwh',
+    name: 'Kit 16 kWh',
+    battery: 16,
+    panels: 10,
+    panelW: 590,
+    inverter: 6,
+    lines: toLines([
+      ['Batterie lithium 48V (16kwh) Beve', 1, 'pcs', 1000000],
+      ['Panneaux photovoltaïque 590Wc', 10, 'pcs', 63000],
+      ['Onduleur hybride Beve 6kva', 1, 'pcs', 310000],
+      ['Coffret de protection DC 2 entrée/sortie', 1, 'pcs', 65000],
+      ['Dijoncteur compacte 125A', 1, 'pcs', 22000],
+      ['Câble PV 1x6mm² Rouge/Noire', 100, 'm', 700],
+      ['Câble batterie 1x35mm²', 2, 'm', 4000],
+      ['Cosse batterie cuivre de 35mm²', 4, 'pcs', 1500],
+      ['Moulure 40x40', 2, 'pcs', 5500],
+      ['Kit terre', 1, 'pcs', 25000],
+      ['Câble terre 1x6mm²', 50, 'pcs', 700],
+      ['Coffret AC', 1, 'pcs', 25000],
+      ['Câble TH AC 1x6mm²', 12, 'pcs', 1000],
+      ["Main d'œuvre", 1, 'pcs', 100000],
+    ]),
+  },
+  {
     id: 'kit-20kwh',
     name: 'Kit 20 kWh',
     battery: 20,
@@ -113,4 +137,16 @@ export const SOLAR_KITS = [
       ["Main d'œuvre", 1, 'pcs', 150000],
     ]),
   },
+];
+
+// Kits officiels déjà dotés AVANT l'introduction du registre `kitsDotes`
+// (context/dataState.js). Sert une seule fois, à la migration : sans cette
+// liste figée, un kit que le gérant avait supprimé serait pris pour un kit
+// jamais doté et ressusciterait. Liste historique — ne jamais l'étendre.
+export const KITS_DOTES_AVANT_REGISTRE = [
+  'kit-2.5kwh-eco',
+  'kit-2.5kwh-premium',
+  'kit-5kwh',
+  'kit-20kwh',
+  'kit-32kwh',
 ];

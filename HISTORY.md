@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-21
+- Kits : nouveau **Kit 16 kWh** (batterie Beve 16 kWh, 10 × 590 Wc, onduleur Beve 6 kVA, 14 lignes, 2 319 000 F hors structure) — les kits officiels ajoutés par une mise à jour rejoignent désormais les installations existantes, une seule fois, sans ressusciter un kit supprimé par le gérant
 - Paramètres : tous les onglets (Profil, Apparence, Moyens de paiement, Sauvegarde, Administration) recadrés comme l'écran qui y mène — en-tête titre + phrase d'explication, un seul retour (la flèche de l'en-tête, que le bouton « Retour » doublait sur mobile), libellés de section en majuscules et même espacement des cartes partout
 
 ## 2026-08-20
