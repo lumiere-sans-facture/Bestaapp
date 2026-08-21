@@ -626,7 +626,7 @@ export default function Plus() {
   // et le menu « Plus » n'énumèrent plus que le travail quotidien — chaque
   // réglage reste à un seul endroit, jamais dupliqué entre les deux.
   const renderParametres = () => (
-    <div className="plus-grid">
+    <div className="plus-grid settings-page">
       <div className="plus-section">
         <div className="plus-section-label">Compte</div>
         <div className="plus-card card">
@@ -811,7 +811,7 @@ export default function Plus() {
   };
 
   return (
-    <div className="page">
+    <div className={`page ${activeTab === 'parametres' || SECTIONS_PARAMETRES.includes(activeTab) ? 'settings-shell' : ''}`}>
       <PageHeader
         title={TAB_TITLES[activeTab] || 'Plus'}
         subtitle={activeTab === 'parametres' ? 'Gérez votre compte et vos préférences' : undefined}
