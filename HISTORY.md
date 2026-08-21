@@ -9,7 +9,7 @@ pull requests correspondantes sur GitHub.
 - Paramètres : tous les onglets (Profil, Apparence, Moyens de paiement, Sauvegarde, Administration) recadrés comme l'écran qui y mène — en-tête titre + phrase d'explication, un seul retour (la flèche de l'en-tête, que le bouton « Retour » doublait sur mobile), libellés de section en majuscules et même espacement des cartes partout
 
 ## 2026-08-20
-- Apparence : écran dédié (Paramètres → Apparence) avec des cartes d'option illustrées ; nouveau réglage « Densité de l'interface » (compact / par défaut / confortable) et retrait des icônes de thème de la barre latérale
+- Apparence : écran dédié (Paramètres → Apparence) avec des cartes d'option illustrées, et retrait des icônes de thème de la barre latérale
 - Clients : carnet en cartes (pastille d'initiales, téléphone/email/adresse, nombre de devis) et fiche client plein écran sur `/clients/:id` — onglets Résumé / Devis / Contact / Notes, quatre indicateurs, activité sur 6 mois et devis récents
 - Clients : champ email ajouté à la fiche client (saisie, affichage, recherche)
 - Paramètres : nouvel écran qui réunit tout ce qui se règle (profil, abonnement, apparence, moyens de paiement, sauvegarde, administration, diagnostic) — la barre latérale et le menu « Plus » n'énumèrent plus que le travail quotidien

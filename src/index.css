@@ -48,7 +48,7 @@
   --radius-lg: 16px;
   --radius-pill: 999px;
   --control-h: 46px;      /* hauteur standard d'un champ / contrôle de formulaire */
-  --card-pad: 16px;       /* marge intérieure d'une carte — varie avec la densité */
+  --card-pad: 16px;       /* marge intérieure d'une carte */
   --sidebar-width: 264px;
   --tab-bar-height: 64px;
   /* Variante uniforme : une seule mise en page à toutes les largeurs. */
@@ -58,18 +58,6 @@
   --tap: 44px;            /* cible tactile minimale, souris comprise */
 }
 @media (min-width: 1024px) { :root { --page-pad: 32px; } }
-
-/* ============================================================
-   Densité de l'interface — réglée dans Paramètres → Apparence
-   (context/ThemeContext.jsx pose `data-density` sur <html>).
-
-   Ne touche QUE des jetons d'espacement, jamais --page-pad : celui-ci est
-   redéfini plus haut dans une media query sur `:root`, qu'un sélecteur
-   `:root[data-density]` (plus spécifique) écraserait — la marge de page
-   desktop retomberait alors à sa valeur mobile.
-   ============================================================ */
-:root[data-density="compact"] { --card-pad: 11px; --control-h: 40px; }
-:root[data-density="confortable"] { --card-pad: 22px; --control-h: 52px; }
 
 /* ============================================================
    Thème sombre — voir context/ThemeContext.jsx pour le réglage

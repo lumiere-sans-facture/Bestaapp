@@ -21,9 +21,6 @@
           var sombre = t === 'sombre' || (t === 'systeme' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           if (t === 'sombre' || !t || t === 'clair') document.documentElement.dataset.theme = sombre ? 'dark' : 'light';
           else if (sombre) document.documentElement.dataset.theme = 'dark';
-          // Densité : même raison, sinon la mise en page se resserre après coup.
-          var d = localStorage.getItem('bestasolar_densite');
-          if (d === 'compact' || d === 'confortable') document.documentElement.dataset.density = d;
         } catch (e) { /* localStorage indisponible (navigation privée stricte) : reste clair */ }
       })();
     </script>
