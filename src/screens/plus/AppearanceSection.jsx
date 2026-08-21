@@ -35,7 +35,7 @@ export default function AppearanceSection() {
   const { theme, setTheme, density, setDensity } = useTheme();
 
   return (
-    <>
+    <div className="settings-tab">
       <div className="card appearance-group">
         <div className="appearance-group-title"><Palette size={17} /> Thème</div>
         <p className="appearance-group-hint">Choisissez entre le mode clair, sombre ou les préférences de votre système.</p>
@@ -55,6 +55,6 @@ export default function AppearanceSection() {
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }

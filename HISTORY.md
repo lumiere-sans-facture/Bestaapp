@@ -5,6 +5,9 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-21
+- Paramètres : tous les onglets (Profil, Apparence, Moyens de paiement, Sauvegarde, Administration) recadrés comme l'écran qui y mène — en-tête titre + phrase d'explication, un seul retour (la flèche de l'en-tête, que le bouton « Retour » doublait sur mobile), libellés de section en majuscules et même espacement des cartes partout
+
 ## 2026-08-20
 - Apparence : écran dédié (Paramètres → Apparence) avec des cartes d'option illustrées ; nouveau réglage « Densité de l'interface » (compact / par défaut / confortable) et retrait des icônes de thème de la barre latérale
 - Clients : carnet en cartes (pastille d'initiales, téléphone/email/adresse, nombre de devis) et fiche client plein écran sur `/clients/:id` — onglets Résumé / Devis / Contact / Notes, quatre indicateurs, activité sur 6 mois et devis récents

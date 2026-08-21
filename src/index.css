@@ -2559,3 +2559,20 @@ form .login-link { width: 100%; margin-top: 4px; }
 .lesson-next-cta { display: inline-flex; align-items: center; gap: 3px; margin-top: 3px; color: var(--primary-ink); font-size: .8125rem; font-weight: 800; }
 .lesson-action-input { margin-top: 8px; }
 @media (min-width: 900px) { .school-layout { grid-template-columns: 320px minmax(0, 1fr); } .school-side { top: 84px; } }
+
+/* ============ Paramètres : cadrage commun des onglets ============
+   Profil, Apparence, Moyens de paiement, Sauvegarde, Administration se
+   lisent dans le même cadre que l'écran qui y mène : mêmes libellés de
+   section, même espacement entre les cartes, et UN SEUL retour — la flèche
+   de l'en-tête, que le bouton « Retour » du contenu doublait sur mobile.
+
+   Ce bloc reste EN DERNIER : il neutralise les marges que les cartes se
+   donnent ailleurs (`.commission-totals`, `.appearance-group`…), et à
+   spécificité égale c'est la dernière déclaration qui l'emporte. */
+.settings-tab { display: flex; flex-direction: column; gap: 16px; }
+/* La colonne décide seule de l'espacement, sinon les écarts sont inégaux
+   d'un onglet à l'autre. */
+.settings-tab > * { margin-top: 0; margin-bottom: 0; }
+.settings-tab-actions { display: flex; justify-content: flex-end; }
+/* Note de règle sous un libellé de section (« un seul encaisse à la fois »). */
+.settings-tab .plus-section-label + .field-hint { margin: -4px 0 12px; padding: 0 4px; }

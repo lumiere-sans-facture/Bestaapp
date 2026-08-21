@@ -571,13 +571,11 @@ export default function Plus() {
     </>
   );
 
-  const renderProfile = () => <MyProfile onBack={() => setActiveTab('parametres')} />;
+  const renderProfile = () => <MyProfile />;
 
   const renderBackup = () => (
-    <>
-      <BackButton to="parametres" />
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="card-title">Sauvegarde des données</div>
+    <div className="settings-tab">
+      <div className="card">
         <p className="text-sm text-secondary">
           Exportez régulièrement toutes vos données (clients, devis, factures, partenaires, commissions…)
           dans un fichier. Vous pourrez les restaurer en cas de perte ou de changement d'appareil.
@@ -595,7 +593,7 @@ export default function Plus() {
         </button>
         <p className="field-hint">L'import remplace les données actuelles — exportez d'abord par sécurité.</p>
       </div>
-    </>
+    </div>
   );
 
   // Entrée de menu générique (icône, titre, sous-titre, action).
@@ -785,15 +783,19 @@ export default function Plus() {
   const TAB_TITLES = {
     menu: 'Plus', parametres: 'Paramètres', apparence: 'Apparence', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
-    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
+    subsadmin: 'Abonnements Devis Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
     paiements: 'Moyens de paiement',
-    profile: 'Mon profil', backup: 'Sauvegarde',
+    profile: 'Profil', backup: 'Sauvegarde des données',
   };
 
   // Sous-titre d'en-tête, pour les écrans qui en portent un.
   const TAB_SUBTITLES = {
     parametres: 'Gérez votre compte et vos préférences',
+    profile: 'Vos informations et votre entreprise',
     apparence: 'Personnalisez l’apparence de l’application',
+    paiements: 'Qui encaisse les abonnements Devis Pro',
+    backup: 'Exporter / restaurer toutes les données',
+    subsadmin: 'Abonnés, paiements à valider et MRR',
   };
 
   return (
@@ -815,9 +817,9 @@ export default function Plus() {
         {activeTab === 'kits' && <KitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'inverters' && <InvertersSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'pompekits' && <PompeKitsSection onBack={() => setActiveTab('menu')} />}
-        {activeTab === 'paiements' && <PaiementsSection onBack={() => setActiveTab('parametres')} />}
+        {activeTab === 'paiements' && <PaiementsSection />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
-        {activeTab === 'subsadmin' && <SubscriptionsAdmin onBack={() => setActiveTab('parametres')} />}
+        {activeTab === 'subsadmin' && <SubscriptionsAdmin />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
         {activeTab === 'profile' && renderProfile()}
         {activeTab === 'backup' && renderBackup()}
