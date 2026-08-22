@@ -1,34 +1,34 @@
-// Simulateur de retour sur investissement solaire : ce que le client dépense
-// AUJOURD'HUI en énergie, ce qu'il dépenserait avec l'installation, et en
-// combien de temps celle-ci est remboursée.
+// Retour sur investissement solaire — une chaîne que le client suit du doigt :
 //
-// Logique pure, sans React : c'est un argumentaire commercial chiffré, il doit
-// être testable ligne à ligne. Toutes les hypothèses sont des constantes
-// nommées et exportées — elles s'affichent telles quelles à l'écran, parce
-// qu'un chiffre de vente qu'on ne peut pas justifier devant le client ne vaut
-// rien.
+//   1. les appareils qu'il fait tourner        → kWh par jour
+//   2. ces kWh, il les paie déjà : au réseau,  → F CFA par an
+//      et au groupe électrogène pendant les
+//      coupures (du gazole pour les MÊMES kWh)
+//   3. le kit dimensionné pour ces appareils   → prix de l'installation
+//   4. le prix ÷ ce qu'il ne paie plus         → nombre d'années
+//
+// Chaque étape part du résultat de la précédente. Aucun taux abstrait, aucune
+// « part couverte » à régler : c'est la consommation saisie qui commande tout,
+// exactement comme l'assistant de devis de l'application.
+//
+// Logique pure, sans React — chaque maillon est testable séparément.
 
-/** Jours facturés dans une année (moyenne). */
 export const JOURS_PAR_AN = 365;
-export const MOIS_PAR_AN = 12;
+export const HEURES_PAR_JOUR = 24;
 
 /** Durée de vie retenue pour la projection (garantie panneaux : 25 ans). */
 export const DUREE_SYSTEME_ANS = 25;
 
 /**
- * Part du besoin réellement couverte par le solaire. Jamais 100 % : le
- * dimensionnement de l'app se cale sur le PIRE mois, et il reste des jours
- * sans soleil et des pointes que la batterie ne tient pas. Annoncer 100 %
- * ferait un client déçu, ce qui coûte plus cher qu'une vente perdue.
+ * Ce qu'un groupe électrogène tire d'un litre de gazole, en kWh. Un groupe de
+ * chantier rend ~3 kWh par litre à charge courante.
+ *
+ * C'est LE maillon qui rend la démonstration simple : plus besoin de demander
+ * la consommation en litres/heure d'un groupe que personne ne connaît. Les
+ * appareils donnent les kWh, les kWh donnent les litres, les litres donnent
+ * les francs.
  */
-export const TAUX_COUVERTURE_DEFAUT = 0.8;
-
-/**
- * Perte de rendement des panneaux, par an. Les fiches constructeur garantissent
- * ~80 % de la puissance à 25 ans, soit environ 0,5 %/an. Sans elle, la
- * projection à 25 ans surestime le gain de plusieurs millions.
- */
-export const DEGRADATION_ANNUELLE = 0.005;
+export const KWH_PAR_LITRE_GAZOLE = 3;
 
 /** Entretien annuel de l'installation (nettoyage, contrôle) — F CFA. */
 export const MAINTENANCE_ANNUELLE = 15000;
@@ -37,22 +37,16 @@ export const MAINTENANCE_ANNUELLE = 15000;
 export const HAUSSE_TARIF_DEFAUT = 0.05;
 
 /**
- * Consommation d'un groupe électrogène, en litres par heure et par kVA, à
- * charge courante (~60 %). Repère de terrain : un 5 kVA consomme ~1,5 L/h.
- * Ce n'est qu'une valeur de départ — le prix du carburant et la consommation
- * réelle restent saisis par l'utilisateur.
+ * Perte de rendement des panneaux, par an. Les fiches constructeur garantissent
+ * ~80 % de la puissance à 25 ans, soit environ 0,5 %/an. Sans elle, la
+ * projection à 25 ans surestime le gain de plusieurs millions.
  */
-export const LITRES_PAR_KVA_HEURE = 0.3;
-
-/** Consommation par défaut d'un groupe, en L/h, d'après sa puissance. */
-export const consommationGroupe = (puissanceKva) =>
-  Math.round(Math.max(0, Number(puissanceKva) || 0) * LITRES_PAR_KVA_HEURE * 10) / 10;
+export const DEGRADATION_ANNUELLE = 0.005;
 
 /**
- * Émissions évitées. Le gazole d'un groupe : 2,68 kg de CO₂ par litre brûlé
- * (facteur standard GIEC pour le diesel routier). Le réseau togolais (CEET),
- * alimenté par du thermique et des importations : 0,45 kg par kWh — ordre de
- * grandeur, à ne pas présenter comme une mesure.
+ * Émissions évitées : 2,68 kg de CO₂ par litre de gazole brûlé (facteur GIEC
+ * pour le diesel), 0,45 kg par kWh du réseau togolais — ordres de grandeur,
+ * à ne pas présenter comme une mesure.
  */
 export const CO2_PAR_LITRE_GAZOLE = 2.68;
 export const CO2_PAR_KWH_RESEAU = 0.45;
@@ -63,60 +57,85 @@ const nombre = (v) => {
 };
 
 /**
- * Coût énergétique annuel du client AVANT installation, décomposé.
+ * ÉTAPE 1 — Les appareils du client en kWh par jour.
  *
- * Le groupe électrogène est presque toujours le poste dominant, et c'est
- * précisément celui que le client ne voit pas : il paie son carburant au
- * litre, jamais à l'année. Le décomposer est tout l'argumentaire.
+ * Même calcul que l'assistant de devis solaire (`screens/devis/SolarWizard`) :
+ * puissance × quantité × heures, séparé jour et nuit. Les deux écrans DOIVENT
+ * donner le même nombre, sinon le commercial ne sait plus lequel croire.
  */
-export const coutActuel = ({
-  factureMensuelle = 0,
-  groupeActif = false,
-  heuresCoupureJour = 0,
-  prixCarburant = 0,
-  consommationLh = 0,
-} = {}) => {
-  const reseau = nombre(factureMensuelle) * MOIS_PAR_AN;
-  const litresAn = groupeActif
-    ? nombre(heuresCoupureJour) * JOURS_PAR_AN * nombre(consommationLh)
-    : 0;
-  const carburant = litresAn * nombre(prixCarburant);
+export const consommationAppareils = (appareils = []) => {
+  const somme = (heures) => appareils.reduce(
+    (t, a) => t + nombre(a?.power) * (nombre(a?.quantity) || 1) * nombre(a?.[heures]),
+    0
+  ) / 1000;
+  const jour = somme('day');
+  const nuit = somme('night');
   return {
-    reseau: Math.round(reseau),
-    carburant: Math.round(carburant),
-    litresAn: Math.round(litresAn),
-    total: Math.round(reseau + carburant),
+    jour: Math.round(jour * 100) / 100,
+    nuit: Math.round(nuit * 100) / 100,
+    total: Math.round((jour + nuit) * 100) / 100,
+    // Pic de charge : tout allumé en même temps. Sert au choix de l'onduleur.
+    pic: appareils.reduce((t, a) => t + nombre(a?.power) * (nombre(a?.quantity) || 1), 0),
   };
 };
 
 /**
- * Économie nette de la première année : ce que l'installation fait disparaître
- * de la facture, entretien déduit. Peut être NÉGATIVE (petite facture, gros
- * entretien) — dans ce cas le simulateur doit le dire, pas l'arrondir à zéro.
+ * ÉTAPE 2 — Ce que ces kWh coûtent aujourd'hui, avant toute installation.
+ *
+ * Les heures de coupure décident du partage : pendant une coupure, ce sont les
+ * mêmes appareils qui tournent, mais c'est le groupe qui les alimente — et
+ * chaque kWh coûte alors un tiers de litre de gazole au lieu du tarif CEET.
+ * C'est la comparaison qui frappe le client : le même kWh, deux prix.
  */
-export const economieNette = (coutAnnuel, tauxCouverture = TAUX_COUVERTURE_DEFAUT, maintenance = MAINTENANCE_ANNUELLE) =>
-  Math.round(nombre(coutAnnuel) * Math.min(1, Math.max(0, Number(tauxCouverture) || 0)) - nombre(maintenance));
-
-/**
- * Économie d'une année donnée (1 = première), hausse du prix de l'énergie et
- * usure des panneaux comprises. L'entretien, lui, suit aussi l'inflation.
- */
-export const economieAnnee = (annee, { coutAnnuel, tauxCouverture, maintenance, hausse }) => {
-  const n = Math.max(1, Math.floor(Number(annee) || 1));
-  const inflation = (1 + (Number(hausse) || 0)) ** (n - 1);
-  const rendement = (1 - DEGRADATION_ANNUELLE) ** (n - 1);
-  const brute = nombre(coutAnnuel) * Math.min(1, Math.max(0, Number(tauxCouverture) || 0)) * inflation * rendement;
-  return Math.round(brute - nombre(maintenance) * inflation);
+export const coutActuel = ({
+  kwhJour = 0,
+  heuresCoupureJour = 0,
+  tarifKwh = 0,
+  prixCarburant = 0,
+  groupeActif = false,
+} = {}) => {
+  const kwh = nombre(kwhJour);
+  const partGroupe = groupeActif
+    ? Math.min(1, nombre(heuresCoupureJour) / HEURES_PAR_JOUR)
+    : 0;
+  const kwhGroupeAn = kwh * partGroupe * JOURS_PAR_AN;
+  const kwhReseauAn = kwh * (1 - partGroupe) * JOURS_PAR_AN;
+  const litresAn = kwhGroupeAn / KWH_PAR_LITRE_GAZOLE;
+  const reseau = kwhReseauAn * nombre(tarifKwh);
+  const groupe = litresAn * nombre(prixCarburant);
+  return {
+    kwhAn: Math.round(kwh * JOURS_PAR_AN),
+    kwhReseauAn: Math.round(kwhReseauAn),
+    kwhGroupeAn: Math.round(kwhGroupeAn),
+    litresAn: Math.round(litresAn),
+    reseau: Math.round(reseau),
+    groupe: Math.round(groupe),
+    total: Math.round(reseau + groupe),
+    // Prix de revient du kWh dans chaque cas — le cœur de l'argumentaire.
+    prixKwhReseau: Math.round(nombre(tarifKwh)),
+    prixKwhGroupe: Math.round(nombre(prixCarburant) / KWH_PAR_LITRE_GAZOLE),
+  };
 };
 
 /**
- * Projection année par année : économie de l'année, cumul, et ce qu'il reste à
- * rembourser sur l'investissement. C'est la matière du graphique.
+ * ÉTAPE 4 — Économie de l'année n (1 = première), entretien déduit.
+ *
+ * Le kit étant dimensionné POUR ces appareils, il les alimente : l'économie,
+ * c'est donc tout ce que le client paie aujourd'hui pour les faire tourner.
+ * L'énergie renchérit d'année en année, les panneaux perdent un peu de
+ * rendement, et l'entretien suit l'inflation.
  */
+export const economieAnnee = (annee, { coutAnnuel = 0, maintenance = MAINTENANCE_ANNUELLE, hausse = HAUSSE_TARIF_DEFAUT } = {}) => {
+  const n = Math.max(1, Math.floor(Number(annee) || 1));
+  const inflation = (1 + (Number(hausse) || 0)) ** (n - 1);
+  const rendement = (1 - DEGRADATION_ANNUELLE) ** (n - 1);
+  return Math.round(nombre(coutAnnuel) * inflation * rendement - nombre(maintenance) * inflation);
+};
+
+/** Projection année par année : économie, cumul, et reste à rembourser. */
 export const projection = ({
   investissement = 0,
   coutAnnuel = 0,
-  tauxCouverture = TAUX_COUVERTURE_DEFAUT,
   maintenance = MAINTENANCE_ANNUELLE,
   hausse = HAUSSE_TARIF_DEFAUT,
   duree = DUREE_SYSTEME_ANS,
@@ -126,35 +145,28 @@ export const projection = ({
   const lignes = [];
   let cumul = 0;
   for (let annee = 1; annee <= annees; annee += 1) {
-    const economie = economieAnnee(annee, { coutAnnuel, tauxCouverture, maintenance, hausse });
+    const economie = economieAnnee(annee, { coutAnnuel, maintenance, hausse });
     cumul += economie;
-    lignes.push({
-      annee,
-      economie,
-      cumul,
-      // Jamais négatif : une fois remboursé, l'investissement est remboursé.
-      restant: Math.max(0, Math.round(invest - cumul)),
-    });
+    // Jamais négatif : une fois remboursé, l'investissement est remboursé.
+    lignes.push({ annee, economie, cumul, restant: Math.max(0, Math.round(invest - cumul)) });
   }
   return lignes;
 };
 
 /**
- * Année où l'investissement est remboursé, avec la fraction d'année (2,4 ans).
- * Retourne `null` quand il ne l'est JAMAIS sur la durée du système — cas réel
- * d'une petite facture face à une grosse installation. Afficher « 0 an » ou
- * l'omettre serait un mensonge commercial ; le simulateur doit pouvoir dire
- * qu'un projet ne se rembourse pas.
+ * Année où l'installation est remboursée, fraction comprise (2,4 ans).
+ * `null` quand elle ne l'est JAMAIS sur la durée retenue — cas réel d'une
+ * petite consommation face à une grosse installation. Afficher « 0 an » ou
+ * masquer le résultat serait un mensonge commercial : le simulateur doit
+ * pouvoir dire qu'un projet ne se rembourse pas.
  */
-export const retourInvestissement = (lignes, investissement) => {
+export const retourInvestissement = (lignes = [], investissement = 0) => {
   const invest = nombre(investissement);
   if (invest <= 0) return null;
   let precedent = 0;
   for (const ligne of lignes) {
     if (ligne.cumul >= invest) {
-      // Interpolation dans l'année qui franchit le seuil.
-      const manquant = invest - precedent;
-      const fraction = ligne.economie > 0 ? manquant / ligne.economie : 0;
+      const fraction = ligne.economie > 0 ? (invest - precedent) / ligne.economie : 0;
       return Math.round((ligne.annee - 1 + fraction) * 10) / 10;
     }
     precedent = ligne.cumul;
@@ -162,55 +174,53 @@ export const retourInvestissement = (lignes, investissement) => {
   return null;
 };
 
-/**
- * CO₂ évité en un an : le gazole que le groupe ne brûle plus, et les kWh que
- * le réseau ne fournit plus — au prorata de ce que le solaire couvre.
- */
-export const co2EviteAn = ({ litresAn = 0, kwhReseauAn = 0, tauxCouverture = TAUX_COUVERTURE_DEFAUT } = {}) => {
-  const part = Math.min(1, Math.max(0, Number(tauxCouverture) || 0));
-  return Math.round((nombre(litresAn) * CO2_PAR_LITRE_GAZOLE + nombre(kwhReseauAn) * CO2_PAR_KWH_RESEAU) * part);
-};
+/** CO₂ évité en un an : le gazole non brûlé et les kWh non tirés du réseau. */
+export const co2EviteAn = ({ litresAn = 0, kwhReseauAn = 0 } = {}) =>
+  Math.round(nombre(litresAn) * CO2_PAR_LITRE_GAZOLE + nombre(kwhReseauAn) * CO2_PAR_KWH_RESEAU);
 
 /**
- * Simulation complète, prête pour l'écran.
+ * La chaîne complète, prête pour l'écran.
  *
- * @param {object} e entrées du formulaire
- * @returns tout ce qui s'affiche : décomposition du coût actuel, économie de
- *   l'année 1, retour sur investissement, gain sur la durée, CO₂ évité et la
- *   projection année par année.
+ * @param {object}  e
+ * @param {Array}   e.appareils          lignes { power, quantity, day, night }
+ * @param {number}  e.investissement     prix de l'installation (kit ou devis)
+ * @param {number}  e.heuresCoupureJour  coupures quotidiennes du réseau
+ * @param {number}  e.tarifKwh           prix du kWh CEET
+ * @param {number}  e.prixCarburant      prix du litre de gazole
  */
 export const simulerRoi = ({
+  appareils = [],
   investissement = 0,
-  factureMensuelle = 0,
-  tarifKwh = 0,
-  hausse = HAUSSE_TARIF_DEFAUT,
-  groupeActif = false,
   heuresCoupureJour = 0,
+  tarifKwh = 0,
   prixCarburant = 0,
-  consommationLh = 0,
-  tauxCouverture = TAUX_COUVERTURE_DEFAUT,
+  groupeActif = false,
   maintenance = MAINTENANCE_ANNUELLE,
+  hausse = HAUSSE_TARIF_DEFAUT,
   duree = DUREE_SYSTEME_ANS,
 } = {}) => {
-  const cout = coutActuel({ factureMensuelle, groupeActif, heuresCoupureJour, prixCarburant, consommationLh });
-  const lignes = projection({ investissement, coutAnnuel: cout.total, tauxCouverture, maintenance, hausse, duree });
+  const conso = consommationAppareils(appareils);
+  const cout = coutActuel({
+    kwhJour: conso.total, heuresCoupureJour, tarifKwh, prixCarburant, groupeActif,
+  });
+  const lignes = projection({ investissement, coutAnnuel: cout.total, maintenance, hausse, duree });
   const invest = nombre(investissement);
   const cumulFinal = lignes.length ? lignes[lignes.length - 1].cumul : 0;
   const gainDuree = Math.round(cumulFinal - invest);
-  const kwhReseauAn = nombre(tarifKwh) > 0 ? (nombre(factureMensuelle) * MOIS_PAR_AN) / nombre(tarifKwh) : 0;
+  const co2AnKg = co2EviteAn(cout);
 
   return {
+    conso,
     cout,
     maintenance: Math.round(nombre(maintenance)),
-    economieAn1: economieNette(cout.total, tauxCouverture, maintenance),
+    economieAn1: lignes[0]?.economie ?? 0,
     retourAns: retourInvestissement(lignes, invest),
     gainDuree,
-    // ROI en % de l'investissement. Sans investissement saisi, il n'y a rien
-    // à rentabiliser : `null` plutôt qu'une division par zéro affichée.
+    // Sans montant d'installation, il n'y a rien à rentabiliser : `null`
+    // plutôt qu'une division par zéro affichée au client.
     roiPct: invest > 0 ? Math.round((gainDuree / invest) * 100) : null,
-    kwhReseauAn: Math.round(kwhReseauAn),
-    co2AnKg: co2EviteAn({ litresAn: cout.litresAn, kwhReseauAn, tauxCouverture }),
-    co2DureeT: Math.round((co2EviteAn({ litresAn: cout.litresAn, kwhReseauAn, tauxCouverture }) * lignes.length) / 100) / 10,
+    co2AnKg,
+    co2DureeT: Math.round((co2AnKg * lignes.length) / 100) / 10,
     projection: lignes,
   };
 };

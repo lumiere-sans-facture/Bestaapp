@@ -1,100 +1,135 @@
 import { describe, it, expect } from 'vitest';
 import {
-  coutActuel, economieNette, economieAnnee, projection, retourInvestissement,
-  co2EviteAn, consommationGroupe, simulerRoi,
-  JOURS_PAR_AN, MOIS_PAR_AN, DUREE_SYSTEME_ANS, TAUX_COUVERTURE_DEFAUT,
-  MAINTENANCE_ANNUELLE, HAUSSE_TARIF_DEFAUT, DEGRADATION_ANNUELLE,
-  CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU, LITRES_PAR_KVA_HEURE,
+  consommationAppareils, coutActuel, economieAnnee, projection, retourInvestissement,
+  co2EviteAn, simulerRoi,
+  JOURS_PAR_AN, DUREE_SYSTEME_ANS, KWH_PAR_LITRE_GAZOLE, MAINTENANCE_ANNUELLE,
+  HAUSSE_TARIF_DEFAUT, DEGRADATION_ANNUELLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../roi';
+import { appliances } from '../../data/appliances';
 
-// Cas de référence : un client de Lomé, 60 000 F de facture CEET par mois,
-// groupe 5 kVA tournant 6 h par jour à 750 F le litre.
-const CLIENT = {
-  factureMensuelle: 60000,
-  groupeActif: true,
-  heuresCoupureJour: 6,
-  prixCarburant: 750,
-  consommationLh: 1.5,
-};
+// Petit commerce de Lomé : 10 lampes LED la nuit, un réfrigérateur et un
+// téléviseur — pris tels quels dans le catalogue d'appareils de l'app.
+const lampe = appliances.find((a) => a.id === 'ledlamp');   // 10 W · 0 j · 12 n
+const frigo = appliances.find((a) => a.id === 'fridge');    // 250 W · 12 j · 12 n
+const tele = appliances.find((a) => a.id === 'tv32');       // 50 W · 3 j · 2 n
+const CLIENT = [
+  { ...lampe, quantity: 10 },
+  { ...frigo, quantity: 1 },
+  { ...tele, quantity: 1 },
+];
 
-describe('coutActuel', () => {
-  it('décompose réseau et carburant sur l’année', () => {
-    const c = coutActuel(CLIENT);
-    expect(c.reseau).toBe(60000 * MOIS_PAR_AN);        // 720 000
-    expect(c.litresAn).toBe(6 * JOURS_PAR_AN * 1.5);   // 3 285 L
-    expect(c.carburant).toBe(3285 * 750);              // 2 463 750
-    expect(c.total).toBe(c.reseau + c.carburant);
+describe('consommationAppareils — étape 1 : des appareils à des kWh', () => {
+  it('applique puissance × quantité × heures, jour et nuit séparés', () => {
+    const c = consommationAppareils(CLIENT);
+    // Jour : frigo 250×12 + télé 50×3 = 3150 Wh
+    expect(c.jour).toBe(3.15);
+    // Nuit : lampes 10×10×12 + frigo 250×12 + télé 50×2 = 1200 + 3000 + 100 = 4300 Wh
+    expect(c.nuit).toBe(4.3);
+    expect(c.total).toBe(7.45);
   });
 
-  it('sans groupe électrogène, seul le réseau compte', () => {
-    const c = coutActuel({ ...CLIENT, groupeActif: false });
-    expect(c.carburant).toBe(0);
+  it('donne le même résultat que l’assistant de devis (même formule)', () => {
+    // C'est le calcul de SolarWizard, à la ligne près : les deux écrans ne
+    // doivent jamais annoncer deux consommations différentes.
+    const jour = CLIENT.reduce((s, r) => s + r.power * r.quantity * r.day, 0) / 1000;
+    const nuit = CLIENT.reduce((s, r) => s + r.power * r.quantity * r.night, 0) / 1000;
+    const c = consommationAppareils(CLIENT);
+    expect(c.jour).toBeCloseTo(jour, 2);
+    expect(c.nuit).toBeCloseTo(nuit, 2);
+  });
+
+  it('calcule le pic de charge (tout allumé en même temps)', () => {
+    expect(consommationAppareils(CLIENT).pic).toBe(10 * 10 + 250 + 50);
+  });
+
+  it('quantité absente = 1, valeurs illisibles ignorées', () => {
+    expect(consommationAppareils([{ power: 100, day: 2, night: 0 }]).jour).toBe(0.2);
+    expect(consommationAppareils([{ power: 'x', day: 2 }]).total).toBe(0);
+  });
+
+  it('aucune liste, aucune consommation', () => {
+    expect(consommationAppareils().total).toBe(0);
+    expect(consommationAppareils([]).total).toBe(0);
+  });
+});
+
+describe('coutActuel — étape 2 : ces kWh, il les paie déjà', () => {
+  const base = { kwhJour: 10, tarifKwh: 114, prixCarburant: 750, groupeActif: true };
+
+  it('sans coupure, tout vient du réseau', () => {
+    const c = coutActuel({ ...base, heuresCoupureJour: 0 });
+    expect(c.kwhReseauAn).toBe(10 * JOURS_PAR_AN);
+    expect(c.kwhGroupeAn).toBe(0);
     expect(c.litresAn).toBe(0);
-    expect(c.total).toBe(720000);
+    expect(c.total).toBe(Math.round(10 * JOURS_PAR_AN * 114));
   });
 
-  it('des entrées vides ou absurdes donnent zéro, jamais NaN', () => {
-    expect(coutActuel().total).toBe(0);
-    expect(coutActuel({ factureMensuelle: -5000, groupeActif: true, heuresCoupureJour: 'x' }).total).toBe(0);
+  it('6 h de coupure : un quart des kWh passe par le groupe', () => {
+    const c = coutActuel({ ...base, heuresCoupureJour: 6 });
+    expect(c.kwhGroupeAn).toBe(Math.round(10 * 0.25 * JOURS_PAR_AN));
+    expect(c.kwhReseauAn).toBe(Math.round(10 * 0.75 * JOURS_PAR_AN));
+    // Les litres se déduisent des kWh, pas d'une consommation horaire saisie.
+    expect(c.litresAn).toBe(Math.round((10 * 0.25 * JOURS_PAR_AN) / KWH_PAR_LITRE_GAZOLE));
+  });
+
+  it('le même kWh coûte bien plus cher au groupe qu’au réseau', () => {
+    // C'est l'argument central de la visite : 250 F contre 114 F.
+    const c = coutActuel({ ...base, heuresCoupureJour: 6 });
+    expect(c.prixKwhReseau).toBe(114);
+    expect(c.prixKwhGroupe).toBe(Math.round(750 / KWH_PAR_LITRE_GAZOLE));
+    expect(c.prixKwhGroupe).toBeGreaterThan(c.prixKwhReseau);
+  });
+
+  it('sans groupe électrogène, aucune goutte de gazole', () => {
+    const c = coutActuel({ ...base, heuresCoupureJour: 12, groupeActif: false });
+    expect(c.litresAn).toBe(0);
+    expect(c.groupe).toBe(0);
+    expect(c.kwhReseauAn).toBe(10 * JOURS_PAR_AN);
+  });
+
+  it('une coupure permanente ne dépasse jamais 24 h', () => {
+    const c = coutActuel({ ...base, heuresCoupureJour: 48 });
+    expect(c.kwhReseauAn).toBe(0);
+    expect(c.kwhGroupeAn).toBe(10 * JOURS_PAR_AN);
+  });
+
+  it('des entrées vides donnent zéro, jamais NaN', () => {
+    const c = coutActuel();
+    expect(c.total).toBe(0);
+    expect(Number.isFinite(c.litresAn)).toBe(true);
   });
 });
 
-describe('economieNette', () => {
-  it('applique le taux de couverture et retranche l’entretien', () => {
-    expect(economieNette(1000000, 0.8, 15000)).toBe(800000 - 15000);
-  });
-
-  it('reste NÉGATIVE quand l’entretien dépasse l’économie', () => {
-    // Le simulateur doit pouvoir annoncer qu'un projet ne rapporte rien —
-    // arrondir à zéro maquillerait une mauvaise affaire.
-    expect(economieNette(10000, 0.8, 15000)).toBe(-7000);
-  });
-
-  it('borne le taux de couverture entre 0 et 100 %', () => {
-    expect(economieNette(1000000, 1.5, 0)).toBe(1000000);
-    expect(economieNette(1000000, -1, 0)).toBe(0);
-  });
-});
-
-describe('economieAnnee', () => {
-  const base = { coutAnnuel: 1000000, tauxCouverture: 1, maintenance: 0, hausse: 0.05 };
+describe('economieAnnee et projection — étape 4', () => {
+  const base = { coutAnnuel: 1000000, maintenance: 0, hausse: 0.05 };
 
   it('la première année ne subit ni inflation ni usure', () => {
     expect(economieAnnee(1, base)).toBe(1000000);
   });
 
-  it('l’énergie renchérit d’année en année', () => {
-    // 1 000 000 × 1,05 × (1 − 0,005) = 1 044 750
+  it('l’énergie renchérit, les panneaux s’usent', () => {
     expect(economieAnnee(2, base)).toBe(Math.round(1000000 * 1.05 * (1 - DEGRADATION_ANNUELLE)));
-    expect(economieAnnee(2, base)).toBeGreaterThan(economieAnnee(1, base));
-  });
-
-  it('les panneaux perdent du rendement (sans hausse, l’économie baisse)', () => {
     const sansHausse = { ...base, hausse: 0 };
     expect(economieAnnee(10, sansHausse)).toBeLessThan(economieAnnee(1, sansHausse));
-    expect(economieAnnee(25, sansHausse)).toBe(Math.round(1000000 * (1 - DEGRADATION_ANNUELLE) ** 24));
   });
 
   it('l’entretien suit lui aussi l’inflation', () => {
-    const avecEntretien = { ...base, maintenance: 100000 };
-    expect(economieAnnee(2, avecEntretien))
+    expect(economieAnnee(2, { ...base, maintenance: 100000 }))
       .toBe(Math.round(1000000 * 1.05 * (1 - DEGRADATION_ANNUELLE) - 100000 * 1.05));
   });
-});
 
-describe('projection', () => {
-  it('couvre toute la durée, cumule les économies et décompte le restant dû', () => {
-    const p = projection({ investissement: 3000000, coutAnnuel: 1000000, tauxCouverture: 1, maintenance: 0, hausse: 0, duree: 5 });
+  it('la projection couvre la durée et décompte le restant dû', () => {
+    const p = projection({ investissement: 3000000, coutAnnuel: 1000000, maintenance: 0, hausse: 0, duree: 5 });
     expect(p).toHaveLength(5);
-    expect(p[0].annee).toBe(1);
-    expect(p[4].cumul).toBe(p.reduce((s, l) => s + l.economie, 0));
-    expect(p[0].restant).toBeGreaterThan(p[4].restant);
-  });
-
-  it('le restant dû ne devient jamais négatif', () => {
-    const p = projection({ investissement: 100000, coutAnnuel: 1000000, tauxCouverture: 1, maintenance: 0, duree: 5 });
+    // Un peu moins de 5 × 1 000 000 : les panneaux perdent 0,5 %/an, même
+    // quand le prix de l'énergie, lui, ne bouge pas.
+    const attendu = [0, 1, 2, 3, 4].reduce((t, i) => t + Math.round(1000000 * (1 - DEGRADATION_ANNUELLE) ** i), 0);
+    expect(p[4].cumul).toBe(attendu);
+    expect(p[4].cumul).toBeLessThan(5000000);
+    // 3 000 000 à rembourser : il reste un souffle après 3 ans, soldé au 4e.
+    expect(p[2].restant).toBeGreaterThan(0);
+    expect(p[3].restant).toBe(0);
     expect(p.every((l) => l.restant >= 0)).toBe(true);
-    expect(p[4].restant).toBe(0);
   });
 
   it('durée par défaut : la garantie des panneaux', () => {
@@ -103,104 +138,97 @@ describe('projection', () => {
 });
 
 describe('retourInvestissement', () => {
-  const lignes = (invest, cout) => projection({ investissement: invest, coutAnnuel: cout, tauxCouverture: 1, maintenance: 0, hausse: 0, duree: 25 });
+  const lignes = (cout) => projection({ coutAnnuel: cout, maintenance: 0, hausse: 0, duree: 25 });
 
   it('donne l’année, fraction comprise', () => {
-    // 2 500 000 remboursés à 1 000 000/an → 2,5 ans
-    expect(retourInvestissement(lignes(2500000, 1000000), 2500000)).toBe(2.5);
+    expect(retourInvestissement(lignes(1000000), 2500000)).toBe(2.5);
+    expect(retourInvestissement(lignes(1000000), 500000)).toBe(0.5);
   });
 
-  it('un investissement remboursé dès la première année', () => {
-    expect(retourInvestissement(lignes(500000, 1000000), 500000)).toBe(0.5);
-  });
-
-  it('rend null quand l’installation ne se rembourse JAMAIS sur la durée', () => {
-    // 50 millions face à 100 000 F d'économie par an : jamais remboursé.
-    expect(retourInvestissement(lignes(50000000, 100000), 50000000)).toBeNull();
+  it('rend null quand l’installation ne se rembourse JAMAIS', () => {
+    expect(retourInvestissement(lignes(100000), 50000000)).toBeNull();
   });
 
   it('rend null quand l’économie annuelle est négative', () => {
-    const p = projection({ investissement: 2000000, coutAnnuel: 10000, tauxCouverture: 0.8, maintenance: 500000, duree: 25 });
+    const p = projection({ coutAnnuel: 10000, maintenance: 500000, duree: 25 });
     expect(retourInvestissement(p, 2000000)).toBeNull();
   });
 
   it('rend null sans investissement saisi (rien à rentabiliser)', () => {
-    expect(retourInvestissement(lignes(0, 1000000), 0)).toBeNull();
+    expect(retourInvestissement(lignes(1000000), 0)).toBeNull();
   });
 });
 
 describe('co2EviteAn', () => {
   it('compte le gazole non brûlé et les kWh non tirés du réseau', () => {
-    const kg = co2EviteAn({ litresAn: 1000, kwhReseauAn: 2000, tauxCouverture: 1 });
-    expect(kg).toBe(Math.round(1000 * CO2_PAR_LITRE_GAZOLE + 2000 * CO2_PAR_KWH_RESEAU));
+    expect(co2EviteAn({ litresAn: 1000, kwhReseauAn: 2000 }))
+      .toBe(Math.round(1000 * CO2_PAR_LITRE_GAZOLE + 2000 * CO2_PAR_KWH_RESEAU));
   });
 
-  it('au prorata de ce que le solaire couvre réellement', () => {
-    const total = co2EviteAn({ litresAn: 1000, tauxCouverture: 1 });
-    expect(co2EviteAn({ litresAn: 1000, tauxCouverture: 0.5 })).toBe(Math.round(total * 0.5));
-  });
-});
-
-describe('consommationGroupe', () => {
-  it('un 5 kVA consomme environ 1,5 L/h', () => {
-    expect(consommationGroupe(5)).toBe(5 * LITRES_PAR_KVA_HEURE);
-    expect(consommationGroupe(5)).toBe(1.5);
-  });
-
-  it('une puissance absente ou absurde ne casse rien', () => {
-    expect(consommationGroupe(0)).toBe(0);
-    expect(consommationGroupe(-3)).toBe(0);
-    expect(consommationGroupe('abc')).toBe(0);
+  it('sans consommation, aucune émission évitée', () => {
+    expect(co2EviteAn()).toBe(0);
   });
 });
 
-describe('simulerRoi (cas complet)', () => {
-  const sim = simulerRoi({ ...CLIENT, investissement: 4000000, tarifKwh: 114 });
-
-  it('reprend la décomposition du coût actuel', () => {
-    expect(sim.cout.total).toBe(720000 + 2463750);
+describe('simulerRoi — la chaîne complète', () => {
+  const sim = simulerRoi({
+    appareils: CLIENT,
+    investissement: 2500000,
+    heuresCoupureJour: 6,
+    tarifKwh: 114,
+    prixCarburant: 750,
+    groupeActif: true,
   });
 
-  it('l’économie de l’année 1 suit le taux de couverture par défaut', () => {
-    expect(sim.economieAn1).toBe(Math.round(sim.cout.total * TAUX_COUVERTURE_DEFAUT) - MAINTENANCE_ANNUELLE);
+  it('chaque étape part du résultat de la précédente', () => {
+    // 1 → 2 : ce sont bien les kWh des appareils qui sont facturés.
+    expect(sim.conso.total).toBe(7.45);
+    expect(sim.cout.kwhAn).toBe(Math.round(7.45 * JOURS_PAR_AN));
+    expect(sim.cout.kwhReseauAn + sim.cout.kwhGroupeAn).toBeCloseTo(sim.cout.kwhAn, 0);
+    // 2 → 4 : l'économie de l'an 1, c'est ce coût moins l'entretien.
+    expect(sim.economieAn1).toBe(sim.cout.total - MAINTENANCE_ANNUELLE);
   });
 
-  it('le retour sur investissement est plausible (entre 1 et 5 ans ici)', () => {
+  it('donne un remboursement plausible pour ce client', () => {
     expect(sim.retourAns).toBeGreaterThan(1);
-    expect(sim.retourAns).toBeLessThan(5);
+    expect(sim.retourAns).toBeLessThan(12);
   });
 
-  it('le gain sur la durée déduit bien l’investissement', () => {
+  it('le gain sur la durée déduit l’investissement', () => {
     const cumul = sim.projection[sim.projection.length - 1].cumul;
-    expect(sim.gainDuree).toBe(cumul - 4000000);
-    expect(sim.roiPct).toBe(Math.round((sim.gainDuree / 4000000) * 100));
+    expect(sim.gainDuree).toBe(cumul - 2500000);
+    expect(sim.roiPct).toBe(Math.round((sim.gainDuree / 2500000) * 100));
   });
 
-  it('convertit la facture en kWh réseau pour le calcul du CO₂', () => {
-    expect(sim.kwhReseauAn).toBe(Math.round((60000 * MOIS_PAR_AN) / 114));
-    expect(sim.co2AnKg).toBeGreaterThan(0);
-    expect(sim.co2DureeT).toBeCloseTo((sim.co2AnKg * DUREE_SYSTEME_ANS) / 1000, 1);
-  });
-
-  it('sans investissement, aucun ROI n’est annoncé plutôt qu’une division par zéro', () => {
-    const s = simulerRoi({ ...CLIENT, investissement: 0, tarifKwh: 114 });
+  it('sans installation chiffrée, aucun ROI n’est inventé', () => {
+    const s = simulerRoi({ appareils: CLIENT, investissement: 0, tarifKwh: 114 });
     expect(s.roiPct).toBeNull();
     expect(s.retourAns).toBeNull();
-    expect(Number.isFinite(s.gainDuree)).toBe(true);
   });
 
-  it('un formulaire vide ne produit ni NaN ni Infinity', () => {
+  it('sans appareil saisi, tout est à zéro — ni NaN ni Infinity', () => {
     const s = simulerRoi();
+    expect(s.conso.total).toBe(0);
     expect(s.cout.total).toBe(0);
     expect(s.economieAn1).toBe(-MAINTENANCE_ANNUELLE);
     expect(s.retourAns).toBeNull();
-    expect(s.roiPct).toBeNull();
     expect(s.projection.every((l) => Number.isFinite(l.cumul))).toBe(true);
   });
 
-  it('la hausse tarifaire par défaut est bien appliquée', () => {
-    const sansHausse = simulerRoi({ ...CLIENT, investissement: 4000000, tarifKwh: 114, hausse: 0 });
-    expect(sim.gainDuree).toBeGreaterThan(sansHausse.gainDuree);
+  it('retirer le groupe électrogène réduit l’économie', () => {
+    const sansGroupe = simulerRoi({
+      appareils: CLIENT, investissement: 2500000, heuresCoupureJour: 6,
+      tarifKwh: 114, prixCarburant: 750, groupeActif: false,
+    });
+    expect(sansGroupe.cout.total).toBeLessThan(sim.cout.total);
+  });
+
+  it('la hausse tarifaire par défaut joue bien sur la durée', () => {
+    const fige = simulerRoi({
+      appareils: CLIENT, investissement: 2500000, heuresCoupureJour: 6,
+      tarifKwh: 114, prixCarburant: 750, groupeActif: true, hausse: 0,
+    });
+    expect(sim.gainDuree).toBeGreaterThan(fige.gainDuree);
     expect(HAUSSE_TARIF_DEFAUT).toBeGreaterThan(0);
   });
 });

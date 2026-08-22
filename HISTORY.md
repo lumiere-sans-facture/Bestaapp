@@ -6,7 +6,12 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-22
-- **Simulateur ROI** : nouvel écran (barre latérale et menu « Plus », ouvert à toute l'équipe) qui chiffre devant le client ce que lui coûte vraiment son énergie aujourd'hui — facture réseau **et** carburant du groupe électrogène sur douze mois — puis l'économie de la première année, le délai de remboursement, le gain sur 25 ans et le CO₂ évité ; curseurs en direct, projection tracée, montant repris d'un devis existant, et hypothèses de calcul écrites à l'écran (couverture solaire, hausse tarifaire, usure des panneaux, entretien, facteurs CO₂). Un projet qui ne se rembourse pas est annoncé comme tel, jamais arrondi en sa faveur
+- **Simulateur ROI** : nouvel écran (barre latérale et menu « Plus », ouvert à toute l'équipe) bâti sur ce que l'app sait déjà calculer, en quatre étapes qui s'enchaînent —
+  1. les appareils du client (le catalogue de l'assistant de devis : lampes, réfrigérateur, ventilateurs…) → kWh par jour ;
+  2. ces mêmes kWh, payés au réseau et, pendant les coupures, au groupe électrogène : le litre de gazole se déduit des kWh, et l'écran met les deux prix du kWh face à face ;
+  3. le kit que l'assistant de devis proposerait pour cette consommation, au prix du catalogue de l'entreprise — ou le montant d'un devis déjà émis, avec son étude reprise en un clic ;
+  4. remboursement, économie de la 1re année, gain sur 25 ans et CO₂ évité, avec la projection tracée.
+  Plus aucun réglage abstrait (ni « taux de couverture », ni consommation du groupe en litres/heure) : chaque étape part du résultat de la précédente. Un projet qui ne se rembourse pas est annoncé comme tel, et les hypothèses de calcul restent consultables à l'écran
 - Barre latérale : la cloche de notifications rejoint le coin de l'app, à côté du logo (elle ne double plus le bandeau de chaque page sur grand écran ; sur mobile, où il n'y a pas de barre latérale, elle y reste)
 - Barre latérale : fléchette de repli — le menu se réduit à un rail d'icônes (264 → 76 px) et le contenu récupère la place ; libellés en infobulle, cloche, voyant de synchronisation et déconnexion restent accessibles, et le choix est conservé d'un écran à l'autre
 - **Mode hors-ligne** : l'app s'ouvre et reste utilisable sans réseau, et tout remonte seul au retour de la connexion

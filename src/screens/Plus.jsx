@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, TrendingUp } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, Calculator } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -755,7 +755,7 @@ export default function Plus() {
             <MenuItem icon={Users} title="Clients" subtitle="Carnet d'adresses : ajouter et retrouver vos clients" onClick={() => navigate('/clients')} />
             {/* Outil de vente, pas de gestion : ouvert à toute l'équipe, il se
                 montre au client pendant la visite. */}
-            <MenuItem icon={TrendingUp} title="Simulateur ROI" subtitle="Économies et retour sur investissement, à montrer au client" onClick={() => setActiveTab('roi')} />
+            <MenuItem icon={Calculator} title="Simulateur ROI" subtitle="Ce que le client paie aujourd'hui, et en combien de temps l'installation se rembourse" onClick={() => setActiveTab('roi')} />
           </div>
         </div>
 
@@ -801,7 +801,7 @@ export default function Plus() {
     paiements: 'Qui encaisse les abonnements Devis Pro',
     backup: 'Exporter / restaurer toutes les données',
     subsadmin: 'Abonnés, paiements à valider et MRR',
-    roi: 'Calculez les économies et le retour sur investissement pour convaincre votre client',
+    roi: 'Des appareils du client à son remboursement, en quatre étapes',
   };
 
   return (
