@@ -2261,33 +2261,18 @@ form .login-link { width: 100%; margin-top: 4px; }
 
 
 /* ============ Simulateur ROI ============
-   Un flux d'étapes numérotées, pas un tableau de bord : c'est l'ORDRE de
-   lecture qui explique le calcul au client (appareils → kWh → francs → kit →
-   années). Chaque étape rend un résultat que la suivante reprend. */
-.roi-flux { display: flex; flex-direction: column; gap: 16px; max-width: 760px; margin-inline: auto; }
-.roi-etape { padding: 18px 20px; }
-.roi-etape-tete { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 4px; }
-.roi-etape-num {
-  flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--primary); color: #fff; font-weight: 700; font-size: 0.875rem;
-}
-.roi-etape-titre { display: flex; align-items: center; gap: 7px; font-size: 1rem; font-weight: 700; }
-.roi-etape-phrase { margin-top: 3px; font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.45; }
-
-/* Le résultat d'une étape, mis en évidence parce qu'il est l'entrée de la
-   suivante. La flèche dit « ce chiffre continue plus bas ». */
-.roi-report {
-  position: relative; margin-top: 16px; padding: 12px 14px;
-  background: var(--bg); border-radius: var(--radius-sm); text-align: center;
-}
-.roi-report-valeur { font-size: 1.25rem; font-weight: 700; color: var(--primary-ink); }
-.roi-report-legende { margin-top: 2px; font-size: 0.75rem; color: var(--text-secondary); }
-.roi-report-fleche {
-  position: absolute; left: 50%; bottom: -26px; transform: translateX(-50%);
-  color: var(--text-muted);
-}
-.roi-etape:last-of-type .roi-report-fleche { display: none; }
+   Deux colonnes sur grand écran : les saisies à gauche (appareils, coupures,
+   installation), ce qu'elles produisent à droite. Le commercial change une
+   quantité et le client voit les chiffres bouger — c'est tout l'intérêt de
+   l'écran. Une seule colonne en dessous de 1024px. */
+.roi-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.roi-colonne { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.roi-bloc { margin: 0; }
+.roi-kpis { margin-top: 0; }
+.roi-aide { margin-top: 4px; font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.45; }
+.roi-vide { margin-top: 10px; font-size: 0.8125rem; color: var(--text-secondary); }
+.roi-note { margin-top: 10px; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
+.roi-lien { border: none; background: none; padding: 0; color: var(--primary-ink); font: inherit; text-decoration: underline; cursor: pointer; }
 
 /* Liste des appareils : nom, caractéristiques, quantité, retrait. */
 .roi-appareils { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
@@ -2297,8 +2282,8 @@ form .login-link { width: 100%; margin-top: 4px; }
   background: var(--bg); border-radius: var(--radius-sm); font-size: 0.875rem;
 }
 .roi-appareil-nom { font-weight: 600; min-width: 0; }
-/* La ligne complète passe sous le nom en écran étroit : les caractéristiques
-   ne doivent jamais écraser la quantité, qui est le seul champ à toucher. */
+/* Les caractéristiques passent sous le nom : elles ne doivent jamais écraser
+   la quantité, seul champ à toucher pendant une visite. */
 .roi-appareil-spec { grid-column: 1 / 2; grid-row: 2; font-size: 0.75rem; color: var(--text-secondary); }
 .roi-appareil-qte {
   grid-column: 2; grid-row: 1 / 3; width: 62px; padding: 6px 8px; text-align: center;
@@ -2312,13 +2297,20 @@ form .login-link { width: 100%; margin-top: 4px; }
   background: transparent; color: var(--text-muted); cursor: pointer;
 }
 .roi-appareil-retirer:hover { background: var(--error-light); color: var(--error-ink); }
-.roi-vide { margin-top: 10px; font-size: 0.8125rem; color: var(--text-secondary); }
-.roi-note { margin-top: 10px; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
-.roi-lien { border: none; background: none; padding: 0; color: var(--primary-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* Consommation totale : c'est elle qui commande le kit ET le coût. */
+.roi-total { margin-top: 14px; padding: 12px; background: var(--bg); border-radius: var(--radius-sm); text-align: center; }
+.roi-total-valeur { font-size: 1.25rem; font-weight: 700; color: var(--primary-ink); }
+.roi-total-detail { margin-top: 2px; font-size: 0.75rem; color: var(--text-secondary); }
+
+/* Kit retenu par l'assistant de devis pour cette consommation. */
+.roi-kit { margin-top: 12px; padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm); }
+.roi-kit-nom { font-weight: 700; }
+.roi-kit-spec { margin-top: 3px; font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.45; }
 
 /* Le même kWh, deux prix : l'argument central de la visite. */
 .roi-comparaison {
-  display: flex; align-items: center; gap: 10px; margin: 16px 0 6px;
+  display: flex; align-items: center; gap: 10px; margin: 14px 0 6px;
   padding: 12px; background: var(--bg); border-radius: var(--radius-sm);
 }
 .roi-comparaison-cote { flex: 1; text-align: center; min-width: 0; }
@@ -2327,13 +2319,9 @@ form .login-link { width: 100%; margin-top: 4px; }
 .roi-comparaison-label { font-size: 0.75rem; color: var(--text-secondary); }
 .roi-comparaison-vs { flex-shrink: 0; font-size: 0.75rem; color: var(--text-muted); }
 
-/* Kit retenu par l'assistant de devis pour cette consommation. */
-.roi-kit { margin-top: 12px; padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm); }
-.roi-kit-nom { font-weight: 700; }
-.roi-kit-spec { margin-top: 3px; font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.45; }
-
 /* Curseurs */
 .roi-champ { margin-top: 14px; }
+.roi-champ:first-of-type { margin-top: 10px; }
 .roi-champ-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .roi-champ-label { font-size: 0.8125rem; color: var(--text-secondary); }
 .roi-champ-valeur { display: inline-flex; align-items: baseline; gap: 4px; flex-shrink: 0; font-weight: 700; color: var(--primary-ink); }
@@ -2369,13 +2357,9 @@ form .login-link { width: 100%; margin-top: 4px; }
 .roi-ligne.is-forte .roi-ligne-montant { color: var(--primary-ink); font-weight: 700; }
 .roi-ligne-montant.is-negatif { color: var(--error-ink); }
 
-/* Résultats */
-.roi-kpis { margin-top: 14px; }
-.roi-sous-bloc { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
-
 /* Projection : graphique fait main (pas de librairie de charts dans le
    projet). preserveAspectRatio="none" étire le tracé à la largeur du bloc —
-   d'où les épaisseurs en unités de vue, neutralisées par vector-effect. */
+   d'où les épaisseurs neutralisées par vector-effect. */
 .roi-projection { margin-top: 12px; }
 .roi-svg { display: block; width: 100%; height: 160px; overflow: visible; }
 .roi-aire { fill: var(--primary); opacity: 0.12; }
@@ -2450,8 +2434,8 @@ form .login-link { width: 100%; margin-top: 4px; }
   .cart-bar { bottom: 24px; right: 32px; }
   .bar-chart { height: 220px; }
 
-  /* Simulateur ROI : le flux reste en colonne (c'est l'ordre qui explique le
-     calcul), seul le graphique respire. */
+  /* Simulateur ROI : saisies à gauche, résultats à droite. */
+  .roi-grid { grid-template-columns: minmax(320px, 5fr) 7fr; gap: 20px; align-items: start; }
   .roi-svg { height: 200px; }
 
   /* Le panneau devient une fenêtre centrée */

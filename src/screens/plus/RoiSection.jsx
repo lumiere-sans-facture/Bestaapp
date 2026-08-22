@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Lightbulb, Banknote, Package, Sun, CalendarCheck, Sprout, Plus as PlusIcon, X, ArrowDown } from 'lucide-react';
+import { Lightbulb, Banknote, Package, Sun, CalendarCheck, Sprout, Plus as PlusIcon, X } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { useAuth } from '../../context/AuthContext';
 import { formatCFA, formatCFACourt } from '../../utils/format';
 import { PRIX_KWH_RESEAU } from '../../utils/factureConso';
 import { applianceCategories, appliances } from '../../data/appliances';
@@ -46,33 +45,6 @@ function Curseur({ label, value, onChange, min, max, step = 1, suffixe }) {
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label={label}
       />
-    </div>
-  );
-}
-
-/** Numéro d'étape + titre : c'est l'ordre de lecture qui explique le calcul. */
-function Etape({ n, icone: Icone, titre, phrase, children }) {
-  return (
-    <section className="card roi-etape">
-      <div className="roi-etape-tete">
-        <span className="roi-etape-num">{n}</span>
-        <div>
-          <h2 className="roi-etape-titre"><Icone size={15} /> {titre}</h2>
-          <p className="roi-etape-phrase">{phrase}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/** Résultat d'une étape, repris tel quel par la suivante. */
-function Report({ valeur, legende }) {
-  return (
-    <div className="roi-report">
-      <div className="roi-report-valeur">{valeur}</div>
-      <div className="roi-report-legende">{legende}</div>
-      <ArrowDown size={16} className="roi-report-fleche" aria-hidden="true" />
     </div>
   );
 }
@@ -124,7 +96,6 @@ function Projection({ lignes, investissement, retourAns }) {
 
 export default function RoiSection() {
   const { devis, kits, inverters, products } = useData();
-  const { user } = useAuth();
   const [rows, setRows] = useState(DEPART);
   const [coupures, setCoupures] = useState(COUPURES_PAR_JOUR);
   const [groupeActif, setGroupeActif] = useState(true);
@@ -161,22 +132,22 @@ export default function RoiSection() {
     setPrixDevis(Math.round(Number(d.total)));
   };
 
-  // ---- Étape 3 : le kit que l'app elle-même proposerait pour ces appareils ----
+  // Le kit que l'assistant de devis de l'app proposerait pour ces appareils —
+  // même dimensionnement, même catalogue, donc même prix que le devis.
   const kit = useMemo(() => {
     const jour = rows.reduce((s, r) => s + r.power * r.quantity * r.day, 0) / 1000;
     const nuit = rows.reduce((s, r) => s + r.power * r.quantity * r.night, 0) / 1000;
     if (jour + nuit <= 0) return null;
     const pic = rows.reduce((s, r) => s + r.power * r.quantity, 0);
     // Système autonome — le même choix par défaut que l'assistant de devis
-    // (`utils/dimensionnement.js`). C'est aussi l'hypothèse qui a du sens ici :
-    // le client vient précisément pour cesser de dépendre du réseau et du
-    // groupe. L'identifiant est repris du référentiel, jamais recopié.
+    // (`utils/dimensionnement.js`), et l'hypothèse qui a du sens ici : le
+    // client vient pour cesser de dépendre du réseau et du groupe.
     const sizing = calculateSystemSize({ day: jour, night: nuit }, SYSTEM_TYPES[0].id, DEFAULT_PEAK_SUN_HOURS,
       undefined, undefined, { peakLoad: pic, inverters: inverters || [] });
     const choisi = suggestKitForBattery(kits || [], sizing.batteryCapacity);
     if (!choisi) return null;
     const devisKit = buildKitQuotation(choisi, undefined, true, sizing, inverters || [], products || []);
-    return { kit: choisi, sizing, total: devisKit.total, panneaux: devisKit.panelsIncluded };
+    return { kit: choisi, total: devisKit.total, panneaux: devisKit.panelsIncluded };
   }, [rows, kits, inverters, products]);
 
   const investissement = prixDevis ?? kit?.total ?? 0;
@@ -191,118 +162,103 @@ export default function RoiSection() {
   }), [rows, investissement, coupures, tarif, carburant, groupeActif]);
 
   return (
-    <div className="roi-flux">
-      {/* ---------- 1 ---------- */}
-      <Etape n="1" icone={Lightbulb} titre="Ce que le client fait tourner"
-             phrase="Les mêmes appareils que l’assistant de devis : lampes, réfrigérateur, ventilateurs…">
-        {etudes.length > 0 && (
+    <div className="roi-grid">
+      {/* ---------- Colonne des saisies ---------- */}
+      <div className="roi-colonne">
+        <div className="card">
+          <div className="sheet-section-title"><Lightbulb size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Appareils du client</div>
+          <p className="roi-aide">Le même catalogue que l’assistant de devis : c’est lui qui donne la consommation.</p>
+
+          {etudes.length > 0 && (
+            <div className="input-group">
+              <label className="input-label" htmlFor="roi-etude">Reprendre l’étude d’un devis</label>
+              <select id="roi-etude" className="input" value="" onChange={(e) => reprendreEtude(e.target.value)}>
+                <option value="">Saisir les appareils ici</option>
+                {etudes.map((d) => (
+                  <option key={d.id} value={d.id}>{d.devisNumber || 'Devis'} — {resumeDimensionnement(d)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="roi-appareils">
+            {rows.map((r) => (
+              <div key={r.rowId} className="roi-appareil">
+                <span className="roi-appareil-nom">{r.name}</span>
+                <span className="roi-appareil-spec">{r.power} W · {r.day + r.night} h/j</span>
+                <input
+                  type="number" className="roi-appareil-qte" min="1" value={r.quantity}
+                  onChange={(e) => quantite(r.rowId, Number(e.target.value))}
+                  aria-label={`Quantité — ${r.name}`}
+                />
+                <button type="button" className="roi-appareil-retirer" onClick={() => retirer(r.rowId)}
+                        aria-label={`Retirer ${r.name}`}><X size={15} /></button>
+              </div>
+            ))}
+            {rows.length === 0 && <p className="roi-vide">Ajoutez au moins un appareil pour lancer le calcul.</p>}
+          </div>
+
           <div className="input-group">
-            <label className="input-label" htmlFor="roi-etude">Reprendre l’étude d’un devis</label>
-            <select id="roi-etude" className="input" value="" onChange={(e) => reprendreEtude(e.target.value)}>
-              <option value="">Saisir les appareils ici</option>
-              {etudes.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.devisNumber || 'Devis'} — {resumeDimensionnement(d)}
-                </option>
+            <label className="input-label" htmlFor="roi-ajout"><PlusIcon size={12} /> Ajouter un appareil</label>
+            <select id="roi-ajout" className="input" value="" onChange={(e) => ajouter(e.target.value)}>
+              <option value="">Choisir dans le catalogue…</option>
+              {applianceCategories.map((c) => (
+                <optgroup key={c.label} label={c.label}>
+                  {c.items.map((a) => <option key={a.id} value={a.id}>{a.name} — {a.power} W</option>)}
+                </optgroup>
               ))}
             </select>
           </div>
-        )}
 
-        <div className="roi-appareils">
-          {rows.map((r) => (
-            <div key={r.rowId} className="roi-appareil">
-              <span className="roi-appareil-nom">{r.name}</span>
-              <span className="roi-appareil-spec">{r.power} W · {r.day + r.night} h/j</span>
-              <input
-                type="number" className="roi-appareil-qte" min="1" value={r.quantity}
-                onChange={(e) => quantite(r.rowId, Number(e.target.value))}
-                aria-label={`Quantité — ${r.name}`}
-              />
-              <button type="button" className="roi-appareil-retirer" onClick={() => retirer(r.rowId)}
-                      aria-label={`Retirer ${r.name}`}><X size={15} /></button>
+          {/* Le total, mis en avant : c'est lui qui commande le kit ET le coût. */}
+          <div className="roi-total">
+            <div className="roi-total-valeur">{dec(sim.conso.total, 2)} kWh / jour</div>
+            <div className="roi-total-detail">
+              {dec(sim.conso.jour, 2)} kWh en journée · {dec(sim.conso.nuit, 2)} kWh la nuit
             </div>
-          ))}
-          {rows.length === 0 && <p className="roi-vide">Ajoutez au moins un appareil pour lancer le calcul.</p>}
-        </div>
-
-        <div className="input-group">
-          <label className="input-label" htmlFor="roi-ajout"><PlusIcon size={12} /> Ajouter un appareil</label>
-          <select id="roi-ajout" className="input" value="" onChange={(e) => ajouter(e.target.value)}>
-            <option value="">Choisir dans le catalogue…</option>
-            {applianceCategories.map((c) => (
-              <optgroup key={c.label} label={c.label}>
-                {c.items.map((a) => <option key={a.id} value={a.id}>{a.name} — {a.power} W</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-
-        <Report valeur={`${dec(sim.conso.total, 2)} kWh par jour`}
-                legende={`${dec(sim.conso.jour, 2)} kWh en journée · ${dec(sim.conso.nuit, 2)} kWh la nuit`} />
-      </Etape>
-
-      {/* ---------- 2 ---------- */}
-      <Etape n="2" icone={Banknote} titre="Ce que ces kWh lui coûtent aujourd’hui"
-             phrase="Pendant une coupure, ce sont les mêmes appareils qui tournent — mais c’est le groupe qui les alimente, et le kWh change de prix.">
-        <Curseur label="Coupures de courant" value={coupures} onChange={setCoupures} min={0} max={24} step={0.5} suffixe="h/jour" />
-        <label className="checkbox-row roi-bascule">
-          <input type="checkbox" checked={groupeActif} onChange={(e) => setGroupeActif(e.target.checked)} />
-          <span>Le client a un groupe électrogène</span>
-        </label>
-        <Curseur label="Prix du kWh (CEET)" value={tarif} onChange={setTarif} min={50} max={250} suffixe="F" />
-        {groupeActif && (
-          <Curseur label="Prix du litre de gazole" value={carburant} onChange={setCarburant} min={300} max={1500} step={25} suffixe="F" />
-        )}
-
-        <div className="roi-comparaison">
-          <div className="roi-comparaison-cote">
-            <div className="roi-comparaison-prix">{formatCFA(sim.cout.prixKwhReseau)}</div>
-            <div className="roi-comparaison-label">le kWh au réseau</div>
-          </div>
-          <div className="roi-comparaison-vs">contre</div>
-          <div className="roi-comparaison-cote is-cher">
-            <div className="roi-comparaison-prix">{groupeActif ? formatCFA(sim.cout.prixKwhGroupe) : '—'}</div>
-            <div className="roi-comparaison-label">le kWh au groupe</div>
           </div>
         </div>
 
-        <Ligne label="Réseau CEET" detail={`${sim.cout.kwhReseauAn.toLocaleString('fr-FR')} kWh/an`} montant={sim.cout.reseau} />
-        {groupeActif && (
-          <Ligne label="Groupe électrogène" detail={`${sim.cout.kwhGroupeAn.toLocaleString('fr-FR')} kWh/an, soit ${sim.cout.litresAn.toLocaleString('fr-FR')} L de gazole`} montant={sim.cout.groupe} />
-        )}
-        <Ligne label="Total payé chaque année" montant={sim.cout.total} fort />
+        <div className="card">
+          <div className="sheet-section-title"><Banknote size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Réseau et coupures</div>
+          <Curseur label="Coupures de courant" value={coupures} onChange={setCoupures} min={0} max={24} step={0.5} suffixe="h/jour" />
+          <Curseur label="Prix du kWh (CEET)" value={tarif} onChange={setTarif} min={50} max={250} suffixe="F" />
+          <label className="checkbox-row roi-bascule">
+            <input type="checkbox" checked={groupeActif} onChange={(e) => setGroupeActif(e.target.checked)} />
+            <span>Le client a un groupe électrogène</span>
+          </label>
+          {groupeActif && (
+            <Curseur label="Prix du litre de gazole" value={carburant} onChange={setCarburant} min={300} max={1500} step={25} suffixe="F" />
+          )}
+        </div>
 
-        <Report valeur={`${formatCFA(sim.cout.total)} par an`} legende="c’est ce que l’installation fait disparaître" />
-      </Etape>
-
-      {/* ---------- 3 ---------- */}
-      <Etape n="3" icone={Package} titre="L’installation qu’il lui faut"
-             phrase="Le kit que votre assistant de devis propose pour cette consommation, au prix de votre catalogue.">
-        {kit ? (
-          <>
-            <div className="roi-kit">
-              <div className="roi-kit-nom">{kit.kit.name}</div>
-              <div className="roi-kit-spec">
-                {kit.kit.battery} kWh de batterie · {kit.panneaux} panneaux de {kit.kit.panelW} Wc · onduleur {kit.kit.inverter} kVA
+        <div className="card">
+          <div className="sheet-section-title"><Package size={13} style={{ verticalAlign: -2, marginRight: 5 }} />L’installation</div>
+          {kit ? (
+            <>
+              <p className="roi-aide">Le kit que votre assistant de devis propose pour cette consommation, au prix de votre catalogue.</p>
+              <div className="roi-kit">
+                <div className="roi-kit-nom">{kit.kit.name}</div>
+                <div className="roi-kit-spec">
+                  {kit.kit.battery} kWh de batterie · {kit.panneaux} panneaux de {kit.kit.panelW} Wc · onduleur {kit.kit.inverter} kVA
+                </div>
               </div>
-            </div>
-            {prixDevis != null && (
-              <p className="roi-note">
-                Prix repris du devis ({formatCFA(prixDevis)}) au lieu du prix du kit ({formatCFA(kit.total)}).{' '}
-                <button type="button" className="roi-lien" onClick={() => setPrixDevis(null)}>Revenir au prix du kit</button>
-              </p>
-            )}
-            <Report valeur={formatCFA(investissement)} legende="prix de l’installation, pose comprise" />
-          </>
-        ) : (
-          <p className="roi-vide">Ajoutez des appareils : le kit se choisit tout seul d’après leur consommation.</p>
-        )}
-      </Etape>
+              <Ligne label="Prix de l’installation" detail="pose comprise" montant={investissement} fort />
+              {prixDevis != null && (
+                <p className="roi-note">
+                  Montant repris du devis, au lieu du prix du kit ({formatCFA(kit.total)}).{' '}
+                  <button type="button" className="roi-lien" onClick={() => setPrixDevis(null)}>Revenir au prix du kit</button>
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="roi-vide">Ajoutez des appareils : le kit se choisit tout seul d’après leur consommation.</p>
+          )}
+        </div>
+      </div>
 
-      {/* ---------- 4 ---------- */}
-      <Etape n="4" icone={CalendarCheck} titre="Ce que ça lui rapporte"
-             phrase={`${formatCFA(investissement)} d’installation, ${formatCFA(sim.cout.total)} économisés chaque année.`}>
+      {/* ---------- Colonne des résultats ---------- */}
+      <div className="roi-colonne">
         <div className="partner-kpis roi-kpis">
           <div className="kpi-card is-highlight">
             <div className="kpi-icon"><CalendarCheck size={17} /></div>
@@ -330,29 +286,53 @@ export default function RoiSection() {
           </div>
         </div>
 
-        <div className="roi-sous-bloc">
+        <div className="card roi-bloc">
+          <div className="sheet-section-title">Ce que ces kWh coûtent aujourd’hui</div>
+          {/* Le même kWh, deux prix : pendant une coupure, ce sont les mêmes
+              appareils qui tournent, mais c'est le gazole qui les alimente. */}
+          <div className="roi-comparaison">
+            <div className="roi-comparaison-cote">
+              <div className="roi-comparaison-prix">{formatCFA(sim.cout.prixKwhReseau)}</div>
+              <div className="roi-comparaison-label">le kWh au réseau</div>
+            </div>
+            <div className="roi-comparaison-vs">contre</div>
+            <div className="roi-comparaison-cote is-cher">
+              <div className="roi-comparaison-prix">{groupeActif ? formatCFA(sim.cout.prixKwhGroupe) : '—'}</div>
+              <div className="roi-comparaison-label">le kWh au groupe</div>
+            </div>
+          </div>
+
+          <Ligne label="Réseau CEET" detail={`${sim.cout.kwhReseauAn.toLocaleString('fr-FR')} kWh/an`} montant={sim.cout.reseau} />
+          {groupeActif && (
+            <Ligne label="Groupe électrogène"
+                   detail={`${sim.cout.kwhGroupeAn.toLocaleString('fr-FR')} kWh/an, soit ${sim.cout.litresAn.toLocaleString('fr-FR')} L de gazole`}
+                   montant={sim.cout.groupe} />
+          )}
+          <Ligne label="Total payé chaque année" montant={sim.cout.total} fort />
+          <Ligne label="Entretien de l’installation" montant={sim.maintenance} negatif />
+          <Ligne label="Économie nette la 1re année" montant={sim.economieAn1} fort />
+        </div>
+
+        <div className="card roi-bloc">
           <div className="sheet-section-title">Projection sur {DUREE_SYSTEME_ANS} ans</div>
           <Projection lignes={sim.projection} investissement={investissement} retourAns={sim.retourAns} />
         </div>
-      </Etape>
 
-      {/* Ce qui n'est pas saisi mais entre quand même dans le calcul : écrit,
-          jamais enfoui dans le code. Un chiffre qu'on ne peut pas justifier
-          devant le client ne vaut rien. */}
-      <details className="card roi-hypotheses">
-        <summary>Ce que le calcul suppose</summary>
-        <ul>
-          <li>Un groupe électrogène tire environ {KWH_PAR_LITRE_GAZOLE} kWh d’un litre de gazole — c’est ce qui convertit les kWh en litres.</li>
-          <li>Les coupures sont réparties sur la journée : {dec(coupures)} h sur 24, soit {Math.round((coupures / 24) * 100)} % des kWh produits par le groupe.</li>
-          <li>Le kit étant dimensionné pour ces appareils, il les alimente : l’économie, c’est tout ce qui est payé aujourd’hui pour les faire tourner.</li>
-          <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(MAINTENANCE_ANNUELLE)}/an) suit la même hausse.</li>
-          <li>Les panneaux perdent {dec(DEGRADATION_ANNUELLE * 100)} % de rendement par an (garantie constructeur : {DUREE_SYSTEME_ANS} ans).</li>
-          <li>CO₂ : {dec(CO2_PAR_LITRE_GAZOLE, 2)} kg par litre de gazole, {dec(CO2_PAR_KWH_RESEAU, 2)} kg par kWh réseau — ordres de grandeur, pas une mesure.</li>
-        </ul>
-        {user?.role === 'gerant' && (
-          <p className="roi-note">Les kits et leurs prix se règlent dans Paramètres → Mes kits.</p>
-        )}
-      </details>
+        {/* Ce qui n'est pas saisi mais entre quand même dans le calcul : écrit,
+            jamais enfoui dans le code. Un chiffre qu'on ne peut pas justifier
+            devant le client ne vaut rien. */}
+        <details className="card roi-hypotheses">
+          <summary>Ce que le calcul suppose</summary>
+          <ul>
+            <li>Un groupe électrogène tire environ {KWH_PAR_LITRE_GAZOLE} kWh d’un litre de gazole — c’est ce qui convertit les kWh en litres.</li>
+            <li>Les coupures sont réparties sur la journée : {dec(coupures)} h sur 24, soit {Math.round((coupures / 24) * 100)} % des kWh produits par le groupe.</li>
+            <li>Le kit étant dimensionné pour ces appareils, il les alimente : l’économie, c’est tout ce qui est payé aujourd’hui pour les faire tourner.</li>
+            <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(MAINTENANCE_ANNUELLE)}/an) suit la même hausse.</li>
+            <li>Les panneaux perdent {dec(DEGRADATION_ANNUELLE * 100)} % de rendement par an (garantie constructeur : {DUREE_SYSTEME_ANS} ans).</li>
+            <li>CO₂ : {dec(CO2_PAR_LITRE_GAZOLE, 2)} kg par litre de gazole, {dec(CO2_PAR_KWH_RESEAU, 2)} kg par kWh réseau — ordres de grandeur, pas une mesure.</li>
+          </ul>
+        </details>
+      </div>
     </div>
   );
 }

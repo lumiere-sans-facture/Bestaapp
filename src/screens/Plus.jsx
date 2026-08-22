@@ -801,7 +801,7 @@ export default function Plus() {
     paiements: 'Qui encaisse les abonnements Devis Pro',
     backup: 'Exporter / restaurer toutes les données',
     subsadmin: 'Abonnés, paiements à valider et MRR',
-    roi: 'Des appareils du client à son remboursement, en quatre étapes',
+    roi: 'Ce que le client paie aujourd’hui, et en combien de temps l’installation se rembourse',
   };
 
   return (
