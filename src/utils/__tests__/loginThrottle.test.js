@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
-import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining, CAPTCHA_AFTER_ATTEMPTS } from '../loginThrottle';
+import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining } from '../loginThrottle';
 
 // localStorage lu/écrit par le module : stub minimal pour l'environnement de test
 beforeAll(() => {
@@ -21,13 +21,7 @@ beforeEach(() => {
 
 describe('loginThrottle', () => {
   it("n'est pas verrouillé avant tout échec", () => {
-    expect(getLockState('adam@bestasolar.tg')).toEqual({ locked: false, remainingMs: 0, count: 0 });
-  });
-
-  it('le compteur reflète le nombre d\'échecs, à CAPTCHA_AFTER_ATTEMPTS pour déclencher le défi', () => {
-    expect(registerFailedAttempt('adam@bestasolar.tg').count).toBe(1);
-    expect(registerFailedAttempt('adam@bestasolar.tg').count).toBe(2);
-    expect(registerFailedAttempt('adam@bestasolar.tg').count).toBe(CAPTCHA_AFTER_ATTEMPTS);
+    expect(getLockState('adam@bestasolar.tg')).toEqual({ locked: false, remainingMs: 0 });
   });
 
   it('verrouille au 5e échec, pas avant', () => {

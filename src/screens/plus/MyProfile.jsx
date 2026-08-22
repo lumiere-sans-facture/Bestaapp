@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Camera, Check, Phone, Mail, MapPin, Star, Building2 } from 'lucide-react';
+import { Camera, Check, Phone, Mail, MapPin, Star, Building2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import StageBadge from '../../components/StageBadge';
@@ -15,7 +15,7 @@ import { updateMyProfile } from '../../lib/remoteSync';
 // Rien de ce qui mène à une commission n'y figure — montants, Mobile Money,
 // affaires gagnées, historique des versements : tout vit dans « Mon espace
 // partenaire », d'un seul tenant.
-export default function MyProfile({ onBack }) {
+export default function MyProfile() {
   const { user } = useAuth();
   const { partners, leads, devis, stages, lostStage, ensurePartnerForUser, updatePartner } = useData();
   const fileRef = useRef(null);
@@ -75,11 +75,7 @@ export default function MyProfile({ onBack }) {
   };
 
   return (
-    <>
-      <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={onBack}>
-        <ChevronLeft size={16} /> Retour
-      </button>
-
+    <div className="settings-tab">
       <div className="profile-card card">
         <button className="profile-photo-btn" onClick={() => fileRef.current?.click()} aria-label="Changer ma photo">
           {me.photo ? (
@@ -174,6 +170,6 @@ export default function MyProfile({ onBack }) {
           </div>
         )) : <div className="text-sm text-secondary">Aucun client en cours pour le moment.</div>}
       </div>
-    </>
+    </div>
   );
 }

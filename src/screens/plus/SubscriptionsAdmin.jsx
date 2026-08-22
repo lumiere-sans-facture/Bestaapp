@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, Crown, Check, X, TrendingUp, Users, Clock, Handshake } from 'lucide-react';
+import { Crown, Check, X, TrendingUp, Users, Clock, Handshake } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate } from '../../utils/format';
 import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft } from '../../utils/subscription';
@@ -18,7 +18,7 @@ const STATUS_LABEL = {
   en_attente_paiement: ['En attente', 'badge-warning'],
 };
 
-export default function SubscriptionsAdmin({ onBack }) {
+export default function SubscriptionsAdmin() {
   const {
     subscriptions, subscriptionPayments, team,
     confirmSubscriptionPayment, rejectSubscriptionPayment, getUserById,
@@ -78,12 +78,7 @@ export default function SubscriptionsAdmin({ onBack }) {
   };
 
   return (
-    <>
-      <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={onBack}>
-        <ChevronLeft size={16} /> Retour
-      </button>
-      <div className="section-title">Abonnements Devis Pro</div>
-
+    <div className="settings-tab">
       <div className="commission-totals">
         <div className="commission-total-card paid">
           <div className="commission-total-value"><TrendingUp size={15} /> {formatCFA(mrr)}</div>
@@ -190,6 +185,6 @@ export default function SubscriptionsAdmin({ onBack }) {
         confirmLabel="Refuser"
         danger
       />
-    </>
+    </div>
   );
 }

@@ -5,20 +5,21 @@ import { buildKitQuotation, suggestKitForBattery, MOUNTING_TYPES } from '../sola
 const byId = (id) => SOLAR_KITS.find((k) => k.id === id);
 
 describe('buildKitQuotation', () => {
-  // Totaux exacts des 5 devis kits officiels (prix tout compris, sans TVA),
+  // Totaux exacts des 6 devis kits officiels (prix tout compris, sans TVA),
   // sur le support par défaut (tôle) : la ligne « Structure de montage » du
   // kit est recalculée au panneau, pas au prix fixe de data/kits.js.
   const TOTALS = {
     'kit-2.5kwh-eco': 625000,
     'kit-2.5kwh-premium': 715000,
     'kit-5kwh': 1180000,
-    // 20 et 32 kWh : leur composition ne portait aucune structure ; le devis
-    // l'ajoute désormais au panneau (12 × 10 000, 16 × 10 000 sur tôle).
+    // 16, 20 et 32 kWh : leur composition ne porte aucune structure ; le devis
+    // l'ajoute au panneau (10 × 10 000, 12 × 10 000, 16 × 10 000 sur tôle).
+    'kit-16kwh': 2419000,
     'kit-20kwh': 3344000,
     'kit-32kwh': 4518000,
   };
 
-  it('propose les 5 kits officiels', () => {
+  it('propose les 6 kits officiels', () => {
     expect(SOLAR_KITS.map((k) => k.id)).toEqual(Object.keys(TOTALS));
   });
 
@@ -50,6 +51,15 @@ describe('buildKitQuotation', () => {
     expect(sum).toBe(q.total);
   });
 
+  it('le kit 16 kWh vaut 2 319 000 F dans sa composition d’origine (hors structure)', () => {
+    // Total du devis officiel BestaSolar : la structure de montage n'y figure
+    // pas, elle est ajoutée par le devis selon le support choisi.
+    const kit = byId('kit-16kwh');
+    const somme = kit.lines.reduce((s, l) => s + l.qty * l.pu, 0);
+    expect(somme).toBe(2319000);
+    expect(buildKitQuotation(kit, 'tole', false).total).toBe(somme);
+  });
+
   it('le kit 32 kWh détaille ses 2 modules batterie de 16 kWh', () => {
     expect(byId('kit-32kwh').batteryModules).toEqual([{ capacity: 16, qty: 2 }]);
   });
@@ -77,7 +87,7 @@ describe('buildKitQuotation', () => {
     expect(sol).toBeGreaterThan(dalle);
   });
 
-  it('un kit sans ligne « Structure de montage » (20/32 kWh) en reçoit une', () => {
+  it('un kit sans ligne « Structure de montage » (16/20/32 kWh) en reçoit une', () => {
     // Le sélecteur de support de l'assistant restait sans effet sur ces kits :
     // le devis sortait sans structure, quel que soit le terrain.
     const kit = byId('kit-20kwh');

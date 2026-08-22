@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FileText, Plus, Download, Search, Check, Trash2, Pencil, BadgeCheck, SlidersHorizontal } from 'lucide-react';
+import { FileText, Plus, Download, Search, Check, Trash2, Pencil, BadgeCheck, SlidersHorizontal, Send } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchAdminPublicDevis } from '../lib/remoteSync';
 import { formatCFA, formatDate } from '../utils/format';
-import { etatDevis, ETAT_DEVIS_LABEL, joursAvantExpiration, dateExpiration } from '../utils/affaires';
+import { etatDevis, ETAT_DEVIS_LABEL, joursAvantExpiration, dateExpiration, estDevisSansSuite, devisRelanceMessage } from '../utils/affaires';
+import { whatsappLink } from '../utils/paiement';
 import { dimensionnementRejouable, resumeDimensionnement } from '../utils/dimensionnement';
 import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import ConfirmSheet from '../components/ConfirmSheet';
+import { useToast } from '../components/Toast';
 import DevisCreator from './devis/DevisCreator';
 import DevisEditSheet from './devis/DevisEditSheet';
 
@@ -26,7 +28,8 @@ const SORT_OPTIONS = [
 
 export default function Devis() {
   const { user } = useAuth();
-  const { devis, getLeadById, getPartnerById, products, updateDevis, deleteDevis, updateDevisStage } = useData();
+  const { devis, getLeadById, getPartnerById, products, updateDevis, deleteDevis, updateDevisStage, addDevisRelance } = useData();
+  const toast = useToast();
 
   // Document imprimable (HTML autonome, export PDF par Ctrl+P). L'espace
   // public n'utilise qu'un seul modèle : Studio.
@@ -48,6 +51,17 @@ export default function Devis() {
       }),
     });
   };
+
+  // Relance WhatsApp : ouvre un message pré-rempli, trace la relance et le
+  // dit (de retour dans l'app, l'utilisateur sait que c'est parti) — même
+  // principe que la relance des factures Pro.
+  const relancer = (d) => {
+    const lead = d._externe ? null : getLeadById(d.leadId);
+    const phone = d.clientPhone || lead?.phone;
+    window.open(whatsappLink(phone, devisRelanceMessage(d, lead)), '_blank', 'noopener');
+    addDevisRelance(d.id);
+    toast(`Relance envoyée à ${lead?.name || d.clientName || 'ce client'} sur WhatsApp.`);
+  };
   // Arrivée depuis le panier de la boutique : assistant manuel pré-rempli.
   // Arrivée depuis une fiche client : création directe, client présélectionné.
   const location = useLocation();
@@ -58,8 +72,9 @@ export default function Devis() {
   // 'list' | 'create'  (le choix du type + les assistants vivent dans DevisCreator)
   const [view, setView] = useState(fromCart || initialLeadId ? 'create' : 'list');
   const [search, setSearch] = useState('');
-  // all | brouillon | en-cours | converti | expire | solar | manual
-  const [typeFilter, setTypeFilter] = useState('all');
+  // all | brouillon | en-cours | converti | expire | sans-suite | solar | manual
+  // Arrivée depuis le tableau de bord (pastille « Devis sans suite ») : le filtre est présélectionné.
+  const [typeFilter, setTypeFilter] = useState(location.state?.typeFilter || 'all');
   const [confirmVente, setConfirmVente] = useState(null);
   // Étude solaire rouverte pour ajustement : l'assistant repart des saisies
   // enregistrées et MET À JOUR le devis au lieu d'en créer un second.
@@ -103,6 +118,7 @@ export default function Devis() {
       if (typeFilter === 'all') return true;
       if (typeFilter === 'solar') return d.type === 'solar';
       if (typeFilter === 'manual') return d.type !== 'solar';
+      if (typeFilter === 'sans-suite') return estDevisSansSuite(d, d._externe ? null : getLeadById(d.leadId));
       // Les autres puces filtrent sur l'ÉTAT commercial, qui se déduit de la
       // validité du devis — voir utils/affaires.js.
       return etatDevis(d, d._externe ? null : getLeadById(d.leadId)) === typeFilter;
@@ -162,7 +178,7 @@ export default function Devis() {
             <>
             <div className="list-toolbar">
               <div className="categories-scroll">
-                {[['all', 'Tous'], ['en-cours', 'En cours'], ['converti', 'Convertis'], ['expire', 'Expirés'], ['brouillon', 'Brouillons'], ['solar', 'Solaires'], ['manual', 'Manuels']].map(([id, label]) => (
+                {[['all', 'Tous'], ['en-cours', 'En cours'], ['sans-suite', 'Sans suite'], ['converti', 'Convertis'], ['expire', 'Expirés'], ['brouillon', 'Brouillons'], ['solar', 'Solaires'], ['manual', 'Manuels']].map(([id, label]) => (
                   <button key={id} className={`category-chip ${typeFilter === id ? 'active' : ''}`} aria-pressed={typeFilter === id} onClick={() => setTypeFilter(id)}>{label}</button>
                 ))}
               </div>
@@ -193,6 +209,9 @@ export default function Devis() {
                             en permanence, il deviendrait du décor qu'on ne lit plus. */}
                         {etat === 'en-cours' && restants != null && restants <= 7 && (
                           <span className="flat-badge warning">{restants === 0 ? 'Expire aujourd’hui' : `Expire dans ${restants} j`}</span>
+                        )}
+                        {!d._externe && estDevisSansSuite(d, lead) && (
+                          <span className="flat-badge warning">Sans suite</span>
                         )}
                         <span className="flat-row-date">
                           {formatDate(d.createdAt)} · {d.type === 'solar' ? (d.sousType === 'pompage' ? 'Pompage solaire' : 'Solaire') : 'Comptant'}
@@ -241,7 +260,19 @@ export default function Devis() {
                   </span>
                 </div>
               )}
+              {actions.derniereRelance && (
+                <div className="sheet-row"><span className="sheet-label">Dernière relance</span><span className="sheet-value">{formatDate(actions.derniereRelance)}</span></div>
+              )}
               <button className="btn btn-primary btn-block" onClick={() => runAction(() => ouvrirDocument(actions))}><Download size={16} /> Devis imprimable (PDF)</button>
+              {/* Relancer n'a de sens que pour une affaire encore ouverte, avec
+                  un numéro à contacter — même logique que la relance des factures Pro. */}
+              {!actions._externe
+                && etatDevis(actions, getLeadById(actions.leadId)) === 'en-cours'
+                && (actions.clientPhone || getLeadById(actions.leadId)?.phone) && (
+                <button className="btn btn-outline btn-block" onClick={() => runAction(() => relancer(actions))}>
+                  <Send size={16} /> Relancer par WhatsApp
+                </button>
+              )}
               {/* Un devis d'un autre compte se consulte : il s'édite chez son auteur. */}
               {!actions._externe && (
                 <>

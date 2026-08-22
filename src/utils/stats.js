@@ -28,6 +28,27 @@ export const computeMonthlyStats = (leads, months = 6) => {
 };
 
 /**
+ * Devis créés par mois sur les N derniers mois (mois courant inclus) —
+ * l'activité d'UN client sur sa fiche. Rend aussi `max`, pour que l'appelant
+ * dessine des barres proportionnelles sans reparcourir la liste.
+ */
+export const computeMonthlyDevis = (devisList = [], months = 6, now = new Date()) => {
+  const out = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const crees = devisList.filter((x) => sameMonth(x.createdAt, year, month));
+    out.push({
+      month: MONTH_LABELS[month],
+      devis: crees.length,
+      total: crees.reduce((sum, x) => sum + (Number(x.total) || 0), 0),
+    });
+  }
+  return out;
+};
+
+/**
  * Chiffre d'affaires Pro sur les N derniers mois (mois courant inclus),
  * calculé depuis les encaissements réels (paiements datés, acomptes compris ;
  * repli sur les factures payées sans détail).

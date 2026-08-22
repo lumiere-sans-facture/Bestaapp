@@ -254,5 +254,18 @@ export function createDevisActions(setState) {
         ...s,
         devis: s.devis.filter((d) => d.id !== devisId),
       })),
+
+    // Trace une relance client (WhatsApp/SMS) pour l'historique et le calcul
+    // des « devis sans suite » (voir utils/affaires.js#estDevisSansSuite) —
+    // même principe que la relance des factures Pro (actions/pro.js).
+    addDevisRelance: (devisId, canal = 'whatsapp') =>
+      setState((s) => ({
+        ...s,
+        devis: s.devis.map((d) => {
+          if (d.id !== devisId) return d;
+          const date = new Date().toISOString();
+          return { ...d, relances: [...(d.relances || []), { date, canal }], derniereRelance: date };
+        }),
+      })),
   };
 }

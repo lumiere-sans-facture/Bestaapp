@@ -5,7 +5,38 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-22
+- **Mode hors-ligne** : l'app s'ouvre et reste utilisable sans réseau, et tout remonte seul au retour de la connexion
+  - la session est restaurée depuis le profil mémorisé sur l'appareil — sans réseau, l'app renvoyait l'utilisateur à l'écran de connexion, qu'il ne pouvait pas franchir non plus (ouverture : 7,4 s → 0,2 s)
+  - une modification faite hors-ligne (étape d'un client, prix d'un kit, statut d'un devis) survit au relancement : une file d'attente persistante la fait primer sur la copie du serveur, plus ancienne
+  - une app lancée sans serveur se reconnecte toute seule dès son retour (reprise à délai croissant, immédiate au retour du réseau ou de l'app) — avant, il fallait recharger la page
+  - le voyant distingue « Hors ligne — le travail est enregistré ici » d'un vrai refus du serveur, annonce le nombre d'éléments en attente et propose « Synchroniser maintenant »
+
+## 2026-08-21
+- Kits : nouveau **Kit 16 kWh** (batterie Beve 16 kWh, 10 × 590 Wc, onduleur Beve 6 kVA, 14 lignes, 2 319 000 F hors structure) — les kits officiels ajoutés par une mise à jour rejoignent désormais les installations existantes, une seule fois, sans ressusciter un kit supprimé par le gérant
+- Paramètres : tous les onglets (Profil, Apparence, Moyens de paiement, Sauvegarde, Administration) recadrés comme l'écran qui y mène — en-tête titre + phrase d'explication, un seul retour (la flèche de l'en-tête, que le bouton « Retour » doublait sur mobile), libellés de section en majuscules et même espacement des cartes partout
+
+## 2026-08-20
+- Apparence : écran dédié (Paramètres → Apparence) avec des cartes d'option illustrées, et retrait des icônes de thème de la barre latérale
+- Clients : carnet en cartes (pastille d'initiales, téléphone/email/adresse, nombre de devis) et fiche client plein écran sur `/clients/:id` — onglets Résumé / Devis / Contact / Notes, quatre indicateurs, activité sur 6 mois et devis récents
+- Clients : champ email ajouté à la fiche client (saisie, affichage, recherche)
+- Paramètres : nouvel écran qui réunit tout ce qui se règle (profil, abonnement, apparence, moyens de paiement, sauvegarde, administration, diagnostic) — la barre latérale et le menu « Plus » n'énumèrent plus que le travail quotidien
+- Plus → Compte : « Apparence » devient une ligne comme les autres (icône, sous-titre = thème actuel, flèche), le réglage s'ouvre dans une fiche au lieu d'être toujours affiché
+- Chargement : l'écran plein « Chargement… » cède la place à un squelette animé qui reprend la forme de l'app (barre latérale, en-tête) — la structure reste visible tout de suite, seul le contenu se dessine en attendant
+- Connexion (inscription) : bandeau tarifs/fonctionnalités retiré sous « Créer mon compte » ; texte du volet de marque recentré sur le dimensionnement solaire (fiche complète générée en quelques minutes)
+- Connexion : nouvelle mise en page à deux volets sur grand écran (formulaire à gauche, présentation de l'app à droite) — repli sur le formulaire seul en dessous de 900px
+- Logo officiel BestaSolar Pro : barre latérale (mode public, version blanche sans plaque) et documents imprimables (devis, factures) ; devient aussi le favicon et l'icône iOS (icône « B » dédiée) — écran de connexion inchangé (icône Sun)
+- Apparence : clair par défaut (ne suit plus l'OS tant que « Système » n'est pas choisi exprès) ; la page de connexion reste toujours claire, quel que soit le thème réglé sur l'appareil
+- Apparence : mode clair / sombre / système, réglable depuis Plus → Apparence (mobile) ou la barre latérale (desktop), sans backend — préférence d'appareil posée avant le premier rendu (pas de clignotement)
+- Devis : bouton « Relancer par WhatsApp » sur les affaires en cours, message pré-rempli et trace de la dernière relance
+- Notifications : cloche dans l'en-tête, sur tous les écrans — reprend le flux d'alertes du tableau de bord (pistes sans activité, devis sans suite, abonnement, commissions à payer)
+
 ## 2026-08-18
+- Tableau de bord : le suivi de stock disparaît, remplacé par « Devis sans suite » et « Transformation devis → commande » — deux indicateurs commerciaux, cliquables vers la liste filtrée
+- Boutique : les champs stock passent derrière un interrupteur par produit (« Suivre le stock »), désactivé par défaut — plus de décrément automatique à la confirmation de commande
+- Inscription : numéro de téléphone avec choix du pays (Togo +228 / Bénin +229) plutôt qu'un indicatif deviné
+- Inscription : message de succès reformulé pour orienter aussi qui a déjà un compte (connexion / mot de passe oublié), sans révéler si l'email existe déjà
+- CAPTCHA retiré entièrement (connexion, inscription, mot de passe oublié) : Supabase ne peut pas le réserver à la connexion sans casser l'inscription — la protection réelle reste le verrouillage progressif et les Rate Limits Supabase
 - Inscription : CAPTCHA retiré (gardé sur mot de passe oublié et connexion après 3 échecs)
 - Connexion : le CAPTCHA n'apparaît plus qu'à partir du 3e échec sur un même email, moins de friction pour la saisie normale
 - Session : durée de vie (30 j) et inactivité (7 j) bornées côté app, en attendant le palier payant Supabase qui fait ça nativement

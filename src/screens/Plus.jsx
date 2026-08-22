@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
+import { useTheme } from '../context/ThemeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchPlatformPayouts, decidePlatformPayout } from '../lib/remoteSync';
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
 import { estProprietaireEspace } from '../utils/roles';
 import { configActive, providerById, MODE_LABEL } from '../utils/paiementProviders';
-import { SUBSCRIPTION_PRICE, effectiveStatus } from '../utils/subscription';
+import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft } from '../utils/subscription';
 import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
@@ -27,6 +28,7 @@ import FormationSection from './plus/FormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import KitsSection from './plus/KitsSection';
 import PaiementsSection from './plus/PaiementsSection';
+import AppearanceSection from './plus/AppearanceSection';
 import KkiapayButton from '../components/KkiapayButton';
 import InvertersSection from './plus/InvertersSection';
 import PompeKitsSection from './plus/PompeKitsSection';
@@ -37,12 +39,15 @@ import { reconcileMissingCommissions } from '../utils/commissionSync';
 import { MODES_RETRAIT, ETATS_COMMISSION, commissionsEngagees, etatCommission } from '../utils/payouts';
 import { suivre, EVENEMENTS } from '../lib/analytique';
 
+const THEME_LABEL = { clair: 'Clair', sombre: 'Sombre', systeme: 'Système' };
+
 export default function Plus() {
   const { user, logout, refreshOrg } = useAuth();
   // Parrainage de l'entreprise : saisie une seule fois, puis verrouillé (serveur).
   const [refInput, setRefInput] = useState('');
   const [refSaving, setRefSaving] = useState(false);
   const { setMode, proActive } = useMode();
+  const { theme } = useTheme();
   const data = useData();
   const {
     partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team, teamChargee,
@@ -63,7 +68,7 @@ export default function Plus() {
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
@@ -88,6 +93,10 @@ export default function Plus() {
     if (section && !sectionAutorisee(section)) navigate('/plus', { replace: true });
   }, [section, user.role, user.is_platform_admin]); // eslint-disable-line react-hooks/exhaustive-deps
   const setActiveTab = (x) => navigate(x === 'menu' ? '/plus' : `/plus/${x}`);
+  // Sections ouvertes DEPUIS « Paramètres » : leur retour y revient, sinon on
+  // retomberait sur le menu « Plus » sans jamais pouvoir enchaîner deux réglages.
+  const SECTIONS_PARAMETRES = ['profile', 'apparence', 'backup', 'paiements', 'subsadmin'];
+  const retourDepuis = (tab) => (SECTIONS_PARAMETRES.includes(tab) ? 'parametres' : 'menu');
   const [comFilter, setComFilter] = useState('all');
   const [comPartner, setComPartner] = useState('all');
   const [payCom, setPayCom] = useState(null); // commission en cours de paiement
@@ -384,8 +393,8 @@ export default function Plus() {
     return lead ? Math.round(lead.estimatedValue * COMMISSION_RATES[level]) : '';
   };
 
-  const BackButton = () => (
-    <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={() => setActiveTab('menu')}>
+  const BackButton = ({ to = 'menu' }) => (
+    <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={() => setActiveTab(to)}>
       <ChevronLeft size={16} /> Retour
     </button>
   );
@@ -562,13 +571,11 @@ export default function Plus() {
     </>
   );
 
-  const renderProfile = () => <MyProfile onBack={() => setActiveTab('menu')} />;
+  const renderProfile = () => <MyProfile />;
 
   const renderBackup = () => (
-    <>
-      <BackButton />
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="card-title">Sauvegarde des données</div>
+    <div className="settings-tab">
+      <div className="card">
         <p className="text-sm text-secondary">
           Exportez régulièrement toutes vos données (clients, devis, factures, partenaires, commissions…)
           dans un fichier. Vous pourrez les restaurer en cas de perte ou de changement d'appareil.
@@ -586,7 +593,7 @@ export default function Plus() {
         </button>
         <p className="field-hint">L'import remplace les données actuelles — exportez d'abord par sécurité.</p>
       </div>
-    </>
+    </div>
   );
 
   // Entrée de menu générique (icône, titre, sous-titre, action).
@@ -599,6 +606,66 @@ export default function Plus() {
       </div>
       <ChevronRight size={18} className="menu-item-arrow" />
     </button>
+  );
+
+  // État de l'abonnement Devis Pro, tel qu'il se lit dans les réglages.
+  const resumeAbonnement = () => {
+    if (proActive) {
+      const jours = daysLeft(sub);
+      return jours ? `Actif · ${jours} j restants` : 'Actif';
+    }
+    if (subStatus === 'en_attente_paiement') return 'Paiement en attente de validation';
+    if (subStatus === 'expire') return 'Expiré — à renouveler';
+    return `Gratuit · Devis Pro à ${formatCFA(SUBSCRIPTION_PRICE)}/mois`;
+  };
+
+  // Écran « Paramètres » : tout ce qui se RÈGLE (compte, apparence,
+  // abonnement, configuration de l'entreprise) réuni ici. La barre latérale
+  // et le menu « Plus » n'énumèrent plus que le travail quotidien — chaque
+  // réglage reste à un seul endroit, jamais dupliqué entre les deux.
+  const renderParametres = () => (
+    <div className="plus-grid settings-page">
+      <div className="plus-section">
+        <div className="plus-section-label">Compte</div>
+        <div className="plus-card card">
+          <MenuItem icon={User} title="Profil" subtitle="Vos informations et votre entreprise" onClick={() => setActiveTab('profile')} />
+          <MenuItem icon={Crown} title="Abonnement Devis Pro" subtitle={resumeAbonnement()} onClick={handleProClick} />
+        </div>
+      </div>
+
+      <div className="plus-section">
+        <div className="plus-section-label">Application</div>
+        <div className="plus-card card">
+          {/* Réglage d'appareil (pas une donnée métier) : stocké en local,
+              jamais répliqué — voir context/ThemeContext.jsx. */}
+          <MenuItem icon={Palette} title="Apparence" subtitle={`Thème et mode d'affichage · ${THEME_LABEL[theme]}`} onClick={() => setActiveTab('apparence')} />
+        </div>
+      </div>
+
+      {user.role === 'gerant' && (
+        <div className="plus-section">
+          <div className="plus-section-label">Configuration</div>
+          <div className="plus-card card">
+            <MenuItem icon={CreditCard} title="Moyens de paiement" subtitle={paiementActif ? `${paiementActif.nom} · ${paiementActif.mode}` : 'Aucun agrégateur activé — Mobile Money manuel'} onClick={() => setActiveTab('paiements')} />
+            <MenuItem icon={DatabaseBackup} title="Sauvegarde des données" subtitle="Exporter / restaurer toutes les données" onClick={() => setActiveTab('backup')} />
+            {/* Administration du SaaS : en mode backend, réservée à l'admin
+                plateforme (le serveur refuse de toute façon l'activation
+                d'un abonnement à quiconque d'autre). Titre volontairement
+                distinct de « Abonnement Devis Pro » plus haut, qui est CELUI
+                de l'utilisateur — deux lignes homonymes prêtaient à confusion. */}
+            {(!isSupabaseConfigured || user.is_platform_admin) && (
+              <MenuItem icon={Crown} title="Administration des abonnements" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="sync-inline"><SyncStatusRow /></div>
+
+      {/* Réservé au gérant : lui seul peut agir sur la configuration du
+          suivi, et lui seul a besoin de savoir s'il est actif. */}
+      {user.role === 'gerant' && <DiagnosticCard />}
+    </div>
   );
 
   const renderMenu = () => (
@@ -677,13 +744,6 @@ export default function Plus() {
               <MenuItem icon={Package} title="Mes kits" subtitle={`${(kits || []).length} kits proposés par l'assistant de devis`} onClick={() => setActiveTab('kits')} />
               <MenuItem icon={Cpu} title="Onduleurs" subtitle={`${(inverters || []).length} onduleurs, suggérés si celui du kit ne suffit pas`} onClick={() => setActiveTab('inverters')} />
               <MenuItem icon={Droplets} title="Kits pompage" subtitle={`${(pompeKits || []).length} kits proposés par l'assistant Pompe solaire`} onClick={() => setActiveTab('pompekits')} />
-              <MenuItem icon={CreditCard} title="Moyens de paiement" subtitle={paiementActif ? `${paiementActif.nom} · ${paiementActif.mode}` : 'Aucun agrégateur activé — Mobile Money manuel'} onClick={() => setActiveTab('paiements')} />
-              {/* Administration du SaaS : en mode backend, réservée à l'admin
-                  plateforme (le serveur refuse de toute façon l'activation
-                  d'un abonnement à quiconque d'autre). */}
-              {(!isSupabaseConfigured || user.is_platform_admin) && (
-                <MenuItem icon={Crown} title="Abonnements Devis Pro" subtitle="Abonnés, paiements à valider, MRR" onClick={() => setActiveTab('subsadmin')} />
-              )}
             </div>
           </div>
         )}
@@ -706,17 +766,14 @@ export default function Plus() {
         <div className="plus-section">
           <div className="plus-section-label">Compte</div>
           <div className="plus-card card">
-            <MenuItem icon={User} title="Mon profil" subtitle="Voir vos informations" onClick={() => setActiveTab('profile')} />
-            {user.role === 'gerant' && (
-              <MenuItem icon={DatabaseBackup} title="Sauvegarde des données" subtitle="Exporter / restaurer toutes les données" onClick={() => setActiveTab('backup')} />
-            )}
+            {/* Tous les réglages (profil, apparence, abonnement, configuration)
+                vivent dans « Paramètres » — cette entrée y mène, elle ne les
+                redouble pas. La déconnexion reste ici : c'est un geste courant,
+                pas un réglage. */}
+            <MenuItem icon={Settings} title="Paramètres" subtitle="Profil, apparence, abonnement et configuration" onClick={() => setActiveTab('parametres')} />
             <MenuItem icon={LogOut} tone="danger" title="Déconnexion" subtitle="Quitter l'application" onClick={logout} />
           </div>
         </div>
-
-        {/* Réservé au gérant : lui seul peut agir sur la configuration du
-            suivi, et lui seul a besoin de savoir s'il est actif. */}
-        {user.role === 'gerant' && <DiagnosticCard />}
       </div>
     </div>
   );
@@ -724,22 +781,35 @@ export default function Plus() {
   // Le titre de page suit la sous-section : arriver sur /plus/commissions
   // depuis la barre latérale doit afficher « Commissions », pas « Plus ».
   const TAB_TITLES = {
-    menu: 'Plus', partners: 'Partenaires', commissions: 'Commissions',
+    menu: 'Plus', parametres: 'Paramètres', apparence: 'Apparence', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
-    subsadmin: 'Abonnements Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
+    subsadmin: 'Abonnements Devis Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
     paiements: 'Moyens de paiement',
-    profile: 'Mon profil', backup: 'Sauvegarde',
+    profile: 'Profil', backup: 'Sauvegarde des données',
+  };
+
+  // Sous-titre d'en-tête, pour les écrans qui en portent un.
+  const TAB_SUBTITLES = {
+    parametres: 'Gérez votre compte et vos préférences',
+    profile: 'Vos informations et votre entreprise',
+    apparence: 'Personnalisez l’apparence de l’application',
+    paiements: 'Qui encaisse les abonnements Devis Pro',
+    backup: 'Exporter / restaurer toutes les données',
+    subsadmin: 'Abonnés, paiements à valider et MRR',
   };
 
   return (
-    <div className="page">
+    <div className={`page ${activeTab === 'parametres' || SECTIONS_PARAMETRES.includes(activeTab) ? 'settings-shell' : ''}`}>
       <PageHeader
         title={TAB_TITLES[activeTab] || 'Plus'}
-        onBack={activeTab !== 'menu' ? () => navigate('/plus') : undefined}
+        subtitle={TAB_SUBTITLES[activeTab]}
+        onBack={activeTab !== 'menu' ? () => setActiveTab(retourDepuis(activeTab)) : undefined}
       />
       {/* La formation s'étale en large (catalogue + école) ; le reste garde la colonne étroite. */}
       <div className={`page-content ${activeTab === 'formation' ? 'page-content-wide' : 'page-content-narrow'}`}>
         {activeTab === 'menu' && renderMenu()}
+        {activeTab === 'parametres' && renderParametres()}
+        {activeTab === 'apparence' && <AppearanceSection />}
         {activeTab === 'partners' && renderPartners()}
         {activeTab === 'commissions' && renderCommissions()}
         {activeTab === 'orders' && <OrdersSection onBack={() => setActiveTab('menu')} />}
@@ -747,9 +817,9 @@ export default function Plus() {
         {activeTab === 'kits' && <KitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'inverters' && <InvertersSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'pompekits' && <PompeKitsSection onBack={() => setActiveTab('menu')} />}
-        {activeTab === 'paiements' && <PaiementsSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'paiements' && <PaiementsSection />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
-        {activeTab === 'subsadmin' && <SubscriptionsAdmin onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'subsadmin' && <SubscriptionsAdmin />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
         {activeTab === 'profile' && renderProfile()}
         {activeTab === 'backup' && renderBackup()}

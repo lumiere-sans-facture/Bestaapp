@@ -79,29 +79,24 @@ droits, utiliser `temps-reel.sql`.
   VRAIE limite anti-brute-force ; le compteur de l'écran de connexion
   (`utils/loginThrottle.js`) n'est qu'une couche supplémentaire côté
   navigateur, contournable par un appel direct à l'API.
-- **Authentication → Attack Protection → CAPTCHA protection** : laisser
-  **désactivé**, par choix — voir l'encadré ci-dessous.
+- **Authentication → Attack Protection → CAPTCHA protection** : **désactivé**,
+  définitivement — voir l'encadré ci-dessous. ⚠️ Si l'inscription échoue avec
+  `captcha protection: request disallowed (no captcha_token found)`, c'est que
+  ce réglage traîne encore activé sur cet environnement : il n'y a plus aucun
+  widget CAPTCHA dans l'app pour fournir le jeton qu'il exige.
 
-> **CAPTCHA : pourquoi désactivé côté Supabase alors que le widget existe.**
-> Le CAPTCHA de Supabase est tout-ou-rien : soit chaque appel de connexion
-> exige un jeton résolu (le défi doit alors s'afficher dès le premier
-> chargement du formulaire), soit aucun. Or l'écran de connexion n'affiche
-> le défi hCaptcha/Turnstile qu'à partir du **3e échec** sur un même email
-> (`CAPTCHA_AFTER_ATTEMPTS`, `utils/loginThrottle.js`) — moins de friction
-> pour la saisie normale. Choix assumé : Supabase reste désactivé, le
-> défi n'est qu'une friction ajoutée par l'écran (un script qui appelle
-> l'API directement, en contournant l'écran, ne le rencontre jamais). Ce
-> qui reste actif indépendamment, et protège vraiment : le verrouillage
-> progressif après 5 échecs (`loginThrottle.js`) et la limite par IP
-> ci-dessus (*Rate Limits*).
+> **Pourquoi pas de CAPTCHA du tout, ni sur l'app ni sur Supabase.**
+> Le CAPTCHA de Supabase est tout-ou-rien : un seul interrupteur pour
+> connexion, inscription et mot de passe oublié ensemble — impossible de le
+> réserver à la connexion sans casser l'inscription (vérifié dans la doc
+> Supabase). Comme l'inscription doit rester sans friction, le réglage reste
+> désactivé partout, et le widget hCaptcha/Turnstile a été retiré de l'app
+> plutôt que de laisser une friction d'écran qui ne protège plus rien.
 >
-> Pour activer quand même une clé de site (`VITE_HCAPTCHA_SITE_KEY` ou
-> `VITE_TURNSTILE_SITE_KEY`, voir `.env.example`) sans le protéger côté
-> Supabase : le défi reste purement une friction d'écran. L'activer aussi
-> côté Supabase revient à l'exiger dès le premier essai — modifier alors
-> `CAPTCHA_AFTER_ATTEMPTS` à `0` dans `loginThrottle.js`, sinon les deux
-> premières tentatives échoueraient avec une erreur CAPTCHA au lieu du
-> message « Identifiants incorrects » habituel.
+> Ce qui protège réellement les tentatives de connexion répétées, sans
+> CAPTCHA : le verrouillage progressif après 5 échecs (`utils/loginThrottle.js`
+> — 15 min à 2 h, par email) et la limite par IP ci-dessus (*Rate Limits*),
+> réglage Supabase indépendant du CAPTCHA.
 - **Authentication → Sessions** : fixer une durée de vie de session
   (« Time-box user sessions ») et un délai d'inactivité (« Inactivity
   timeout ») — **réservé au plan payant Supabase**. Par défaut, Supabase
@@ -469,8 +464,10 @@ Dans cet ordre, à chaque fois :
    *Redirect URLs* — avec **l'adresse propre à cet environnement**.
 3. Se déclarer admin plateforme (§ 4) : les comptes ne sont **pas** partagés
    entre les deux bases, c'est deux fois le même geste.
-4. *Rate Limits*, *Attack Protection* (CAPTCHA) et *Sessions* (§ 3) — sinon
-   l'environnement de test reste sans les mêmes garde-fous que la production.
+4. *Rate Limits*, *Attack Protection* (CAPTCHA **désactivé**) et *Sessions*
+   (§ 3) — sinon l'environnement de test reste sans les mêmes garde-fous que
+   la production, ou pire, avec un CAPTCHA oublié activé qui casse
+   l'inscription.
 
 ⚠️ **Le piège de la mise en production.** Fusionner vers `main` déploie le
 CODE, pas le schéma. Du code neuf devant une base restée en arrière donne une

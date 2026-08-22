@@ -4,10 +4,12 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
 import { ModeProvider, useMode } from './context/ModeContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
 import AppLayout from './components/AppLayout';
 import AppErrorBoundary from './components/AppErrorBoundary';
+import LoadingShell from './components/LoadingShell';
 import Login from './screens/Login';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
 import { installerAnalytique, suivrePage } from './lib/analytique';
@@ -82,7 +84,7 @@ function AppRoutes() {
   }, [user?.id, navigate]);
 
   if (isLoading) {
-    return <div className="splash-screen">Chargement…</div>;
+    return <LoadingShell />;
   }
 
   // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.
@@ -131,6 +133,8 @@ function ModeSwitch() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/clients" element={<Clients />} />
+        {/* Fiche client plein écran : même écran, piloté par l'URL (comme /plus/:section). */}
+        <Route path="/clients/:id" element={<Clients />} />
         <Route path="/boutique" element={<Boutique />} />
         <Route path="/devis" element={<Devis />} />
         <Route path="/plus" element={<Plus />} />
@@ -146,11 +150,13 @@ export default function App() {
     // Le filet enveloppe TOUT, y compris les fournisseurs de contexte : une
     // erreur dans l'un d'eux plantait l'app entière sans laisser de trace.
     <AppErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </AppErrorBoundary>
   );
 }

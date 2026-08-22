@@ -1,5 +1,4 @@
-// Domaine boutique : catalogue produits et commandes. Le stock est décrémenté
-// à la confirmation d'une commande et restitué à l'annulation (couplage assumé).
+// Domaine boutique : catalogue produits et commandes.
 import { prochainNumeroCommande } from '../../utils/affaires';
 import { suivre, EVENEMENTS } from '../../lib/analytique';
 export function createCatalogueActions(setState) {
@@ -49,9 +48,7 @@ export function createCatalogueActions(setState) {
     },
 
     // Paiement VÉRIFIÉ PAR LE SERVEUR (api/paiement/verifier). Le statut de la
-    // commande ne bouge pas : « confirmé » décrémente le stock, c'est une
-    // décision du gérant qui doit avoir la marchandise. Le paiement, lui, est
-    // un fait — il est noté séparément.
+    // commande ne bouge pas : le paiement est un fait, noté séparément.
     marquerCommandePayee: (orderId, { reference, montant, methode = 'kkiapay' }) =>
       setState((s) => ({
         ...s,
@@ -65,30 +62,9 @@ export function createCatalogueActions(setState) {
       })),
 
     updateOrderStatus: (orderId, status) =>
-      setState((s) => {
-        const order = (s.orders || []).find((o) => o.id === orderId);
-        if (!order) return s;
-        let products = s.products;
-        if (status === 'confirme' && order.status !== 'confirme') {
-          // Décrémenter le stock à la confirmation
-          products = s.products.map((p) => {
-            const item = (order.items || []).find((i) => i.productId === p.id);
-            if (!item) return p;
-            return { ...p, stock: Math.max(0, (p.stock || 0) - item.qty) };
-          });
-        } else if (status === 'annule' && order.status === 'confirme') {
-          // Restituer le stock à l'annulation (uniquement si était confirmé)
-          products = s.products.map((p) => {
-            const item = (order.items || []).find((i) => i.productId === p.id);
-            if (!item) return p;
-            return { ...p, stock: (p.stock || 0) + item.qty };
-          });
-        }
-        return {
-          ...s,
-          products,
-          orders: (s.orders || []).map((o) => (o.id === orderId ? { ...o, status } : o)),
-        };
-      }),
+      setState((s) => ({
+        ...s,
+        orders: (s.orders || []).map((o) => (o.id === orderId ? { ...o, status } : o)),
+      })),
   };
 }

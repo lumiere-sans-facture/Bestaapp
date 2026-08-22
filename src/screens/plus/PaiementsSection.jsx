@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, Plus, Pencil, Trash2, Check, ShieldAlert, ServerCog, CheckCircle2, Circle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, ShieldAlert, ServerCog, CheckCircle2, Circle } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import {
   PROVIDERS, MODES, MODE_LABEL, providerById, problemeConfig, masquerCle, configActive,
@@ -24,7 +24,7 @@ const NOUVELLE = { provider: 'kkiapay', mode: 'test', actif: false, champs: {} }
  * serveur ; l'écran se contente d'en rappeler le nom exact à déclarer dans
  * Vercel, et refuse une valeur qui ressemble à un secret.
  */
-export default function PaiementsSection({ onBack }) {
+export default function PaiementsSection() {
   const { paiementConfigs, savePaiementConfig, deletePaiementConfig } = useData();
   const [edition, setEdition] = useState(null);
   const [aSupprimer, setASupprimer] = useState(null);
@@ -46,20 +46,12 @@ export default function PaiementsSection({ onBack }) {
     setEdition((c) => ({ ...c, champs: { ...c.champs, [cle]: valeur } }));
 
   return (
-    <>
-      <div className="partners-toolbar">
-        <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={onBack}>
-          <ChevronLeft size={16} /> Retour
-        </button>
+    <div className="settings-tab">
+      <div className="settings-tab-actions">
         <button className="btn btn-accent btn-sm" onClick={() => setEdition({ ...NOUVELLE })}>
           <Plus size={16} /> Ajouter
         </button>
       </div>
-      <div className="section-title">Moyens de paiement ({liste.length})</div>
-      <p className="text-sm text-secondary" style={{ marginBottom: 12 }}>
-        L'agrégateur activé encaisse les abonnements Devis Pro. Un seul à la fois :
-        en activer un désactive les autres.
-      </p>
 
       {/* L'avertissement est en tête, pas en note de bas de page : c'est la
           règle qui protège l'argent, elle doit être lue avant la saisie. */}
@@ -73,66 +65,73 @@ export default function PaiementsSection({ onBack }) {
         </div>
       </div>
 
-      {!liste.length && (
-        <EmptyState card>
-          Aucun moyen de paiement configuré — le bouton de paiement en ligne reste caché
-          et seul le Mobile Money manuel est proposé aux clients.
-        </EmptyState>
-      )}
+      <div className="plus-section">
+        <div className="plus-section-label">Agrégateurs ({liste.length})</div>
+        <p className="field-hint">
+          Un seul encaisse à la fois : en activer un désactive les autres.
+        </p>
 
-      {liste.map((c) => {
-        const p = providerById(c.provider);
-        const estActif = active?.id === c.id;
-        return (
-          <div key={c.id} className={`card paiement-card ${estActif ? 'actif' : ''}`}>
-            <div className="paiement-card-head">
-              <span className="paiement-etat">
-                {estActif ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-              </span>
-              <div className="paiement-card-titre">
-                <div className="paiement-nom">{p?.nom || c.provider}</div>
-                <div className="text-sm text-secondary">{p?.zone}</div>
-              </div>
-              <span className={`flat-badge ${c.mode === 'live' ? 'badge-danger' : ''}`}>
-                {MODE_LABEL[c.mode] || c.mode}
-              </span>
-            </div>
+        {!liste.length && (
+          <EmptyState card>
+            Aucun moyen de paiement configuré — le bouton de paiement en ligne reste caché
+            et seul le Mobile Money manuel est proposé aux clients.
+          </EmptyState>
+        )}
 
-            <div className="paiement-champs">
-              {(p?.champs || []).map((champ) => (
-                <div key={champ.cle} className="sheet-row">
-                  <span className="sheet-label">{champ.label}</span>
-                  <span className="sheet-value paiement-mono">{masquerCle(c.champs?.[champ.cle])}</span>
+        {liste.map((c) => {
+          const p = providerById(c.provider);
+          const estActif = active?.id === c.id;
+          return (
+            <div key={c.id} className={`card paiement-card ${estActif ? 'actif' : ''}`}>
+              <div className="paiement-card-head">
+                <span className="paiement-etat">
+                  {estActif ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                </span>
+                <div className="paiement-card-titre">
+                  <div className="paiement-nom">{p?.nom || c.provider}</div>
+                  <div className="text-sm text-secondary">{p?.zone}</div>
                 </div>
-              ))}
-            </div>
-
-            {/* Configurable ne veut pas dire opérationnel : le dire, plutôt
-                que de laisser croire à un encaissement qui n'arrivera pas. */}
-            {p && !p.pret && (
-              <div className="text-sm text-secondary paiement-note">
-                Encaissement pas encore branché pour {p.nom} ({p.integration}) — l'activer
-                laisse le paiement Mobile Money manuel en place.
+                <span className={`flat-badge ${c.mode === 'live' ? 'badge-danger' : ''}`}>
+                  {MODE_LABEL[c.mode] || c.mode}
+                </span>
               </div>
-            )}
 
-            <div className="paiement-actions">
-              <button className="btn btn-sm btn-outline" onClick={() => setEdition({ ...c, champs: { ...c.champs } })}>
-                <Pencil size={14} /> Modifier
-              </button>
-              {!estActif && (
-                <button className="btn btn-sm btn-primary"
-                  onClick={() => { savePaiementConfig({ ...c, actif: true }); toast(`${p?.nom || c.provider} activé.`); }}>
-                  <Check size={14} /> Activer
-                </button>
+              <div className="paiement-champs">
+                {(p?.champs || []).map((champ) => (
+                  <div key={champ.cle} className="sheet-row">
+                    <span className="sheet-label">{champ.label}</span>
+                    <span className="sheet-value paiement-mono">{masquerCle(c.champs?.[champ.cle])}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Configurable ne veut pas dire opérationnel : le dire, plutôt
+                  que de laisser croire à un encaissement qui n'arrivera pas. */}
+              {p && !p.pret && (
+                <div className="text-sm text-secondary paiement-note">
+                  Encaissement pas encore branché pour {p.nom} ({p.integration}) — l'activer
+                  laisse le paiement Mobile Money manuel en place.
+                </div>
               )}
-              <button className="btn btn-sm btn-outline paiement-supprimer" onClick={() => setASupprimer(c)}>
-                <Trash2 size={14} /> Supprimer
-              </button>
+
+              <div className="paiement-actions">
+                <button className="btn btn-sm btn-outline" onClick={() => setEdition({ ...c, champs: { ...c.champs } })}>
+                  <Pencil size={14} /> Modifier
+                </button>
+                {!estActif && (
+                  <button className="btn btn-sm btn-primary"
+                    onClick={() => { savePaiementConfig({ ...c, actif: true }); toast(`${p?.nom || c.provider} activé.`); }}>
+                    <Check size={14} /> Activer
+                  </button>
+                )}
+                <button className="btn btn-sm btn-outline paiement-supprimer" onClick={() => setASupprimer(c)}>
+                  <Trash2 size={14} /> Supprimer
+                </button>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       {/* Ce que le gérant doit déclarer côté serveur — la moitié invisible de
           l'intégration, sans laquelle un paiement ne peut pas être vérifié. */}
@@ -210,6 +209,6 @@ export default function PaiementsSection({ onBack }) {
         onConfirm={() => { deletePaiementConfig(aSupprimer.id); setASupprimer(null); toast('Moyen de paiement supprimé.'); }}
         onClose={() => setASupprimer(null)}
       />
-    </>
+    </div>
   );
 }
