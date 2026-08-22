@@ -299,7 +299,7 @@ export default function Login() {
     </div>
   );
 
-  const googleAccess = isSupabaseConfigured && (
+  const googleAccess = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true' && isSupabaseConfigured && (
     <>
       <button type="button" className="btn btn-google btn-block btn-lg" onClick={handleGoogle} disabled={loading}>
         <GoogleIcon /> {loading ? 'Ouverture de Google…' : 'Continuer avec Google'}
