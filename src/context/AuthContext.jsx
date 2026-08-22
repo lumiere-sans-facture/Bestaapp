@@ -6,6 +6,7 @@ import { setContexteAnalytique } from '../lib/analytique';
 import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
 import { getActiveRef } from '../utils/referral';
 import { isSessionExpired, touchSession, clearSessionLifetime } from '../utils/sessionLifetime';
+import { lireProfilCache, ecrireProfilCache, oublierProfilCache } from '../utils/profilCache';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
@@ -15,14 +16,24 @@ const PENDING_KEY = 'bestasolar_pending_signup';
 
 // select('*') : tolère l'ancien schéma (sans org_id / is_platform_admin)
 // comme le schéma multi-entreprise.
+//
+// Renvoie { profile, injoignable }. La distinction est essentielle : un profil
+// RÉELLEMENT absent (PGRST116, « aucune ligne ») déclenche la création de
+// l'organisation ; un serveur injoignable, lui, ne prouve rien — il faut alors
+// se rabattre sur le profil connu de l'appareil, pas conclure à un compte sans
+// profil et renvoyer l'utilisateur à la connexion.
 const fetchProfile = async (email) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('email', email.toLowerCase())
-    .single();
-  if (error || !data) return null;
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .single();
+    if (data) return { profile: data, injoignable: false };
+    return { profile: null, injoignable: error?.code !== 'PGRST116' };
+  } catch {
+    return { profile: null, injoignable: true }; // requête avortée : hors-ligne
+  }
 };
 
 const readPending = () => {
@@ -54,6 +65,10 @@ export function AuthProvider({ children }) {
     setSyncOrg(profile?.org_id);
     let org = null;
     if (profile?.org_id) org = await fetchMyOrg();
+    // Serveur injoignable : `fetchMyOrg` rend null. Reprendre l'organisation
+    // connue plutôt que de repartir sans — un type d'organisation inconnu
+    // suspend la réplication du catalogue pour toute la session.
+    if (!org && profile?.org_id) org = profile.org || lireProfilCache(profile.email || '')?.org || null;
     // Le type (interne/pro) conditionne la sync du catalogue partagé.
     setSyncOrg(profile?.org_id, org?.kind);
     // Les rapports d'erreur portent désormais l'identifiant du compte et de
@@ -65,7 +80,9 @@ export function AuthProvider({ children }) {
       role: profile?.role || null,
     });
     setContexteAnalytique({ distinctId: profile?.id || null });
-    setUser(org ? { ...profile, org } : profile);
+    const adopte = org ? { ...profile, org } : profile;
+    ecrireProfilCache(adopte);
+    setUser(adopte);
   };
 
   // Le compte Auth existe mais pas encore le profil : crée l'organisation (ou
@@ -85,7 +102,7 @@ export function AuthProvider({ children }) {
         });
       }
       localStorage.removeItem(PENDING_KEY);
-      return await fetchProfile(email);
+      return (await fetchProfile(email)).profile;
     } catch {
       return null;
     }
@@ -97,14 +114,37 @@ export function AuthProvider({ children }) {
       // au-delà de la durée de vie ou de l'inactivité tolérées (palliatif à
       // « Authentication → Sessions », payant, voir utils/sessionLifetime.js).
       supabase.auth.getSession().then(async ({ data: { session } }) => {
-        if (session?.user?.email) {
-          if (isSessionExpired()) {
-            clearSessionLifetime();
+        const email = session?.user?.email;
+        if (!email) { setIsLoading(false); return; }
+        if (isSessionExpired()) {
+          clearSessionLifetime();
+          oublierProfilCache();
+          await supabase.auth.signOut();
+          setIsLoading(false);
+          return;
+        }
+        touchSession();
+        // Profil déjà connu de cet appareil : l'app s'ouvre IMMÉDIATEMENT,
+        // sans attendre le serveur. C'est ce qui la rend utilisable sur le
+        // terrain : sans réseau, la lecture du profil est réessayée quatre
+        // fois avec un délai croissant, et l'utilisateur restait sept
+        // secondes devant « Chargement… » avant d'être renvoyé à la
+        // connexion. Le profil est rafraîchi juste après, en arrière-plan.
+        const cache = lireProfilCache(email);
+        if (cache) { await adoptProfile(cache); setIsLoading(false); }
+
+        const { profile, injoignable } = await fetchProfile(email);
+        if (profile) await adoptProfile(profile);
+        else if (!injoignable) {
+          // Le serveur répond clairement : ce compte n'a pas de profil.
+          const cree = await provisionProfile(email);
+          if (cree) await adoptProfile(cree);
+          // Ouvert sur un profil mémorisé que le serveur ne reconnaît plus
+          // (membre retiré de l'entreprise) : la session est refermée.
+          else if (cache) {
+            oublierProfilCache();
             await supabase.auth.signOut();
-          } else {
-            touchSession();
-            const profile = (await fetchProfile(session.user.email)) || (await provisionProfile(session.user.email));
-            if (profile) await adoptProfile(profile);
+            setUser(null);
           }
         }
         setIsLoading(false);
@@ -130,7 +170,7 @@ export function AuthProvider({ children }) {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) return false;
       touchSession();
-      const profile = (await fetchProfile(email.trim())) || (await provisionProfile(email.trim()));
+      const profile = (await fetchProfile(email.trim())).profile || (await provisionProfile(email.trim()));
       if (!profile) {
         // Compte Auth valide mais profil jamais créé (inscription interrompue,
         // autre navigateur…) : on garde la session et on laisse l'écran de
@@ -207,7 +247,7 @@ export function AuthProvider({ children }) {
       return { ok: false, error: e.message };
     }
     const { data: { session } } = await supabase.auth.getSession();
-    const profile = session?.user?.email ? await fetchProfile(session.user.email) : null;
+    const profile = session?.user?.email ? (await fetchProfile(session.user.email)).profile : null;
     if (!profile) return { ok: false, error: 'Profil introuvable après création — réessayez.' };
     localStorage.removeItem(PENDING_KEY);
     await adoptProfile(profile);
@@ -232,7 +272,7 @@ export function AuthProvider({ children }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
         touchSession();
-        const profile = await fetchProfile(session.user.email);
+        const profile = (await fetchProfile(session.user.email)).profile;
         if (profile) await adoptProfile(profile);
       }
     }
@@ -241,6 +281,9 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     if (isSupabaseConfigured) supabase.auth.signOut();
+    // Le profil mémorisé pour l'ouverture hors-ligne part avec la session :
+    // le laisser rouvrirait l'app sur le compte précédent.
+    oublierProfilCache();
     // Le compte quitte l'app : les rapports suivants ne doivent plus lui être
     // attribués.
     setContexteErreur({ userId: null, orgId: null, role: null });

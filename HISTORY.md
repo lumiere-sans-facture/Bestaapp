@@ -5,6 +5,13 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-22
+- **Mode hors-ligne** : l'app s'ouvre et reste utilisable sans réseau, et tout remonte seul au retour de la connexion
+  - la session est restaurée depuis le profil mémorisé sur l'appareil — sans réseau, l'app renvoyait l'utilisateur à l'écran de connexion, qu'il ne pouvait pas franchir non plus (ouverture : 7,4 s → 0,2 s)
+  - une modification faite hors-ligne (étape d'un client, prix d'un kit, statut d'un devis) survit au relancement : une file d'attente persistante la fait primer sur la copie du serveur, plus ancienne
+  - une app lancée sans serveur se reconnecte toute seule dès son retour (reprise à délai croissant, immédiate au retour du réseau ou de l'app) — avant, il fallait recharger la page
+  - le voyant distingue « Hors ligne — le travail est enregistré ici » d'un vrai refus du serveur, annonce le nombre d'éléments en attente et propose « Synchroniser maintenant »
+
 ## 2026-08-21
 - Kits : nouveau **Kit 16 kWh** (batterie Beve 16 kWh, 10 × 590 Wc, onduleur Beve 6 kVA, 14 lignes, 2 319 000 F hors structure) — les kits officiels ajoutés par une mise à jour rejoignent désormais les installations existantes, une seule fois, sans ressusciter un kit supprimé par le gérant
 - Paramètres : tous les onglets (Profil, Apparence, Moyens de paiement, Sauvegarde, Administration) recadrés comme l'écran qui y mène — en-tête titre + phrase d'explication, un seul retour (la flèche de l'en-tête, que le bouton « Retour » doublait sur mobile), libellés de section en majuscules et même espacement des cartes partout

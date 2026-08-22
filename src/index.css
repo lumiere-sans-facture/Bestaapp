@@ -2100,6 +2100,9 @@ form .login-link { width: 100%; margin-top: 4px; }
 .sync-online { background: var(--success); }
 .sync-connecting { background: var(--warning); animation: sync-pulse 1.2s infinite; }
 .sync-error { background: var(--error); }
+/* Coupure réseau : signalée, mais pas comme une panne — c'est l'ordinaire du
+   terrain, et un rouge permanent finit par ne plus être lu. */
+.sync-offline { background: var(--warning); }
 .sync-local { background: var(--text-muted); }
 @keyframes sync-pulse { 50% { opacity: 0.35; } }
 /* Colonne, et non ligne : le motif de l'échec se place SOUS l'état. En
@@ -2122,6 +2125,13 @@ form .login-link { width: 100%; margin-top: 4px; }
   overflow-wrap: anywhere;
 }
 .sync-status-detail-text { flex: 1; min-width: 0; }
+/* Ce qui reste à envoyer, et de quoi le relancer à la main. Même alignement
+   que le bloc d'erreur, mais en ton neutre : rien n'est cassé, ça attend. */
+.sync-status-attente {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 4px; padding-left: 16px; max-width: 100%;
+  font-size: 0.72rem; line-height: 1.35; color: var(--text-secondary);
+}
 /* Cible tactile confortable malgré la petite taille de texte du bloc. */
 .sync-status-copy { flex-shrink: 0; min-height: 32px; }
 .sync-status-row .sync-dot { margin-left: 0; }

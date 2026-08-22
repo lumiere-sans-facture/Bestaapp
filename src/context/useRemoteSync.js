@@ -1,9 +1,11 @@
 // Moteur de réplication Supabase (optionnel, auto-détecté). Isolé du Provider :
 // reçoit l'état et son setter, gère le pull initial, la diffusion temps réel
 // et la réplication non-destructive (tombstones). Retourne le statut de sync.
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { pullAll, pushCollections, pushTombstone, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
+import { loadFileSync, persistFileSync } from './dataState';
+import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection } from '../utils/fileSync';
 
 // Filet de sécurité du temps réel : intervalle entre deux relectures du
 // serveur quand l'app est visible. Le temps réel reste le canal principal
@@ -13,7 +15,17 @@ import { pullAll, pushCollections, pushTombstone, subscribeToChanges, SYNCED_COL
 // au technicien qu'au prochain lancement de l'app.
 const INTERVALLE_RELECTURE = 60000;
 
-export function useRemoteSync(state, setState, stateRef) {
+// Délai avant une nouvelle tentative, doublé à chaque échec et plafonné.
+// Sert aussi bien à la CONNEXION initiale qu'au renvoi des modifications.
+const delaiReprise = (echecs) => Math.min(60000, 5000 * 2 ** Math.max(0, echecs - 1));
+
+// L'appareil se sait-il sans réseau ? Distingue la coupure ordinaire — banale
+// sur le terrain, rien à signaler — d'un serveur qui refuse, qui, lui, demande
+// une intervention. `navigator.onLine` n'est fiable que dans ce sens : « faux »
+// veut dire hors-ligne à coup sûr, « vrai » ne promet rien.
+const horsLigne = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
+export function useRemoteSync(state, setState, stateRef, scope = null) {
   const syncedRef = useRef(null); // dernier état RÉELLEMENT répliqué, par collection
   const lastPushAt = useRef(0);
   const echecs = useRef(0);       // échecs consécutifs de push (délai croissant)
@@ -24,40 +36,73 @@ export function useRemoteSync(state, setState, stateRef) {
   // injoignable » n'aide personne à comprendre CE qui est refusé.
   const [syncError, setSyncError] = useState(null);
 
-  // La relecture est déclenchée depuis un autre effet (filet de sécurité) :
-  // elle est donc exposée par une ref, remplie au montage.
-  const refreshRef = useRef(null);
+  // ---- File d'attente : ce qui est modifié ici et pas encore confirmé ----
+  // Elle SURVIT à la fermeture de l'app. Sans elle, une modification faite
+  // hors-ligne (étape d'un client, prix d'un kit) était écrasée au lancement
+  // suivant par la copie du serveur, plus ancienne — silencieusement, et
+  // seulement pour les modifications : les créations, absentes du serveur,
+  // étaient bien conservées.
+  const fileInitiale = useRef(isSupabaseConfigured ? loadFileSync(scope) : {});
+  const fileRef = useRef(fileInitiale.current);
+  // État au montage : sert de référence de comparaison tant que rien n'a été
+  // répliqué dans cette session (app ouverte sans réseau). Comparer à `null`
+  // ferait passer TOUTE la base locale — catalogue compris — pour « en
+  // attente », et afficherait un compte absurde.
+  const baseRef = useRef(state);
+  const [enAttente, setEnAttente] = useState(() => totalEnAttente(fileInitiale.current));
 
-  // ---- Pull initial + abonnement temps réel ----
+  // Recalcule la file depuis la dernière référence connue, la retient et
+  // l'enregistre. Tant que la session n'a rien répliqué, la file de la session
+  // précédente compte toujours : elle n'a pas été envoyée pour autant.
+  const fileEcrite = useRef(null); // dernière forme enregistrée, pour ne pas réécrire à l'identique
+  const majFile = useCallback((etat) => {
+    const vivante = fileEnAttente(SYNCED_COLLECTIONS, syncedRef.current || baseRef.current, etat);
+    const file = syncedRef.current ? vivante : unionFiles(fileInitiale.current, vivante);
+    fileRef.current = file;
+    // Écriture seulement quand la file CHANGE : la frappe au clavier remet le
+    // même identifiant en attente des dizaines de fois d'affilée, inutile de
+    // réécrire le stockage à chaque caractère.
+    const forme = JSON.stringify(file);
+    if (forme !== fileEcrite.current) {
+      fileEcrite.current = forme;
+      persistFileSync(file, scope);
+      setEnAttente(totalEnAttente(file));
+    }
+    return file;
+  }, [scope]);
+
+  // La relecture et la connexion sont déclenchées depuis d'autres effets
+  // (filet de sécurité, bouton « Synchroniser maintenant ») : exposées par des
+  // refs, remplies au montage.
+  const refreshRef = useRef(null);
+  const connecterRef = useRef(null);
+
+  // ---- Connexion (pull initial + abonnement temps réel), avec reprise ----
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) return undefined;
     let cancelled = false;
     let unsubscribe = () => {};
+    let timerConnexion = null;
+    let echecsConnexion = 0;
+    let enCours = false;
 
-    // Pull fusionné : les items locaux absents du remote sont conservés
-    // (créés hors-ligne), sauf si un tombstone indique une suppression distante.
+    // Pull fusionné : les modifications locales en attente et les items créés
+    // hors-ligne survivent à la réception (voir utils/fileSync.js).
     const applyRemote = (collections, tombstones = new Map()) => {
       const merged = { ...stateRef.current };
       for (const table of SYNCED_COLLECTIONS) {
-        const remoteItems = collections[table] || [];
-        const localItems = stateRef.current[table] || [];
-        const remoteMap = new Map(remoteItems.map((i) => [i.id, i]));
-        const deletedIds = tombstones.get(table) || new Set();
-        // `partage` : élément appartenant à l'organisation interne, reçu en
-        // lecture (catalogue, cours de formation). Absent de la réception, il
-        // a été retiré à la source — le conserver comme « créé hors-ligne »
-        // le figerait ici pour toujours, sans propriétaire pour le mettre à
-        // jour ni le supprimer.
-        const localOnly = localItems.filter((i) => !remoteMap.has(i.id) && !deletedIds.has(i.id) && !i.partage);
-        // Rien à ajouter localement : on garde la RÉFÉRENCE reçue du serveur.
-        // Créer un nouveau tableau ferait croire à une modification locale, et
-        // l'app renverrait l'intégralité des 14 tables au serveur à CHAQUE
-        // ouverture — plusieurs mégaoctets pour un catalogue avec photos, d'où
-        // des envois qui n'aboutissent pas et une synchronisation bloquée.
-        merged[table] = localOnly.length ? [...remoteItems, ...localOnly] : remoteItems;
+        merged[table] = fusionnerCollection(
+          stateRef.current[table] || [],
+          collections[table] || [],
+          tombstones.get(table) || new Set(),
+          enAttentePourTable(fileRef.current, table)
+        );
       }
       syncedRef.current = collections;
       setState(merged);
+      // La file se recalcule maintenant depuis le serveur : ce qui vient d'en
+      // arriver n'attend plus, ce qui a été retenu localement attend encore.
+      majFile(merged);
     };
 
     const refreshFromRemote = async () => {
@@ -73,7 +118,13 @@ export function useRemoteSync(state, setState, stateRef) {
     };
     refreshRef.current = refreshFromRemote;
 
-    (async () => {
+    // Première connexion au serveur. REJOUÉE tant qu'elle échoue : sans cela,
+    // une app ouverte hors réseau restait déconnectée pour toute la session,
+    // même une fois la 4G revenue — une journée de travail ne montait qu'au
+    // prochain rechargement complet de la page.
+    const connecter = async () => {
+      if (cancelled || enCours || syncedRef.current) return;
+      enCours = true;
       try {
         const { empty, collections, tombstones } = await pullAll();
         if (cancelled) return;
@@ -87,10 +138,14 @@ export function useRemoteSync(state, setState, stateRef) {
           const initial = Object.fromEntries(SYNCED_COLLECTIONS.map((t) => [t, stateRef.current[t] || []]));
           lastPushAt.current = Date.now();
           await pushCollections(initial);
+          if (cancelled) return;
           syncedRef.current = initial;
+          majFile(stateRef.current);
         } else {
           applyRemote(collections, tombstones);
         }
+        echecsConnexion = 0;
+        setSyncError(null);
         setSyncStatus('online');
         let timer = null;
         unsubscribe = subscribeToChanges(() => {
@@ -100,12 +155,36 @@ export function useRemoteSync(state, setState, stateRef) {
           timer = setTimeout(refreshFromRemote, 600);
         });
       } catch (e) {
+        if (cancelled) return;
         console.error('Supabase indisponible, mode local :', e.message);
-        if (!cancelled) { setSyncError(e.message); setSyncStatus('error'); }
+        setSyncError(e.message);
+        setSyncStatus('error');
+        echecsConnexion += 1;
+        clearTimeout(timerConnexion);
+        timerConnexion = setTimeout(connecter, delaiReprise(echecsConnexion));
+      } finally {
+        enCours = false;
       }
-    })();
+    };
+    connecterRef.current = connecter;
+    connecter();
 
-    return () => { cancelled = true; unsubscribe(); };
+    // Reprise immédiate au retour du réseau ou de l'app, sans attendre le
+    // minuteur : c'est le geste naturel de l'utilisateur qui ressort de la
+    // zone blanche et rouvre l'app.
+    const reprendre = () => { if (!syncedRef.current) connecter(); };
+    window.addEventListener('online', reprendre);
+    window.addEventListener('focus', reprendre);
+    document.addEventListener('visibilitychange', reprendre);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timerConnexion);
+      unsubscribe();
+      window.removeEventListener('online', reprendre);
+      window.removeEventListener('focus', reprendre);
+      document.removeEventListener('visibilitychange', reprendre);
+    };
   // Dépendances volontairement vides : ce pull initial + abonnement temps réel
   // ne doit s'exécuter QU'UNE FOIS par montage. setState est stable (useState)
   // et stateRef est une ref — les inclure relancerait la souscription à chaque
@@ -119,10 +198,14 @@ export function useRemoteSync(state, setState, stateRef) {
   // Le marquer avant ferait passer pour répliquées des données restées locales :
   // elles ne seraient jamais repoussées (perte silencieuse) et le voyant
   // resterait au vert. En cas d'échec, le statut passe à « error » (visible) et
-  // le même envoi est retenté avec un délai croissant.
+  // le même envoi est retenu avec un délai croissant.
   useEffect(() => {
-    if (!isSupabaseConfigured || !syncedRef.current) return;
-    if (syncStatus !== 'online' && syncStatus !== 'error') return;
+    if (!isSupabaseConfigured) return undefined;
+    // La file est tenue à jour MÊME sans connexion : c'est elle qui protège
+    // le travail fait hors-ligne, et elle alimente le compte affiché.
+    majFile(state);
+    if (!syncedRef.current) return undefined;
+    if (syncStatus !== 'online' && syncStatus !== 'error') return undefined;
     const changed = {};
     const deletedByTable = {};
     for (const table of SYNCED_COLLECTIONS) {
@@ -137,7 +220,7 @@ export function useRemoteSync(state, setState, stateRef) {
       const deleted = [...prevIds].filter((id) => !nextIds.has(id));
       if (deleted.length) deletedByTable[table] = deleted;
     }
-    if (!Object.keys(changed).length) return;
+    if (!Object.keys(changed).length) return undefined;
 
     let annule = false;
     lastPushAt.current = Date.now();
@@ -178,6 +261,8 @@ export function useRemoteSync(state, setState, stateRef) {
         const acquis = { ...syncedRef.current };
         for (const t of acquises) if (changed[t]) acquis[t] = changed[t];
         syncedRef.current = acquis;
+        // Ce qui vient d'être confirmé quitte la file d'attente.
+        majFile(stateRef.current);
       }
       if (!erreurs.length) {
         // Réellement répliqué : on peut enfin considérer ces données à jour.
@@ -193,13 +278,12 @@ export function useRemoteSync(state, setState, stateRef) {
       const restantes = Object.keys(changed).filter((t) => !acquises.includes(t));
       setSyncError(`${erreurs.join(' · ')}${restantes.length ? ` (en attente : ${restantes.join(', ')})` : ''}`);
       setSyncStatus('error');
-      const delai = Math.min(60000, 5000 * 2 ** (echecs.current - 1));
       clearTimeout(retryTimer.current);
-      retryTimer.current = setTimeout(() => setRetryTick((t) => t + 1), delai);
+      retryTimer.current = setTimeout(() => setRetryTick((t) => t + 1), delaiReprise(echecs.current));
     };
     doSync();
     return () => { annule = true; };
-  }, [state, syncStatus, retryTick]);
+  }, [state, syncStatus, retryTick, majFile, stateRef]); // stateRef est une ref stable
 
   // ---- Filet de sécurité : relecture régulière et au retour de l'app ----
   // Le temps réel reste le canal principal, mais il ne garantit rien : une
@@ -212,27 +296,64 @@ export function useRemoteSync(state, setState, stateRef) {
       if (syncStatus !== 'online' || !syncedRef.current) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       // Jamais par-dessus un changement local pas encore répliqué : la
-      // réception remplace les items de même id et effacerait l'édition en
-      // cours d'envoi.
+      // réception le protège désormais (file d'attente), mais relire pendant
+      // un envoi en cours ne sert à rien — l'écho reviendra juste après.
       if (SYNCED_COLLECTIONS.some((t) => stateRef.current[t] !== syncedRef.current[t])) return;
       // Ni dans la foulée de notre propre écriture (l'écho revient à peine).
       if (Date.now() - lastPushAt.current < 2500) return;
       refreshRef.current?.();
     };
+    // Retour du réseau alors que des modifications attendent : les renvoyer
+    // tout de suite plutôt que d'attendre la fin du délai de reprise en cours.
+    const reprendreEnvoi = () => {
+      if (syncedRef.current && syncStatus !== 'online') setRetryTick((t) => t + 1);
+    };
     const timer = setInterval(relire, INTERVALLE_RELECTURE);
     document.addEventListener('visibilitychange', relire);
     window.addEventListener('online', relire);
+    window.addEventListener('online', reprendreEnvoi);
     window.addEventListener('focus', relire);
     return () => {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', relire);
       window.removeEventListener('online', relire);
+      window.removeEventListener('online', reprendreEnvoi);
       window.removeEventListener('focus', relire);
     };
   }, [syncStatus, stateRef]);
 
+  // ---- Réseau de l'appareil : coupure ordinaire ou serveur qui refuse ? ----
+  // Les deux donnaient « Serveur injoignable ». Sur le terrain, la coupure est
+  // la règle : la signaler comme une panne rendait le voyant rouge permanent,
+  // donc ignoré — et le vrai refus passait inaperçu avec lui.
+  const [reseauCoupe, setReseauCoupe] = useState(horsLigne);
+  useEffect(() => {
+    const majReseau = () => setReseauCoupe(horsLigne());
+    window.addEventListener('online', majReseau);
+    window.addEventListener('offline', majReseau);
+    return () => {
+      window.removeEventListener('online', majReseau);
+      window.removeEventListener('offline', majReseau);
+    };
+  }, []);
+
+  // Relance manuelle : reconnecte si la session n'a jamais joint le serveur,
+  // sinon renvoie ce qui attend et relit le serveur.
+  const synchroniserMaintenant = useCallback(() => {
+    if (!isSupabaseConfigured) return;
+    if (!syncedRef.current) { connecterRef.current?.(); return; }
+    clearTimeout(retryTimer.current);
+    echecs.current = 0;
+    setRetryTick((t) => t + 1);
+    refreshRef.current?.();
+  }, []);
+
   // Arrêt du minuteur de reprise au démontage (évite un setState post-unmount).
   useEffect(() => () => clearTimeout(retryTimer.current), []);
 
-  return { syncStatus, syncError };
+  // Statut affiché : une panne d'envoi alors que l'appareil se sait sans
+  // réseau est un « hors ligne », pas une erreur — le travail est en sécurité
+  // localement et repartira tout seul.
+  const statut = syncStatus === 'error' && reseauCoupe ? 'offline' : syncStatus;
+  return { syncStatus: statut, syncError, enAttente, synchroniserMaintenant };
 }

@@ -181,6 +181,36 @@ export const loadState = (scope = null) => {
   return buildInitialState();
 };
 
+// ---- File d'attente de synchronisation ----
+// Ce qui a été modifié sur cet appareil et n'est pas encore confirmé par le
+// serveur. Rangée à PART de l'état : ce n'est pas une donnée métier, elle ne
+// doit ni être répliquée ni voyager dans une sauvegarde. Même découpage par
+// périmètre que l'état, pour la même raison (deux comptes sur un appareil).
+const FILE_SYNC_KEY = 'bestasolar_file_sync';
+const fileKeyFor = (scope) => (scope ? `${FILE_SYNC_KEY}_${scope}` : FILE_SYNC_KEY);
+
+/** File relue au lancement — `{}` si absente, illisible ou stockage refusé. */
+export const loadFileSync = (scope = null) => {
+  try {
+    const brut = JSON.parse(localStorage.getItem(fileKeyFor(scope)));
+    return brut && typeof brut === 'object' && !Array.isArray(brut) ? brut : {};
+  } catch {
+    return {};
+  }
+};
+
+/** Écrit la file (et l'efface quand plus rien n'attend). */
+export const persistFileSync = (file, scope = null) => {
+  try {
+    const cle = fileKeyFor(scope);
+    if (!file || !Object.keys(file).length) localStorage.removeItem(cle);
+    else localStorage.setItem(cle, JSON.stringify(file));
+    return true;
+  } catch {
+    return false; // quota dépassé / navigation privée : la session en cours reste juste
+  }
+};
+
 /**
  * Écrit l'état dans localStorage. Retourne `false` si l'écriture a échoué
  * (quota dépassé — typiquement des photos produits volumineuses — ou
