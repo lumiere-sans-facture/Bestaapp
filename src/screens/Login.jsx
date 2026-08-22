@@ -50,6 +50,17 @@ function CountryFlag({ country }) {
   );
 }
 
+function GoogleIcon() {
+  return (
+    <svg className="google-icon" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
+      <path fill="#4285f4" d="M21.6 12.23c0-.72-.06-1.26-.2-1.82H12v3.42h5.52a4.7 4.7 0 0 1-2.05 3.09v2.22h3.32c1.94-1.79 2.81-4.42 2.81-6.91Z" />
+      <path fill="#34a853" d="M12 22c2.7 0 4.96-.89 6.61-2.42l-3.32-2.22c-.9.61-2.06.98-3.29.98-2.6 0-4.8-1.76-5.59-4.12H2.98v2.29A10 10 0 0 0 12 22Z" />
+      <path fill="#fbbc05" d="M6.41 14.22A6.01 6.01 0 0 1 6.1 12c0-.77.13-1.52.31-2.22V7.49H2.98A10 10 0 0 0 2 12c0 1.61.39 3.13.98 4.51l3.43-2.29Z" />
+      <path fill="#ea4335" d="M12 5.66c1.47 0 2.79.51 3.82 1.5l2.87-2.87A9.64 9.64 0 0 0 12 2a10 10 0 0 0-9.02 5.49l3.43 2.29C7.2 7.42 9.4 5.66 12 5.66Z" />
+    </svg>
+  );
+}
+
 /**
  * Écran d'entrée : connexion, et — quand le backend est configuré —
  * inscription self-service (créer son entreprise ou rejoindre une équipe
@@ -57,7 +68,7 @@ function CountryFlag({ country }) {
  * En mode local (sans backend), seul le formulaire de connexion est monté.
  */
 export default function Login() {
-  const { login, signUp, completeSignup, resetPassword, updatePassword, recovery } = useAuth();
+  const { login, signInWithGoogle, signUp, completeSignup, resetPassword, updatePassword, recovery, pendingAuthUser } = useAuth();
   // Lien de parrainage (?ref=BESTA-XXX) actif sur cet appareil : on ouvre
   // directement l'inscription, code partenaire prérempli.
   const [refCode, setRefCode] = useState(() => (isSupabaseConfigured ? getActiveRef()?.code || '' : ''));
@@ -65,7 +76,7 @@ export default function Login() {
   const [refFromLink] = useState(() => refCode !== '');
   // Lien d'invitation d'équipe (?equipe=CODE) partagé par un gérant : la même
   // page d'inscription rattache silencieusement le compte à son équipe.
-  const [teamCode] = useState(() => {
+  const [teamCode, setTeamCode] = useState(() => {
     try { return (new URLSearchParams(window.location.search).get('equipe') || '').trim().toUpperCase(); } catch { return ''; }
   });
   const [view, setView] = useState(refCode || teamCode ? 'signup' : 'login'); // login | signup | forgot | complete
@@ -112,7 +123,31 @@ export default function Login() {
     return '';
   };
 
+  // Premier retour Google : l'email est déjà vérifié par Google, mais Bestaapp
+  // demande encore les données métier nécessaires à la création du profil.
+  useEffect(() => {
+    if (!pendingAuthUser) return;
+    setView('complete');
+    setEmail(pendingAuthUser.email || '');
+    setName((current) => current || pendingAuthUser.name || '');
+    if (pendingAuthUser.inviteCode) setTeamCode(pendingAuthUser.inviteCode);
+    if (pendingAuthUser.refCode) setRefCode(pendingAuthUser.refCode);
+  }, [pendingAuthUser]);
+
   const switchView = (v) => { setView(v); setError(''); setNotice(''); };
+
+  const handleGoogle = async () => {
+    setError('');
+    setLoading(true);
+    const res = await signInWithGoogle({
+      inviteCode: teamCode || null,
+      refCode: teamCode ? null : refCode.trim() || null,
+    });
+    if (!res.ok) {
+      setLoading(false);
+      setError(res.error || 'Connexion avec Google impossible.');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -264,6 +299,15 @@ export default function Login() {
     </div>
   );
 
+  const googleAccess = isSupabaseConfigured && (
+    <>
+      <button type="button" className="btn btn-google btn-block btn-lg" onClick={handleGoogle} disabled={loading}>
+        <GoogleIcon /> {loading ? 'Ouverture de Google…' : 'Continuer avec Google'}
+      </button>
+      <div className="login-divider"><span>ou avec votre email</span></div>
+    </>
+  );
+
   const phoneField = (idPrefix) => (
     <div className="input-group">
       <label className="input-label" htmlFor={`${idPrefix}-phone`}>Numéro de téléphone</label>
@@ -343,7 +387,9 @@ export default function Login() {
             <form className="login-form" onSubmit={handleComplete}>
               <h2 className="login-form-title">Terminer l'inscription</h2>
               <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
-                Votre compte existe — une dernière étape :
+                {pendingAuthUser
+                  ? `Compte Google ${pendingAuthUser.email} — complétez votre profil :`
+                  : 'Votre compte existe — une dernière étape :'}
               </p>
               {error && <div className="login-error">{error}</div>}
               <div className="input-group">
@@ -367,6 +413,7 @@ export default function Login() {
             <form className="login-form" onSubmit={handleSignup}>
               <h2 className="login-form-title">Créer un compte</h2>
               {error && <div className="login-error">{error}</div>}
+              {googleAccess}
               {teamCode && (
                 <div className="login-notice">
                   <UserPlus size={14} style={{ verticalAlign: -2, marginRight: 5 }} />
@@ -420,6 +467,7 @@ export default function Login() {
               <h2 className="login-form-title">Connexion</h2>
               {notice && <div className="login-notice">{notice}</div>}
               {error && <div className="login-error">{error}</div>}
+              {googleAccess}
               {emailField}
               {passwordField()}
               <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
