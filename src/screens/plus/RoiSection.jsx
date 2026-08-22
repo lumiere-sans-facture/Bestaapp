@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { Lightbulb, Banknote, Package, Sun, CalendarCheck, Sprout, Plus as PlusIcon, X } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatCFACourt } from '../../utils/format';
-import { PRIX_KWH_RESEAU } from '../../utils/factureConso';
+import { PRIX_KWH_RESEAU, REPARTITIONS, DEFAULT_REPARTITION, partJourDe } from '../../utils/factureConso';
 import { applianceCategories, appliances } from '../../data/appliances';
 import { calculateSystemSize, suggestKitForBattery, buildKitQuotation, DEFAULT_PEAK_SUN_HOURS, SYSTEM_TYPES } from '../../utils/solarSizing';
 import { dimensionnementRejouable, restaurerDimensionnement, resumeDimensionnement } from '../../utils/dimensionnement';
 import {
-  simulerRoi, DUREE_SYSTEME_ANS, MAINTENANCE_ANNUELLE, HAUSSE_TARIF_DEFAUT,
+  simulerRoi, consommationDepuisFacture, DUREE_SYSTEME_ANS, DUREES_SYSTEME, MAINTENANCE_ANNUELLE, HAUSSE_TARIF_DEFAUT,
   DEGRADATION_ANNUELLE, KWH_PAR_LITRE_GAZOLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../../utils/roi';
 
@@ -23,6 +23,7 @@ const DEPART = [
 
 const PRIX_CARBURANT = 750;   // F CFA le litre de gazole (Togo)
 const COUPURES_PAR_JOUR = 6;  // heures de coupure quotidiennes, valeur de terrain
+const FACTURE_MENSUELLE = 60000; // F CFA — facture CEET d'un petit commerce
 
 const dec = (n, d = 1) => Number(n || 0).toFixed(d).replace('.', ',');
 const ans = (n) => `${String(n).replace('.', ',')} an${n >= 2 ? 's' : ''}`;
@@ -96,7 +97,14 @@ function Projection({ lignes, investissement, retourAns }) {
 
 export default function RoiSection() {
   const { devis, kits, inverters, products } = useData();
+  // Deux façons d'estimer la consommation, comme dans l'assistant de devis :
+  // par les appareils, ou par la facture quand le client ne sait pas dire ce
+  // qu'il fait tourner mais sait très bien ce qu'il paie.
+  const [mode, setMode] = useState('appareils');
   const [rows, setRows] = useState(DEPART);
+  const [facture, setFacture] = useState(FACTURE_MENSUELLE);
+  const [repartition, setRepartition] = useState(DEFAULT_REPARTITION);
+  const [duree, setDuree] = useState(DUREE_SYSTEME_ANS);
   const [coupures, setCoupures] = useState(COUPURES_PAR_JOUR);
   const [groupeActif, setGroupeActif] = useState(true);
   const [tarif, setTarif] = useState(PRIX_KWH_RESEAU);
@@ -132,13 +140,29 @@ export default function RoiSection() {
     setPrixDevis(Math.round(Number(d.total)));
   };
 
-  // Le kit que l'assistant de devis de l'app proposerait pour ces appareils —
-  // même dimensionnement, même catalogue, donc même prix que le devis.
+  // Consommation retenue : les appareils, ou la facture convertie en kWh par
+  // `utils/factureConso.js` — le même module que l'assistant de devis, donc
+  // les deux écrans annoncent le même chiffre pour la même facture.
+  const consoFacture = useMemo(
+    () => consommationDepuisFacture(facture, tarif, partJourDe(repartition)),
+    [facture, tarif, repartition]
+  );
+  // Mémorisée : recréer l'objet à chaque rendu relancerait le calcul du kit et
+  // la simulation entière sans qu'aucune saisie ait bougé.
+  const consoRetenue = useMemo(
+    () => (mode === 'facture' && consoFacture.total > 0 ? consoFacture : null),
+    [mode, consoFacture]
+  );
+
+  // Le kit que l'assistant de devis de l'app proposerait pour cette
+  // consommation — même dimensionnement, même catalogue, donc même prix.
   const kit = useMemo(() => {
-    const jour = rows.reduce((s, r) => s + r.power * r.quantity * r.day, 0) / 1000;
-    const nuit = rows.reduce((s, r) => s + r.power * r.quantity * r.night, 0) / 1000;
+    const jour = consoRetenue ? consoRetenue.jour : rows.reduce((s, r) => s + r.power * r.quantity * r.day, 0) / 1000;
+    const nuit = consoRetenue ? consoRetenue.nuit : rows.reduce((s, r) => s + r.power * r.quantity * r.night, 0) / 1000;
     if (jour + nuit <= 0) return null;
-    const pic = rows.reduce((s, r) => s + r.power * r.quantity, 0);
+    // Une facture ne dit rien du pic de charge : l'onduleur se cale alors sur
+    // la seule puissance photovoltaïque, exactement comme dans l'assistant.
+    const pic = consoRetenue ? 0 : rows.reduce((s, r) => s + r.power * r.quantity, 0);
     // Système autonome — le même choix par défaut que l'assistant de devis
     // (`utils/dimensionnement.js`), et l'hypothèse qui a du sens ici : le
     // client vient pour cesser de dépendre du réseau et du groupe.
@@ -148,38 +172,66 @@ export default function RoiSection() {
     if (!choisi) return null;
     const devisKit = buildKitQuotation(choisi, undefined, true, sizing, inverters || [], products || []);
     return { kit: choisi, total: devisKit.total, panneaux: devisKit.panelsIncluded };
-  }, [rows, kits, inverters, products]);
+  }, [rows, consoRetenue, kits, inverters, products]);
 
   const investissement = prixDevis ?? kit?.total ?? 0;
 
   const sim = useMemo(() => simulerRoi({
     appareils: rows,
+    conso: consoRetenue,
     investissement,
     heuresCoupureJour: coupures,
     tarifKwh: tarif,
     prixCarburant: carburant,
     groupeActif,
-  }), [rows, investissement, coupures, tarif, carburant, groupeActif]);
+    duree,
+  }), [rows, consoRetenue, investissement, coupures, tarif, carburant, groupeActif, duree]);
 
   return (
     <div className="roi-grid">
       {/* ---------- Colonne des saisies ---------- */}
       <div className="roi-colonne">
         <div className="card">
-          <div className="sheet-section-title"><Lightbulb size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Appareils du client</div>
-          <p className="roi-aide">Le même catalogue que l’assistant de devis : c’est lui qui donne la consommation.</p>
+          <div className="sheet-section-title"><Lightbulb size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Consommation du client</div>
+          {/* Deux entrées possibles, comme dans l'assistant de devis : le client
+              sait dire ce qu'il fait tourner, ou seulement ce qu'il paie. */}
+          <div className="roi-modes" role="group" aria-label="Estimer la consommation">
+            <button type="button" className={`roi-mode ${mode === 'appareils' ? 'is-actif' : ''}`}
+                    onClick={() => setMode('appareils')}>D’après ses appareils</button>
+            <button type="button" className={`roi-mode ${mode === 'facture' ? 'is-actif' : ''}`}
+                    onClick={() => setMode('facture')}>D’après sa facture</button>
+          </div>
 
-          {etudes.length > 0 && (
-            <div className="input-group">
-              <label className="input-label" htmlFor="roi-etude">Reprendre l’étude d’un devis</label>
-              <select id="roi-etude" className="input" value="" onChange={(e) => reprendreEtude(e.target.value)}>
-                <option value="">Saisir les appareils ici</option>
-                {etudes.map((d) => (
-                  <option key={d.id} value={d.id}>{d.devisNumber || 'Devis'} — {resumeDimensionnement(d)}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          {mode === 'facture' ? (
+            <>
+              <p className="roi-aide">La facture divisée par le prix du kWh donne la consommation — le même calcul que l’assistant de devis.</p>
+              <Curseur label="Facture d’électricité" value={facture} onChange={setFacture} min={0} max={2000000} step={5000} suffixe="F/mois" />
+              <div className="input-group">
+                <label className="input-label" htmlFor="roi-repartition">Quand consomme-t-il le plus ?</label>
+                <select id="roi-repartition" className="input" value={repartition} onChange={(e) => setRepartition(e.target.value)}>
+                  {REPARTITIONS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+              </div>
+              <p className="roi-note">
+                {formatCFA(facture)} par mois à {formatCFA(tarif)} le kWh, soit
+                {' '}{dec(consoFacture.kwhMois, 0)} kWh par mois.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="roi-aide">Le même catalogue que l’assistant de devis : c’est lui qui donne la consommation.</p>
+
+              {etudes.length > 0 && (
+                <div className="input-group">
+                  <label className="input-label" htmlFor="roi-etude">Reprendre l’étude d’un devis</label>
+                  <select id="roi-etude" className="input" value="" onChange={(e) => reprendreEtude(e.target.value)}>
+                    <option value="">Saisir les appareils ici</option>
+                    {etudes.map((d) => (
+                      <option key={d.id} value={d.id}>{d.devisNumber || 'Devis'} — {resumeDimensionnement(d)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
           <div className="roi-appareils">
             {rows.map((r) => (
@@ -209,6 +261,9 @@ export default function RoiSection() {
               ))}
             </select>
           </div>
+
+            </>
+          )}
 
           {/* Le total, mis en avant : c'est lui qui commande le kit ET le coût. */}
           <div className="roi-total">
@@ -244,6 +299,23 @@ export default function RoiSection() {
                 </div>
               </div>
               <Ligne label="Prix de l’installation" detail="pose comprise" montant={investissement} fort />
+
+              {/* Sur quelle durée raisonner : 25 ans, c'est la garantie de
+                  production des panneaux ; un client prudent préfère souvent
+                  la durée de vie des batteries ou de l'onduleur. */}
+              <div className="roi-durees" role="group" aria-label="Durée de vie retenue">
+                <span className="roi-durees-label">Durée de vie retenue</span>
+                <div className="roi-durees-choix">
+                  {DUREES_SYSTEME.map((d) => (
+                    <button
+                      key={d} type="button"
+                      className={`roi-duree ${duree === d ? 'is-actif' : ''}`}
+                      onClick={() => setDuree(d)}
+                      aria-pressed={duree === d}
+                    >{d} ans</button>
+                  ))}
+                </div>
+              </div>
               {prixDevis != null && (
                 <p className="roi-note">
                   Montant repris du devis, au lieu du prix du kit ({formatCFA(kit.total)}).{' '}
@@ -264,7 +336,7 @@ export default function RoiSection() {
             <div className="kpi-icon"><CalendarCheck size={17} /></div>
             <div className="kpi-value">{sim.retourAns != null ? ans(sim.retourAns) : '—'}</div>
             <div className="kpi-label">
-              {sim.retourAns != null ? 'Installation remboursée' : `Non remboursée en ${DUREE_SYSTEME_ANS} ans`}
+              {sim.retourAns != null ? 'Installation remboursée' : `Non remboursée en ${duree} ans`}
             </div>
           </div>
           <div className="kpi-card is-primary">
@@ -276,7 +348,7 @@ export default function RoiSection() {
             <div className="kpi-icon"><Sun size={17} /></div>
             <div className="kpi-value">{formatCFACourt(sim.gainDuree)}</div>
             <div className="kpi-label">
-              Gagné sur {DUREE_SYSTEME_ANS} ans{sim.roiPct != null ? `, soit ${sim.roiPct.toLocaleString('fr-FR')} % du prix payé` : ''}
+              Gagné sur {duree} ans{sim.roiPct != null ? `, soit ${sim.roiPct.toLocaleString('fr-FR')} % du prix payé` : ''}
             </div>
           </div>
           <div className="kpi-card is-info">
@@ -314,7 +386,7 @@ export default function RoiSection() {
         </div>
 
         <div className="card roi-bloc">
-          <div className="sheet-section-title">Projection sur {DUREE_SYSTEME_ANS} ans</div>
+          <div className="sheet-section-title">Projection sur {duree} ans</div>
           <Projection lignes={sim.projection} investissement={investissement} retourAns={sim.retourAns} />
         </div>
 
@@ -329,6 +401,7 @@ export default function RoiSection() {
             <li>Le kit étant dimensionné pour ces appareils, il les alimente : l’économie, c’est tout ce qui est payé aujourd’hui pour les faire tourner.</li>
             <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(MAINTENANCE_ANNUELLE)}/an) suit la même hausse.</li>
             <li>Les panneaux perdent {dec(DEGRADATION_ANNUELLE * 100)} % de rendement par an (garantie constructeur : {DUREE_SYSTEME_ANS} ans).</li>
+            <li>La projection porte sur {duree} ans — au-delà, l’installation continue d’économiser, mais ce n’est plus compté ici.</li>
             <li>CO₂ : {dec(CO2_PAR_LITRE_GAZOLE, 2)} kg par litre de gazole, {dec(CO2_PAR_KWH_RESEAU, 2)} kg par kWh réseau — ordres de grandeur, pas une mesure.</li>
           </ul>
         </details>

@@ -14,9 +14,15 @@
 // Logique pure, sans React — chaque maillon est testable séparément.
 
 export const JOURS_PAR_AN = 365;
+export const MOIS_PAR_AN = 12;
 export const HEURES_PAR_JOUR = 24;
 
-/** Durée de vie retenue pour la projection (garantie panneaux : 25 ans). */
+/**
+ * Durée de vie retenue pour la projection. 25 ans = la garantie de production
+ * des panneaux, mais un client prudent raisonne souvent sur la durée de vie du
+ * maillon le plus court (batteries, onduleur) : le choix lui est laissé.
+ */
+export const DUREES_SYSTEME = [10, 15, 25];
 export const DUREE_SYSTEME_ANS = 25;
 
 /**
@@ -76,6 +82,39 @@ export const consommationAppareils = (appareils = []) => {
     total: Math.round((jour + nuit) * 100) / 100,
     // Pic de charge : tout allumé en même temps. Sert au choix de l'onduleur.
     pic: appareils.reduce((t, a) => t + nombre(a?.power) * (nombre(a?.quantity) || 1), 0),
+  };
+};
+
+/**
+ * ÉTAPE 1 bis — La facture du client en kWh par jour, quand il ne sait pas
+ * dire ce qu'il fait tourner mais sait très bien ce qu'il paie.
+ *
+ * L'annualisation part de DOUZE FACTURES, pas de mois de 30 jours comme
+ * `utils/factureConso.js` (dont la convention sert au dimensionnement). La
+ * différence n'est que de 1,4 %, mais elle porte sur le seul chiffre que le
+ * client peut vérifier : sa facture, qu'il a sous les yeux. Le coût réseau
+ * annoncé ici vaut donc exactement douze fois ce qu'il paie.
+ *
+ * @param {number} montantMensuel  facture, F CFA
+ * @param {number} prixKwh         prix du kWh
+ * @param {number} partJour        part consommée en journée (0 à 1)
+ */
+export const consommationDepuisFacture = (montantMensuel, prixKwh, partJour = 0.5) => {
+  const montant = nombre(montantMensuel);
+  const prix = nombre(prixKwh);
+  if (montant <= 0 || prix <= 0) return { kwhMois: 0, jour: 0, nuit: 0, total: 0, pic: 0 };
+  const kwhAn = (montant * MOIS_PAR_AN) / prix;
+  const kwhJour = kwhAn / JOURS_PAR_AN;
+  const part = Math.min(1, Math.max(0, Number(partJour) || 0));
+  // Volontairement NON arrondi : l'écran arrondit à l'affichage, mais arrondir
+  // ici ferait dériver le coût annuel de quelques centaines de francs — juste
+  // assez pour ne plus tomber sur la facture que le client tient en main.
+  return {
+    kwhMois: kwhAn / MOIS_PAR_AN,
+    jour: kwhJour * part,
+    nuit: kwhJour * (1 - part),
+    total: kwhJour,
+    pic: 0, // une facture ne dit rien du pic de charge
   };
 };
 
@@ -179,17 +218,41 @@ export const co2EviteAn = ({ litresAn = 0, kwhReseauAn = 0 } = {}) =>
   Math.round(nombre(litresAn) * CO2_PAR_LITRE_GAZOLE + nombre(kwhReseauAn) * CO2_PAR_KWH_RESEAU);
 
 /**
+ * Consommation retenue : celle passée directement (estimation depuis la
+ * facture du client) ou, à défaut, celle déduite de ses appareils. Les deux
+ * chemins doivent produire la MÊME forme, sinon tout ce qui suit diverge.
+ */
+export const consommationRetenue = (appareils = [], conso = null) => {
+  const total = Number(conso?.total) || 0;
+  if (total <= 0) return consommationAppareils(appareils);
+  // Reprise telle quelle, sans réarrondir : l'affichage s'en charge, et un
+  // arrondi de plus décalerait le coût annuel de la facture réelle.
+  return {
+    jour: Number(conso.jour) || 0,
+    nuit: Number(conso.nuit) || 0,
+    total,
+    // Une facture ne dit rien du pic de charge : l'onduleur se calera alors
+    // sur la seule puissance photovoltaïque, comme dans l'assistant de devis.
+    pic: Number(conso.pic) || 0,
+  };
+};
+
+/**
  * La chaîne complète, prête pour l'écran.
  *
  * @param {object}  e
  * @param {Array}   e.appareils          lignes { power, quantity, day, night }
+ * @param {object}  e.conso              consommation déjà connue { jour, nuit, total } —
+ *                                       prime sur `appareils` (estimation par facture)
  * @param {number}  e.investissement     prix de l'installation (kit ou devis)
  * @param {number}  e.heuresCoupureJour  coupures quotidiennes du réseau
  * @param {number}  e.tarifKwh           prix du kWh CEET
  * @param {number}  e.prixCarburant      prix du litre de gazole
+ * @param {number}  e.duree              durée de vie retenue, en années
  */
 export const simulerRoi = ({
   appareils = [],
+  conso = null,
   investissement = 0,
   heuresCoupureJour = 0,
   tarifKwh = 0,
@@ -199,9 +262,9 @@ export const simulerRoi = ({
   hausse = HAUSSE_TARIF_DEFAUT,
   duree = DUREE_SYSTEME_ANS,
 } = {}) => {
-  const conso = consommationAppareils(appareils);
+  const consommation = consommationRetenue(appareils, conso);
   const cout = coutActuel({
-    kwhJour: conso.total, heuresCoupureJour, tarifKwh, prixCarburant, groupeActif,
+    kwhJour: consommation.total, heuresCoupureJour, tarifKwh, prixCarburant, groupeActif,
   });
   const lignes = projection({ investissement, coutAnnuel: cout.total, maintenance, hausse, duree });
   const invest = nombre(investissement);
@@ -210,7 +273,7 @@ export const simulerRoi = ({
   const co2AnKg = co2EviteAn(cout);
 
   return {
-    conso,
+    conso: consommation,
     cout,
     maintenance: Math.round(nombre(maintenance)),
     economieAn1: lignes[0]?.economie ?? 0,

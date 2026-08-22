@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  consommationAppareils, coutActuel, economieAnnee, projection, retourInvestissement,
+  consommationAppareils, consommationRetenue, consommationDepuisFacture, coutActuel, economieAnnee, projection, retourInvestissement,
   co2EviteAn, simulerRoi,
-  JOURS_PAR_AN, DUREE_SYSTEME_ANS, KWH_PAR_LITRE_GAZOLE, MAINTENANCE_ANNUELLE,
+  JOURS_PAR_AN, MOIS_PAR_AN, DUREE_SYSTEME_ANS, DUREES_SYSTEME, KWH_PAR_LITRE_GAZOLE, MAINTENANCE_ANNUELLE,
   HAUSSE_TARIF_DEFAUT, DEGRADATION_ANNUELLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../roi';
 import { appliances } from '../../data/appliances';
@@ -230,5 +230,124 @@ describe('simulerRoi — la chaîne complète', () => {
     });
     expect(sim.gainDuree).toBeGreaterThan(fige.gainDuree);
     expect(HAUSSE_TARIF_DEFAUT).toBeGreaterThan(0);
+  });
+});
+
+describe('consommationRetenue — appareils ou facture', () => {
+  it('sans consommation fournie, elle vient des appareils', () => {
+    expect(consommationRetenue(CLIENT).total).toBe(7.45);
+  });
+
+  it('une consommation fournie (estimation par facture) prime sur les appareils', () => {
+    const c = consommationRetenue(CLIENT, { jour: 5, nuit: 3, total: 8 });
+    expect(c.total).toBe(8);
+    expect(c.jour).toBe(5);
+    expect(c.nuit).toBe(3);
+  });
+
+  it('ne réarrondit pas la consommation fournie', () => {
+    // Un arrondi de plus et le coût annuel ne tombe plus sur la facture.
+    expect(consommationRetenue([], { jour: 8.6536, nuit: 8.6536, total: 17.3072 }).total).toBe(17.3072);
+  });
+
+  it('une facture nulle retombe sur les appareils plutôt que sur zéro', () => {
+    expect(consommationRetenue(CLIENT, { jour: 0, nuit: 0, total: 0 }).total).toBe(7.45);
+  });
+
+  it('une facture ne connaît pas le pic de charge', () => {
+    expect(consommationRetenue([], { jour: 5, nuit: 3, total: 8 }).pic).toBe(0);
+  });
+});
+
+describe('durée de vie retenue', () => {
+  it('trois durées proposées, 25 ans par défaut', () => {
+    expect(DUREES_SYSTEME).toEqual([10, 15, 25]);
+    expect(DUREES_SYSTEME).toContain(DUREE_SYSTEME_ANS);
+  });
+
+  it('la projection suit la durée choisie', () => {
+    for (const duree of DUREES_SYSTEME) {
+      const s = simulerRoi({ appareils: CLIENT, investissement: 2500000, tarifKwh: 114, duree });
+      expect(s.projection).toHaveLength(duree);
+    }
+  });
+
+  it('une durée plus courte réduit le gain, jamais le remboursement', () => {
+    const commun = { appareils: CLIENT, investissement: 2500000, heuresCoupureJour: 6, tarifKwh: 114, prixCarburant: 750, groupeActif: true };
+    const court = simulerRoi({ ...commun, duree: 10 });
+    const long = simulerRoi({ ...commun, duree: 25 });
+    expect(court.gainDuree).toBeLessThan(long.gainDuree);
+    // Le remboursement ne dépend pas de l'horizon : il tombe au même moment.
+    expect(court.retourAns).toBe(long.retourAns);
+  });
+
+  it('sur 10 ans, une installation lente à rembourser peut ne plus l’être', () => {
+    const commun = { appareils: CLIENT, investissement: 6000000, tarifKwh: 114, heuresCoupureJour: 0 };
+    expect(simulerRoi({ ...commun, duree: 25 }).retourAns).not.toBeNull();
+    expect(simulerRoi({ ...commun, duree: 10 }).retourAns).toBeNull();
+  });
+
+  it('le CO₂ cumulé suit lui aussi la durée', () => {
+    const commun = { appareils: CLIENT, investissement: 2500000, heuresCoupureJour: 6, tarifKwh: 114, prixCarburant: 750, groupeActif: true };
+    const court = simulerRoi({ ...commun, duree: 10 });
+    const long = simulerRoi({ ...commun, duree: 25 });
+    expect(court.co2AnKg).toBe(long.co2AnKg);
+    expect(court.co2DureeT).toBeLessThan(long.co2DureeT);
+  });
+});
+
+describe('simulerRoi depuis la facture du client', () => {
+  // 60 000 F à 114 F le kWh ≈ 526 kWh par mois, soit ~17,5 kWh par jour.
+  const parFacture = simulerRoi({
+    conso: { jour: 8.77, nuit: 8.77, total: 17.54 },
+    investissement: 4000000, heuresCoupureJour: 6, tarifKwh: 114,
+    prixCarburant: 750, groupeActif: true,
+  });
+
+  it('la consommation retenue est celle de la facture', () => {
+    expect(parFacture.conso.total).toBe(17.54);
+  });
+
+  it('et le coût annuel en découle comme pour les appareils', () => {
+    expect(parFacture.cout.kwhAn).toBe(Math.round(17.54 * JOURS_PAR_AN));
+    expect(parFacture.cout.total).toBeGreaterThan(0);
+    expect(parFacture.retourAns).not.toBeNull();
+  });
+});
+
+describe('consommationDepuisFacture — estimer depuis ce que le client paie', () => {
+  it('le coût réseau annoncé vaut EXACTEMENT douze factures', () => {
+    // Le seul chiffre que le client peut vérifier : sa facture. Annualiser sur
+    // des mois de 30 jours (360 j/an) donnait 729 839 F là où il paie
+    // 720 000 F — 1,4 % d'écart, mais sur la ligne qu'il a sous les yeux.
+    const c = consommationDepuisFacture(60000, 114, 0.5);
+    const cout = coutActuel({ kwhJour: c.total, tarifKwh: 114, heuresCoupureJour: 0 });
+    expect(cout.reseau).toBe(60000 * MOIS_PAR_AN);
+  });
+
+  it('répartit le jour et la nuit selon la part choisie', () => {
+    const c = consommationDepuisFacture(60000, 114, 0.7);
+    expect(c.jour).toBeCloseTo(c.total * 0.7, 1);
+    expect(c.nuit).toBeCloseTo(c.total * 0.3, 1);
+    expect(c.jour + c.nuit).toBeCloseTo(c.total, 1);
+  });
+
+  it('rend aussi le volume mensuel, pour l’afficher au client', () => {
+    expect(consommationDepuisFacture(60000, 114).kwhMois).toBeCloseTo(60000 / 114, 1);
+  });
+
+  it('une facture ne dit rien du pic de charge', () => {
+    expect(consommationDepuisFacture(60000, 114).pic).toBe(0);
+  });
+
+  it('facture ou prix absent : aucune consommation inventée', () => {
+    expect(consommationDepuisFacture(0, 114).total).toBe(0);
+    expect(consommationDepuisFacture(60000, 0).total).toBe(0);
+    expect(consommationDepuisFacture().total).toBe(0);
+  });
+
+  it('une part de jour absurde est ramenée entre 0 et 1', () => {
+    expect(consommationDepuisFacture(60000, 114, 5).nuit).toBe(0);
+    expect(consommationDepuisFacture(60000, 114, -2).jour).toBe(0);
   });
 });
