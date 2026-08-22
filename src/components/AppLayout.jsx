@@ -1,14 +1,15 @@
-import { Suspense } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
 import SkeletonPageContent from './SkeletonPageContent';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { initials } from '../utils/format';
 import { SyncDot } from './SyncStatus';
+import NotificationBell from './NotificationBell';
 
 const publicNavItems = [
   { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
@@ -56,6 +57,14 @@ const plusSections = (user) => [
 // de la barre latérale y reste allumée.
 const SETTINGS_PATHS = ['/plus/profile', '/plus/apparence', '/plus/backup', '/plus/paiements', '/plus/subsadmin'];
 
+// Barre latérale repliée : le choix suit l'utilisateur d'un écran à l'autre et
+// d'une session à l'autre. Replier pour gagner de la place et devoir le
+// refaire à chaque page serait pire que de ne pas pouvoir replier du tout.
+const REPLI_KEY = 'bestasolar_sidebar_repliee';
+const lireRepli = () => {
+  try { return localStorage.getItem(REPLI_KEY) === '1'; } catch { return false; }
+};
+
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const { getCompanyForUser, storageError } = useData();
@@ -63,6 +72,13 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isPro = mode === 'pro';
+  const [repliee, setRepliee] = useState(lireRepli);
+  const basculerRepli = useCallback(() => {
+    setRepliee((r) => {
+      try { localStorage.setItem(REPLI_KEY, r ? '0' : '1'); } catch { /* stockage indisponible */ }
+      return !r;
+    });
+  }, []);
   const navItems = isPro ? proNavItems : publicNavItems;
   // Barre latérale publique : « Plus » n'y figure pas (toutes ses entrées y
   // sont détaillées) — il reste dans la barre d'onglets mobile.
@@ -79,27 +95,50 @@ export default function AppLayout() {
   const company = isPro ? getCompanyForUser(user.id) : null;
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${repliee ? 'sidebar-repliee' : ''}`}>
       {/* Barre latérale — visible uniquement sur grand écran */}
       <aside className="sidebar">
-        {isPro ? (
-          <div className="sidebar-brand">
-            <div className="sidebar-logo">
-              {company?.logo
-                ? <img src={company.logo} alt={`Logo ${company.nomEntreprise || 'entreprise'}`} />
-                : <Crown size={22} />}
-            </div>
-            <div>
-              <div className="sidebar-title">{company?.nomEntreprise || 'Espace Pro'}</div>
-              <div className="sidebar-subtitle">Espace Pro</div>
+        {/* Marque, cloche et repli sur la même ligne : la cloche vit ici, au
+            coin de l'app, plutôt que dans le bandeau de chaque page. */}
+        <div className={`sidebar-brand ${isPro ? '' : 'sidebar-brand-public'}`}>
+          <div className="sidebar-brand-row">
+            {isPro ? (
+              <>
+                <div className="sidebar-logo">
+                  {company?.logo
+                    ? <img src={company.logo} alt={`Logo ${company.nomEntreprise || 'entreprise'}`} />
+                    : <Crown size={22} />}
+                </div>
+                {!repliee && (
+                  <div className="sidebar-brand-nom">
+                    <div className="sidebar-title">{company?.nomEntreprise || 'Espace Pro'}</div>
+                    <div className="sidebar-subtitle">Espace Pro</div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <img
+                src={repliee ? '/besta-solar-icon-blanc.png' : '/besta-solar-pro-logo-blanc.png'}
+                alt="BestaSolar Pro"
+                className={repliee ? 'sidebar-brand-icone' : 'sidebar-brand-logo'}
+              />
+            )}
+            <div className="sidebar-brand-tools">
+              <NotificationBell />
+              <button
+                type="button"
+                className="sidebar-repli"
+                onClick={basculerRepli}
+                aria-expanded={!repliee}
+                aria-label={repliee ? 'Déplier le menu' : 'Replier le menu'}
+                title={repliee ? 'Déplier le menu' : 'Replier le menu'}
+              >
+                {repliee ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="sidebar-brand sidebar-brand-public">
-            <img src="/besta-solar-pro-logo-blanc.png" alt="BestaSolar Pro" className="sidebar-brand-logo" />
-            <div className="sidebar-subtitle">Lomé, Togo</div>
-          </div>
-        )}
+          {!isPro && !repliee && <div className="sidebar-subtitle">Lomé, Togo</div>}
+        </div>
         <nav className="sidebar-nav" aria-label="Navigation principale">
           {sidebarItems.map((item) => (
             <NavLink
@@ -107,6 +146,7 @@ export default function AppLayout() {
               to={item.path}
               end={item.path === '/pro'}
               className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+              title={repliee ? item.label : undefined}
             >
               <item.icon size={20} strokeWidth={2} />
               <span>{item.label}</span>
@@ -119,12 +159,13 @@ export default function AppLayout() {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                  title={repliee ? item.label : undefined}
                 >
                   <item.icon size={20} strokeWidth={2} />
                   <span>{item.label}</span>
                 </NavLink>
               ))}
-              <button className="sidebar-link sidebar-pro-link" onClick={goPro}>
+              <button className="sidebar-link sidebar-pro-link" onClick={goPro} title={repliee ? 'Passer en mode Pro' : undefined}>
                 <Crown size={20} strokeWidth={2} />
                 <span>Passer en mode Pro</span>
               </button>
@@ -134,6 +175,7 @@ export default function AppLayout() {
               <NavLink
                 to="/plus/parametres"
                 className={({ isActive }) => `sidebar-link ${isActive || SETTINGS_PATHS.includes(pathname) ? 'active' : ''}`}
+                title={repliee ? 'Paramètres' : undefined}
               >
                 <Settings size={20} strokeWidth={2} />
                 <span>Paramètres</span>
@@ -145,16 +187,26 @@ export default function AppLayout() {
           {/* Le réglage d'apparence a quitté la barre latérale : il vit dans
               Paramètres → Apparence (/plus/apparence), avec la densité. */}
           {isPro && (
-            <button className="btn btn-accent btn-block sidebar-pro-btn" onClick={() => setMode('public')}>
+            <button
+              className="btn btn-accent btn-block sidebar-pro-btn"
+              onClick={() => setMode('public')}
+              title={repliee ? 'Revenir au mode public' : undefined}
+              aria-label={repliee ? 'Revenir au mode public' : undefined}
+            >
               <ArrowLeft size={16} /> Revenir au mode public
             </button>
           )}
           <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{user.avatar || initials(user.name)}</div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{user.name} <SyncDot /></div>
-              <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'}</div>
-            </div>
+            <div className="sidebar-user-avatar" title={repliee ? user.name : undefined}>{user.avatar || initials(user.name)}</div>
+            {/* Barre repliée : le nom et le rôle s'effacent, mais l'état de
+                synchronisation reste — c'est lui qui dit si le travail est
+                parti. Il vit d'ordinaire à côté du nom. */}
+            {repliee ? <SyncDot /> : (
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-name">{user.name} <SyncDot /></div>
+                <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'}</div>
+              </div>
+            )}
             <button className="sidebar-logout" onClick={logout} title="Déconnexion" aria-label="Déconnexion">
               <LogOut size={18} />
             </button>

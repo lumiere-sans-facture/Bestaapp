@@ -209,7 +209,10 @@ img { max-width: 100%; }
   background: rgba(255, 255, 255, 0.12); color: inherit; cursor: pointer; flex-shrink: 0;
 }
 .notif-bell:hover { background: rgba(255, 255, 255, 0.2); }
+/* Bandeau clair du desktop : le survol suit ce fond — mais PAS dans la barre
+   latérale, restée sombre (règle rétablie juste après). */
 @media (min-width: 1024px) { .notif-bell:hover { background: var(--bg); } }
+.sidebar .notif-bell:hover { background: rgba(255, 255, 255, 0.16); }
 .notif-badge {
   position: absolute; top: -2px; right: -2px; min-width: 17px; height: 17px;
   padding: 0 4px; border-radius: 999px; background: var(--error); color: white;
@@ -217,6 +220,7 @@ img { max-width: 100%; }
   border: 2px solid var(--primary);
 }
 @media (min-width: 1024px) { .notif-badge { border-color: var(--bg-card); } }
+.sidebar .notif-badge { border-color: var(--primary-dark); }
 
 .pipeline-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 0.8125rem; opacity: 0.9; }
 .pipeline-stat strong { font-weight: 600; }
@@ -246,10 +250,27 @@ img { max-width: 100%; }
 /* Marque BestaSolar (hors mode Pro) : le logo (texte marine + orange) n'a
    pas de contraste sur --primary-dark sans cette plaque blanche. */
 .sidebar-brand-public { flex-direction: column; align-items: flex-start; gap: 8px; }
+/* Logo à gauche, cloche et repli à droite — sur une seule ligne. */
+.sidebar-brand-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+.sidebar-brand-nom { min-width: 0; }
+.sidebar-brand-nom .sidebar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* `margin-left: auto` plutôt qu'un `justify-content` sur la ligne : le logo
+   garde sa largeur naturelle, les outils sont poussés au bord. */
+.sidebar-brand-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.sidebar-repli {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: none; border-radius: 9px;
+  background: transparent; color: rgba(255, 255, 255, 0.6); cursor: pointer;
+}
+.sidebar-repli:hover { background: rgba(255, 255, 255, 0.1); color: white; }
 /* Variante blanche du logo : lisible directement sur --primary-dark, sans
    plaque de fond (contrairement au mode Pro, dont le logo de l'abonné peut
    être de n'importe quelle couleur). */
-.sidebar-brand-logo { display: block; width: 100%; max-width: 176px; height: auto; }
+.sidebar-brand-logo { display: block; width: 100%; max-width: 148px; height: auto; }
+/* Barre repliée : le logo long devient l'icône carrée (même marque, lisible
+   dans un rail de 76 px). */
+.sidebar-brand-icone { display: block; width: 34px; height: 34px; object-fit: contain; }
 .sidebar-nav { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
 .sidebar-link {
   display: flex; align-items: center; gap: 12px;
@@ -2246,6 +2267,28 @@ form .login-link { width: 100%; margin-top: 4px; }
   .sidebar { display: flex; }
   .tab-bar { display: none; }
   .app-main { margin-left: var(--sidebar-width); padding-bottom: 0; }
+  /* La cloche du bandeau de page cède la place à celle de la barre latérale :
+     deux cloches côte à côte pour la même alerte, c'est une de trop. */
+  .page-header-bell { display: none; }
+
+  /* ---- Barre latérale repliée ----
+     Une seule variable pilote tout : la barre ET la marge du contenu la
+     lisent (ainsi que les zones de dépôt du kanban). */
+  .sidebar-repliee { --sidebar-width: 76px; }
+  .sidebar-repliee .sidebar-brand { padding: 18px 12px; align-items: center; }
+  .sidebar-repliee .sidebar-brand-row { flex-direction: column; gap: 6px; }
+  .sidebar-repliee .sidebar-brand-tools { margin-left: 0; flex-direction: column; gap: 4px; }
+  .sidebar-repliee .sidebar-nav { padding: 12px 10px; }
+  /* Libellés masqués, icônes centrées : le nom reste accessible en infobulle
+     (attribut `title` posé côté React quand la barre est repliée). */
+  .sidebar-repliee .sidebar-link { justify-content: center; padding: 11px 0; gap: 0; }
+  .sidebar-repliee .sidebar-link span { display: none; }
+  .sidebar-repliee .sidebar-footer { padding: 12px 10px; }
+  /* Colonne : l'avatar, le voyant de synchronisation et la déconnexion
+     tiennent dans 76 px les uns sous les autres. La déconnexion reste
+     accessible — la masquer enfermerait l'utilisateur dans l'app. */
+  .sidebar-repliee .sidebar-user { flex-direction: column; gap: 8px; }
+  .sidebar-repliee .sidebar-pro-btn { padding-inline: 0; font-size: 0; gap: 0; }
 
   /* L'en-tête devient une barre claire intégrée au contenu */
   .page-header {

@@ -17,7 +17,10 @@ export default function PageHeader({ title, subtitle, children, actions, onBack 
         </div>
         <div className="page-header-actions">
           {actions}
-          <NotificationBell />
+          {/* Sur grand écran, la cloche vit au coin de la barre latérale : ici
+              elle ferait doublon, une même alerte à deux endroits de l'écran.
+              Sur mobile il n'y a pas de barre latérale — elle reste donc. */}
+          <span className="page-header-bell"><NotificationBell /></span>
         </div>
       </div>
     </header>

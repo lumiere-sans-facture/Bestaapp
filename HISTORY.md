@@ -6,6 +6,8 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-22
+- Barre latérale : la cloche de notifications rejoint le coin de l'app, à côté du logo (elle ne double plus le bandeau de chaque page sur grand écran ; sur mobile, où il n'y a pas de barre latérale, elle y reste)
+- Barre latérale : fléchette de repli — le menu se réduit à un rail d'icônes (264 → 76 px) et le contenu récupère la place ; libellés en infobulle, cloche, voyant de synchronisation et déconnexion restent accessibles, et le choix est conservé d'un écran à l'autre
 - **Mode hors-ligne** : l'app s'ouvre et reste utilisable sans réseau, et tout remonte seul au retour de la connexion
   - la session est restaurée depuis le profil mémorisé sur l'appareil — sans réseau, l'app renvoyait l'utilisateur à l'écran de connexion, qu'il ne pouvait pas franchir non plus (ouverture : 7,4 s → 0,2 s)
   - une modification faite hors-ligne (étape d'un client, prix d'un kit, statut d'un devis) survit au relancement : une file d'attente persistante la fait primer sur la copie du serveur, plus ancienne
