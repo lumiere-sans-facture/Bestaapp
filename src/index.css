@@ -400,6 +400,12 @@ textarea.input { resize: vertical; }
 .login-subtitle { font-size: 0.75rem; color: var(--text-secondary); }
 .login-form { padding: 0; }
 .login-form-title { font-size: 1.75rem; font-weight: 700; margin-bottom: 22px; color: var(--text-primary); }
+.btn-google {
+  border: 1.5px solid var(--border); background: var(--bg-card); color: var(--text-primary);
+  font-weight: 600; box-shadow: 0 1px 2px rgba(10, 36, 114, 0.05);
+}
+.btn-google:hover { border-color: var(--text-muted); background: var(--bg); }
+.btn-google .google-icon { flex-shrink: 0; }
 /* Volet de marque : masqué sur mobile — une deuxième colonne n'a pas la
    place d'exister sous 900px, mieux vaut l'omettre que la tasser. */
 .login-right {
