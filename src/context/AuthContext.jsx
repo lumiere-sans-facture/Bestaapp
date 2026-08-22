@@ -13,6 +13,7 @@ const STORAGE_KEY = 'bestasolar_user';
 // Inscription en attente de confirmation d'email : on mémorise de quoi créer
 // l'organisation au premier login (le compte Auth existe, pas encore le profil).
 const PENDING_KEY = 'bestasolar_pending_signup';
+const OAUTH_CONTEXT_KEY = 'bestasolar_google_signup';
 
 // select('*') : tolère l'ancien schéma (sans org_id / is_platform_admin)
 // comme le schéma multi-entreprise.
@@ -40,6 +41,10 @@ const readPending = () => {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY)); } catch { return null; }
 };
 
+const readOAuthContext = () => {
+  try { return JSON.parse(localStorage.getItem(OAUTH_CONTEXT_KEY)) || {}; } catch { return {}; }
+};
+
 // Certaines erreurs de Supabase Auth révèlent qu'un email est déjà inscrit
 // (« User already registered »…) : les remplacer par un message générique à
 // affichage conditionnel évite d'énumérer les comptes existants depuis
@@ -57,11 +62,16 @@ export function AuthProvider({ children }) {
   // true après un clic sur le lien « mot de passe oublié » reçu par email :
   // l'app demande alors le nouveau mot de passe avant tout le reste.
   const [recovery, setRecovery] = useState(false);
+  // Session Auth valide mais profil métier absent : cas normal au premier
+  // retour de Google OAuth. L'écran de connexion termine alors l'inscription.
+  const [pendingAuthUser, setPendingAuthUser] = useState(null);
 
   // Attache l'organisation au profil (type interne/pro, nom, code d'invitation).
   // user.org absent = ancien schéma mono-équipe ou mode local → comportement
   // « interne » (CRM complet), comme avant.
   const adoptProfile = async (profile) => {
+    setPendingAuthUser(null);
+    localStorage.removeItem(OAUTH_CONTEXT_KEY);
     setSyncOrg(profile?.org_id);
     let org = null;
     if (profile?.org_id) org = await fetchMyOrg();
@@ -145,6 +155,16 @@ export function AuthProvider({ children }) {
             oublierProfilCache();
             await supabase.auth.signOut();
             setUser(null);
+          } else {
+            // Compte Auth sans profil (connexion Google d'un nouvel arrivant) :
+            // l'inscription se termine à l'écran, elle n'est pas un échec.
+            const oauthContext = readOAuthContext();
+            setPendingAuthUser({
+              email,
+              name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+              inviteCode: oauthContext.inviteCode || null,
+              refCode: oauthContext.refCode || null,
+            });
           }
         }
         setIsLoading(false);
@@ -164,6 +184,20 @@ export function AuthProvider({ children }) {
     }
     setIsLoading(false);
   }, []);
+
+  const signInWithGoogle = async ({ inviteCode, refCode } = {}) => {
+    if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
+    localStorage.setItem(OAUTH_CONTEXT_KEY, JSON.stringify({
+      inviteCode: inviteCode || null,
+      refCode: refCode || null,
+    }));
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) localStorage.removeItem(OAUTH_CONTEXT_KEY);
+    return { ok: !error, error: error?.message };
+  };
 
   const login = async (email, password) => {
     if (isSupabaseConfigured) {
@@ -250,6 +284,8 @@ export function AuthProvider({ children }) {
     const profile = session?.user?.email ? (await fetchProfile(session.user.email)).profile : null;
     if (!profile) return { ok: false, error: 'Profil introuvable après création — réessayez.' };
     localStorage.removeItem(PENDING_KEY);
+    localStorage.removeItem(OAUTH_CONTEXT_KEY);
+    setPendingAuthUser(null);
     await adoptProfile(profile);
     return { ok: true };
   };
@@ -289,8 +325,10 @@ export function AuthProvider({ children }) {
     setContexteErreur({ userId: null, orgId: null, role: null });
     setContexteAnalytique({ distinctId: null });
     setUser(null);
+    setPendingAuthUser(null);
     setSyncOrg(null);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(OAUTH_CONTEXT_KEY);
     clearSessionLifetime();
   };
 
@@ -305,7 +343,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, signUp, completeSignup, resetPassword, updatePassword, refreshOrg, recovery }}>
+    <AuthContext.Provider value={{ user, isLoading, login, signInWithGoogle, logout, signUp, completeSignup, resetPassword, updatePassword, refreshOrg, recovery, pendingAuthUser }}>
       {children}
     </AuthContext.Provider>
   );
