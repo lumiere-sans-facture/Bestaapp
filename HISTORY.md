@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-22
+- **Simulateur ROI** : nouvel écran (barre latérale et menu « Plus », ouvert à toute l'équipe) qui chiffre devant le client ce que lui coûte vraiment son énergie aujourd'hui — facture réseau **et** carburant du groupe électrogène sur douze mois — puis l'économie de la première année, le délai de remboursement, le gain sur 25 ans et le CO₂ évité ; curseurs en direct, projection tracée, montant repris d'un devis existant, et hypothèses de calcul écrites à l'écran (couverture solaire, hausse tarifaire, usure des panneaux, entretien, facteurs CO₂). Un projet qui ne se rembourse pas est annoncé comme tel, jamais arrondi en sa faveur
 - Barre latérale : la cloche de notifications rejoint le coin de l'app, à côté du logo (elle ne double plus le bandeau de chaque page sur grand écran ; sur mobile, où il n'y a pas de barre latérale, elle y reste)
 - Barre latérale : fléchette de repli — le menu se réduit à un rail d'icônes (264 → 76 px) et le contenu récupère la place ; libellés en infobulle, cloche, voyant de synchronisation et déconnexion restent accessibles, et le choix est conservé d'un écran à l'autre
 - **Mode hors-ligne** : l'app s'ouvre et reste utilisable sans réseau, et tout remonte seul au retour de la connexion

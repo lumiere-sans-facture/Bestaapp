@@ -2259,6 +2259,89 @@ form .login-link { width: 100%; margin-top: 4px; }
   .sizing-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
+
+/* ============ Simulateur ROI ============
+   Deux colonnes sur grand écran : les hypothèses à gauche, ce qu'elles
+   produisent à droite — le commercial bouge un curseur et le client voit le
+   chiffre changer, c'est tout l'intérêt de l'écran. Une seule colonne en
+   dessous de 1024px (les résultats passent alors SOUS le formulaire). */
+.roi-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.roi-colonne { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.roi-bloc { margin: 0; }
+.roi-kpis { margin-top: 0; }
+
+/* Un curseur et sa valeur : le libellé à gauche, le chiffre à droite, la
+   piste en dessous — pour que la valeur reste lisible pendant qu'on glisse. */
+.roi-champ { margin-top: 14px; }
+.roi-champ:first-of-type { margin-top: 10px; }
+.roi-champ-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.roi-champ-label { font-size: 0.8125rem; color: var(--text-secondary); }
+.roi-champ-valeur {
+  display: inline-flex; align-items: baseline; gap: 4px; flex-shrink: 0;
+  font-weight: 700; color: var(--primary-ink);
+}
+.roi-champ-suffixe { font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); }
+/* Montants saisissables : une facture ou un devis se dictent au franc près,
+   un curseur seul ne permet pas de poser « 62 500 ». */
+.roi-champ-input {
+  width: 7.5em; padding: 2px 6px; text-align: right;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-card); color: inherit; font: inherit; font-weight: 700;
+}
+.roi-champ-input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+.roi-curseur {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; margin-top: 8px; padding: 0;
+  border-radius: 3px; background: var(--border); cursor: pointer;
+}
+/* La pastille doit rester attrapable au doigt : 20px visibles, zone de
+   contact élargie par la hauteur du contrôle. */
+.roi-curseur::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); border: 2px solid var(--bg-card);
+  box-shadow: var(--shadow); cursor: pointer;
+}
+.roi-curseur::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); border: 2px solid var(--bg-card); cursor: pointer;
+}
+.roi-bascule { margin-top: 14px; }
+
+/* Décomposition du coût actuel */
+.roi-ligne {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.875rem;
+}
+.roi-ligne:last-child { border-bottom: none; }
+.roi-ligne-label { color: var(--text-secondary); }
+.roi-ligne-montant { font-weight: 600; white-space: nowrap; }
+.roi-ligne.is-forte { font-size: 0.9375rem; }
+.roi-ligne.is-forte .roi-ligne-label { color: var(--text-primary); font-weight: 600; }
+.roi-ligne.is-forte .roi-ligne-montant { color: var(--primary-ink); font-weight: 700; }
+.roi-ligne-montant.is-negatif { color: var(--error-ink); }
+
+/* Projection : graphique fait main (pas de librairie de charts dans le
+   projet). preserveAspectRatio="none" étire le tracé à la largeur du bloc —
+   d'où les épaisseurs en unités de vue, ajustées à l'œil. */
+.roi-projection { margin-top: 12px; }
+.roi-svg { display: block; width: 100%; height: 170px; overflow: visible; }
+.roi-aire { fill: var(--primary); opacity: 0.12; }
+.roi-courbe { fill: none; stroke: var(--primary); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.roi-ligne-invest { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.roi-ligne-seuil { stroke: var(--success); stroke-width: 1.5; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.roi-axe {
+  display: flex; justify-content: space-between; gap: 8px;
+  margin-top: 8px; font-size: 0.6875rem; color: var(--text-muted);
+}
+.roi-axe-seuil { color: var(--success-text); font-weight: 600; }
+.roi-dot-cumul { background: var(--primary); }
+.roi-dot-invest { background: var(--accent); }
+
+/* Hypothèses : volontairement discrètes, mais toujours à l'écran. */
+.roi-hypotheses ul { margin: 6px 0 0; padding-left: 18px; }
+.roi-hypotheses li { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; margin-top: 5px; }
+
 /* ============================================================
    Desktop (≥ 1024px) : barre latérale + contenu pleine page
    ============================================================ */
@@ -2314,6 +2397,10 @@ form .login-link { width: 100%; margin-top: 4px; }
 
   .cart-bar { bottom: 24px; right: 32px; }
   .bar-chart { height: 220px; }
+
+  /* Simulateur ROI : hypothèses à gauche, résultats à droite. */
+  .roi-grid { grid-template-columns: minmax(320px, 5fr) 7fr; gap: 20px; align-items: start; }
+  .roi-svg { height: 210px; }
 
   /* Le panneau devient une fenêtre centrée */
   .sheet {

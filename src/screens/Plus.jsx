@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -32,6 +32,7 @@ import AppearanceSection from './plus/AppearanceSection';
 import KkiapayButton from '../components/KkiapayButton';
 import InvertersSection from './plus/InvertersSection';
 import PompeKitsSection from './plus/PompeKitsSection';
+import RoiSection from './plus/RoiSection';
 import { SyncStatusRow } from '../components/SyncStatus';
 import DiagnosticCard from '../components/DiagnosticCard';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
@@ -68,7 +69,7 @@ export default function Plus() {
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup'];
+  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup', 'roi'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
@@ -752,6 +753,9 @@ export default function Plus() {
           <div className="plus-section-label">Clients</div>
           <div className="plus-card card">
             <MenuItem icon={Users} title="Clients" subtitle="Carnet d'adresses : ajouter et retrouver vos clients" onClick={() => navigate('/clients')} />
+            {/* Outil de vente, pas de gestion : ouvert à toute l'équipe, il se
+                montre au client pendant la visite. */}
+            <MenuItem icon={TrendingUp} title="Simulateur ROI" subtitle="Économies et retour sur investissement, à montrer au client" onClick={() => setActiveTab('roi')} />
           </div>
         </div>
 
@@ -786,6 +790,7 @@ export default function Plus() {
     subsadmin: 'Abonnements Devis Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
     paiements: 'Moyens de paiement',
     profile: 'Profil', backup: 'Sauvegarde des données',
+    roi: 'Simulateur ROI',
   };
 
   // Sous-titre d'en-tête, pour les écrans qui en portent un.
@@ -796,6 +801,7 @@ export default function Plus() {
     paiements: 'Qui encaisse les abonnements Devis Pro',
     backup: 'Exporter / restaurer toutes les données',
     subsadmin: 'Abonnés, paiements à valider et MRR',
+    roi: 'Calculez les économies et le retour sur investissement pour convaincre votre client',
   };
 
   return (
@@ -817,6 +823,7 @@ export default function Plus() {
         {activeTab === 'kits' && <KitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'inverters' && <InvertersSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'pompekits' && <PompeKitsSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'roi' && <RoiSection />}
         {activeTab === 'paiements' && <PaiementsSection />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'subsadmin' && <SubscriptionsAdmin />}

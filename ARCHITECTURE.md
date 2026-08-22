@@ -124,6 +124,7 @@ Bestaapp/
     │
     └── utils/                  ── LOGIQUE MÉTIER PURE (testable) ──
         ├── solarSizing.js      Dimensionnement + génération de devis solaire
+        ├── roi.js              Retour sur investissement (coût réel, projection 25 ans, CO₂)
         ├── referral.js         Affiliation (capture ?ref=, codes, last-click 30j)
         ├── subscription.js     Règles d'abonnement Devis Pro
         ├── stats.js            Agrégations mensuelles (dashboard)

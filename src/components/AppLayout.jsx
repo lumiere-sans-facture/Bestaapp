@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
 import SkeletonPageContent from './SkeletonPageContent';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -49,6 +49,9 @@ const plusSections = (user) => [
     { path: '/plus/inverters', label: 'Onduleurs', icon: Cpu },
     { path: '/plus/pompekits', label: 'Kits pompage', icon: Droplets },
   ] : []),
+  // Outil de vente, ouvert à toute l'équipe : c'est le technicien en visite
+  // qui le montre au client, pas le gérant depuis son bureau.
+  { path: '/plus/roi', label: 'Simulateur ROI', icon: TrendingUp },
   { path: '/plus/formation', label: 'Formation', icon: GraduationCap },
   { path: '/plus/mypartner', label: 'Mon espace partenaire', icon: Users },
 ];
