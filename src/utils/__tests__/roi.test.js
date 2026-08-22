@@ -3,6 +3,7 @@ import {
   consommationAppareils, consommationRetenue, consommationDepuisFacture, coutActuel, economieAnnee, projection, retourInvestissement,
   co2EviteAn, simulerRoi,
   JOURS_PAR_AN, MOIS_PAR_AN, DUREE_SYSTEME_ANS, DUREES_SYSTEME, KWH_PAR_LITRE_GAZOLE, MAINTENANCE_ANNUELLE,
+  PART_JOUR_FACTURE, PART_NUIT_FACTURE,
   HAUSSE_TARIF_DEFAUT, DEGRADATION_ANNUELLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../roi';
 import { appliances } from '../../data/appliances';
@@ -325,11 +326,22 @@ describe('consommationDepuisFacture — estimer depuis ce que le client paie', (
     expect(cout.reseau).toBe(60000 * MOIS_PAR_AN);
   });
 
-  it('répartit le jour et la nuit selon la part choisie', () => {
+  it('par défaut : 40 % en journée, 60 % la nuit', () => {
+    // La part nocturne dimensionne la batterie. Une facture ne dit pas QUAND
+    // le client consomme : supposer la nuit majoritaire donne un kit qui tient
+    // jusqu'au matin — au pire un peu large, jamais court.
+    expect(PART_JOUR_FACTURE).toBe(0.4);
+    expect(PART_NUIT_FACTURE).toBeCloseTo(0.6, 5);
+    const c = consommationDepuisFacture(60000, 114);
+    expect(c.jour).toBeCloseTo(c.total * 0.4, 1);
+    expect(c.nuit).toBeCloseTo(c.total * 0.6, 1);
+    expect(c.nuit).toBeGreaterThan(c.jour);
+    expect(c.jour + c.nuit).toBeCloseTo(c.total, 1);
+  });
+
+  it('la répartition reste forçable pour un cas particulier', () => {
     const c = consommationDepuisFacture(60000, 114, 0.7);
     expect(c.jour).toBeCloseTo(c.total * 0.7, 1);
-    expect(c.nuit).toBeCloseTo(c.total * 0.3, 1);
-    expect(c.jour + c.nuit).toBeCloseTo(c.total, 1);
   });
 
   it('rend aussi le volume mensuel, pour l’afficher au client', () => {

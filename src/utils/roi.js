@@ -86,6 +86,22 @@ export const consommationAppareils = (appareils = []) => {
 };
 
 /**
+ * Répartition retenue quand la consommation vient de la FACTURE : 40 % en
+ * journée, 60 % la nuit.
+ *
+ * Ce n'est pas une moyenne, c'est une marge de sécurité. Une facture ne dit
+ * pas QUAND le client consomme, et c'est la part nocturne qui dimensionne le
+ * parc batterie : la sous-estimer donne une installation qui s'éteint avant le
+ * matin. En supposant toujours la nuit majoritaire, le kit sorti du simulateur
+ * tient — au pire il est un peu large, jamais court.
+ *
+ * (Le mode « appareils », lui, connaît les heures réelles de chaque appareil :
+ * il garde sa répartition mesurée, plus précise que toute hypothèse.)
+ */
+export const PART_JOUR_FACTURE = 0.4;
+export const PART_NUIT_FACTURE = 1 - PART_JOUR_FACTURE;
+
+/**
  * ÉTAPE 1 bis — La facture du client en kWh par jour, quand il ne sait pas
  * dire ce qu'il fait tourner mais sait très bien ce qu'il paie.
  *
@@ -99,7 +115,7 @@ export const consommationAppareils = (appareils = []) => {
  * @param {number} prixKwh         prix du kWh
  * @param {number} partJour        part consommée en journée (0 à 1)
  */
-export const consommationDepuisFacture = (montantMensuel, prixKwh, partJour = 0.5) => {
+export const consommationDepuisFacture = (montantMensuel, prixKwh, partJour = PART_JOUR_FACTURE) => {
   const montant = nombre(montantMensuel);
   const prix = nombre(prixKwh);
   if (montant <= 0 || prix <= 0) return { kwhMois: 0, jour: 0, nuit: 0, total: 0, pic: 0 };

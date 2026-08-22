@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { Lightbulb, Banknote, Package, Sun, CalendarCheck, Sprout, Plus as PlusIcon, X } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatCFACourt } from '../../utils/format';
-import { PRIX_KWH_RESEAU, REPARTITIONS, DEFAULT_REPARTITION, partJourDe } from '../../utils/factureConso';
+import { TARIFS_UEMOA, PAYS_DEFAUT, tarifPays, operateurPays } from '../../data/tarifsUemoa';
 import { applianceCategories, appliances } from '../../data/appliances';
 import { calculateSystemSize, suggestKitForBattery, buildKitQuotation, DEFAULT_PEAK_SUN_HOURS, SYSTEM_TYPES } from '../../utils/solarSizing';
 import { dimensionnementRejouable, restaurerDimensionnement, resumeDimensionnement } from '../../utils/dimensionnement';
 import {
-  simulerRoi, consommationDepuisFacture, DUREE_SYSTEME_ANS, DUREES_SYSTEME, MAINTENANCE_ANNUELLE, HAUSSE_TARIF_DEFAUT,
+  simulerRoi, consommationDepuisFacture, PART_JOUR_FACTURE, PART_NUIT_FACTURE,
+  DUREE_SYSTEME_ANS, DUREES_SYSTEME, MAINTENANCE_ANNUELLE, HAUSSE_TARIF_DEFAUT,
   DEGRADATION_ANNUELLE, KWH_PAR_LITRE_GAZOLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../../utils/roi';
 
@@ -103,14 +104,22 @@ export default function RoiSection() {
   const [mode, setMode] = useState('appareils');
   const [rows, setRows] = useState(DEPART);
   const [facture, setFacture] = useState(FACTURE_MENSUELLE);
-  const [repartition, setRepartition] = useState(DEFAULT_REPARTITION);
+  const [pays, setPays] = useState(PAYS_DEFAUT);
   const [duree, setDuree] = useState(DUREE_SYSTEME_ANS);
   const [coupures, setCoupures] = useState(COUPURES_PAR_JOUR);
   const [groupeActif, setGroupeActif] = useState(true);
-  const [tarif, setTarif] = useState(PRIX_KWH_RESEAU);
+  const [tarif, setTarif] = useState(tarifPays(PAYS_DEFAUT).prixKwh);
   const [carburant, setCarburant] = useState(PRIX_CARBURANT);
   // Prix retenu pour l'installation : celui du kit, sauf si un devis est repris.
   const [prixDevis, setPrixDevis] = useState(null);
+
+  // Changer de pays recale le prix du kWh sur celui de son opérateur ; le
+  // curseur reste libre ensuite (les tranches varient d'un abonné à l'autre).
+  const choisirPays = (id) => {
+    setPays(id);
+    const t = tarifPays(id);
+    if (t) setTarif(t.prixKwh);
+  };
 
   const ajouter = (id) => {
     const modele = appliances.find((a) => a.id === id);
@@ -144,8 +153,8 @@ export default function RoiSection() {
   // `utils/factureConso.js` — le même module que l'assistant de devis, donc
   // les deux écrans annoncent le même chiffre pour la même facture.
   const consoFacture = useMemo(
-    () => consommationDepuisFacture(facture, tarif, partJourDe(repartition)),
-    [facture, tarif, repartition]
+    () => consommationDepuisFacture(facture, tarif),
+    [facture, tarif]
   );
   // Mémorisée : recréer l'objet à chaque rendu relancerait le calcul du kit et
   // la simulation entière sans qu'aucune saisie ait bougé.
@@ -206,15 +215,12 @@ export default function RoiSection() {
             <>
               <p className="roi-aide">La facture divisée par le prix du kWh donne la consommation — le même calcul que l’assistant de devis.</p>
               <Curseur label="Facture d’électricité" value={facture} onChange={setFacture} min={0} max={2000000} step={5000} suffixe="F/mois" />
-              <div className="input-group">
-                <label className="input-label" htmlFor="roi-repartition">Quand consomme-t-il le plus ?</label>
-                <select id="roi-repartition" className="input" value={repartition} onChange={(e) => setRepartition(e.target.value)}>
-                  {REPARTITIONS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-                </select>
-              </div>
               <p className="roi-note">
                 {formatCFA(facture)} par mois à {formatCFA(tarif)} le kWh, soit
-                {' '}{dec(consoFacture.kwhMois, 0)} kWh par mois.
+                {' '}{dec(consoFacture.kwhMois, 0)} kWh par mois. Une facture ne dit pas QUAND
+                le client consomme : on retient {Math.round(PART_NUIT_FACTURE * 100)} % la nuit
+                et {Math.round(PART_JOUR_FACTURE * 100)} % en journée, la part nocturne étant
+                celle qui dimensionne la batterie.
               </p>
             </>
           ) : (
@@ -277,7 +283,21 @@ export default function RoiSection() {
         <div className="card">
           <div className="sheet-section-title"><Banknote size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Réseau et coupures</div>
           <Curseur label="Coupures de courant" value={coupures} onChange={setCoupures} min={0} max={24} step={0.5} suffixe="h/jour" />
-          <Curseur label="Prix du kWh (CEET)" value={tarif} onChange={setTarif} min={50} max={250} suffixe="F" />
+          <div className="input-group">
+            <label className="input-label" htmlFor="roi-pays">Pays du client</label>
+            <select id="roi-pays" className="input" value={pays} onChange={(e) => choisirPays(e.target.value)}>
+              {TARIFS_UEMOA.map((t) => (
+                <option key={t.id} value={t.id}>{t.pays} — {t.operateur}</option>
+              ))}
+            </select>
+          </div>
+          <Curseur label={`Prix du kWh (${operateurPays(pays)})`} value={tarif} onChange={setTarif} min={50} max={250} suffixe="F" />
+          {tarifPays(pays) && tarif !== tarifPays(pays).prixKwh && (
+            <p className="roi-note">
+              Tarif ajusté à la main — le tarif indicatif {operateurPays(pays)} est de {formatCFA(tarifPays(pays).prixKwh)}.{' '}
+              <button type="button" className="roi-lien" onClick={() => choisirPays(pays)}>Le rétablir</button>
+            </p>
+          )}
           <label className="checkbox-row roi-bascule">
             <input type="checkbox" checked={groupeActif} onChange={(e) => setGroupeActif(e.target.checked)} />
             <span>Le client a un groupe électrogène</span>
@@ -374,7 +394,7 @@ export default function RoiSection() {
             </div>
           </div>
 
-          <Ligne label="Réseau CEET" detail={`${sim.cout.kwhReseauAn.toLocaleString('fr-FR')} kWh/an`} montant={sim.cout.reseau} />
+          <Ligne label={`Réseau ${operateurPays(pays)}`} detail={`${sim.cout.kwhReseauAn.toLocaleString('fr-FR')} kWh/an`} montant={sim.cout.reseau} />
           {groupeActif && (
             <Ligne label="Groupe électrogène"
                    detail={`${sim.cout.kwhGroupeAn.toLocaleString('fr-FR')} kWh/an, soit ${sim.cout.litresAn.toLocaleString('fr-FR')} L de gazole`}
@@ -401,6 +421,8 @@ export default function RoiSection() {
             <li>Le kit étant dimensionné pour ces appareils, il les alimente : l’économie, c’est tout ce qui est payé aujourd’hui pour les faire tourner.</li>
             <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(MAINTENANCE_ANNUELLE)}/an) suit la même hausse.</li>
             <li>Les panneaux perdent {dec(DEGRADATION_ANNUELLE * 100)} % de rendement par an (garantie constructeur : {DUREE_SYSTEME_ANS} ans).</li>
+            <li>Estimation par facture : {Math.round(PART_NUIT_FACTURE * 100)} % de la consommation la nuit, {Math.round(PART_JOUR_FACTURE * 100)} % en journée — la part nocturne dimensionne la batterie, la sous-estimer donnerait un kit qui s’éteint avant le matin. Le mode « appareils », lui, garde les heures réelles de chacun.</li>
+            <li>Les prix du kWh proposés par pays sont des ordres de grandeur de la tranche domestique, pas des tarifs officiels : c’est la facture du client qui fait foi.</li>
             <li>La projection porte sur {duree} ans — au-delà, l’installation continue d’économiser, mais ce n’est plus compté ici.</li>
             <li>CO₂ : {dec(CO2_PAR_LITRE_GAZOLE, 2)} kg par litre de gazole, {dec(CO2_PAR_KWH_RESEAU, 2)} kg par kWh réseau — ordres de grandeur, pas une mesure.</li>
           </ul>
