@@ -532,20 +532,25 @@ quels droits y sont réellement posés — le code ne peut pas le dire.
 
 1. Dashboard Supabase → choisir le projet (recette **ou** production) →
    **SQL Editor** → *New query*.
-2. Coller tout le contenu de `supabase/verification-securite.sql` → **Run**.
+2. Coller le **BILAN** de `supabase/verification-securite.sql` — le bloc qui
+   va de `with anomalies as (` au `;` qui suit `order by 1, 2` → **Run**.
    Le fichier ne contient que des `select` : il ne modifie rien, il est
    rejouable autant de fois qu'on veut.
-3. Lire les quatre résultats (onglets *Results 1* à *4* sous l'éditeur) :
+3. Lire l'unique tableau de résultat :
 
-| Requête | Résultat attendu | Si ce n'est pas le cas |
-|---|---|---|
-| 1. Tables sans RLS | **aucune ligne** | la table nommée est lisible par n'importe quel visiteur → rejouer `multitenant.sql` |
-| 2. RLS sans policy | **aucune ligne** | la table nommée n'est plus lisible par personne (donnée perdue de vue côté app) |
-| 3. Policies « tout ouvert » | **aucune ligne** | ⚠️ le plus grave : `multitenant.sql` n'est pas passé ici, **chaque entreprise voit toutes les autres** → le rejouer immédiatement |
-| 4. Fonctions `security definer` | `search_path_fige` = **true** partout | rejouer `multitenant.sql` (il redéfinit les fonctions avec leur `search_path` figé) |
+| Ce qui s'affiche | Ce que ça veut dire |
+|---|---|
+| une ligne **« ✅ aucune anomalie »** | la base est fermée, rien à faire |
+| `1. table sans RLS` | la table nommée est lisible par n'importe quel visiteur → rejouer `multitenant.sql` |
+| `2. RLS sans policy` | la table nommée n'est plus lisible par personne (donnée perdue de vue côté app) |
+| `3. policy « tout ouvert »` | ⚠️ le plus grave : `multitenant.sql` n'est pas passé ici, **chaque entreprise voit toutes les autres** → le rejouer immédiatement |
+| `4. search_path non figé` | rejouer `multitenant.sql` (il redéfinit les fonctions avec leur `search_path` figé) |
 
-« Aucune ligne » se lit *Success. No rows returned* — c'est le bon résultat,
-pas une erreur.
+⚠️ **Ne pas coller le fichier entier d'un bloc** : le SQL Editor de Supabase
+n'affiche que le résultat de la **dernière** instruction d'un script. On ne
+verrait donc que le contrôle 4 — et on croirait les trois autres passés. Les
+quatre requêtes détaillées, sous le bilan, se lancent **une par une** :
+sélectionner la requête dans l'éditeur, puis *Run*.
 
 4. **Recommencer dans l'autre projet.** Recette et production sont deux bases
    distinctes : l'une peut être impeccable et l'autre grande ouverte.

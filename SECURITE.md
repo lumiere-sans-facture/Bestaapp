@@ -35,10 +35,12 @@ pose sa propre garde en première ligne (`auth_is_platform_admin()`,
 `auth_org_id()`) et fige son `search_path`.
 
 **À vérifier après chaque déploiement SQL** — dans les DEUX projets Supabase :
-exécuter `supabase/verification-securite.sql`. Il répond à la seule question
-que le code ne peut pas trancher : *le SQL a-t-il réellement été rejoué ici ?*
-Une base restée sur l'ancien schéma mono-équipe expose toutes les entreprises
-les unes aux autres, avec un code applicatif pourtant irréprochable.
+exécuter le bilan de `supabase/verification-securite.sql` (une requête, quatre
+contrôles, « ✅ aucune anomalie » quand tout va bien). Il répond à la seule
+question que le code ne peut pas trancher : *le SQL a-t-il réellement été
+rejoué ici ?* Une base restée sur l'ancien schéma mono-équipe expose toutes les
+entreprises les unes aux autres, avec un code applicatif pourtant irréprochable.
+Marche à suivre : `supabase/DEPLOIEMENT.md` § 11.5.
 
 ## 2. Secrets
 
