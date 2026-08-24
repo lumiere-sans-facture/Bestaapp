@@ -76,7 +76,7 @@ await page.waitForTimeout(500);
 // La page tient sur un écran tant que rien n'est déplié : c'est tout l'objet
 // des sections repliables.
 const sections = await page.locator('.accordion').count();
-ok(sections >= 6, `espace partenaire : ${sections} sections repliables`);
+ok(sections >= 7, `espace partenaire : ${sections} sections repliables`);
 ok(await page.locator('.accordion[open]').count() === 0,
    'espace partenaire : tout est replié à l’ouverture (page courte)');
 const hReplie = await page.evaluate(() => document.querySelector('.page-content').scrollHeight);
@@ -88,6 +88,8 @@ ok(entetes.some((t) => /Historique de mes commissions/.test(t) && /15 000 F à r
    'espace partenaire : l’en-tête annonce le montant à réclamer sans ouvrir');
 ok(entetes.some((t) => /Mes affaires gagnées/.test(t) && /500 000 F/.test(t)),
    'espace partenaire : l’en-tête des affaires gagnées annonce le total');
+ok(entetes.some((t) => /Mes devis convertis/.test(t) && /1/.test(t)),
+   'espace partenaire : le nombre de devis convertis est annoncé sans ouvrir');
 
 // On déplie tout pour vérifier le contenu.
 for (const h of await page.locator('.accordion-head').all()) await h.click();
@@ -111,6 +113,11 @@ const couleurs = Object.fromEntries(pastilles.map(([c, col]) => [/\bn2\b/.test(c
 ok(couleurs.n1 === 'rgb(146, 64, 14)', `espace partenaire : N1 en ORANGE [${couleurs.n1}]`);
 ok(couleurs.n2 === 'rgb(4, 120, 87)', `espace partenaire : N2 en VERT [${couleurs.n2}]`);
 ok(/BS-20260801-0001/.test(espace), 'espace partenaire : le devis d’origine est rappelé');
+const devisConvertis = page.locator('.accordion:has-text("Mes devis convertis") .sheet-row');
+ok(await devisConvertis.count() === 1, 'espace partenaire : un devis converti est listé');
+const devisConverti = await devisConvertis.first().innerText();
+ok(/converti le 2 août 2026/.test(devisConverti) && /Commission N1\s*·\s*15 000 F\s*·\s*À payer/.test(devisConverti),
+   'espace partenaire : le devis converti affiche sa commission et son statut');
 ok(/payée le 3 août 2026/.test(espace), 'espace partenaire : la date de paiement est affichée');
 ok(await page.locator('#mpd-momo').inputValue() === '+229 97 11 22 33',
    'espace partenaire : le numéro Mobile Money se règle ici');
