@@ -3,6 +3,7 @@ import { users } from '../data/seed';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { setContexteErreur } from '../lib/rapportErreur';
 import { setContexteAnalytique } from '../lib/analytique';
+import { marquerGuideNouveauUtilisateur } from '../utils/onboarding';
 import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
 import { getActiveRef } from '../utils/referral';
 import { isSessionExpired, touchSession, clearSessionLifetime } from '../utils/sessionLifetime';
@@ -112,7 +113,9 @@ export function AuthProvider({ children }) {
         });
       }
       localStorage.removeItem(PENDING_KEY);
-      return (await fetchProfile(email)).profile;
+      const nouveauProfil = (await fetchProfile(email)).profile;
+      if (nouveauProfil?.id) marquerGuideNouveauUtilisateur(nouveauProfil.id);
+      return nouveauProfil;
     } catch {
       return null;
     }
@@ -286,6 +289,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(PENDING_KEY);
     localStorage.removeItem(OAUTH_CONTEXT_KEY);
     setPendingAuthUser(null);
+    marquerGuideNouveauUtilisateur(profile.id);
     await adoptProfile(profile);
     return { ok: true };
   };
