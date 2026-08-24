@@ -5,6 +5,9 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-23
+- Nouveaux utilisateurs : mini-guide d’accueil en trois étapes avec flèches vers le suivi clients, les devis et les formations ; responsive PC/mobile, il ne s’affiche qu’après la création réelle du profil et ne revient plus après « Passer » ou « Terminer »
+
 ## 2026-08-22
 - Simulateur ROI : le **prix du kWh se choisit par pays de l'UEMOA** (les huit, avec leur opérateur — SBEE, SONABEL, CIE, EAGB, EDM, NIGELEC, Senelec, CEET), **Bénin par défaut** ; le curseur reste ajustable et l'écart au tarif indicatif est signalé
 - Simulateur ROI : l'estimation par facture retient désormais **toujours 60 % la nuit et 40 % en journée** — une facture ne dit pas quand le client consomme, et c'est la part nocturne qui dimensionne la batterie. Le mode « appareils » garde, lui, les heures réelles de chaque appareil
