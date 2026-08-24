@@ -6,6 +6,13 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-08-22
+- **Sécurité** : audit complet et correctifs —
+  - plafond de requêtes sur les cinq points d'entrée API (10/min pour la vérification de paiement, 20 pour le journal d'erreurs ouvert, 60 pour le webhook, 30 et 20 pour les relais solaire et YouTube), avec `Retry-After` et en-têtes `X-RateLimit-*` ;
+  - plus aucun détail technique dans les réponses d'erreur : message générique au client, cause exacte (exception, message Postgres, réponse de l'agrégateur, noms de variables d'environnement) au journal serveur ;
+  - journal de sécurité horodaté et attribué (IP réelle, méthode, chemin) pour les plafonds atteints, les authentifications refusées et les erreurs 4xx/5xx ;
+  - `.gitignore` durci : `.env.local` — le nom que la documentation du projet demande de créer — n'était pas ignoré, pas plus que les clés, certificats et jetons de déploiement ;
+  - `supabase/verification-securite.sql` : quatre requêtes à passer après chaque déploiement SQL pour vérifier que la base est bien à jour (RLS, policies ouvertes de l'ancien schéma mono-équipe, fonctions `security definer`) ;
+  - `SECURITE.md` : posture complète, y compris les limites assumées.
 - Simulateur ROI : le **prix du kWh se choisit par pays de l'UEMOA** (les huit, avec leur opérateur — SBEE, SONABEL, CIE, EAGB, EDM, NIGELEC, Senelec, CEET), **Bénin par défaut** ; le curseur reste ajustable et l'écart au tarif indicatif est signalé
 - Simulateur ROI : l'estimation par facture retient désormais **toujours 60 % la nuit et 40 % en journée** — une facture ne dit pas quand le client consomme, et c'est la part nocturne qui dimensionne la batterie. Le mode « appareils » garde, lui, les heures réelles de chaque appareil
 - Simulateur ROI : la consommation s'estime au choix **d'après les appareils** ou **d'après la facture** du client (avec la répartition jour / nuit), et la **durée de vie retenue** se règle — 10, 15 ou 25 ans. L'estimation par facture annualise sur douze factures réelles : sans coupure, la ligne « Réseau CEET » vaut exactement douze fois ce que le client paie — c'est le seul chiffre qu'il a sous les yeux

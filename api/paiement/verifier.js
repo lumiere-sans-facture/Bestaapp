@@ -18,9 +18,13 @@ import {
   profilDuJeton, supabaseConfigure, modeSandbox,
 } from '../_lib/encaissement.js';
 import { transactionIdValide, verdictTransaction } from '../../src/utils/verificationPaiement.js';
+import { limiter, erreurServeur, refusAuth, journaliser, PLAFONDS } from '../_lib/garde.js';
 
 
 export default async function handler(req, res) {
+  // C'est ici que s'active un abonnement : le point le plus sensible de l'API.
+  if (limiter(req, res, PLAFONDS.paiementVerifier, 'paiement-verifier')) return;
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Méthode non autorisée' });
     return;
@@ -28,10 +32,12 @@ export default async function handler(req, res) {
   // Configuration incomplète : le dire franchement plutôt que de laisser
   // croire à un refus de paiement.
   if (!clesCompletes() || !supabaseConfigure()) {
-    res.status(503).json({
-      error: 'Vérification serveur non configurée',
-      detail: 'Déclarez KKIAPAY_PRIVATE_KEY, KKIAPAY_SECRET et SUPABASE_SERVICE_ROLE_KEY dans Vercel.',
+    // Les NOMS des variables manquantes n'ont rien à faire dans une réponse
+    // publique : ils décrivent la pile technique. Au journal, pour l'exploitant.
+    journaliser('config-incomplete', req, {
+      cles_kkiapay: clesCompletes(), supabase: supabaseConfigure(),
     });
+    res.status(503).json({ error: 'Vérification serveur non configurée' });
     return;
   }
 
@@ -50,7 +56,9 @@ export default async function handler(req, res) {
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   const profil = await profilDuJeton(token);
   if (!profil) {
-    res.status(401).json({ error: 'Session non reconnue — reconnectez-vous.' });
+    // Tentative d'activation sans session valide : à tracer, c'est le signal
+    // d'un appel forgé bien plus que d'un utilisateur distrait.
+    refusAuth(req, res, token ? 'jeton refuse' : 'jeton absent');
     return;
   }
 
@@ -74,7 +82,8 @@ export default async function handler(req, res) {
     // L'agrégateur n'a pas répondu : ce n'est PAS un refus. Le paiement peut
     // très bien avoir eu lieu ; la validation manuelle du gérant reste la
     // porte de sortie.
-    res.status(502).json({ error: 'Agrégateur injoignable', detail: e.message });
+    // `e.message` recopie la réponse brute de l'agrégateur : au journal.
+    erreurServeur(req, res, 502, 'Agrégateur injoignable', e, { transactionId });
     return;
   }
 
@@ -99,7 +108,9 @@ export default async function handler(req, res) {
     }
     res.status(200).json({ active: true, dateFin: resultat.dateFin, montant: verdict.montant });
   } catch (e) {
-    res.status(500).json({ error: 'Enregistrement du paiement impossible', detail: e.message });
+    erreurServeur(req, res, 500, 'Enregistrement du paiement impossible', e, {
+      profil: profil.id, transactionId,
+    });
   }
 }
 

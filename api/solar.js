@@ -4,6 +4,8 @@
 // angle réel) de façon fiable, là où l'appel direct depuis le navigateur peut
 // être bloqué par CORS.
 
+import { limiter, erreurServeur, PLAFONDS } from './_lib/garde.js';
+
 const round1 = (n) => Math.round(n * 10) / 10;
 
 // Dimensionnement sur le PIRE MOIS (saison des pluies), pas la moyenne
@@ -53,6 +55,8 @@ async function fetchNASA(lat, lon) {
 }
 
 export default async function handler(req, res) {
+  if (limiter(req, res, PLAFONDS.solar, 'solar')) return;
+
   const lat = parseFloat(req.query.lat);
   const lon = parseFloat(req.query.lon);
   if (Number.isNaN(lat) || Number.isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
@@ -64,7 +68,11 @@ export default async function handler(req, res) {
   const nasa = na.status === 'fulfilled' ? na.value : null;
 
   if (!pvgis && !nasa) {
-    return res.status(502).json({ error: 'Sources solaires indisponibles.' });
+    // Le motif exact de chaque source part au journal, pas au client.
+    return erreurServeur(req, res, 502, 'Sources solaires indisponibles.', [
+      pv.status === 'rejected' ? `pvgis: ${pv.reason?.message}` : null,
+      na.status === 'rejected' ? `nasa: ${na.reason?.message}` : null,
+    ].filter(Boolean).join(' · '));
   }
 
   // Valeurs réelles = NASA en priorité (irradiation horizontale, plus

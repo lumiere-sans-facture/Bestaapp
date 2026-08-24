@@ -13,6 +13,8 @@
 // Un échec ne renvoie jamais d'erreur 500 « nue » : l'app doit pouvoir
 // continuer en saisie manuelle.
 
+import { limiter, erreurServeur, PLAFONDS } from './_lib/garde.js';
+
 const LIGNE_CHAPITRE = /^[\s\-–—•*·]*\(?(\d{1,2}:\d{2}(?::\d{2})?)\)?\s*[)\].:–—-]*\s*(.+?)\s*$/;
 const LIGNE_INVERSE = /^\s*(.+?)\s*[[(–—:-]+\s*\(?(\d{1,2}:\d{2}(?::\d{2})?)\)?\s*[\])]?\s*$/;
 
@@ -105,6 +107,8 @@ async function viaPagePublique(videoId) {
 }
 
 export default async function handler(req, res) {
+  if (limiter(req, res, PLAFONDS.youtube, 'youtube')) return;
+
   const videoId = videoIdDe(req.query?.url || req.query?.v);
   if (!videoId) {
     res.status(400).json({ error: 'Lien YouTube non reconnu' });
@@ -127,6 +131,8 @@ export default async function handler(req, res) {
         return;
       } catch { /* les deux sources ont échoué */ }
     }
-    res.status(502).json({ error: e.message || 'Sommaire indisponible', videoId });
+    // `e.message` porte le statut de l'API YouTube et parfois sa réponse :
+    // au journal, jamais au client.
+    erreurServeur(req, res, 502, 'Sommaire indisponible', e, { videoId });
   }
 }
