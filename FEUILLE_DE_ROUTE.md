@@ -32,7 +32,7 @@ Priorités : **P0** = cœur du CDC, à faire en premier · **P1** = important ·
       commissions, **fige le montant de vente** (éditer le devis ensuite ne change plus la commission)
 - [x] Recherche d'un devis par numéro au moment de la vente — le bouton de conversion est dans le panneau
       du devis, atteint depuis le résultat de recherche
-- [ ] Le tableau de bord partenaire liste « devis convertis » avec la commission associée (§3.5.1)
+- [x] Le tableau de bord partenaire liste « devis convertis » avec la commission associée (§3.5.1)
 
 *Vérifié de bout en bout : `node e2e/devis-conversion.mjs` (devis créés par l'interface, temps avancé
 avec l'horloge simulée).*
