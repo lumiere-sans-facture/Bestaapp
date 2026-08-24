@@ -56,6 +56,11 @@ exception près** : une fois `multitenant.sql` passé, ne PAS rejouer
 l'isolation par organisation. Pour rétablir le temps réel sans toucher aux
 droits, utiliser `temps-reel.sql`.
 
+**Une fois les six scripts passés, exécuter `verification-securite.sql`** —
+lecture seule, quatre requêtes, deux minutes. C'est la seule preuve que la
+base est réellement fermée : le code peut être irréprochable et les données
+ouvertes si un script n'a pas été rejoué ici. Marche à suivre en **11.5**.
+
 ### Scripts d'entretien (à la demande, jamais au déploiement)
 
 | Script | Quand s'en servir |
@@ -516,6 +521,37 @@ Ouvrir l'app de cet environnement :
 | *Plus* affiche « Mode local — données sur cet appareil » | les variables Supabase manquent sur ce projet Vercel |
 | Voyant rouge de synchronisation | la base répond mais **il manque des tables** : scripts SQL non passés |
 | *Plus → Diagnostic* en vert, « Mot de passe oublié » reçu | l'environnement est complet |
+
+### 11.5 Vérifier que la base est bien FERMÉE
+
+Complet ne veut pas dire fermé : une base peut répondre à tout, voyant vert,
+et laisser chaque entreprise lire les données des autres. Seule la base sait
+quels droits y sont réellement posés — le code ne peut pas le dire.
+
+**À faire après chaque déploiement SQL, dans les DEUX projets Supabase.**
+
+1. Dashboard Supabase → choisir le projet (recette **ou** production) →
+   **SQL Editor** → *New query*.
+2. Coller tout le contenu de `supabase/verification-securite.sql` → **Run**.
+   Le fichier ne contient que des `select` : il ne modifie rien, il est
+   rejouable autant de fois qu'on veut.
+3. Lire les quatre résultats (onglets *Results 1* à *4* sous l'éditeur) :
+
+| Requête | Résultat attendu | Si ce n'est pas le cas |
+|---|---|---|
+| 1. Tables sans RLS | **aucune ligne** | la table nommée est lisible par n'importe quel visiteur → rejouer `multitenant.sql` |
+| 2. RLS sans policy | **aucune ligne** | la table nommée n'est plus lisible par personne (donnée perdue de vue côté app) |
+| 3. Policies « tout ouvert » | **aucune ligne** | ⚠️ le plus grave : `multitenant.sql` n'est pas passé ici, **chaque entreprise voit toutes les autres** → le rejouer immédiatement |
+| 4. Fonctions `security definer` | `search_path_fige` = **true** partout | rejouer `multitenant.sql` (il redéfinit les fonctions avec leur `search_path` figé) |
+
+« Aucune ligne » se lit *Success. No rows returned* — c'est le bon résultat,
+pas une erreur.
+
+4. **Recommencer dans l'autre projet.** Recette et production sont deux bases
+   distinctes : l'une peut être impeccable et l'autre grande ouverte.
+
+Le détail du modèle de sécurité et ses limites assumées sont dans
+`SECURITE.md`, à la racine du dépôt.
 
 ## Ce que fait l'app selon la configuration
 
