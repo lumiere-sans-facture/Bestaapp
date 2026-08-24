@@ -83,6 +83,13 @@ export default function MyPartnerDashboard({ onBack }) {
     .sort((a, b) => new Date(b.wonAt || 0) - new Date(a.wonAt || 0));
   const totalGagne = mesGagnees.reduce((s, l) => s + (l.estimatedValue || 0), 0);
   const mesDevis = (devis || []).filter((d) => d.partnerId === me.id);
+  // Un devis gagné est la trace de la vente qui a généré la commission.
+  // La commission garde le devisId afin que le partenaire puisse relier
+  // immédiatement son règlement à la vente correspondante.
+  const devisConvertis = mesDevis
+    .filter((d) => d.stage === 'gagne')
+    .sort((a, b) => new Date(b.wonAt || b.createdAt) - new Date(a.wonAt || a.createdAt));
+  const commissionsDuDevis = (devisId) => myComs.filter((c) => c.devisId === devisId);
   const myReferrals = (referrals || []).filter((r) => r.partnerCode === me.code);
   const clicks = myReferrals.filter((r) => r.type === 'clic').length;
   const conversions = myReferrals.filter((r) => r.type !== 'clic');
@@ -338,6 +345,34 @@ export default function MyPartnerDashboard({ onBack }) {
               </div>
             ))}
           </>
+        )}
+      </Accordion>
+
+      <Accordion icon={CheckCircle} title="Mes devis convertis" count={devisConvertis.length}>
+        {devisConvertis.length ? devisConvertis.map((d) => {
+          const commissionsLiees = commissionsDuDevis(d.id);
+          return (
+            <div key={d.id} className="sheet-row">
+              <span className="sheet-label">
+                {d.devisNumber} — {getLeadById(d.leadId)?.name || 'Client'}
+                <span className="text-secondary"> · converti le {formatDate(d.wonAt || d.createdAt)}</span>
+              </span>
+              <span className="sheet-value">
+                <span className="amount">{formatCFA(d.montantVente ?? d.total)}</span>
+                {commissionsLiees.length ? commissionsLiees.map((c) => (
+                  <span key={c.id} className="text-secondary">
+                    <br />Commission N{c.level} · {formatCFA(c.amount)} · {ETATS_COMMISSION[etatDe(c)]}
+                  </span>
+                )) : (
+                  <span className="text-secondary"><br />Commission en cours de génération</span>
+                )}
+              </span>
+            </div>
+          );
+        }) : (
+          <div className="text-sm text-secondary">
+            Aucun devis converti en vente pour le moment.
+          </div>
         )}
       </Accordion>
 
