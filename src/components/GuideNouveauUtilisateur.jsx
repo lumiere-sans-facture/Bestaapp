@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { doitAfficherGuide, terminerGuideUtilisateur } from '../utils/onboarding';
@@ -59,6 +59,9 @@ export default function GuideNouveauUtilisateur() {
   const [etape, setEtape] = useState(0);
   const [cadre, setCadre] = useState(null);
   const [carte, setCarte] = useState(null);
+  const dialogRef = useRef(null);
+  const focusPrecedent = useRef(null);
+  const guideOuvert = useRef(false);
 
   useEffect(() => {
     setEtape(0);
@@ -103,14 +106,59 @@ export default function GuideNouveauUtilisateur() {
     };
   }, [etape, ouvert]);
 
+  // Une boîte modale doit recevoir le focus, le conserver pendant le parcours
+  // et le rendre à son point de départ. Sans cela, Tab atteint la navigation
+  // masquée sous le voile et le lecteur d'écran quitte le guide sans le dire.
+  useEffect(() => {
+    if (!ouvert || !carte || guideOuvert.current) return;
+    guideOuvert.current = true;
+    focusPrecedent.current = document.activeElement;
+    dialogRef.current?.focus();
+  }, [ouvert, carte]);
+
+  useEffect(() => {
+    if (ouvert || !guideOuvert.current) return;
+    guideOuvert.current = false;
+    const precedent = focusPrecedent.current;
+    focusPrecedent.current = null;
+    if (precedent instanceof HTMLElement && document.contains(precedent)) precedent.focus();
+  }, [ouvert]);
+
   useEffect(() => {
     if (!ouvert) return undefined;
-    const echap = (event) => {
-      if (event.key === 'Escape') fermer();
+    const gestionClavier = (event) => {
+      if (event.key === 'Escape') {
+        fermer();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const elements = [...dialog.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )].filter((element) => !element.hasAttribute('hidden'));
+      const premier = elements[0];
+      const dernier = elements[elements.length - 1];
+      if (!premier || !dernier) {
+        event.preventDefault();
+        dialog.focus();
+      } else if (!dialog.contains(document.activeElement) || (!event.shiftKey && document.activeElement === dernier)) {
+        event.preventDefault();
+        premier.focus();
+      } else if (event.shiftKey && document.activeElement === premier) {
+        event.preventDefault();
+        dernier.focus();
+      }
     };
-    document.addEventListener('keydown', echap);
-    return () => document.removeEventListener('keydown', echap);
+    document.addEventListener('keydown', gestionClavier);
+    return () => document.removeEventListener('keydown', gestionClavier);
   }, [fermer, ouvert]);
+
+  useEffect(() => () => {
+    const precedent = focusPrecedent.current;
+    if (precedent instanceof HTMLElement && document.contains(precedent)) precedent.focus();
+  }, []);
 
   if (!ouvert || !user || !carte) return null;
 
@@ -127,8 +175,10 @@ export default function GuideNouveauUtilisateur() {
       <div className="guide-nouveau-bloqueur" aria-hidden="true" />
       {cadre && <div className="guide-nouveau-cible" style={cadre} aria-hidden="true" />}
       <section
+        ref={dialogRef}
         className="guide-nouveau-carte"
         style={styleCarte}
+        tabIndex={-1}
         data-placement={placement}
         role="dialog"
         aria-modal="true"
