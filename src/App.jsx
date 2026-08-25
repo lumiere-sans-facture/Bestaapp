@@ -11,6 +11,7 @@ import AppLayout from './components/AppLayout';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import LoadingShell from './components/LoadingShell';
 import Login from './screens/Login';
+import Landing from './screens/Landing';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
 import { installerAnalytique, suivrePage } from './lib/analytique';
 
@@ -90,7 +91,7 @@ function AppRoutes() {
   // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.
   if (recovery) return <Login />;
 
-  if (!user) return <Login />;
+  if (!user) return <PublicEntry />;
 
   return (
     <DataProvider>
@@ -105,6 +106,17 @@ function AppRoutes() {
   );
 }
 
+// Entrée publique : la landing explique la valeur du produit avant la connexion.
+// Une session déjà ouverte contourne cette arborescence et arrive dans l'app.
+function PublicEntry() {
+  return (
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/connexion" element={<Login />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 // Bascule exclusive : une seule arborescence de routes montée à la fois.
 // mode === 'pro'    → routes Pro dans AppLayout (zéro donnée publique visible)
 // mode === 'public' → routes publiques dans AppLayout
