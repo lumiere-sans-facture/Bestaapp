@@ -95,19 +95,31 @@ await page.waitForTimeout(400);
 const debord = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 ok(debord <= 1, `pas de défilement horizontal sur mobile (débordement ${debord}px)`);
 
-// Les schémas s'empilent en une colonne : la maquette les laissait défiler
-// de côté, et l'on ne voyait que le premier bloc sur un téléphone.
+// Le schéma garde sur mobile la géométrie du grand écran : source à gauche,
+// onduleur au centre, charge à droite, satellites au-dessus et en dessous.
+// La maquette le laissait défiler de côté — on ne voyait que le premier bloc.
 for (let i = 0; i < 4; i += 1) {
   await page.locator('#schemas button').nth(i).click();
   await page.waitForTimeout(300);
   const r = await page.evaluate((n) => {
     const g = document.querySelectorAll('.lp-schema')[n];
     const boite = g.parentElement;
-    const visibles = [...g.children].filter((c) => c.getBoundingClientRect().width > 0).length;
-    return { defile: boite.scrollWidth > boite.clientWidth + 1, blocs: g.children.length, visibles };
+    const cadre = (el) => { const b = el.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; };
+    const blocs = [...g.querySelectorAll('.lp-schema-bloc')];
+    const colonnes = new Set(blocs.map((b) => Math.round(cadre(b).x / 20)));
+    const lignes = new Set(blocs.map((b) => Math.round(cadre(b).y / 20)));
+    return {
+      defile: boite.scrollWidth > boite.clientWidth + 1,
+      horsCadre: [...g.querySelectorAll('*')].filter((e) => e.getBoundingClientRect().right > boite.getBoundingClientRect().right + 1).length,
+      colonnes: colonnes.size,
+      lignes: lignes.size,
+    };
   }, i);
-  ok(!r.defile && r.visibles === r.blocs,
-     `schéma ${i + 1} sur mobile : empilé, ${r.visibles}/${r.blocs} blocs visibles sans défilement latéral`);
+  // Trois colonnes de cartes au minimum : c'est ce qui distingue un schéma
+  // d'une liste. Le nombre de niveaux varie selon l'architecture — le site
+  // isolé n'a pas de source au-dessus.
+  ok(!r.defile && r.horsCadre === 0 && r.colonnes >= 3,
+     `schéma ${i + 1} sur mobile : ${r.colonnes} colonnes de cartes, rien hors cadre, aucun défilement latéral`);
 }
 
 // ---- 8. AUCUNE ERREUR JS ----

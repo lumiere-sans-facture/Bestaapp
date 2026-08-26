@@ -2827,30 +2827,50 @@ form .login-link { width: 100%; margin-top: 4px; }
    titre se cache derrière lui à chaque clic du menu. */
 .landing section[id] { scroll-margin-top: 84px; }
 
-/* Schémas de principe : cinq colonnes (source · liaison · onduleur · liaison ·
-   charge) qui demandent 700 px. Sous ~860 px la largeur manque, et la maquette
-   se contentait de laisser défiler le schéma horizontalement — sur un
-   téléphone, on ne voyait que les panneaux, le reste hors cadre sans que rien
-   ne l'indique. Le schéma s'empile donc en UNE colonne, dans l'ordre de
-   lecture, et les liaisons horizontales redressent leur trait à la verticale
-   pour que la flèche continue de montrer le sens du courant.
+/* Schémas de principe : la géométrie du grand écran, resserrée pour tenir
+   sur un téléphone. Le schéma DOIT rester un schéma — source à gauche,
+   onduleur au centre, charge à droite, satellites au-dessus et en dessous :
+   c'est la circulation du courant qu'il montre, et une liste empilée la perd.
 
-   Les `!important` sont ici indispensables : les positions de grille sont
-   portées par des attributs `style`, qui l'emportent sinon sur toute règle. */
+   Ce qui rétrécit : cartes, icônes, libellés, et les colonnes de liaison, qui
+   n'ont plus à tenir leur texte sur une seule ligne. Ce qui ne bouge pas :
+   les positions. Les tailles suivent la largeur d'écran par `clamp`, sans
+   palier visible entre le téléphone et le grand écran.
+
+   Les `!important` sont indispensables : ces valeurs sont portées par des
+   attributs `style`, qui l'emportent sinon sur toute règle. */
 @media (max-width: 860px) {
   .lp-schema {
     min-width: 0 !important;
-    grid-template-columns: 1fr !important;
-    gap: 4px 0 !important;
+    grid-template-columns: 1fr 0.42fr 1.06fr 0.42fr 1fr !important;
+    gap: 0 clamp(3px, 0.8vw, 10px) !important;
   }
-  /* Empilés, les blocs se centrent et gardent une largeur de carte : sur une
-     tablette, une carte étirée sur 600 px pour trois mots se lit mal. */
-  .lp-schema { justify-items: center; }
-  .lp-schema > * { grid-column: 1 !important; grid-row: auto !important; width: 100%; max-width: 420px; }
-  /* Le trait de liaison : couché en large, il se redresse en hauteur. */
-  .lp-schema-lien > span:last-child { width: auto !important; height: 26px; flex-direction: column; }
-  .lp-schema-lien > span:last-child > span { flex: 1 !important; width: 2px !important; height: auto !important; }
-  .lp-schema-lien > span:last-child > svg { transform: rotate(90deg); }
+
+  .lp-schema-bloc {
+    padding: clamp(9px, 1.6vw, 16px) clamp(5px, 1.3vw, 12px) !important;
+    gap: clamp(4px, 0.8vw, 8px) !important;
+    border-radius: 10px !important;
+  }
+  .lp-schema-bloc > span:first-child {
+    width: clamp(26px, 4.4vw, 40px) !important;
+    height: clamp(26px, 4.4vw, 40px) !important;
+    border-radius: 8px !important;
+  }
+  .lp-schema-bloc > span:first-child > svg { width: clamp(14px, 2.3vw, 20px); height: clamp(14px, 2.3vw, 20px); }
+  .lp-schema-bloc > span:nth-child(2) { font-size: clamp(0.625rem, 1.45vw, 0.875rem) !important; line-height: 1.2 !important; }
+  .lp-schema-bloc > span:nth-child(3) { font-size: clamp(0.5625rem, 1.25vw, 0.75rem) !important; line-height: 1.25 !important; }
+
+  /* Le libellé de liaison passe sur plusieurs lignes : tenu sur une seule, il
+     imposait à lui seul la largeur de sa colonne. */
+  .lp-schema-lien > span:first-child,
+  .lp-schema-lienv > span:last-child {
+    font-size: clamp(0.5rem, 1.15vw, 0.6875rem) !important;
+    white-space: normal !important;
+    text-align: center;
+    line-height: 1.25;
+  }
+  .lp-schema-lien { gap: 3px !important; }
+  .lp-schema-lienv { gap: 4px !important; padding: 4px 0 !important; }
 }
 
 /* Les quatre formules passent 4 → 2 → 1 colonne, jamais par 3 : un état à
