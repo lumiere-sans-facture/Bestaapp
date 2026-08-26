@@ -66,8 +66,11 @@ function GoogleIcon() {
  * inscription self-service (créer son entreprise ou rejoindre une équipe
  * avec un code d'invitation), mot de passe oublié et réinitialisation.
  * En mode local (sans backend), seul le formulaire de connexion est monté.
+ *
+ * `vueInitiale` permet d'ouvrir directement l'inscription : c'est la route
+ * /inscription, où mènent les appels à l'action de la page d'accueil publique.
  */
-export default function Login() {
+export default function Login({ vueInitiale = 'login' }) {
   const { login, signInWithGoogle, signUp, completeSignup, resetPassword, updatePassword, recovery, pendingAuthUser } = useAuth();
   // Lien de parrainage (?ref=BESTA-XXX) actif sur cet appareil : on ouvre
   // directement l'inscription, code partenaire prérempli.
@@ -79,7 +82,7 @@ export default function Login() {
   const [teamCode, setTeamCode] = useState(() => {
     try { return (new URLSearchParams(window.location.search).get('equipe') || '').trim().toUpperCase(); } catch { return ''; }
   });
-  const [view, setView] = useState(refCode || teamCode ? 'signup' : 'login'); // login | signup | forgot | complete
+  const [view, setView] = useState(refCode || teamCode ? 'signup' : vueInitiale); // login | signup | forgot | complete
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

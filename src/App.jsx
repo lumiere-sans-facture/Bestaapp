@@ -1,4 +1,4 @@
-import { lazy, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
@@ -16,7 +16,16 @@ import { installerAnalytique, suivrePage } from './lib/analytique';
 
 // Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
-captureRefFromUrl();
+const REF_DU_LIEN = captureRefFromUrl();
+
+// Venu par un lien de parrainage ou d'invitation d'équipe : ce visiteur-là
+// vient créer son compte, pas lire la vitrine — on lui ouvre le formulaire
+// directement, code prérempli, comme avant l'arrivée de la page d'accueil.
+// Le test porte sur CE chargement de page, jamais sur l'attribution stockée :
+// elle vaut 30 jours, et masquerait la vitrine pendant tout ce temps.
+const VENU_PAR_LIEN = Boolean(REF_DU_LIEN) || (() => {
+  try { return Boolean(new URLSearchParams(window.location.search).get('equipe')); } catch { return false; }
+})();
 
 // Erreurs hors React (minuteurs, gestionnaires d'événements) et promesses
 // rejetées sans `catch` : installées au chargement, avant tout rendu.
@@ -44,6 +53,11 @@ const ProDocuments = lazyWithPreload(() => import('./screens/pro/ProDocuments'))
 const ProClients = lazyWithPreload(() => import('./screens/pro/ProClients'));
 const ProCompany = lazyWithPreload(() => import('./screens/pro/ProCompany'));
 const ProSubscription = lazyWithPreload(() => import('./screens/pro/ProSubscription'));
+
+// Page publique d'accueil : vue par les visiteurs non connectés uniquement.
+// Chargée à la demande — elle n'a rien à faire dans le bundle d'un utilisateur
+// déjà connecté, qui ne la reverra plus.
+const Landing = lazy(() => import('./screens/Landing'));
 
 const ALL_SCREENS = [Dashboard, Pipeline, Clients, Boutique, Devis, Plus, ProDashboard, ProDocuments, ProClients, ProCompany, ProSubscription];
 
@@ -90,7 +104,20 @@ function AppRoutes() {
   // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.
   if (recovery) return <Login />;
 
-  if (!user) return <Login />;
+  // Visiteur non connecté : la vitrine à la racine, les formulaires à côté.
+  // Toute autre adresse (un signet vers /dashboard, par exemple) ouvre la
+  // connexion — comme avant l'arrivée de la page d'accueil.
+  if (!user) {
+    return (
+      <Suspense fallback={<LoadingShell />}>
+        <Routes>
+          <Route path="/" element={VENU_PAR_LIEN ? <Login vueInitiale="signup" /> : <Landing />} />
+          <Route path="/inscription" element={<Login vueInitiale="signup" />} />
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </Suspense>
+    );
+  }
 
   return (
     <DataProvider>

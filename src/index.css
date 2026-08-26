@@ -2793,6 +2793,49 @@ form .login-link { width: 100%; margin-top: 4px; }
 .lesson-action-input { margin-top: 8px; }
 @media (min-width: 900px) { .school-layout { grid-template-columns: 320px minmax(0, 1fr); } .school-side { top: 84px; } }
 
+/* ============ Page publique d'accueil (src/screens/landing/) ============
+   La maquette porte ses styles en ligne, un choix assumé : c'est une vitrine
+   figée, pas un écran de l'application, et chaque section reste lisible d'un
+   seul tenant. Ne vivent ici que les règles qu'un attribut `style` ne sait
+   pas exprimer : les survols et la grille des formules.
+
+   La page est CLAIRE en toutes circonstances, comme l'écran de connexion :
+   un visiteur qui découvre le produit voit la même chose que sur la plaquette,
+   quel que soit le thème réglé sur son appareil. */
+.landing { background: #ffffff; color: #0c0f14; min-height: 100vh; }
+
+/* Survols — repris tels quels de la maquette. */
+.lp-h1:hover { color: #0c3483; }
+.lp-h2:hover { background: #00297c; }
+.lp-h3:hover { background: #e09000; }
+.lp-h4:hover { border-color: #0c3483; color: #0c3483; }
+.lp-h5:hover { box-shadow: 0 2px 4px rgba(0,23,68,.07), 0 14px 34px rgba(0,23,68,.10); transform: translateY(-2px); }
+.lp-h6:hover { color: #ffa800; }
+.lp-h7:hover { background: #ffa800; color: #001744; }
+
+/* En-tête : le groupe d'ancres est un simple conteneur en ligne, il doit
+   suivre la même disposition que la barre qui le porte. */
+.lp-nav-liens { display: flex; align-items: center; gap: 22px; }
+
+/* Sous 900 px, les ancres de section cèdent la place : sept liens repliés
+   occupaient trois lignes d'en-tête sur un téléphone. Le logo et le bouton
+   « Commencer » suffisent — le contenu défile juste en dessous. */
+@media (max-width: 900px) { .lp-nav-liens { display: none; } }
+@media (max-width: 420px) { .lp-nav-slogan { display: none; } }
+
+/* Une section visée par une ancre s'arrête SOUS l'en-tête collant, sinon son
+   titre se cache derrière lui à chaque clic du menu. */
+.landing section[id] { scroll-margin-top: 84px; }
+
+/* Les quatre formules passent 4 → 2 → 1 colonne, jamais par 3 : un état à
+   trois pistes orphelinerait la quatrième carte. `auto-fit` traverse
+   forcément cet état, d'où des paliers explicites. Les seuils correspondent
+   aux largeurs d'écran où le conteneur (max 1200 px, moins la marge de page)
+   atteint 1040 px puis 520 px. */
+.lp-tarifs-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 1135px) { .lp-tarifs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 577px) { .lp-tarifs-grid { grid-template-columns: 1fr; } }
+
 /* ============ Paramètres : cadrage commun des onglets ============
    Profil, Apparence, Moyens de paiement, Sauvegarde, Administration se
    lisent dans le même cadre que l'écran qui y mène : mêmes libellés de
