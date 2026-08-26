@@ -22,6 +22,7 @@ node e2e/mes-kits.mjs
 node e2e/demande-paiement.mjs
 node e2e/formulaire-client.mjs
 node e2e/landing.mjs
+node e2e/abonnement-inscription.mjs
 ```
 
 Chaque scénario prépare son propre jeu de données (mode local, sans backend)
@@ -40,6 +41,7 @@ puis vérifie ce que l'utilisateur voit réellement à l'écran.
 | `formulaire-client.mjs` | Le formulaire « Nouveau client » (Clients et Suivi clients) adapte ses champs au type choisi : « Nom complet » seul pour un particulier (son contact reprend automatiquement son nom, aucune ligne redondante dans sa fiche) ; « Nom de l'entreprise » **et** « Personne de contact » distincts pour une entreprise. |
 | `espace-partenaire.mjs` | Le profil ne parle plus d'argent (ni tuiles de commissions, ni Mobile Money, ni affaires gagnées, ni le mot « commission ») ; l'espace partenaire porte tout : affaires gagnées, historique complet des commissions (niveau et taux, devis d'origine, date de paiement, à encaisser d'abord) et Mobile Money. Ses sections sont repliées à l'ouverture — la page tient sur un écran, chaque en-tête annonce son compte et son montant, et chacune s'ouvre au clic. |
 | `landing.mjs` | La page publique d'accueil : un visiteur non connecté arrive sur la vitrine et non sur le formulaire ; toutes ses sections sont présentes ; les onglets de schémas n'en montrent qu'un à la fois et le bon ; l'accordéon FAQ s'ouvre et se referme ; les appels à l'action mènent à `/inscription` ; le lien légal ouvre la page de confidentialité ; aucun débordement horizontal sur mobile. |
+| `abonnement-inscription.mjs` | Le client qui choisit une formule sur la page d'accueil arrive au paiement de CETTE formule : chaque carte de tarif porte son identifiant, l'adresse est nettoyée après capture, une formule inventée est ignorée ; le compte créé ouvre la fiche d'abonnement avec la bonne formule pré-sélectionnée, son tarif et sa durée ; changer de formule change le montant engagé ; sans choix, rien ne change ; un abonné actif n'est jamais renvoyé au paiement. |
 
 Les scénarios tournent en mode local (sans backend) : ils couvrent le circuit
 à l'intérieur d'une organisation. La remontée des demandes et commissions des

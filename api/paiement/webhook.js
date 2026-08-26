@@ -19,6 +19,7 @@ import {
   profilParId, supabaseConfigure, modeSandbox,
 } from '../_lib/encaissement.js';
 import { transactionIdValide, verdictTransaction } from '../../src/utils/verificationPaiement.js';
+import { formule, formuleValide, FORMULE_DEFAUT } from '../../src/utils/subscription.js';
 import { limiter, erreurServeur, PLAFONDS } from '../_lib/garde.js';
 
 
@@ -98,8 +99,19 @@ export default async function handler(req, res) {
       res.status(200).json({ traite: true, active: true, deja: !!resultat.deja });
       return;
     }
+    // Abonnement : la métadonnée dit QUELLE formule, jamais combien elle
+    // coûte — le tarif exigé sort du catalogue, comme sur le chemin
+    // principal. Une formule inconnue retombe sur la mensuelle : l'argent est
+    // arrivé, on crédite ce qu'il couvre plutôt que de perdre le paiement.
+    const formuleId = formuleValide(meta.formule) ? meta.formule : FORMULE_DEFAUT;
+    const attendu = formule(formuleId).prix;
+    if (verdict.montant < attendu) {
+      res.status(200).json({ traite: true, active: false, motif: 'Montant reçu inférieur au tarif de la formule.' });
+      return;
+    }
     const resultat = await crediterAbonnement({
       profil, transactionId, montant: verdict.montant, methode: 'kkiapay',
+      formule: formuleId,
     });
     res.status(200).json({ traite: true, active: true, deja: !!resultat.deja });
   } catch (e) {

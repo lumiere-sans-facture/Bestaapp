@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Crown, Check, X, TrendingUp, Users, Clock, Handshake } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate } from '../../utils/format';
-import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft } from '../../utils/subscription';
+import { effectiveStatus, daysLeft, prixMensuelEquivalent } from '../../utils/subscription';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import {
   adminSubscriptionsOverview,
@@ -44,7 +44,11 @@ export default function SubscriptionsAdmin() {
   const subs = serverMode ? remote?.subscriptions || [] : subscriptions || [];
   const payments = serverMode ? remote?.payments || [] : subscriptionPayments || [];
   const activeSubs = subs.filter((s) => effectiveStatus(s) === 'actif');
-  const mrr = activeSubs.length * SUBSCRIPTION_PRICE;
+  // Revenu mensuel récurrent : chaque abonnement compte pour ce qu'il rapporte
+  // PAR MOIS, pas pour le tarif mensuel. Un abonné annuel à 45 000 F pèse
+  // 3 750 F par mois ; les compter tous à 5 000 F gonflait le chiffre d'un
+  // tiers sur la formule la plus vendue.
+  const mrr = activeSubs.reduce((t, s) => t + prixMensuelEquivalent(s.formule), 0);
   const pendingPayments = payments.filter((p) => p.statut === 'initie');
   // Libellé d'une ligne : en mode serveur, le nom du membre / de l'entreprise
   // arrive avec la ligne ; en mode local, on résout l'id utilisateur.

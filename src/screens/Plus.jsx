@@ -10,7 +10,9 @@ import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchP
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
 import { estProprietaireEspace } from '../utils/roles';
 import { configActive, providerById, MODE_LABEL } from '../utils/paiementProviders';
-import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft } from '../utils/subscription';
+import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft, formule, FORMULE_DEFAUT } from '../utils/subscription';
+import { lireFormuleChoisie, oublierFormuleChoisie } from '../utils/formuleChoisie';
+import ChoixFormule from '../components/ChoixFormule';
 import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
@@ -106,7 +108,13 @@ export default function Plus() {
   const [syncMsg, setSyncMsg] = useState(null);
   const [newCommission, setNewCommission] = useState({ partnerId: '', leadId: '', level: 1, amount: '' });
   const [subSheetOpen, setSubSheetOpen] = useState(false);
-  const [subForm, setSubForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
+  // La formule retenue sur la page d'accueil est pré-sélectionnée : le client
+  // a déjà choisi, on ne le lui redemande pas — il peut encore en changer.
+  const [subForm, setSubForm] = useState(() => ({
+    methode: 'momo', phone: user.phone || '', reference: '',
+    formule: lireFormuleChoisie() || FORMULE_DEFAUT,
+  }));
+  const formuleChoisie = formule(subForm.formule);
   const [subSent, setSubSent] = useState(false);
   const [pendingRestore, setPendingRestore] = useState(null); // sauvegarde lue, en attente de confirmation
   // Demandes de paiement des partenaires : décision en cours (validation ou refus).
@@ -153,13 +161,15 @@ export default function Plus() {
       return;
     }
     if (verdict.active) {
-      suivre(EVENEMENTS.PAIEMENT_VERIFIE, { objet: 'abonnement', montant: SUBSCRIPTION_PRICE });
-      activerAbonnementVerifie(user.id, { reference, montant: SUBSCRIPTION_PRICE, dateFin: verdict.dateFin });
+      suivre(EVENEMENTS.PAIEMENT_VERIFIE, { objet: 'abonnement', montant: formuleChoisie.prix, formule: formuleChoisie.id });
+      activerAbonnementVerifie(user.id, { reference, montant: formuleChoisie.prix, dateFin: verdict.dateFin, formule: formuleChoisie.id });
+      oublierFormuleChoisie();
       setSubSent(true);
       toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — abonnement activé.');
       return;
     }
     requestSubscription(user.id, { ...subForm, methode: 'kkiapay', reference });
+    oublierFormuleChoisie();
     setSubSent(true);
     toast('Paiement enregistré — vérification par le gérant en attente.');
   };
@@ -192,6 +202,7 @@ export default function Plus() {
   const handleSubSubmit = (e) => {
     e.preventDefault();
     requestSubscription(user.id, subForm);
+    oublierFormuleChoisie();
     setSubSent(true);
   };
 
@@ -617,7 +628,7 @@ export default function Plus() {
     }
     if (subStatus === 'en_attente_paiement') return 'Paiement en attente de validation';
     if (subStatus === 'expire') return 'Expiré — à renouveler';
-    return `Gratuit · Devis Pro à ${formatCFA(SUBSCRIPTION_PRICE)}/mois`;
+    return `Gratuit · Devis Pro à partir de ${formatCFA(SUBSCRIPTION_PRICE)}/mois`;
   };
 
   // Écran « Paramètres » : tout ce qui se RÈGLE (compte, apparence,
@@ -679,7 +690,7 @@ export default function Plus() {
             <div className="pro-cta-subtitle">
               {proActive
                 ? 'Ouvrir mon espace entreprise : devis, factures, encaissements et clients.'
-                : `Devis & factures à votre identité, suivi des paiements — ${formatCFA(SUBSCRIPTION_PRICE)}/mois.`}
+                : `Devis & factures à votre identité, suivi des paiements — à partir de ${formatCFA(SUBSCRIPTION_PRICE)}/mois.`}
             </div>
           </div>
           <ChevronRight size={20} className="pro-cta-arrow" />
@@ -988,7 +999,7 @@ export default function Plus() {
       <Sheet open={subSheetOpen} onClose={closeSubSheet} title="Passer en mode Pro">
         <div className="pro-paywall-icon" style={{ textAlign: 'center', marginBottom: 8 }}><Crown size={28} /></div>
         <p className="pro-paywall-price" style={{ textAlign: 'center', marginBottom: 16 }}>
-          <strong>{formatCFA(SUBSCRIPTION_PRICE)}</strong> / mois
+          <strong>{formatCFA(formuleChoisie.prix)}</strong> / {formuleChoisie.periode}
         </p>
         <ul className="pro-benefits" style={{ marginBottom: 20 }}>
           <li><Check size={15} /> Devis personnalisés à <strong>votre entreprise</strong></li>
@@ -1009,6 +1020,9 @@ export default function Plus() {
           </div>
         ) : (
           <form onSubmit={handleSubSubmit}>
+            {/* Trois formules, une seule retenue. Le tarif affiché est celui
+                que le serveur exigera : même catalogue des deux côtés. */}
+            <ChoixFormule value={subForm.formule} onChange={(id) => setSubForm({ ...subForm, formule: id })} />
             <div className="form-row-2">
               <Field label="Opérateur">
                 <select className="input" value={subForm.methode} onChange={(e) => setSubForm({ ...subForm, methode: e.target.value })}>
@@ -1020,7 +1034,7 @@ export default function Plus() {
                 <input className="input" type="tel" required value={subForm.phone} onChange={(e) => setSubForm({ ...subForm, phone: e.target.value })} placeholder="+228 ..." />
               </Field>
             </div>
-            <p className="text-sm">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} par Mobile Money à ce numéro, puis validez :</p>
+            <p className="text-sm">Envoyez {formatCFA(formuleChoisie.prix)} par Mobile Money à ce numéro, puis validez :</p>
             <div className="copy-block">
               <span className="copy-block-value">{PAY_NUMBER}</span>
               <button type="button" className="btn btn-sm btn-outline" onClick={copyPayNumber}>Copier</button>
@@ -1032,13 +1046,15 @@ export default function Plus() {
                 Pro lui étant fermé tant qu'il n'a pas d'abonnement actif. */}
             <KkiapayButton
               phone={subForm.phone}
-              label="Payer avec KKiaPay (test)"
+              amount={formuleChoisie.prix}
+              objet={{ type: 'abonnement', formule: formuleChoisie.id }}
+              label={`Payer ${formatCFA(formuleChoisie.prix)} avec KKiaPay (test)`}
               disabled={!subForm.phone}
               onNumero={(numero) => setSubForm({ ...subForm, phone: numero })}
               onPaid={(reference, verdict) => paiementKkiapay(reference, verdict)}
             />
             <button type="submit" className="btn btn-accent btn-block btn-lg">
-              <Crown size={18} /> S'abonner — {formatCFA(SUBSCRIPTION_PRICE)}/mois
+              <Crown size={18} /> S'abonner — {formatCFA(formuleChoisie.prix)} / {formuleChoisie.periode}
             </button>
           </form>
         )}

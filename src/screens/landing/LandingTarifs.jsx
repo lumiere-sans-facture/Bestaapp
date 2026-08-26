@@ -1,7 +1,7 @@
 // Formules d'abonnement. Le compte gratuit n'expire pas ; l'abonnement ne
 // sert qu'à personnaliser les documents.
 import { Link } from 'react-router-dom';
-import { LIEN_INSCRIPTION } from './constantes';
+import { LIEN_INSCRIPTION, lienInscription } from './constantes';
 
 export default function LandingTarifs() {
   return (
@@ -54,7 +54,7 @@ export default function LandingTarifs() {
                 <li style={{ display: 'flex', gap: '10px', fontSize: '0.9375rem', color: '#0c0f14' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17845a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: '0', marginTop: '3px' }}><path d="M20 6 9 17l-5-5"></path></svg>Vos coordonnées d'entreprise</li>
                 <li style={{ display: 'flex', gap: '10px', fontSize: '0.9375rem', color: '#0c0f14' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17845a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: '0', marginTop: '3px' }}><path d="M20 6 9 17l-5-5"></path></svg>Export PDF à votre marque</li>
               </ul>
-              <Link className="lp-h4" to={LIEN_INSCRIPTION} style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '13px 20px', borderRadius: '8px', border: '1px solid #e3e7ef', color: '#0c0f14', fontWeight: '600', fontSize: '0.9375rem' }}>Personnaliser</Link>
+              <Link className="lp-h4" to={lienInscription('mensuel')} style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '13px 20px', borderRadius: '8px', border: '1px solid #e3e7ef', color: '#0c0f14', fontWeight: '600', fontSize: '0.9375rem' }}>Personnaliser</Link>
             </article>
 
             <article style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e3e7ef', padding: '28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -80,7 +80,7 @@ export default function LandingTarifs() {
                 <li style={{ display: 'flex', gap: '10px', fontSize: '0.9375rem', color: '#0c0f14' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17845a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: '0', marginTop: '3px' }}><path d="M20 6 9 17l-5-5"></path></svg>Support prioritaire sous 48 h</li>
                 <li style={{ display: 'flex', gap: '10px', fontSize: '0.9375rem', color: '#0c0f14' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17845a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: '0', marginTop: '3px' }}><path d="M20 6 9 17l-5-5"></path></svg>Sauvegarde automatique</li>
               </ul>
-              <Link className="lp-h2" to={LIEN_INSCRIPTION} style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '13px 20px', borderRadius: '8px', background: '#0c3483', color: '#ffffff', fontWeight: '600', fontSize: '0.9375rem' }}>Choisir Pro Confort</Link>
+              <Link className="lp-h2" to={lienInscription('trimestriel')} style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '13px 20px', borderRadius: '8px', background: '#0c3483', color: '#ffffff', fontWeight: '600', fontSize: '0.9375rem' }}>Choisir Pro Confort</Link>
             </article>
 
             <article style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #ffd37f', padding: '28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -106,7 +106,7 @@ export default function LandingTarifs() {
                 <li style={{ display: 'flex', gap: '10px', fontSize: '0.9375rem', color: '#0c0f14' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17845a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: '0', marginTop: '3px' }}><path d="M20 6 9 17l-5-5"></path></svg>Espace partenaire et commissions</li>
                 <li style={{ display: 'flex', gap: '10px', fontSize: '0.9375rem', color: '#0c0f14' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17845a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: '0', marginTop: '3px' }}><path d="M20 6 9 17l-5-5"></path></svg>Plusieurs utilisateurs : toute votre équipe</li>
               </ul>
-              <Link className="lp-h2" to={LIEN_INSCRIPTION} style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '13px 20px', borderRadius: '8px', background: '#0c3483', color: '#ffffff', fontWeight: '600', fontSize: '0.9375rem' }}>Choisir Pro Premium</Link>
+              <Link className="lp-h2" to={lienInscription('annuel')} style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '13px 20px', borderRadius: '8px', background: '#0c3483', color: '#ffffff', fontWeight: '600', fontSize: '0.9375rem' }}>Choisir Pro Premium</Link>
             </article>
           </div>
           <div style={{ margin: '22px 0 0', padding: '18px 22px', background: '#ffffff', border: '1px solid #ffd37f', borderRadius: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>

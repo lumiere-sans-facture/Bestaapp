@@ -6,7 +6,9 @@ import { useToast } from '../../../components/Toast';
 import Field from '../../../components/Field';
 import KkiapayButton from '../../../components/KkiapayButton';
 import { formatCFA, formatDate } from '../../../utils/format';
-import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft } from '../../../utils/subscription';
+import { effectiveStatus, daysLeft, formule, FORMULE_DEFAUT } from '../../../utils/subscription';
+import { lireFormuleChoisie, oublierFormuleChoisie } from '../../../utils/formuleChoisie';
+import ChoixFormule from '../../../components/ChoixFormule';
 import { PAY_NUMBER } from '../../../config/company';
 import { suivre, EVENEMENTS } from '../../../lib/analytique';
 
@@ -22,7 +24,13 @@ export default function SubscriptionTab({ sub }) {
   const { subscriptionPayments, requestSubscription, activerAbonnementVerifie } = useData();
   const toast = useToast();
   const [subSent, setSubSent] = useState(false);
-  const [form, setForm] = useState({ methode: 'momo', phone: user.phone || '', reference: '' });
+  // Formule pré-sélectionnée : celle choisie sur la page d'accueil, sinon
+  // celle de l'abonnement en cours — on renouvelle par défaut ce qu'on a pris.
+  const [form, setForm] = useState(() => ({
+    methode: 'momo', phone: user.phone || '', reference: '',
+    formule: lireFormuleChoisie() || sub?.formule || FORMULE_DEFAUT,
+  }));
+  const f = formule(form.formule);
   const status = effectiveStatus(sub);
   const myPayments = (subscriptionPayments || []).filter((p) => p.userId === user.id);
 
@@ -45,13 +53,15 @@ export default function SubscriptionTab({ sub }) {
       return;
     }
     if (verdict.active) {
-      suivre(EVENEMENTS.PAIEMENT_VERIFIE, { objet: 'abonnement', montant: SUBSCRIPTION_PRICE });
-      activerAbonnementVerifie(user.id, { reference, montant: SUBSCRIPTION_PRICE, dateFin: verdict.dateFin });
+      suivre(EVENEMENTS.PAIEMENT_VERIFIE, { objet: 'abonnement', montant: f.prix, formule: f.id });
+      activerAbonnementVerifie(user.id, { reference, montant: f.prix, dateFin: verdict.dateFin, formule: f.id });
+      oublierFormuleChoisie();
       setSubSent(true);
       toast(verdict.deja ? 'Ce paiement était déjà pris en compte.' : 'Paiement vérifié — abonnement activé.');
       return;
     }
-    requestSubscription(user.id, { methode: 'kkiapay', phone: form.phone, reference });
+    requestSubscription(user.id, { methode: 'kkiapay', phone: form.phone, reference, formule: f.id });
+    oublierFormuleChoisie();
     setSubSent(true);
     toast('Paiement enregistré — vérification par le gérant en attente.');
   };
@@ -59,6 +69,7 @@ export default function SubscriptionTab({ sub }) {
   const demander = (e) => {
     e.preventDefault();
     requestSubscription(user.id, form);
+    oublierFormuleChoisie();
     setSubSent(true);
     toast('Demande envoyée — activation dès validation du paiement.');
   };
@@ -67,13 +78,14 @@ export default function SubscriptionTab({ sub }) {
   if (!sub && !subSent) {
     return (
       <div className="card my-partner-section">
-        <div className="card-title"><Crown size={15} /> Activer Devis Pro — {formatCFA(SUBSCRIPTION_PRICE)}/mois</div>
+        <div className="card-title"><Crown size={15} /> Activer Devis Pro — {formatCFA(f.prix)} / {f.periode}</div>
         <ul className="pro-benefits">
           <li><Check size={16} /> Devis et factures à l'identité de votre entreprise (logo, couleurs)</li>
           <li><Check size={16} /> Dimensionnement solaire guidé jusqu'au devis chiffré</li>
           <li><Check size={16} /> Carnet clients, suivi des encaissements et relances WhatsApp</li>
         </ul>
         <form onSubmit={demander}>
+          <ChoixFormule value={form.formule} onChange={(id) => setForm({ ...form, formule: id })} />
           <div className="form-row-2">
             <Field label="Opérateur">
               <select className="input" value={form.methode} onChange={(e) => setForm({ ...form, methode: e.target.value })}>
@@ -85,7 +97,7 @@ export default function SubscriptionTab({ sub }) {
               <input className="input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
             </Field>
           </div>
-          <p className="text-sm">Envoyez {formatCFA(SUBSCRIPTION_PRICE)} par Mobile Money à ce numéro, puis validez :</p>
+          <p className="text-sm">Envoyez {formatCFA(f.prix)} par Mobile Money à ce numéro, puis validez :</p>
           <div className="copy-block">
             <span className="copy-block-value">{PAY_NUMBER}</span>
             <button type="button" className="btn btn-sm btn-outline" onClick={copyPayNumber}>Copier</button>
@@ -95,7 +107,9 @@ export default function SubscriptionTab({ sub }) {
           </Field>
           <KkiapayButton
             phone={form.phone}
-            label="Payer avec KKiaPay (test)"
+            amount={f.prix}
+            objet={{ type: 'abonnement', formule: f.id }}
+            label={`Payer ${formatCFA(f.prix)} avec KKiaPay (test)`}
             disabled={!form.phone}
             onNumero={(numero) => setForm({ ...form, phone: numero })}
             onPaid={paiementKkiapay}
@@ -136,21 +150,24 @@ export default function SubscriptionTab({ sub }) {
       {sub.dateFin && (
         <div className="sheet-row"><span className="sheet-label">Expire le</span><span className="sheet-value">{formatDate(sub.dateFin)} ({daysLeft(sub)} jour(s) restants)</span></div>
       )}
-      <div className="sheet-row"><span className="sheet-label">Montant</span><span className="sheet-value">{formatCFA(sub.montant)} / mois</span></div>
-      <p className="text-sm" style={{ margin: '10px 0 4px' }}>Pour renouveler : envoyez {formatCFA(SUBSCRIPTION_PRICE)} au numéro ci-dessous, puis validez.</p>
+      <div className="sheet-row"><span className="sheet-label">Formule</span><span className="sheet-value">{formule(sub.formule).libelle} — {formatCFA(sub.montant)} / {formule(sub.formule).periode}</span></div>
+      <ChoixFormule value={form.formule} onChange={(id) => setForm({ ...form, formule: id })} />
+      <p className="text-sm" style={{ margin: '10px 0 4px' }}>Pour renouveler : envoyez {formatCFA(f.prix)} au numéro ci-dessous, puis validez.</p>
       <div className="copy-block">
         <span className="copy-block-value">{PAY_NUMBER}</span>
         <button type="button" className="btn btn-sm btn-outline" onClick={copyPayNumber}>Copier</button>
       </div>
       <KkiapayButton
         phone={form.phone}
-        label="Renouveler avec KKiaPay (test)"
+        amount={f.prix}
+        objet={{ type: 'abonnement', formule: f.id }}
+        label={`Renouveler ${formatCFA(f.prix)} avec KKiaPay (test)`}
         disabled={!form.phone}
         onNumero={(numero) => setForm({ ...form, phone: numero })}
         onPaid={paiementKkiapay}
       />
-      <button className="btn btn-accent btn-block" onClick={() => { requestSubscription(user.id, { methode: 'momo', phone: user.phone || '', reference: '' }); setSubSent(true); }}>
-        <Crown size={16} /> J'ai payé — demander le renouvellement (+30 jours)
+      <button className="btn btn-accent btn-block" onClick={() => { requestSubscription(user.id, { methode: 'momo', phone: user.phone || '', reference: '', formule: f.id }); setSubSent(true); }}>
+        <Crown size={16} /> J'ai payé — demander le renouvellement (+{f.jours} jours)
       </button>
       <Historique paiements={myPayments} />
     </div>

@@ -18,6 +18,7 @@ import {
   profilDuJeton, supabaseConfigure, modeSandbox,
 } from '../_lib/encaissement.js';
 import { transactionIdValide, verdictTransaction } from '../../src/utils/verificationPaiement.js';
+import { formule, formuleValide, FORMULE_DEFAUT } from '../../src/utils/subscription.js';
 import { limiter, erreurServeur, refusAuth, journaliser, PLAFONDS } from '../_lib/garde.js';
 
 
@@ -62,10 +63,17 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Montant ATTENDU : lu côté serveur (prix de l'abonnement, ou total de la
-  // commande en base). Jamais celui annoncé par le navigateur — sinon il
-  // suffirait de déclarer 100 F pour une commande de 500 000.
+  // Montant ATTENDU : lu côté serveur (tarif de la formule au catalogue, ou
+  // total de la commande en base). Jamais celui annoncé par le navigateur —
+  // sinon il suffirait de déclarer 100 F pour une commande de 500 000.
+  //
+  // Le navigateur choisit sa FORMULE, pas son prix : l'identifiant reçu est
+  // confronté au catalogue, et c'est le catalogue qui dit combien exiger et
+  // combien de jours créditer. Déclarer « annuel » en payant 5 000 F fait
+  // échouer la vérification ; payer 45 000 en déclarant « mensuel » ne
+  // crédite que trente jours — dans les deux sens, jamais plus que payé.
   let montantAttendu;
+  let formuleId = FORMULE_DEFAUT;
   if (objet.type === 'commande') {
     const r = await montantCommande(String(objet.commandeId || ''), profil);
     if (r.erreur) {
@@ -73,6 +81,14 @@ export default async function handler(req, res) {
       return;
     }
     montantAttendu = r.montant;
+  } else {
+    if (objet.formule && !formuleValide(objet.formule)) {
+      journaliser('formule-inconnue', req, { recue: String(objet.formule).slice(0, 40) });
+      res.status(400).json({ error: 'Formule d’abonnement inconnue' });
+      return;
+    }
+    formuleId = objet.formule || FORMULE_DEFAUT;
+    montantAttendu = formule(formuleId).prix;
   }
 
   let reponse;
@@ -101,6 +117,7 @@ export default async function handler(req, res) {
         })
       : await crediterAbonnement({
           profil, transactionId, montant: verdict.montant, methode: 'kkiapay',
+          formule: formuleId,
         });
     if (resultat.deja) {
       res.status(200).json({ active: true, deja: true, message: 'Ce paiement a déjà été pris en compte.' });

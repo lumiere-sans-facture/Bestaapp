@@ -7,6 +7,7 @@ import { ModeProvider, useMode } from './context/ModeContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
+import { capturerFormuleUrl, lireFormuleChoisie } from './utils/formuleChoisie';
 import AppLayout from './components/AppLayout';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import LoadingShell from './components/LoadingShell';
@@ -17,6 +18,11 @@ import { installerAnalytique, suivrePage } from './lib/analytique';
 // Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
 const REF_DU_LIEN = captureRefFromUrl();
+
+// Formule choisie sur la page d'accueil (« Choisir Pro Premium »), captée
+// avant tout rendu : elle doit survivre à la création du compte, qui
+// recharge l'application.
+capturerFormuleUrl();
 
 // Venu par un lien de parrainage ou d'invitation d'équipe : ce visiteur-là
 // vient créer son compte, pas lire la vitrine — on lui ouvre le formulaire
@@ -136,9 +142,30 @@ function AppRoutes() {
 // Bascule exclusive : une seule arborescence de routes montée à la fois.
 // mode === 'pro'    → routes Pro dans AppLayout (zéro donnée publique visible)
 // mode === 'public' → routes publiques dans AppLayout
+/**
+ * Le client venu d'une formule de la page d'accueil arrive au paiement, pas
+ * au tableau de bord : cliquer « Choisir Pro Premium » puis atterrir sur un
+ * écran sans rapport, c'est perdre la vente entre les deux.
+ *
+ * Une seule fois par session, et seulement s'il reste quelque chose à payer :
+ * un abonné actif n'a rien à faire sur l'écran d'abonnement.
+ */
+function useOuvrirPaiementSiFormuleChoisie(proActive) {
+  const navigate = useNavigate();
+  const fait = useRef(false);
+  useEffect(() => {
+    if (fait.current) return;
+    fait.current = true;
+    if (proActive) return;
+    if (!lireFormuleChoisie()) return;
+    navigate('/plus/gopro', { replace: true });
+  }, [proActive, navigate]);
+}
+
 function ModeSwitch() {
-  const { mode } = useMode();
+  const { mode, proActive } = useMode();
   usePreloadScreens();
+  useOuvrirPaiementSiFormuleChoisie(proActive);
 
   if (mode === 'pro') {
     return (

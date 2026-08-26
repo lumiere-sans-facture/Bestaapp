@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, ChevronDown, Handshake } from 'lucide-react';
+import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, ChevronDown, Handshake, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef } from '../utils/referral';
+import { lireFormuleChoisie } from '../utils/formuleChoisie';
+import { formule } from '../utils/subscription';
+import { formatCFA } from '../utils/format';
 import { users } from '../data/seed';
 import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining } from '../utils/loginThrottle';
 import { AsYouType, getCountries, getCountryCallingCode, isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js/min';
@@ -82,6 +85,9 @@ export default function Login({ vueInitiale = 'login' }) {
   const [teamCode, setTeamCode] = useState(() => {
     try { return (new URLSearchParams(window.location.search).get('equipe') || '').trim().toUpperCase(); } catch { return ''; }
   });
+  // Formule retenue sur la page d'accueil : annoncée ici pour que la suite ne
+  // surprenne pas — le paiement arrive juste après la création du compte.
+  const [formuleChoisie] = useState(() => lireFormuleChoisie());
   const [view, setView] = useState(refCode || teamCode ? 'signup' : vueInitiale); // login | signup | forgot | complete
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -421,6 +427,13 @@ export default function Login({ vueInitiale = 'login' }) {
                 <div className="login-notice">
                   <UserPlus size={14} style={{ verticalAlign: -2, marginRight: 5 }} />
                   Vous rejoignez une équipe (invitation {teamCode}).
+                </div>
+              )}
+              {formuleChoisie && (
+                <div className="login-notice">
+                  <Crown size={14} style={{ verticalAlign: -2, marginRight: 5 }} />
+                  Formule <strong>{formule(formuleChoisie).libelle}</strong> — {formatCFA(formule(formuleChoisie).prix)} / {formule(formuleChoisie).periode}.
+                  Le paiement vous sera proposé juste après la création du compte.
                 </div>
               )}
               <div className="input-group">

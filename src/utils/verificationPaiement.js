@@ -13,7 +13,7 @@
 // afficher un message juste.
 // Extensions explicites : ce module est aussi chargé tel quel par Node dans
 // les fonctions serveur (api/paiement/*), où un import sans extension échoue.
-import { SUBSCRIPTION_DAYS, SUBSCRIPTION_PRICE } from './subscription.js';
+import { SUBSCRIPTION_PRICE, formule } from './subscription.js';
 import { DAY_MS } from './date.js';
 
 /** Seul statut KkiaPay qui vaut « argent reçu ». */
@@ -61,21 +61,30 @@ export const verdictTransaction = (reponse, { montantAttendu = SUBSCRIPTION_PRIC
 };
 
 /**
- * Abonnement après un paiement confirmé : +30 jours à partir d'aujourd'hui,
- * ou de l'échéance en cours si elle court encore — renouveler tôt ne doit
- * jamais faire perdre les jours déjà payés.
+ * Abonnement après un paiement confirmé : la durée de SA formule s'ajoute à
+ * aujourd'hui, ou à l'échéance en cours si elle court encore — renouveler tôt
+ * ne doit jamais faire perdre les jours déjà payés.
+ *
+ * La formule est lue sur l'abonnement lui-même, jamais sur la requête : c'est
+ * l'appelant serveur qui l'y a inscrite après l'avoir validée contre le
+ * catalogue. Un abonnement antérieur au catalogue n'en porte aucune et
+ * retombe sur la mensuelle — trente jours, comme avant.
  *
  * Utilisé par la validation manuelle du gérant ET par la confirmation
  * serveur : une seule règle, donc jamais deux échéances contradictoires.
  */
 export const abonnementApresPaiement = (sub, maintenant = Date.now()) => {
+  const f = formule(sub?.formule);
   const finActuelle = sub?.dateFin ? new Date(sub.dateFin).getTime() : 0;
   const base = finActuelle > maintenant ? finActuelle : maintenant;
   return {
     ...sub,
     status: 'actif',
+    formule: f.id,
+    montant: f.prix,
+    recurrence: f.id,
     dateDebut: sub?.dateDebut || new Date(maintenant).toISOString(),
-    dateFin: new Date(base + SUBSCRIPTION_DAYS * DAY_MS).toISOString(),
+    dateFin: new Date(base + f.jours * DAY_MS).toISOString(),
     lastPaymentAt: new Date(maintenant).toISOString(),
   };
 };
