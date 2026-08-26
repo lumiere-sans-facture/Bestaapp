@@ -67,7 +67,7 @@ export default function LandingConseiller() {
 
             <div style={stylePanneau(0)}>
               <div style={{ background: '#ffffff', border: '1px solid #e3e7ef', borderRadius: '12px', padding: 'clamp(18px, 2.5vw, 28px)', overflowX: 'auto' }}>
-                <div style={{ minWidth: '680px', display: 'grid', gridTemplateColumns: '1fr 0.75fr 1fr 0.75fr 1fr', alignItems: 'center', gap: '0 10px' }}>
+                <div className="lp-schema" style={{ minWidth: '680px', display: 'grid', gridTemplateColumns: '1fr 0.75fr 1fr 0.75fr 1fr', alignItems: 'center', gap: '0 10px' }}>
                   <div style={{ gridColumn: '3', gridRow: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', background: '#ffffff', border: '1px solid #e3e7ef', borderRadius: '12px', padding: '14px 12px', boxShadow: '0 1px 2px rgba(0,23,68,.05),0 6px 18px rgba(0,23,68,.05)', textAlign: 'center' }}>
                     <span style={{ width: '40px', height: '40px', flexShrink: '0', borderRadius: '10px', background: '#edf1fa', color: '#0c3483', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"></path><path d="m2 22 3-3"></path><path d="M7.5 13.5 10 11"></path><path d="M10.5 16.5 13 14"></path><path d="m18 3-4 4h6l-4 4"></path></svg></span>
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0c0f14', lineHeight: '1.25' }}>Réseau SBEE</span>
@@ -82,7 +82,7 @@ export default function LandingConseiller() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0c0f14', lineHeight: '1.25' }}>Panneaux PV</span>
                     <span style={{ fontSize: '0.75rem', color: '#697386', lineHeight: '1.3' }}>6 × 550 Wc · 3,3 kWc</span>
                   </div>
-                  <div style={{ gridColumn: '2', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <div className="lp-schema-lien" style={{ gridColumn: '2', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.6875rem', fontWeight: '600', color: '#0c3483', whiteSpace: 'nowrap' }}>CC → entrées MPPT</span>
                     <span style={{ display: 'flex', alignItems: 'center', width: '100%', color: '#0c3483' }}><span style={{ flex: '1', height: '2px', background: 'currentColor' }}></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '-3px' }}><path d="m9 18 6-6-6-6"></path></svg></span>
                   </div>
@@ -91,7 +91,7 @@ export default function LandingConseiller() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ffffff', lineHeight: '1.25' }}>Onduleur hybride (MPPT intégré)</span>
                     <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.72)', lineHeight: '1.3' }}>5 kVA · 48 V</span>
                   </div>
-                  <div style={{ gridColumn: '4', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <div className="lp-schema-lien" style={{ gridColumn: '4', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.6875rem', fontWeight: '600', color: '#b87400', whiteSpace: 'nowrap' }}>CA 230 V</span>
                     <span style={{ display: 'flex', alignItems: 'center', width: '100%', color: '#ffa800' }}><span style={{ flex: '1', height: '2px', background: 'currentColor' }}></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '-3px' }}><path d="m9 18 6-6-6-6"></path></svg></span>
                   </div>
@@ -120,7 +120,7 @@ export default function LandingConseiller() {
 
             <div style={stylePanneau(1)}>
               <div style={{ background: '#ffffff', border: '1px solid #e3e7ef', borderRadius: '12px', padding: 'clamp(18px, 2.5vw, 28px)', overflowX: 'auto' }}>
-                <div style={{ minWidth: '680px', display: 'grid', gridTemplateColumns: '1fr 0.75fr 1fr 0.75fr 1fr', alignItems: 'center', gap: '0 10px' }}>
+                <div className="lp-schema" style={{ minWidth: '680px', display: 'grid', gridTemplateColumns: '1fr 0.75fr 1fr 0.75fr 1fr', alignItems: 'center', gap: '0 10px' }}>
                   <div style={{ gridColumn: '3', gridRow: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', background: '#ffffff', border: '1px solid #e3e7ef', borderRadius: '12px', padding: '14px 12px', boxShadow: '0 1px 2px rgba(0,23,68,.05),0 6px 18px rgba(0,23,68,.05)', textAlign: 'center' }}>
                     <span style={{ width: '40px', height: '40px', flexShrink: '0', borderRadius: '10px', background: '#edf1fa', color: '#0c3483', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"></path><path d="m2 22 3-3"></path><path d="M7.5 13.5 10 11"></path><path d="M10.5 16.5 13 14"></path><path d="m18 3-4 4h6l-4 4"></path></svg></span>
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0c0f14', lineHeight: '1.25' }}>Réseau SBEE</span>
@@ -135,7 +135,7 @@ export default function LandingConseiller() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0c0f14', lineHeight: '1.25' }}>Panneaux PV</span>
                     <span style={{ fontSize: '0.75rem', color: '#697386', lineHeight: '1.3' }}>4 × 550 Wc · 2,2 kWc</span>
                   </div>
-                  <div style={{ gridColumn: '2', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <div className="lp-schema-lien" style={{ gridColumn: '2', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.6875rem', fontWeight: '600', color: '#0c3483', whiteSpace: 'nowrap' }}>CC → entrées MPPT</span>
                     <span style={{ display: 'flex', alignItems: 'center', width: '100%', color: '#0c3483' }}><span style={{ flex: '1', height: '2px', background: 'currentColor' }}></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '-3px' }}><path d="m9 18 6-6-6-6"></path></svg></span>
                   </div>
@@ -144,7 +144,7 @@ export default function LandingConseiller() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ffffff', lineHeight: '1.25' }}>Onduleur hybride (MPPT intégré)</span>
                     <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.72)', lineHeight: '1.3' }}>3 kVA · bascule automatique</span>
                   </div>
-                  <div style={{ gridColumn: '4', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <div className="lp-schema-lien" style={{ gridColumn: '4', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.6875rem', fontWeight: '600', color: '#b87400', whiteSpace: 'nowrap' }}>CA 230 V</span>
                     <span style={{ display: 'flex', alignItems: 'center', width: '100%', color: '#ffa800' }}><span style={{ flex: '1', height: '2px', background: 'currentColor' }}></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '-3px' }}><path d="m9 18 6-6-6-6"></path></svg></span>
                   </div>
@@ -173,7 +173,7 @@ export default function LandingConseiller() {
 
             <div style={stylePanneau(2)}>
               <div style={{ background: '#ffffff', border: '1px solid #e3e7ef', borderRadius: '12px', padding: 'clamp(18px, 2.5vw, 28px)', overflowX: 'auto' }}>
-                <div style={{ minWidth: '700px', display: 'grid', gridTemplateColumns: '1fr 0.8fr 1fr 0.8fr 1fr', alignItems: 'center', gap: '0 10px' }}>
+                <div className="lp-schema" style={{ minWidth: '700px', display: 'grid', gridTemplateColumns: '1fr 0.8fr 1fr 0.8fr 1fr', alignItems: 'center', gap: '0 10px' }}>
                   <div style={{ gridColumn: '1 / -1', gridRow: '1', display: 'flex', justifyContent: 'center', paddingBottom: '14px' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '999px', background: '#f2f5fa', border: '1px solid #e3e7ef', color: '#697386', fontSize: '0.75rem', fontWeight: '600' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"></path><path d="m4.93 4.93 14.14 14.14"></path><circle cx="12" cy="12" r="10"></circle></svg>Aucun raccordement au réseau</span>
                   </div>
@@ -182,7 +182,7 @@ export default function LandingConseiller() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0c0f14', lineHeight: '1.25' }}>Champ PV</span>
                     <span style={{ fontSize: '0.75rem', color: '#697386', lineHeight: '1.3' }}>8 × 550 Wc · 4,4 kWc</span>
                   </div>
-                  <div style={{ gridColumn: '2', gridRow: '2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <div className="lp-schema-lien" style={{ gridColumn: '2', gridRow: '2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.6875rem', fontWeight: '600', color: '#0c3483', whiteSpace: 'nowrap' }}>CC → entrées MPPT</span>
                     <span style={{ display: 'flex', alignItems: 'center', width: '100%', color: '#0c3483' }}><span style={{ flex: '1', height: '2px', background: 'currentColor' }}></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '-3px' }}><path d="m9 18 6-6-6-6"></path></svg></span>
                   </div>
@@ -191,7 +191,7 @@ export default function LandingConseiller() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ffffff', lineHeight: '1.25' }}>Onduleur hybride (MPPT intégré)</span>
                     <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.72)', lineHeight: '1.3' }}>5 kVA · 230 V · 48 V</span>
                   </div>
-                  <div style={{ gridColumn: '4', gridRow: '2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <div className="lp-schema-lien" style={{ gridColumn: '4', gridRow: '2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.6875rem', fontWeight: '600', color: '#b87400', whiteSpace: 'nowrap' }}>CA 230 V</span>
                     <span style={{ display: 'flex', alignItems: 'center', width: '100%', color: '#ffa800' }}><span style={{ flex: '1', height: '2px', background: 'currentColor' }}></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '-3px' }}><path d="m9 18 6-6-6-6"></path></svg></span>
                   </div>
@@ -222,7 +222,7 @@ export default function LandingConseiller() {
 
             <div style={stylePanneau(3)}>
               <div style={{ background: '#ffffff', border: '1px solid #e3e7ef', borderRadius: '12px', padding: 'clamp(18px, 2.5vw, 28px)', overflowX: 'auto' }}>
-                <div style={{ minWidth: '680px', display: 'grid', gridTemplateColumns: '1fr 0.75fr 1fr 0.75fr 1fr', alignItems: 'center', gap: '0 10px' }}>
+                <div className="lp-schema" style={{ minWidth: '680px', display: 'grid', gridTemplateColumns: '1fr 0.75fr 1fr 0.75fr 1fr', alignItems: 'center', gap: '0 10px' }}>
                   <div style={{ gridColumn: '5', gridRow: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', background: '#ffffff', border: '1px solid #ffd37f', borderRadius: '12px', padding: '14px 12px', boxShadow: '0 1px 2px rgba(0,23,68,.05),0 6px 18px rgba(0,23,68,.05)', textAlign: 'center' }}>
                     <span style={{ width: '40px', height: '40px', flexShrink: '0', borderRadius: '10px', background: '#fff6e5', color: '#b87400', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg></span>
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0c0f14', lineHeight: '1.25' }}>Château d'eau</span>
@@ -237,7 +237,7 @@ export default function LandingConseiller() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0c0f14', lineHeight: '1.25' }}>Panneaux PV</span>
                     <span style={{ fontSize: '0.75rem', color: '#697386', lineHeight: '1.3' }}>6 × 550 Wc · 3,3 kWc</span>
                   </div>
-                  <div style={{ gridColumn: '2', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <div className="lp-schema-lien" style={{ gridColumn: '2', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.6875rem', fontWeight: '600', color: '#0c3483', whiteSpace: 'nowrap' }}>CC → entrées MPPT</span>
                     <span style={{ display: 'flex', alignItems: 'center', width: '100%', color: '#0c3483' }}><span style={{ flex: '1', height: '2px', background: 'currentColor' }}></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '-3px' }}><path d="m9 18 6-6-6-6"></path></svg></span>
                   </div>
@@ -246,7 +246,7 @@ export default function LandingConseiller() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ffffff', lineHeight: '1.25' }}>Variateur de pompe</span>
                     <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.72)', lineHeight: '1.3' }}>3 kW · démarrage progressif</span>
                   </div>
-                  <div style={{ gridColumn: '4', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <div className="lp-schema-lien" style={{ gridColumn: '4', gridRow: '3', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.6875rem', fontWeight: '600', color: '#b87400', whiteSpace: 'nowrap' }}>CA variable</span>
                     <span style={{ display: 'flex', alignItems: 'center', width: '100%', color: '#ffa800' }}><span style={{ flex: '1', height: '2px', background: 'currentColor' }}></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '-3px' }}><path d="m9 18 6-6-6-6"></path></svg></span>
                   </div>

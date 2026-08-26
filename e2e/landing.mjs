@@ -95,6 +95,21 @@ await page.waitForTimeout(400);
 const debord = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 ok(debord <= 1, `pas de défilement horizontal sur mobile (débordement ${debord}px)`);
 
+// Les schémas s'empilent en une colonne : la maquette les laissait défiler
+// de côté, et l'on ne voyait que le premier bloc sur un téléphone.
+for (let i = 0; i < 4; i += 1) {
+  await page.locator('#schemas button').nth(i).click();
+  await page.waitForTimeout(300);
+  const r = await page.evaluate((n) => {
+    const g = document.querySelectorAll('.lp-schema')[n];
+    const boite = g.parentElement;
+    const visibles = [...g.children].filter((c) => c.getBoundingClientRect().width > 0).length;
+    return { defile: boite.scrollWidth > boite.clientWidth + 1, blocs: g.children.length, visibles };
+  }, i);
+  ok(!r.defile && r.visibles === r.blocs,
+     `schéma ${i + 1} sur mobile : empilé, ${r.visibles}/${r.blocs} blocs visibles sans défilement latéral`);
+}
+
 // ---- 8. AUCUNE ERREUR JS ----
 ok(jsErr.length === 0, `aucune erreur JS${jsErr.length ? ' — ' + jsErr.slice(0, 3).join(' | ') : ''}`);
 

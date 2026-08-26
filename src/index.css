@@ -2827,6 +2827,32 @@ form .login-link { width: 100%; margin-top: 4px; }
    titre se cache derrière lui à chaque clic du menu. */
 .landing section[id] { scroll-margin-top: 84px; }
 
+/* Schémas de principe : cinq colonnes (source · liaison · onduleur · liaison ·
+   charge) qui demandent 700 px. Sous ~860 px la largeur manque, et la maquette
+   se contentait de laisser défiler le schéma horizontalement — sur un
+   téléphone, on ne voyait que les panneaux, le reste hors cadre sans que rien
+   ne l'indique. Le schéma s'empile donc en UNE colonne, dans l'ordre de
+   lecture, et les liaisons horizontales redressent leur trait à la verticale
+   pour que la flèche continue de montrer le sens du courant.
+
+   Les `!important` sont ici indispensables : les positions de grille sont
+   portées par des attributs `style`, qui l'emportent sinon sur toute règle. */
+@media (max-width: 860px) {
+  .lp-schema {
+    min-width: 0 !important;
+    grid-template-columns: 1fr !important;
+    gap: 4px 0 !important;
+  }
+  /* Empilés, les blocs se centrent et gardent une largeur de carte : sur une
+     tablette, une carte étirée sur 600 px pour trois mots se lit mal. */
+  .lp-schema { justify-items: center; }
+  .lp-schema > * { grid-column: 1 !important; grid-row: auto !important; width: 100%; max-width: 420px; }
+  /* Le trait de liaison : couché en large, il se redresse en hauteur. */
+  .lp-schema-lien > span:last-child { width: auto !important; height: 26px; flex-direction: column; }
+  .lp-schema-lien > span:last-child > span { flex: 1 !important; width: 2px !important; height: auto !important; }
+  .lp-schema-lien > span:last-child > svg { transform: rotate(90deg); }
+}
+
 /* Les quatre formules passent 4 → 2 → 1 colonne, jamais par 3 : un état à
    trois pistes orphelinerait la quatrième carte. `auto-fit` traverse
    forcément cet état, d'où des paliers explicites. Les seuils correspondent
