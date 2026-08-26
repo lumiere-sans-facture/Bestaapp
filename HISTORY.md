@@ -5,6 +5,9 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-24
+- Nouveaux utilisateurs : mini-guide d’accueil en trois étapes avec flèches vers le suivi clients, les devis et les formations ; responsive PC/mobile, il ne s’affiche qu’après la création réelle du profil et ne revient plus après « Passer » ou « Terminer »
+
 ## 2026-08-22
 - **Sécurité** : audit complet et correctifs —
   - plafond de requêtes sur les cinq points d'entrée API (10/min pour la vérification de paiement, 20 pour le journal d'erreurs ouvert, 60 pour le webhook, 30 et 20 pour les relais solaire et YouTube), avec `Retry-After` et en-têtes `X-RateLimit-*` ;

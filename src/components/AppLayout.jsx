@@ -10,6 +10,7 @@ import { useMode } from '../context/ModeContext';
 import { initials } from '../utils/format';
 import { SyncDot } from './SyncStatus';
 import NotificationBell from './NotificationBell';
+import GuideNouveauUtilisateur from './GuideNouveauUtilisateur';
 
 const publicNavItems = [
   { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
@@ -150,6 +151,7 @@ export default function AppLayout() {
               end={item.path === '/pro'}
               className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               title={repliee ? item.label : undefined}
+              data-guide={item.path === '/pipeline' ? 'suivi' : item.path === '/devis' ? 'devis' : undefined}
             >
               <item.icon size={20} strokeWidth={2} />
               <span>{item.label}</span>
@@ -163,6 +165,7 @@ export default function AppLayout() {
                   to={item.path}
                   className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
                   title={repliee ? item.label : undefined}
+                  data-guide={item.path === '/plus/formation' ? 'formation' : undefined}
                 >
                   <item.icon size={20} strokeWidth={2} />
                   <span>{item.label}</span>
@@ -249,12 +252,14 @@ export default function AppLayout() {
             // sur toutes ses sous-pages /plus/:section (sinon aucun onglet actif).
             end={item.path === '/pro'}
             className={({ isActive }) => `tab-item ${isActive ? 'active' : ''}`}
+            data-guide={item.path === '/pipeline' ? 'suivi' : item.path === '/devis' ? 'devis' : item.path === '/plus' ? 'formation' : undefined}
           >
             <item.icon size={22} strokeWidth={2} />
             <span>{item.shortLabel}</span>
           </NavLink>
         ))}
       </nav>
+      {!isPro && <GuideNouveauUtilisateur />}
     </div>
   );
 }

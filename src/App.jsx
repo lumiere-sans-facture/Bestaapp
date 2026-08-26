@@ -113,6 +113,7 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={VENU_PAR_LIEN ? <Login vueInitiale="signup" /> : <Landing />} />
           <Route path="/inscription" element={<Login vueInitiale="signup" />} />
+          <Route path="/connexion" element={<Login />} />
           <Route path="*" element={<Login />} />
         </Routes>
       </Suspense>
