@@ -20,9 +20,9 @@ const lireKits = () => page.evaluate(() => JSON.parse(localStorage.getItem('best
 
 // ---- 1. LES KITS EXISTANTS SONT RÉCUPÉRÉS ----
 const kits = await lireKits();
-ok(kits.length === 6, `les 6 kits existants sont récupérés dans les données [${kits.length}]`);
+ok(kits.length === 10, `les 10 kits existants sont récupérés dans les données [${kits.length}]`);
 const cartes = await page.locator('.kit-card').count();
-ok(cartes === 6, `« Mes kits » affiche les ${cartes} kits`);
+ok(cartes === 10, `« Mes kits » affiche les ${cartes} kits`);
 const texte = await page.locator('.page-content').innerText();
 ok(/Kit 5 kWh/.test(texte) && /Kit 32 kWh/.test(texte), 'les noms d’origine sont là');
 ok(/1 200 000 F/.test(texte), 'le total du Kit 5 kWh est calculé (1 200 000 F)');
@@ -43,7 +43,7 @@ const apres = await lireKits();
 const k5 = apres.find((k) => k.id === 'kit-5kwh');
 ok(k5.lines[0].pu === 500000, `le prix est enregistré [${k5.lines[0].pu}]`);
 ok(k5.id === 'kit-5kwh', 'l’identifiant du kit ne change pas (les devis émis y font référence)');
-ok(apres.length === 6, 'aucun kit dupliqué par la modification');
+ok(apres.length === 10, 'aucun kit dupliqué par la modification');
 
 // ---- 3. L'ASSISTANT DE DEVIS SUIT ----
 await page.goto('http://localhost:3000/devis');
@@ -63,20 +63,20 @@ await ligne.locator('input').first().fill('Batterie 1 kWh');
 await ligne.locator('input[type="number"]').nth(1).fill('120000');
 await page.locator('.sheet button:has-text("Ajouter le kit")').click();
 await page.waitForTimeout(1000);
-ok((await lireKits()).length === 7, 'un kit créé s’ajoute à la liste');
+ok((await lireKits()).length === 11, 'un kit créé s’ajoute à la liste');
 ok(await page.locator('.kit-card:has-text("Kit 1 kWh — Mini")').count() === 1, 'le nouveau kit est affiché');
 
 await page.locator('.kit-card:has-text("Kit 1 kWh — Mini") button[aria-label^="Dupliquer"]').click();
 await page.waitForTimeout(900);
 const dupli = await lireKits();
-ok(dupli.length === 8 && dupli.some((k) => k.name === 'Kit 1 kWh — Mini (copie)'),
+ok(dupli.length === 12 && dupli.some((k) => k.name === 'Kit 1 kWh — Mini (copie)'),
    'la duplication crée une variante indépendante');
 
 await page.locator('.kit-card:has-text("(copie)") button[aria-label^="Supprimer"]').click();
 await page.waitForTimeout(500);
 await page.locator('.sheet button:has-text("Supprimer")').last().click();
 await page.waitForTimeout(1000);
-ok((await lireKits()).length === 7, 'la suppression retire bien le kit');
+ok((await lireKits()).length === 11, 'la suppression retire bien le kit');
 
 // ---- 5. LE RATTRAPAGE DES KITS D'ORIGINE ----
 await page.locator('.kit-card:has-text("Kit 32 kWh") button[aria-label^="Supprimer"]').click();
