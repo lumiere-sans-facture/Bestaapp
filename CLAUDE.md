@@ -123,6 +123,14 @@ ET son projet Supabase :
   branche (`git merge main`), sinon la fusion suivante l'écraserait.
 - Ne pas créer de PR sans demande explicite.
 
+⚠️ **Plusieurs agents travaillent sur ce dépôt** (sessions Claude, Codex), et
+certains poussent sur la même branche de travail. Si une poussée est refusée
+(`non-fast-forward`), ou si du code que vous n'avez pas écrit apparaît sur la
+branche : **s'arrêter et demander avant de fusionner**. Une livraison entière
+qui surgit sans avoir été annoncée n'est pas une concurrence de session
+ordinaire — c'est le chantier de quelqu'un d'autre. Ne pas y toucher, sauf
+demande explicite ou erreur grave à corriger, et le dire dans ce cas.
+
 ⚠️ **Le code n'est que la moitié du déploiement.** Les scripts SQL de
 `supabase/` et les réglages d'authentification (SMTP, *Redirect URLs*,
 « Confirm email ») doivent être passés **dans les DEUX projets Supabase**.
