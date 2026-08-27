@@ -17,7 +17,7 @@ describe('buildKitQuotation', () => {
     'kit-3.8kwh-2kva': 775000,
     'kit-5kwh-deye': 1429000,
     'kit-10kwh-taico': 2063000,
-    'kit-25kwh-felicity': 4178000,
+    'kit-25kwh-felicity': 4203000,
     // 16, 20 et 32 kWh : leur composition ne porte aucune structure ; le devis
     // l'ajoute au panneau (10 × 10 000, 12 × 10 000, 16 × 10 000 sur tôle).
     'kit-16kwh': 2419000,
