@@ -60,9 +60,8 @@ const ProClients = lazyWithPreload(() => import('./screens/pro/ProClients'));
 const ProCompany = lazyWithPreload(() => import('./screens/pro/ProCompany'));
 const ProSubscription = lazyWithPreload(() => import('./screens/pro/ProSubscription'));
 
-// Page publique d'accueil : vue par les visiteurs non connectés uniquement.
-// Chargée à la demande — elle n'a rien à faire dans le bundle d'un utilisateur
-// déjà connecté, qui ne la reverra plus.
+// Page d'accueil publique : accessible à la racine, y compris après une
+// actualisation lorsque l'utilisateur est déjà connecté.
 const Landing = lazy(() => import('./screens/Landing'));
 
 const ALL_SCREENS = [Dashboard, Pipeline, Clients, Boutique, Devis, Plus, ProDashboard, ProDocuments, ProClients, ProCompany, ProSubscription];
@@ -110,9 +109,14 @@ function AppRoutes() {
   // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.
   if (recovery) return <Login />;
 
-  // Visiteur non connecté : la vitrine à la racine, les formulaires à côté.
-  // Toute autre adresse (un signet vers /dashboard, par exemple) ouvre la
-  // connexion — comme avant l'arrivée de la page d'accueil.
+  // L'accueil reste une vitrine, même pour une session active : actualiser /
+  // ne doit jamais transformer l'adresse en tableau de bord.
+  if (pathname === '/') {
+    return <Suspense fallback={<LoadingShell />}><Landing /></Suspense>;
+  }
+
+  // Visiteur non connecté : les formulaires sont accessibles à côté. Toute
+  // autre adresse (un signet vers /dashboard, par exemple) ouvre la connexion.
   if (!user) {
     return (
       <Suspense fallback={<LoadingShell />}>
