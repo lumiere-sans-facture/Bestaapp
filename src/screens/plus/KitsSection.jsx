@@ -4,7 +4,7 @@ import { useData } from '../../context/DataContext';
 import { SOLAR_KITS } from '../../data/kits';
 import { formatCFA } from '../../utils/format';
 import { prixPublic } from '../../utils/price';
-import { nouveauKit, nouvelleLigneKit, kitTotal, kitEstValide, resumeKit, resolveLignePrice, UNITES_KIT } from '../../utils/kits';
+import { nouveauKit, nouvelleLigneKit, kitTotal, kitEstValide, resumeKit, resolveLignePrice, trierKitsParCapacite, UNITES_KIT } from '../../utils/kits';
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import Field from '../../components/Field';
@@ -23,7 +23,8 @@ export default function KitsSection({ onBack }) {
   const [aSupprimer, setASupprimer] = useState(null);
   const toast = useToast();
 
-  const liste = kits || [];
+  // Affichage croissant par capacité, sans réordonner les données sauvegardées.
+  const liste = trierKitsParCapacite(kits);
   const manquants = SOLAR_KITS.filter((o) => !liste.some((k) => k.id === o.id));
 
   const ouvrirNouveau = () => setEdition({ kit: nouveauKit(), estNouveau: true });
