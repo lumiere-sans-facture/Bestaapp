@@ -5,7 +5,7 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
 import { factureVersConsommation, REPARTITIONS } from '../../utils/factureConso';
-import { calculateSystemSize, buildKitQuotation, suggestKitForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
+import { calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -84,6 +84,9 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   const [mountingType, setMountingType] = useState(reprise.mountingType);
   // Inclure ou non la structure de montage au devis (client qui a déjà le sien).
   const [includeMounting, setIncludeMounting] = useState(reprise.includeMounting);
+  // Parmi les variantes de même capacité suggérée, le premier kit est sélectionné
+  // par défaut ; le technicien peut ensuite retenir l’autre composition.
+  const [selectedSuggestedKitId, setSelectedSuggestedKitId] = useState(null);
   // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
   // ou recherche de ville ; repli en saisie manuelle des heures de pic.
   const [sunHours, setSunHours] = useState(reprise.sunHours);
@@ -178,17 +181,18 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     [consumption, systemType, sunHours, totalConsumption, autonomyNights, peakLoad, INVERTERS]
   );
 
-  // Kit suggéré : le plus petit kit dont la batterie COUVRE le besoin calculé
-  // (jamais moins — un client sous-équipé se retrouve à sec). C'est toujours
-  // ce kit — et lui seul — qui est proposé au devis : pas de choix manuel
-  // d'un kit sous- ou sur-dimensionné par rapport au besoin.
-  const suggestedKitId = useMemo(
-    () => (sizing ? suggestKitForBattery(SOLAR_KITS, sizing.batteryCapacity)?.id || null : null),
+  // Kits suggérés : la plus petite capacité qui couvre le besoin est retenue
+  // (jamais moins). Quand plusieurs variantes ont cette même capacité, elles
+  // sont toutes affichées afin de laisser le technicien choisir la composition.
+  const suggestedKits = useMemo(
+    () => (sizing ? suggestKitsForBattery(SOLAR_KITS, sizing.batteryCapacity) : []),
     [sizing, SOLAR_KITS]
   );
   // La liste est modifiable depuis « Mes kits » : elle peut être vide, ou le
   // kit retenu avoir été supprimé entre-temps. Tout est optionnel à partir d'ici.
-  const effectiveKitId = suggestedKitId || SOLAR_KITS[0]?.id || null;
+  const effectiveKitId = (suggestedKits.some((k) => k.id === selectedSuggestedKitId)
+    ? selectedSuggestedKitId
+    : suggestedKits[0]?.id) || SOLAR_KITS[0]?.id || null;
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0] || null;
   // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
   // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit
@@ -608,19 +612,32 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
           <div>
             <div className="wizard-step-title">Choix du kit et devis</div>
 
-            {/* Kit suggéré par le dimensionnement : seul celui dont la batterie
-                colle le mieux au besoin calculé est proposé, pas de choix
-                manuel d'un kit sous- ou sur-dimensionné. */}
+            {/* Les variantes de même capacité conseillée restent toutes visibles :
+                le technicien choisit la marque ou la composition du devis. */}
             <div className="kit-selector">
-              <div className="kit-selector-title">Kit suggéré</div>
+              <div className="kit-selector-title">{suggestedKits.length > 1 ? 'Kits suggérés' : 'Kit suggéré'}</div>
               <div className="kit-options">
-                <div className="kit-option selected">
-                  <span className="kit-option-name">
-                    {selectedKit.name}
-                    <span className="kit-badge">Suggéré</span>
-                  </span>
-                  <span className="kit-option-meta">{formatCFA(displayQuotation.total)}</span>
-                </div>
+                {suggestedKits.map((kit) => {
+                  const isSelected = kit.id === selectedKit.id;
+                  const quotation = isSelected
+                    ? displayQuotation
+                    : buildKitQuotation(kit, mountingType, includeMounting, sizing, INVERTERS, products);
+                  return (
+                    <button
+                      key={kit.id}
+                      type="button"
+                      className={`kit-option ${isSelected ? 'selected' : ''}`}
+                      onClick={() => setSelectedSuggestedKitId(kit.id)}
+                      aria-pressed={isSelected}
+                    >
+                      <span className="kit-option-name">
+                        {kit.name}
+                        <span className="kit-badge">Suggéré</span>
+                      </span>
+                      <span className="kit-option-meta">{formatCFA(quotation.total)}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
