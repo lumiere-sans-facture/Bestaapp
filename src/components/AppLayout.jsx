@@ -120,12 +120,17 @@ export default function AppLayout() {
                   </div>
                 )}
               </>
-            ) : (
+            ) : repliee ? (
               <img
-                src={repliee ? '/besta-solar-icon-blanc.png' : '/besta-solar-pro-logo-blanc.png'}
+                src="/besta-solar-icon-blanc.png"
                 alt="BestaSolar Pro"
-                className={repliee ? 'sidebar-brand-icone' : 'sidebar-brand-logo'}
+                className="sidebar-brand-icone"
               />
+            ) : (
+              <div className="sidebar-brand-identite" aria-label="BestaSolar Pro">
+                <img src="/besta-solar-icon-blanc.png" alt="" className="sidebar-brand-identite-icone" />
+                <span className="sidebar-brand-identite-nom">BestaSolar <b>Pro</b></span>
+              </div>
             )}
             <div className="sidebar-brand-tools">
               <NotificationBell />
