@@ -146,8 +146,9 @@ export default function KitsSection({ onBack }) {
             {/* Caractéristiques techniques : elles servent à SUGGÉRER le kit
                 selon la consommation du client, et alimentent le devis. */}
             <div className="form-row-2">
-              <Field label="Batterie (kWh)">
-                <input className="input" type="number" min="0" step="0.5" value={edition.kit.battery}
+              <Field label="Capacité de stockage (kWh)">
+                <input className="input" type="number" min="0" step="any" inputMode="decimal"
+                  aria-label="Capacité de stockage (kWh)" value={edition.kit.battery}
                   onChange={(e) => majKit({ battery: e.target.value })} />
               </Field>
               <Field label="Onduleur (kVA)">
@@ -164,8 +165,8 @@ export default function KitsSection({ onBack }) {
               </Field>
             </div>
             <div className="field-hint" style={{ marginBottom: 14 }}>
-              La capacité batterie sert à proposer automatiquement le bon kit selon
-              la consommation calculée du client.
+              La capacité de stockage sert à proposer automatiquement le bon kit selon
+              la consommation calculée du client. Toute valeur décimale est acceptée (ex. 1,2 ou 5,12 kWh).
             </div>
 
             <div className="sheet-section-title">Composition</div>
