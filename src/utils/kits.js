@@ -85,6 +85,17 @@ export const resumeKit = (kit) => [
   kit.inverter ? `onduleur ${kit.inverter} kVA` : null,
 ].filter(Boolean).join(' · ');
 
+/** Trie les kits par capacité de stockage ; les capacités inconnues restent à la fin. */
+export const trierKitsParCapacite = (kits = []) => [...kits].sort((a, b) => {
+  const aCapacity = nombre(a?.battery);
+  const bCapacity = nombre(b?.battery);
+  const aKnown = aCapacity > 0;
+  const bKnown = bCapacity > 0;
+  if (aKnown !== bKnown) return aKnown ? -1 : 1;
+  if (aKnown && aCapacity !== bCapacity) return aCapacity - bCapacity;
+  return String(a?.name || '').localeCompare(String(b?.name || ''), 'fr');
+});
+
 /** Copie d'un kit, nouvel identifiant et nom suffixé — base d'une variante. */
 export const dupliquerKit = (kit) => ({
   ...kit,
