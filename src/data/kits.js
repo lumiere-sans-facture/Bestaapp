@@ -146,6 +146,7 @@ export const SOLAR_KITS = [
 
 
 
+
   {
     id: 'kit-25kwh-felicity',
     name: 'Kit 25 kWh — Felicity',
