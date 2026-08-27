@@ -4,6 +4,10 @@ import { COMPANY } from '../../config/company';
 // Tous les appels à l'action de la page mènent au formulaire d'inscription.
 export const LIEN_INSCRIPTION = '/inscription';
 
+// Le client déjà inscrit, lui, vient pour entrer : la vitrine ne doit pas
+// le forcer à recréer un compte pour retrouver la porte.
+export const LIEN_CONNEXION = '/connexion';
+
 /**
  * Inscription AVEC une formule déjà choisie. Le client qui clique « Choisir
  * Pro Premium » a décidé : il doit arriver au paiement de CETTE formule, pas

@@ -31,6 +31,17 @@ for (const id of ['accueil', 'conseiller', 'schemas', 'avantages', 'tarifs', 'ca
   ok(await page.locator(`#${id}`).count() === 1, `section #${id} présente`);
 }
 
+// ---- 1 bis. LA PORTE DES CLIENTS DÉJÀ INSCRITS ----
+const connexion = page.locator('.landing header a', { hasText: 'Se connecter' });
+ok(await connexion.count() === 1, 'l’en-tête porte un bouton « Se connecter »');
+ok(await connexion.getAttribute('href') === '/connexion', 'il mène à la connexion');
+await connexion.click();
+await page.waitForTimeout(700);
+ok(page.url().endsWith('/connexion'), `clic → /connexion (${page.url()})`);
+ok(await page.locator('input[type="password"]').count() > 0, 'le formulaire de connexion est monté');
+await page.goto(B + '/');
+await page.waitForSelector('.landing');
+
 // ---- 2. ONGLETS DES SCHÉMAS ----
 const panneauVisible = () => page.evaluate(() => {
   const t = document.querySelector('#schemas');
@@ -94,6 +105,13 @@ await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(400);
 const debord = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 ok(debord <= 1, `pas de défilement horizontal sur mobile (débordement ${debord}px)`);
+
+// Deux boutons dans un en-tête collant : sans resserrement, ils passaient à
+// la ligne et l'en-tête doublait de hauteur, sur toute la page.
+const entete = await page.evaluate(() => Math.round(document.querySelector('.landing header').getBoundingClientRect().height));
+ok(entete < 80, `l’en-tête tient sur une ligne sur mobile (${entete}px)`);
+ok(await page.locator('.landing header a', { hasText: 'Se connecter' }).count() === 1,
+   'la connexion reste accessible sur téléphone');
 
 // Le schéma garde sur mobile la géométrie du grand écran : source à gauche,
 // onduleur au centre, charge à droite, satellites au-dessus et en dessous.

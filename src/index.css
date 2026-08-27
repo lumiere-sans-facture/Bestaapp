@@ -2847,6 +2847,22 @@ form .login-link { width: 100%; margin-top: 4px; }
 @media (max-width: 900px) { .lp-nav-liens { display: none; } }
 @media (max-width: 420px) { .lp-nav-slogan { display: none; } }
 
+/* Sous 560 px, le logo et les deux portes ne tiennent plus sur une ligne :
+   l'en-tête passait de 77 à 119 px de haut, collé en permanence en haut de
+   l'écran. Tout se resserre — les écarts d'abord, qui coûtaient 46 px à eux
+   seuls — et « Se connecter » redevient ce qu'il est, un lien, pour laisser
+   « Commencer » seul en relief. */
+@media (max-width: 560px) {
+  .landing header > div { gap: 8px !important; }
+  .landing header nav { gap: 8px !important; }
+  .landing header img { height: auto !important; width: 118px !important; }
+  .lp-nav-connexion {
+    padding: 6px 2px !important; border: 0 !important; background: none !important;
+    font-size: 0.8125rem !important;
+  }
+  .lp-nav-inscription { padding: 8px 12px !important; font-size: 0.8125rem !important; }
+}
+
 /* Une section visée par une ancre s'arrête SOUS l'en-tête collant, sinon son
    titre se cache derrière lui à chaque clic du menu. */
 .landing section[id] { scroll-margin-top: 84px; }

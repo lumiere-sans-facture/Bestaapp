@@ -1,7 +1,7 @@
-// Barre de navigation de la page publique : ancres vers les sections et
-// appel à l'action vers l'inscription.
+// Barre de navigation de la page publique : ancres vers les sections,
+// connexion pour qui a déjà un compte, inscription pour les autres.
 import { Link } from 'react-router-dom';
-import { LIEN_INSCRIPTION } from './constantes';
+import { LIEN_CONNEXION, LIEN_INSCRIPTION } from './constantes';
 
 export default function LandingEntete() {
   return (
@@ -26,7 +26,12 @@ export default function LandingEntete() {
               <a className="lp-h1" href="#carriere" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>Carrière</a>
               <a className="lp-h1" href="#faq" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>FAQ</a>
             </span>
-            <Link className="lp-h2" to={LIEN_INSCRIPTION} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '11px 18px', borderRadius: '8px', background: '#0c3483', color: '#ffffff', fontWeight: '600', fontSize: '0.9375rem' }}>Commencer</Link>
+            {/* Deux portes, jamais confondues : « Se connecter » discret pour
+                celui qui a déjà un compte, « Commencer » plein pour celui qui
+                n'en a pas. Il reste visible sur téléphone — un abonné qui
+                arrive par la vitrine doit pouvoir entrer. */}
+            <Link className="lp-h4 lp-nav-connexion" to={LIEN_CONNEXION} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', border: '1px solid #e3e7ef', background: '#ffffff', color: '#0c0f14', fontWeight: '600', fontSize: '0.9375rem', whiteSpace: 'nowrap' }}>Se connecter</Link>
+            <Link className="lp-h2 lp-nav-inscription" to={LIEN_INSCRIPTION} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '11px 18px', borderRadius: '8px', background: '#0c3483', color: '#ffffff', fontWeight: '600', fontSize: '0.9375rem' }}>Commencer</Link>
           </nav>
         </div>
       </header>
