@@ -210,7 +210,7 @@ describe('suggestKitForBattery', () => {
     ];
     expect(suggestKitsForBattery(variantes, 4).map((k) => k.id)).toEqual(['k5-a', 'k5-b']);
     expect(suggestKitsForBattery(variantes, 5).map((k) => k.id)).toEqual(['k5-a', 'k5-b']);
-    expect(suggestKitsForBattery(variantes, 11)).toEqual([]);
+    expect(suggestKitsForBattery(variantes, 11).map((k) => k.id)).toEqual(['k10']);
   });
 
   it('retombe sur le kit le plus proche si aucun ne couvre le besoin', () => {
