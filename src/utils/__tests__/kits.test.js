@@ -11,10 +11,10 @@ describe('buildKitQuotation', () => {
   const TOTALS = {
     'kit-2.5kwh-eco': 625000,
     'kit-2.5kwh-premium': 715000,
-    'kit-5kwh': 1180000,
     // Le kit 3,8 kWh ne comporte pas de support sur son bordereau : le devis
     // ajoute donc la structure standard (3 × 10 000 F sur tôle).
     'kit-3.8kwh-2kva': 775000,
+    'kit-5kwh': 1180000,
     'kit-5kwh-deye': 1429000,
     'kit-10kwh-taico': 2063000,
     'kit-25kwh-felicity': 4203000,
