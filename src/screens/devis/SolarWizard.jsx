@@ -612,19 +612,32 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
           <div>
             <div className="wizard-step-title">Choix du kit et devis</div>
 
-            {/* Kit suggéré par le dimensionnement : seul celui dont la batterie
-                colle le mieux au besoin calculé est proposé, pas de choix
-                manuel d'un kit sous- ou sur-dimensionné. */}
+            {/* Les variantes de même capacité conseillée restent toutes visibles :
+                le technicien choisit la marque ou la composition du devis. */}
             <div className="kit-selector">
-              <div className="kit-selector-title">Kit suggéré</div>
+              <div className="kit-selector-title">{suggestedKits.length > 1 ? 'Kits suggérés' : 'Kit suggéré'}</div>
               <div className="kit-options">
-                <div className="kit-option selected">
-                  <span className="kit-option-name">
-                    {selectedKit.name}
-                    <span className="kit-badge">Suggéré</span>
-                  </span>
-                  <span className="kit-option-meta">{formatCFA(displayQuotation.total)}</span>
-                </div>
+                {suggestedKits.map((kit) => {
+                  const isSelected = kit.id === selectedKit.id;
+                  const quotation = isSelected
+                    ? displayQuotation
+                    : buildKitQuotation(kit, mountingType, includeMounting, sizing, INVERTERS, products);
+                  return (
+                    <button
+                      key={kit.id}
+                      type="button"
+                      className={`kit-option ${isSelected ? 'selected' : ''}`}
+                      onClick={() => setSelectedSuggestedKitId(kit.id)}
+                      aria-pressed={isSelected}
+                    >
+                      <span className="kit-option-name">
+                        {kit.name}
+                        <span className="kit-badge">Suggéré</span>
+                      </span>
+                      <span className="kit-option-meta">{formatCFA(quotation.total)}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
