@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
-import { normaliserKit, kitTotal, kitEstValide, resumeKit, dupliquerKit, nouveauKit, resolveLignePrice, UNITES_KIT } from '../kits';
+import { normaliserKit, kitTotal, kitEstValide, resumeKit, trierKitsParCapacite, dupliquerKit, nouveauKit, resolveLignePrice, UNITES_KIT } from '../kits';
 
 const brouillon = (patch = {}) => ({
   id: 'k1', name: '  Kit test  ', battery: '5', panels: '4', panelW: '590', inverter: '6',
@@ -154,6 +154,19 @@ describe('resumeKit', () => {
   it('n’invente rien quand les caractéristiques manquent', () => {
     expect(resumeKit({})).toBe('');
     expect(resumeKit({ battery: 5 })).toBe('5 kWh');
+  });
+});
+
+describe('trierKitsParCapacite', () => {
+  it('classe les capacités croissantes sans modifier le tableau d’origine', () => {
+    const source = [
+      { id: 'k10', name: 'Kit 10', battery: 10 },
+      { id: 'k12', name: 'Kit 1,2', battery: '1.2' },
+      { id: 'k5', name: 'Kit 5', battery: 5 },
+      { id: 'sans', name: 'Kit sans capacité', battery: '' },
+    ];
+    expect(trierKitsParCapacite(source).map((k) => k.id)).toEqual(['k12', 'k5', 'k10', 'sans']);
+    expect(source.map((k) => k.id)).toEqual(['k10', 'k12', 'k5', 'sans']);
   });
 });
 
