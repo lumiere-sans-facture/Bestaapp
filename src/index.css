@@ -1570,7 +1570,10 @@ form .login-link { width: 100%; margin-top: 4px; }
   text-align: left; padding: 12px 14px; border-radius: 10px;
   border: 1.5px solid var(--border); background: var(--bg-card);
   transition: border-color 0.15s ease, background 0.15s ease;
+  width: 100%; font: inherit; color: inherit; cursor: pointer;
 }
+.kit-option:hover { border-color: var(--primary); }
+.kit-option:focus-visible { outline: 3px solid rgba(10, 36, 114, 0.28); outline-offset: 2px; }
 .kit-option.selected { border-color: var(--primary); background: rgba(10, 36, 114, 0.04); }
 .kit-option-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.9375rem; }
 .kit-option-meta { font-weight: 700; color: var(--primary-ink); white-space: nowrap; }
