@@ -46,25 +46,6 @@ export const SOLAR_KITS = [
     ]),
   },
   {
-    id: 'kit-5kwh',
-    name: 'Kit 5 kWh',
-    battery: 5,
-    panels: 4,
-    panelW: 590,
-    inverter: 6,
-    lines: toLines([
-      ['Batterie lithium 48V (5kwh) HZ', 1, 'pcs', 460000],
-      ['Panneaux photovoltaïque 590Wc', 4, 'pcs', 65000],
-      ['Onduleur hybride 6kva HZ', 1, 'pcs', 250000],
-      ['Coffret de protection DC/AC', 1, 'pcs', 45000],
-      ['Structure de montage PV rails galvanisé (tôle)', 1, 'pcs', 60000],
-      ['Câble PV 1x4mm²', 30, 'm', 500],
-      ['Kit terre', 1, 'pcs', 20000],
-      ['Câble terre 1x10mm²', 10, 'pcs', 1500],
-      ["Main d'œuvre", 1, 'pcs', 75000],
-    ]),
-  },
-  {
     id: 'kit-3.8kwh-2kva',
     name: 'Kit 3,8 kWh — 2 kVA',
     battery: 3.8,
@@ -82,6 +63,25 @@ export const SOLAR_KITS = [
       ['Câble de terre 1x4mm²', 20, 'm', 800],
       ['Coffret de protection AC (différentiel, disjoncteur 2P numérique)', 1, 'pcs', 25000],
       ["Main d'œuvre", 1, 'pcs', 50000],
+    ]),
+  },
+  {
+    id: 'kit-5kwh',
+    name: 'Kit 5 kWh',
+    battery: 5,
+    panels: 4,
+    panelW: 590,
+    inverter: 6,
+    lines: toLines([
+      ['Batterie lithium 48V (5kwh) HZ', 1, 'pcs', 460000],
+      ['Panneaux photovoltaïque 590Wc', 4, 'pcs', 65000],
+      ['Onduleur hybride 6kva HZ', 1, 'pcs', 250000],
+      ['Coffret de protection DC/AC', 1, 'pcs', 45000],
+      ['Structure de montage PV rails galvanisé (tôle)', 1, 'pcs', 60000],
+      ['Câble PV 1x4mm²', 30, 'm', 500],
+      ['Kit terre', 1, 'pcs', 20000],
+      ['Câble terre 1x10mm²', 10, 'pcs', 1500],
+      ["Main d'œuvre", 1, 'pcs', 75000],
     ]),
   },
   {
@@ -141,6 +141,11 @@ export const SOLAR_KITS = [
       ["Main d'œuvre", 1, 'h', 80000],
     ]),
   },
+
+
+
+
+
   {
     id: 'kit-25kwh-felicity',
     name: 'Kit 25 kWh — Felicity',
