@@ -3077,3 +3077,34 @@ form .login-link { width: 100%; margin-top: 4px; }
   .guide-nouveau-cible { animation: none; }
 }
 
+
+
+/* Marque publique : icône et nom seulement — le slogan n'apparaît plus dans le logo. */
+.sidebar-brand-identite {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.sidebar-brand-identite-icone {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.sidebar-brand-identite-nom {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.sidebar-brand-identite-nom b {
+  color: var(--accent, #f7c948);
+  font-weight: 800;
+}
