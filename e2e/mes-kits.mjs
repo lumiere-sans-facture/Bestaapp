@@ -33,6 +33,8 @@ await page.locator('.kit-card:has-text("Kit 5 kWh") button:has-text("Modifier")'
 await page.waitForTimeout(600);
 const champPu = page.locator('.sheet .doc-line').first().locator('input[type="number"]').nth(1);
 await champPu.fill('500000');
+const capacite = page.locator('.sheet input[aria-label="Capacité de stockage (kWh)"]');
+await capacite.fill('5.12');
 await page.waitForTimeout(300);
 const totalForm = await page.locator('.kit-form-total strong').innerText();
 ok(/1 240 000/.test(totalForm), `le total se recalcule à la saisie [${totalForm}]`);
@@ -42,6 +44,7 @@ await page.waitForTimeout(1000);
 const apres = await lireKits();
 const k5 = apres.find((k) => k.id === 'kit-5kwh');
 ok(k5.lines[0].pu === 500000, `le prix est enregistré [${k5.lines[0].pu}]`);
+ok(k5.battery === 5.12, `la capacité de stockage décimale est enregistrée [${k5.battery} kWh]`);
 ok(k5.id === 'kit-5kwh', 'l’identifiant du kit ne change pas (les devis émis y font référence)');
 ok(apres.length === 10, 'aucun kit dupliqué par la modification');
 

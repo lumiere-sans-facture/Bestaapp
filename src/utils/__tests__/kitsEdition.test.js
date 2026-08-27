@@ -22,8 +22,9 @@ describe('normaliserKit — un brouillon de formulaire devient un kit exploitabl
     expect(k.lines[0].pu).toBe(460000);
   });
 
-  it('accepte la virgule décimale (clavier français)', () => {
-    expect(normaliserKit(brouillon({ battery: '2,5' })).battery).toBe(2.5);
+  it('accepte toute précision décimale, avec point ou virgule', () => {
+    expect(normaliserKit(brouillon({ battery: '1.2' })).battery).toBe(1.2);
+    expect(normaliserKit(brouillon({ battery: '5,12' })).battery).toBe(5.12);
   });
 
   it('supprime les espaces autour du nom et des désignations', () => {
