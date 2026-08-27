@@ -5,21 +5,21 @@ import { buildKitQuotation, suggestKitForBattery, MOUNTING_TYPES } from '../sola
 const byId = (id) => SOLAR_KITS.find((k) => k.id === id);
 
 describe('buildKitQuotation', () => {
-  // Totaux exacts des 6 devis kits officiels (prix tout compris, sans TVA),
+  // Totaux exacts des 10 devis kits officiels (prix tout compris, sans TVA),
   // sur le support par défaut (tôle) : la ligne « Structure de montage » du
   // kit est recalculée au panneau, pas au prix fixe de data/kits.js.
   const TOTALS = {
     'kit-2.5kwh-eco': 625000,
     'kit-2.5kwh-premium': 715000,
     'kit-5kwh': 1180000,
-    // 16, 20 et 32 kWh : leur composition ne porte aucune structure ; le devis
+    // Le kit 3,8 kWh ne comporte pas de support sur son bordereau : le devis\n    // ajoute donc la structure standard (3 × 10 000 F sur tôle).\n    'kit-3.8kwh-2kva': 775000,\n    'kit-5kwh-deye': 1429000,\n    'kit-10kwh-taico': 2063000,\n    'kit-25kwh-felicity': 4178000,\n    // 16, 20 et 32 kWh : leur composition ne porte aucune structure ; le devis
     // l'ajoute au panneau (10 × 10 000, 12 × 10 000, 16 × 10 000 sur tôle).
     'kit-16kwh': 2419000,
     'kit-20kwh': 3344000,
     'kit-32kwh': 4518000,
   };
 
-  it('propose les 6 kits officiels', () => {
+  it('propose les 10 kits officiels', () => {
     expect(SOLAR_KITS.map((k) => k.id)).toEqual(Object.keys(TOTALS));
   });
 
