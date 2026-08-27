@@ -8,6 +8,14 @@ describe('buildKitQuotation', () => {
   // Totaux exacts des 10 devis kits officiels (prix tout compris, sans TVA),
   // sur le support par défaut (tôle) : la ligne « Structure de montage » du
   // kit est recalculée au panneau, pas au prix fixe de data/kits.js.
+  //
+  // Ces totaux sont donc ceux que l'app DEVISE, pas ceux du bordereau
+  // fournisseur : la recalcule de la structure les en écarte, exactement
+  // comme pour le kit 16 kWh (bordereau 2 319 000, devis 2 419 000). Les
+  // relever depuis le bordereau donne des attentes que le code ne peut pas
+  // satisfaire.
+  //
+  // L'ordre suit celui de SOLAR_KITS — trié par capacité de batterie.
   const TOTALS = {
     'kit-2.5kwh-eco': 625000,
     'kit-2.5kwh-premium': 715000,
@@ -15,13 +23,13 @@ describe('buildKitQuotation', () => {
     // ajoute donc la structure standard (3 × 10 000 F sur tôle).
     'kit-3.8kwh-2kva': 775000,
     'kit-5kwh': 1180000,
-    'kit-5kwh-deye': 1429000,
-    'kit-10kwh-taico': 2063000,
-    'kit-25kwh-felicity': 4203000,
+    'kit-5kwh-deye': 1453000,
+    'kit-10kwh-taico': 2119000,
     // 16, 20 et 32 kWh : leur composition ne porte aucune structure ; le devis
     // l'ajoute au panneau (10 × 10 000, 12 × 10 000, 16 × 10 000 sur tôle).
     'kit-16kwh': 2419000,
     'kit-20kwh': 3344000,
+    'kit-25kwh-felicity': 4315000,
     'kit-32kwh': 4518000,
   };
 
