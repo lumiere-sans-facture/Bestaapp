@@ -110,8 +110,9 @@ function AppRoutes() {
   if (recovery) return <Login />;
 
   // L'accueil reste une vitrine, même pour une session active : actualiser /
-  // ne doit jamais transformer l'adresse en tableau de bord.
-  if (pathname === '/') {
+  // ne doit jamais transformer l'adresse en tableau de bord. Seul un lien de
+  // parrainage garde sa priorité et ouvre l’inscription.
+  if (pathname === '/' && (user || !VENU_PAR_LIEN)) {
     return <Suspense fallback={<LoadingShell />}><Landing /></Suspense>;
   }
 
