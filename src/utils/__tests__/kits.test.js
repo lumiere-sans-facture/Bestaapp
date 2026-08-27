@@ -213,6 +213,11 @@ describe('suggestKitForBattery', () => {
     expect(suggestKitsForBattery(variantes, 11).map((k) => k.id)).toEqual(['k10']);
   });
 
+  it('expose les deux kits officiels de 5 kWh pour un besoin de 5 kWh', () => {
+    expect(suggestKitsForBattery(SOLAR_KITS, 5).map((k) => k.id))
+      .toEqual(['kit-5kwh', 'kit-5kwh-deye']);
+  });
+
   it('retombe sur le kit le plus proche si aucun ne couvre le besoin', () => {
     // Besoin 25 kWh : aucun kit n'atteint 25 kWh, on retombe sur le plus gros (20 kWh).
     expect(suggestKitForBattery(kits, 25).id).toBe('k20');
