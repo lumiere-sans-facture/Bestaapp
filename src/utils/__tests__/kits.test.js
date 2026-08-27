@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
-import { buildKitQuotation, suggestKitForBattery, MOUNTING_TYPES } from '../solarSizing';
+import { buildKitQuotation, suggestKitForBattery, suggestKitsForBattery, MOUNTING_TYPES } from '../solarSizing';
 
 const byId = (id) => SOLAR_KITS.find((k) => k.id === id);
 
@@ -202,9 +202,21 @@ describe('suggestKitForBattery', () => {
     expect(suggestKitForBattery(kits, 12).id).toBe('k12');
   });
 
+  it('propose toutes les variantes de la même capacité retenue', () => {
+    const variantes = [
+      { id: 'k5-a', battery: 5 },
+      { id: 'k5-b', battery: 5 },
+      { id: 'k10', battery: 10 },
+    ];
+    expect(suggestKitsForBattery(variantes, 4).map((k) => k.id)).toEqual(['k5-a', 'k5-b']);
+    expect(suggestKitsForBattery(variantes, 5).map((k) => k.id)).toEqual(['k5-a', 'k5-b']);
+    expect(suggestKitsForBattery(variantes, 11)).toEqual([]);
+  });
+
   it('retombe sur le kit le plus proche si aucun ne couvre le besoin', () => {
     // Besoin 25 kWh : aucun kit n'atteint 25 kWh, on retombe sur le plus gros (20 kWh).
     expect(suggestKitForBattery(kits, 25).id).toBe('k20');
+    expect(suggestKitsForBattery(kits, 25).map((k) => k.id)).toEqual(['k20']);
   });
 
   it('gère une liste vide ou un besoin nul', () => {
