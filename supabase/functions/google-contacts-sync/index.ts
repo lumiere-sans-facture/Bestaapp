@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { normalizePhoneNumber } from '../../../shared/phone.js';
+import { findContactByNormalizedPhone, normalizePhoneNumber } from '../../../shared/phone.js';
 
 type Contact = { id?: string; name?: string; phone?: string; email?: string; company?: string; [key: string]: unknown };
 type Job = { id: string; org_id: string; partner_id: string; normalized_phone: string; contact_data: Contact; attempts: number; status: string };
@@ -51,9 +51,8 @@ async function findContactByPhone(token: string, phone: string) {
     const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error?.message || 'Lecture des contacts Google impossible.');
-    for (const person of payload.connections || []) {
-      if ((person.phoneNumbers || []).some((item: { value?: string }) => normalizePhoneNumber(item.value, 'BJ') === phone)) return person;
-    }
+    const match = findContactByNormalizedPhone(payload.connections || [], phone, 'BJ');
+    if (match) return match;
     pageToken = payload.nextPageToken;
   } while (pageToken);
   return null;
