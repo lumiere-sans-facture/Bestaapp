@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ecranDentree } from '../entree';
+import { ecranDentree, vueLogin } from '../entree';
 
 const etat = (extra) => ({ isLoading: false, recovery: false, pendingAuthUser: null, user: null, ...extra });
 
@@ -37,5 +37,38 @@ describe('ecranDentree — quel écran à l’ouverture', () => {
 
   it('un état vide ne fait pas planter l’ouverture', () => {
     expect(ecranDentree()).toBe('public');
+  });
+});
+
+describe('vueLogin — quel formulaire sur l’écran d’entrée', () => {
+  it('sans rien, la connexion', () => {
+    expect(vueLogin()).toBe('login');
+  });
+
+  it('« Se connecter » l’emporte sur une attribution vieille de trois semaines', () => {
+    // Le bogue vu en production et invisible en recette : l'attribution vit
+    // trente jours sur l'appareil, et détournait la route /connexion vers
+    // l'inscription — sur le seul navigateur ayant suivi un lien partenaire.
+    expect(vueLogin({ vueDemandee: 'login', refCode: 'BESTA-SIDDIK' })).toBe('login');
+  });
+
+  it('« Se connecter » l’emporte aussi sur un code d’invitation d’équipe', () => {
+    expect(vueLogin({ vueDemandee: 'login', teamCode: 'ABC123' })).toBe('login');
+  });
+
+  it('la route d’inscription ouvre bien l’inscription', () => {
+    expect(vueLogin({ vueDemandee: 'signup' })).toBe('signup');
+  });
+
+  it('sans vue demandée, un code partenaire ouvre l’inscription', () => {
+    expect(vueLogin({ refCode: 'BESTA-SIDDIK' })).toBe('signup');
+  });
+
+  it('sans vue demandée, un code d’équipe ouvre l’inscription', () => {
+    expect(vueLogin({ teamCode: 'ABC123' })).toBe('signup');
+  });
+
+  it('un code vide ne compte pas pour un code', () => {
+    expect(vueLogin({ refCode: '', teamCode: '' })).toBe('login');
   });
 });

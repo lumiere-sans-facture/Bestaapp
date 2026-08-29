@@ -25,3 +25,29 @@ export const ecranDentree = ({ isLoading, recovery, pendingAuthUser, user } = {}
   if (!user) return 'public';
   return 'application';
 };
+
+/**
+ * Quel formulaire ouvrir sur l'écran d'entrée.
+ *
+ * Une attribution de parrainage vit TRENTE JOURS sur l'appareil. Tant que
+ * l'écran de connexion était le seul point d'entrée, la laisser ouvrir
+ * l'inscription avait du sens. Depuis qu'il existe deux adresses distinctes,
+ * elle prenait le pas sur la demande explicite : cliquer « Se connecter »
+ * amenait au formulaire d'inscription, un mois durant, sur le seul appareil
+ * ayant suivi un lien partenaire — d'où un bogue invisible en recette et bien
+ * réel en production.
+ *
+ * L'adresse demandée l'emporte donc. L'attribution ne décide plus que
+ * lorsqu'aucune vue n'est réclamée (un signet vers une page interne, par
+ * exemple) ; elle continue, dans tous les cas, à préremplir le code.
+ *
+ * @param {object} etat
+ * @param {'login'|'signup'|null} etat.vueDemandee  vue imposée par la route
+ * @param {string} etat.refCode    code partenaire mémorisé sur l'appareil
+ * @param {string} etat.teamCode   code d'invitation lu dans l'adresse
+ * @returns {'login'|'signup'}
+ */
+export const vueLogin = ({ vueDemandee = null, refCode = '', teamCode = '' } = {}) => {
+  if (vueDemandee) return vueDemandee;
+  return refCode || teamCode ? 'signup' : 'login';
+};
