@@ -8,6 +8,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
 import { capturerFormuleUrl, lireFormuleChoisie } from './utils/formuleChoisie';
+import { ecranDentree } from './utils/entree';
 import AppLayout from './components/AppLayout';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import LoadingShell from './components/LoadingShell';
@@ -83,7 +84,7 @@ function usePreloadScreens() {
 }
 
 function AppRoutes() {
-  const { user, isLoading, recovery } = useAuth();
+  const { user, isLoading, recovery, pendingAuthUser } = useAuth();
   const navigate = useNavigate();
   // Page vue : UN SEUL point d'émission, à la racine des routes. Le chemin est
   // normalisé (« /clients/c-4f2a » → « /clients/:id ») avant tout envoi.
@@ -103,17 +104,23 @@ function AppRoutes() {
     dernierCompte.current = id;
   }, [user?.id, navigate]);
 
-  if (isLoading) {
+  // L'ordre de priorité vit dans utils/entree.js, où il se teste : deux
+  // parcours en cours d'achèvement (réinitialisation du mot de passe, retour
+  // de Google d'un nouvel arrivant) passent AVANT la vitrine. Sans cela, le
+  // retour de Google — qui atterrit sur la racine — tombait sur la page
+  // d'accueil et l'inscription se perdait là, sans un mot.
+  const ecran = ecranDentree({ isLoading, recovery, pendingAuthUser, user });
+
+  if (ecran === 'chargement') {
     return <LoadingShell />;
   }
 
-  // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.
-  if (recovery) return <Login />;
+  if (ecran === 'connexion') return <Login />;
 
   // Visiteur non connecté : la vitrine à la racine, les formulaires à côté.
   // Toute autre adresse (un signet vers /dashboard, par exemple) ouvre la
   // connexion — comme avant l'arrivée de la page d'accueil.
-  if (!user) {
+  if (ecran === 'public') {
     return (
       <Suspense fallback={<LoadingShell />}>
         <Routes>

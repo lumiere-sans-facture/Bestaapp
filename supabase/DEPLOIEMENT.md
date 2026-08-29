@@ -79,6 +79,20 @@ ouvertes si un script n'a pas été rejoué ici. Marche à suivre en **11.5**.
 - **Authentication → URL Configuration** :
   - *Site URL* : l'URL de production (`https://app.bestasolar.com`).
   - *Redirect URLs* : ajouter la même URL (nécessaire au lien « mot de passe oublié »).
+- **Connexion Google (facultative) — TROIS réglages, et le bouton disparaît si
+  l'un manque** :
+  1. *Authentication → Providers → Google* : activé, avec le *Client ID* et le
+     *Client Secret* d'un identifiant OAuth de la console Google Cloud.
+  2. Dans la console Google Cloud, *URI de redirection autorisés* doit contenir
+     l'adresse de rappel du projet Supabase :
+     `https://VOTRE-PROJET.supabase.co/auth/v1/callback`.
+  3. Dans **Vercel**, la variable `VITE_ENABLE_GOOGLE_AUTH=true`. Sans elle, le
+     bouton « Continuer avec Google » n'est même pas affiché — l'app n'a alors
+     rien de cassé, elle ne propose simplement pas ce moyen d'entrée.
+
+  Le retour de Google atterrit sur la RACINE du site (`window.location.origin`) :
+  cette adresse doit donc figurer dans les *Redirect URLs* ci-dessus, pour
+  chaque environnement (production ET recette).
 - **Authentication → Rate Limits** : resserrer la limite de tentatives de
   connexion (`sign_in_attempts` — la valeur par défaut est large). C'est la
   VRAIE limite anti-brute-force ; le compteur de l'écran de connexion
