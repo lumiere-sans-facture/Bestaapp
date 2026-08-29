@@ -6,6 +6,7 @@ const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1
 const R = []; const ok = (c, m) => { R.push(`${c ? '✓ ' : '❌'} ${m}`); return c; };
 const jsErr = [];
 const B = 'http://127.0.0.1:3000';
+const UTILISATEUR_CONNECTE = { id: 'u-landing', email: 'landing@bestasolar.bj', name: 'Awa', role: 'gerant', phone: '+229', avatar: 'A' };
 
 const page = await nav.newPage({ viewport: { width: 1366, height: 900 } });
 page.on('pageerror', (e) => jsErr.push(String(e)));
@@ -25,6 +26,17 @@ ok(await page.locator('h1').first().innerText() === 'Vendez plus de solaire, san
 ok(await page.locator('.login-form-title, input[type="password"]').count() === 0,
    'le formulaire de connexion ne s’affiche pas à la racine');
 ok(await page.locator('img[src="/besta-solar-pro-logo.png"]').count() === 1, 'logo d’en-tête chargé');
+
+// ---- 1 ter. ACTUALISER L’ACCUEIL CONNECTÉ GARDE LA VITRINE ----
+const connecte = await nav.newPage({ viewport: { width: 1366, height: 900 } });
+await connecte.goto(B + '/');
+await connecte.evaluate((u) => localStorage.setItem('bestasolar_user', JSON.stringify(u)), UTILISATEUR_CONNECTE);
+await connecte.reload();
+await connecte.waitForSelector('.landing', { timeout: 15000 });
+ok(new URL(connecte.url()).pathname === '/', `session active : / reste l’accueil (${connecte.url()})`);
+ok(await connecte.locator('.dashboard-main, .app-layout').count() === 0,
+   'session active : actualiser l’accueil ne monte pas le tableau de bord');
+await connecte.close();
 
 // Les sections attendues sont toutes là.
 for (const id of ['accueil', 'conseiller', 'schemas', 'avantages', 'tarifs', 'carriere', 'faq']) {

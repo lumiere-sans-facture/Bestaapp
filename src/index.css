@@ -1447,6 +1447,12 @@ form .login-link { width: 100%; margin-top: 4px; }
   box-shadow: var(--shadow); transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 .devis-mode-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.devis-mode-card.is-coming-soon { cursor: default; opacity: 0.78; }
+.devis-mode-card.is-coming-soon:hover { border-color: var(--border); transform: none; box-shadow: var(--shadow); }
+.devis-mode-badge {
+  padding: 3px 8px; border-radius: 999px; background: var(--warning-light); color: var(--accent-dark);
+  font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+}
 .devis-mode-icon {
   width: 56px; height: 56px; border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
@@ -3071,3 +3077,34 @@ form .login-link { width: 100%; margin-top: 4px; }
   .guide-nouveau-cible { animation: none; }
 }
 
+
+
+/* Marque publique : icône et nom seulement — le slogan n'apparaît plus dans le logo. */
+.sidebar-brand-identite {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.sidebar-brand-identite-icone {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.sidebar-brand-identite-nom {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.sidebar-brand-identite-nom b {
+  color: var(--accent, #f7c948);
+  font-weight: 800;
+}

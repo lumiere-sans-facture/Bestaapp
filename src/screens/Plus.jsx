@@ -31,6 +31,7 @@ import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import KitsSection from './plus/KitsSection';
 import PaiementsSection from './plus/PaiementsSection';
 import AppearanceSection from './plus/AppearanceSection';
+import GoogleContactsSection from './plus/GoogleContactsSection';
 import KkiapayButton from '../components/KkiapayButton';
 import InvertersSection from './plus/InvertersSection';
 import PompeKitsSection from './plus/PompeKitsSection';
@@ -71,14 +72,14 @@ export default function Plus() {
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup', 'roi'];
+  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup', 'roi', 'googlecontacts'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
   // simple utilisateur restait ainsi sur l'écran des commissions du gérant,
   // boutons « Payer » et « Commission manuelle » compris. L'autorisation se
   // décide donc ici, à la section, pas au bouton.
-  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'backup'];
+  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'backup', 'googlecontacts'];
   const sectionAutorisee = (tab) => {
     if (!KNOWN_TABS.includes(tab)) return false;
     if (tab === 'subsadmin') {
@@ -98,7 +99,7 @@ export default function Plus() {
   const setActiveTab = (x) => navigate(x === 'menu' ? '/plus' : `/plus/${x}`);
   // Sections ouvertes DEPUIS « Paramètres » : leur retour y revient, sinon on
   // retomberait sur le menu « Plus » sans jamais pouvoir enchaîner deux réglages.
-  const SECTIONS_PARAMETRES = ['profile', 'apparence', 'backup', 'paiements', 'subsadmin'];
+  const SECTIONS_PARAMETRES = ['profile', 'apparence', 'backup', 'paiements', 'subsadmin', 'googlecontacts'];
   const retourDepuis = (tab) => (SECTIONS_PARAMETRES.includes(tab) ? 'parametres' : 'menu');
   const [comFilter, setComFilter] = useState('all');
   const [comPartner, setComPartner] = useState('all');
@@ -659,6 +660,7 @@ export default function Plus() {
           <div className="plus-section-label">Configuration</div>
           <div className="plus-card card">
             <MenuItem icon={CreditCard} title="Moyens de paiement" subtitle={paiementActif ? `${paiementActif.nom} · ${paiementActif.mode}` : 'Aucun agrégateur activé — Mobile Money manuel'} onClick={() => setActiveTab('paiements')} />
+            <MenuItem icon={Share2} title="Synchronisation Google Contacts" subtitle="Connecter le compte qui reçoit les nouveaux partenaires" onClick={() => setActiveTab('googlecontacts')} />
             <MenuItem icon={DatabaseBackup} title="Sauvegarde des données" subtitle="Exporter / restaurer toutes les données" onClick={() => setActiveTab('backup')} />
             {/* Administration du SaaS : en mode backend, réservée à l'admin
                 plateforme (le serveur refuse de toute façon l'activation
@@ -799,7 +801,7 @@ export default function Plus() {
     menu: 'Plus', parametres: 'Paramètres', apparence: 'Apparence', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
     subsadmin: 'Abonnements Devis Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
-    paiements: 'Moyens de paiement',
+    paiements: 'Moyens de paiement', googlecontacts: 'Google Contacts',
     profile: 'Profil', backup: 'Sauvegarde des données',
     roi: 'Simulateur ROI',
   };
@@ -810,6 +812,7 @@ export default function Plus() {
     profile: 'Vos informations et votre entreprise',
     apparence: 'Personnalisez l’apparence de l’application',
     paiements: 'Qui encaisse les abonnements Devis Pro',
+    googlecontacts: 'Compte Google utilisé pour synchroniser les partenaires',
     backup: 'Exporter / restaurer toutes les données',
     subsadmin: 'Abonnés, paiements à valider et MRR',
     roi: 'Ce que le client paie aujourd’hui, et en combien de temps l’installation se rembourse',
@@ -836,6 +839,7 @@ export default function Plus() {
         {activeTab === 'pompekits' && <PompeKitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'roi' && <RoiSection />}
         {activeTab === 'paiements' && <PaiementsSection />}
+        {activeTab === 'googlecontacts' && <GoogleContactsSection />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'subsadmin' && <SubscriptionsAdmin />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}

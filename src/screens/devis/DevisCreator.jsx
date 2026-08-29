@@ -3,7 +3,6 @@ import { PanelTop, ShoppingCart, UserCheck, Droplets } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import ManualWizard from './ManualWizard';
 import SolarWizard from './SolarWizard';
-import PompeWizard from './PompeWizard';
 
 /**
  * Flux de création d'un devis, réutilisable partout (écran Devis public ET
@@ -20,14 +19,13 @@ import PompeWizard from './PompeWizard';
  */
 export default function DevisCreator({ onDone, startManual = false, initialManualItems, initialLeadId = null, devisAModifier = null }) {
   const { getLeadById } = useData();
-  const [mode, setMode] = useState(devisAModifier ? 'solar' : startManual ? 'manual' : 'choose'); // choose | solar | pompe | manual
+  const [mode, setMode] = useState(devisAModifier ? 'solar' : startManual ? 'manual' : 'choose'); // choose | solar | manual
   const initialLead = initialLeadId ? getLeadById(initialLeadId) : null;
 
   // Le dimensionnement par facture n'a plus sa carte : c'est un simple
   // mode de saisie de la consommation, proposé DANS l'assistant solaire
   // (appareils / saisie directe / facture) — une entrée de moins à choisir.
   if (mode === 'solar') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} devisAModifier={devisAModifier} />;
-  if (mode === 'pompe') return <PompeWizard onDone={onDone} initialLeadId={initialLeadId} />;
   if (mode === 'manual') return <ManualWizard onDone={onDone} initialItems={initialManualItems} initialLeadId={initialLeadId} />;
 
   return (
@@ -44,11 +42,12 @@ export default function DevisCreator({ onDone, startManual = false, initialManua
           <div className="devis-mode-title">Dimensionnement solaire</div>
           <div className="devis-mode-desc">Estimez la consommation du client — liste d'appareils, saisie directe ou facture CEET/SBEE — et générez le système (panneaux, onduleur, batteries) et son devis chiffré.</div>
         </button>
-        <button className="devis-mode-card" onClick={() => setMode('pompe')}>
+        <div className="devis-mode-card is-coming-soon" role="status" aria-label="Dimensionnement pompe solaire : bientôt disponible">
           <div className="devis-mode-icon pompe"><Droplets size={26} /></div>
-          <div className="devis-mode-title">Pompe solaire</div>
-          <div className="devis-mode-desc">Volume d'eau quotidien, profondeur et réservoir : le kit de pompage adapté est suggéré avec son devis complet.</div>
-        </button>
+          <div className="devis-mode-title">Dimensionnement pompe solaire</div>
+          <span className="devis-mode-badge">Bientôt disponible</span>
+          <div className="devis-mode-desc">Le dimensionnement des installations de pompage solaire sera disponible prochainement.</div>
+        </div>
         <button className="devis-mode-card" onClick={() => setMode('manual')}>
           <div className="devis-mode-icon"><ShoppingCart size={26} /></div>
           <div className="devis-mode-title">Sélection manuelle</div>

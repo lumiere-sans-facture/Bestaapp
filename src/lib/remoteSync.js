@@ -468,3 +468,39 @@ export function subscribeToChanges(onChange) {
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
+
+
+// ---- Google Contacts ------------------------------------------------------
+// Toute I/O distante reste ici : les écrans et le contexte ne manipulent jamais
+// le client Supabase directement. Les Edge Functions gardent les tokens OAuth
+// hors du navigateur.
+const invokeGoogleContacts = async (functionName, body) => {
+  if (!supabase) return { unavailable: true };
+  const { data, error } = await supabase.functions.invoke(functionName, { body });
+  if (error) throw new Error(error.message || 'Service Google Contacts indisponible.');
+  if (data?.error) throw new Error(data.error);
+  return data || {};
+};
+
+export const getGoogleContactsConfig = () =>
+  invokeGoogleContacts('google-contacts-oauth', { action: 'get-config' });
+
+export const startGoogleContactsOAuth = () =>
+  invokeGoogleContacts('google-contacts-oauth', { action: 'start' });
+
+export const disconnectGoogleContacts = () =>
+  invokeGoogleContacts('google-contacts-oauth', { action: 'disconnect' });
+
+/** Envoie un partenaire vers la file serveur. Le résultat ne bloque jamais
+ *  l'enregistrement local : l'appelant conserve pending/failed pour la reprise. */
+export const syncPartnerGoogleContact = (partner) =>
+  invokeGoogleContacts('google-contacts-sync', {
+    partnerId: partner.id,
+    contact: {
+      id: partner.id,
+      name: partner.name,
+      phone: partner.phone,
+      email: partner.email || '',
+      company: partner.company || partner.entreprise || '',
+    },
+  });
