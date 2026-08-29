@@ -12,7 +12,7 @@ import StageBadge from '../../components/StageBadge';
 
 const EMPTY_FORM = { name: '', phone: '', momoNumber: '', sponsorId: '', status: 'actif', tier: 'standard' };
 
-const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };
+const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };\nconst GOOGLE_SYNC_LABELS = { pending: 'En attente', synced: 'Synchronisé', already_exists: 'Déjà présent', failed: 'À réessayer' };
 
 export default function PartnersSection({ onBack }) {
   const {
@@ -226,6 +226,12 @@ export default function PartnersSection({ onBack }) {
                   <span className="sheet-label"><Phone size={14} /> Téléphone</span>
                   <a className="sheet-value sheet-link" href={`tel:${selected.phone.replace(/\s/g, '')}`}>{selected.phone}</a>
                 </div>
+                {selected.google_contact_sync_status && (
+                  <div className="sheet-row">
+                    <span className="sheet-label">Google Contacts</span>
+                    <span className="sheet-value">{GOOGLE_SYNC_LABELS[selected.google_contact_sync_status] || selected.google_contact_sync_status}</span>
+                  </div>
+                )}
                 <div className="sheet-row"><span className="sheet-label">Inscrit le</span><span className="sheet-value">{formatDate(selected.registeredAt)}</span></div>
                 <div className="sheet-row"><span className="sheet-label">Commissions payées</span><span className="sheet-value">{formatCFA(st.paid)}</span></div>
                 <div className="sheet-row"><span className="sheet-label">Commissions en attente</span><span className="sheet-value amount">{formatCFA(st.pending)}</span></div>
