@@ -109,6 +109,18 @@ export function DataProvider({ children }) {
   // Actions métier (stables : créées une fois sur setState)
   const actions = useMemo(() => createActions(setState), []);
 
+  // Une tentative ratée ne nécessite aucune action manuelle : tant que l'app
+  // est ouverte, on réveille la file chaque minute et immédiatement au retour
+  // du réseau. Le planificateur serveur documenté complète ce filet quand
+  // aucun appareil n'est ouvert.
+  const [googleRetryTick, setGoogleRetryTick] = useState(0);
+  useEffect(() => {
+    const wake = () => setGoogleRetryTick((n) => n + 1);
+    const interval = setInterval(wake, 60 * 1000);
+    window.addEventListener('online', wake);
+    return () => { clearInterval(interval); window.removeEventListener('online', wake); };
+  }, []);
+
   // Reprise asynchrone de Google Contacts. La mutation locale ne dépend jamais
   // de ce réseau : seuls les partenaires avec un statut arrivé à échéance sont
   // tentés, et un seul essai par partenaire est exécuté simultanément.
@@ -138,7 +150,7 @@ export function DataProvider({ children }) {
         .finally(() => googleSyncInFlight.current.delete(partner.id));
     });
     return () => { active = false; };
-  }, [state.partners, actions]);
+  }, [state.partners, actions, googleRetryTick]);
 
   // Profil partenaire de l'utilisateur garanti dès l'ouverture de l'app.
   // C'est lui qui porte les commissions : sans profil, une affaire gagnée
