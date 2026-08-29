@@ -12,7 +12,8 @@ import StageBadge from '../../components/StageBadge';
 
 const EMPTY_FORM = { name: '', phone: '', momoNumber: '', sponsorId: '', status: 'actif', tier: 'standard' };
 
-const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };\nconst GOOGLE_SYNC_LABELS = { pending: 'En attente', synced: 'Synchronisé', already_exists: 'Déjà présent', failed: 'À réessayer' };
+const REFERRAL_TYPE_LABELS = { clic: 'Clic sur le lien', piste: 'Nouvelle piste', devis: 'Devis créé' };
+const GOOGLE_SYNC_LABELS = { pending: 'En attente', synced: 'Synchronisé', already_exists: 'Déjà présent', failed: 'À réessayer' };
 
 export default function PartnersSection({ onBack }) {
   const {
