@@ -41,3 +41,16 @@ export function samePhoneNumber(a, b, country = 'BJ') {
   const right = normalizePhoneNumber(b, country);
   return Boolean(left && right && left === right);
 }
+
+
+/** Trouve un contact dont AU MOINS un numéro est identique après normalisation.
+ *  La People API fournit { phoneNumbers: [{ value }] }; le format tableau de
+ *  chaînes est aussi admis afin de garder la fonction pure et testable. */
+export function findContactByNormalizedPhone(contacts, phone, country = 'BJ') {
+  const target = normalizePhoneNumber(phone, country);
+  if (!target) return null;
+  return (contacts || []).find((contact) => {
+    const items = contact?.phoneNumbers || contact?.phones || [];
+    return items.some((item) => normalizePhoneNumber(typeof item === 'string' ? item : item?.value, country) === target);
+  }) || null;
+}
