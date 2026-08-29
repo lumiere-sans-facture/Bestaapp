@@ -236,8 +236,24 @@ afficher les cinq noms.
 > Les fonctions lisent aussi `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`,
 > mais Supabase les fournit lui-même : ne les ajoutez pas, ils seraient refusés.
 
-`SITE_URL` est l'adresse de l'app **de cet environnement** :
-`https://app.bestasolar.com` en production, l'adresse Vercel de recette sinon.
+### `SITE_URL` : l'adresse exacte de l'app, pas une approchante
+
+C'est le piège le plus discret des huit étapes. `SITE_URL` sert de deux façons
+à la fois : l'adresse de retour après l'autorisation Google, **et** l'origine
+autorisée par les fonctions (`Access-Control-Allow-Origin`).
+
+Si elle ne correspond pas, **au caractère près**, à l'adresse depuis laquelle
+l'app s'ouvre, le navigateur rejette chaque réponse — la fonction a pourtant
+répondu correctement, mais rien n'arrive à l'écran, et la console affiche une
+erreur CORS plutôt qu'un message utile.
+
+| Environnement | `SITE_URL` |
+|---|---|
+| Production | `https://app.bestasolar.com` |
+| Recette | l'adresse Vercel du projet de test |
+
+Ni barre oblique finale, ni `www.`, ni `http`. L'adresse telle qu'elle
+s'affiche dans la barre du navigateur quand vous utilisez l'app.
 
 ---
 
@@ -253,6 +269,8 @@ l'autorisation, et vous revenez dans l'app, compte connecté.
 | `Failed to send a request to the Edge Function` | les fonctions ne sont pas déployées → étape 7 |
 | `redirect_uri_mismatch` | l'adresse de rappel diffère entre l'étape 4 et l'étape 8 |
 | `access_denied` | le compte n'est pas dans *Utilisateurs tests* → étape 3 |
+| une erreur CORS, sans message de la fonction | `SITE_URL` ne correspond pas à l'adresse de l'app → étape 8 |
+| `Réservé au gérant de l'organisation` | le compte connecté n'a pas le rôle `gerant` |
 | une erreur mentionnant une table | la migration n'est pas passée → étape 6 |
 
 ## Reste facultatif : la reprise automatique
