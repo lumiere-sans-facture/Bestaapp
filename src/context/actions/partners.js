@@ -6,19 +6,43 @@ import { COMMISSION_RATES, partnerFromActiveRef } from './shared';
 
 export function createPartnerActions(setState) {
   return {
-    addPartner: (partner) =>
+    // Création locale d'abord : même sans réseau ou sans compte Google relié,
+    // le partenaire apparaît immédiatement. Le contexte reprendra ensuite les
+    // entrées « pending » auprès de la file Google Contacts.
+    addPartner: (partner) => {
+      const id = crypto.randomUUID();
+      const created = { ...partner, id };
       setState((s) => ({
         ...s,
         partners: [
           {
-            ...partner,
-            id: crypto.randomUUID(),
+            ...created,
             code: generatePartnerCode(partner.name, s.partners.map((p) => p.code).filter(Boolean)),
             status: 'actif',
             registeredAt: new Date().toISOString().slice(0, 10),
+            ...(partner.phone?.trim() ? { google_contact_sync_status: 'pending' } : {}),
           },
           ...s.partners,
         ],
+      }));
+      return created;
+    },
+
+    // Résultat renvoyé par l'Edge Function ou par sa file de reprise. Il reste
+    // attaché au partenaire pour être répliqué comme le reste des données.
+    setPartnerGoogleContactSync: (partnerId, result = {}) =>
+      setState((s) => ({
+        ...s,
+        partners: s.partners.map((p) => (p.id === partnerId ? {
+          ...p,
+          google_contact_sync_status: result.status || 'pending',
+          ...(result.resourceName ? { google_contact_resource_name: result.resourceName } : {}),
+          ...(result.status === 'synced' || result.status === 'already_exists'
+            ? { google_contact_synced_at: new Date().toISOString(), google_contact_sync_error: null, google_contact_sync_next_retry_at: null }
+            : {}),
+          ...(result.error ? { google_contact_sync_error: result.error } : {}),
+          ...(result.nextRetryAt ? { google_contact_sync_next_retry_at: result.nextRetryAt } : {}),
+        } : p)),
       })),
 
     updatePartner: (partnerId, patch) =>
