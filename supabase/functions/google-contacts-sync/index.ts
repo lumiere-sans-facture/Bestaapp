@@ -1,0 +1,143 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizePhoneNumber } from '../../../shared/phone.js';
+
+type Contact = { id?: string; name?: string; phone?: string; email?: string; company?: string; [key: string]: unknown };
+type Job = { id: string; org_id: string; partner_id: string; normalized_phone: string; contact_data: Contact; attempts: number; status: string };
+const cors = { 'Access-Control-Allow-Origin': Deno.env.get('SITE_URL') || '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+const db = () => createClient(Deno.env.get('SUPABASE_URL') || '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '', { auth: { persistSession: false, autoRefreshToken: false } });
+const retryAt = (attempts: number) => new Date(Date.now() + Math.min(60 * 60 * 1000, 5 * 60 * 1000 * (2 ** Math.min(attempts, 4)))).toISOString();
+
+async function currentOrg(req: Request) {
+  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\\s+/i, '');
+  if (!token) throw new Error('Authentification requise.');
+  const client = db();
+  const { data: auth } = await client.auth.getUser(token);
+  if (!auth.user) throw new Error('Session invalide.');
+  const { data: profile } = await client.from('profiles').select('org_id').eq('id', auth.user.id).single();
+  if (!profile?.org_id) throw new Error('Organisation introuvable.');
+  return { client, orgId: profile.org_id as string };
+}
+
+async function setPartnerStatus(client: ReturnType<typeof db>, job: Job, status: string, error: string | null = null, resourceName: string | null = null, next: string | null = null) {
+  await client.rpc('set_google_contact_sync_status', {
+    p_org_id: job.org_id, p_partner_id: job.partner_id, p_status: status,
+    p_error: error, p_resource_name: resourceName, p_next_attempt_at: next,
+  });
+}
+async function updateJob(client: ReturnType<typeof db>, job: Job, patch: Record<string, unknown>) {
+  await client.from('google_contact_sync_jobs').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', job.id);
+}
+
+async function accessToken(client: ReturnType<typeof db>, config: any) {
+  if (config.access_token && config.access_token_expires_at && new Date(config.access_token_expires_at).getTime() > Date.now() + 60_000) return config.access_token as string;
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '', client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '', refresh_token: config.refresh_token, grant_type: 'refresh_token' }),
+  });
+  const refreshed = await response.json();
+  if (!response.ok || !refreshed.access_token) throw new Error(refreshed.error_description || 'Renouvellement du jeton Google impossible.');
+  await client.from('google_contacts_configs').update({ access_token: refreshed.access_token, access_token_expires_at: new Date(Date.now() + Number(refreshed.expires_in || 3600) * 1000).toISOString(), updated_at: new Date().toISOString() }).eq('org_id', config.org_id);
+  return refreshed.access_token as string;
+}
+
+async function findContactByPhone(token: string, phone: string) {
+  let pageToken: string | undefined;
+  do {
+    const url = new URL('https://people.googleapis.com/v1/people/me/connections');
+    url.searchParams.set('personFields', 'names,phoneNumbers');
+    url.searchParams.set('pageSize', '1000');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error?.message || 'Lecture des contacts Google impossible.');
+    for (const person of payload.connections || []) {
+      if ((person.phoneNumbers || []).some((item: { value?: string }) => normalizePhoneNumber(item.value, 'BJ') === phone)) return person;
+    }
+    pageToken = payload.nextPageToken;
+  } while (pageToken);
+  return null;
+}
+
+async function createContact(token: string, contact: Contact, normalizedPhone: string) {
+  const words = String(contact.name || 'Partenaire BestaSolar').trim().split(/\\s+/);
+  const payload: Record<string, unknown> = {
+    names: [{ givenName: words[0] || 'Partenaire', familyName: words.slice(1).join(' ') || undefined }],
+    phoneNumbers: [{ value: normalizedPhone, type: 'mobile' }],
+  };
+  if (contact.email) payload.emailAddresses = [{ value: String(contact.email), type: 'work' }];
+  if (contact.company) payload.organizations = [{ name: String(contact.company), type: 'work' }];
+  const response = await fetch('https://people.googleapis.com/v1/people:createContact', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  });
+  const created = await response.json();
+  if (!response.ok) throw new Error(created.error?.message || 'Création du contact Google impossible.');
+  return created;
+}
+
+async function processJob(client: ReturnType<typeof db>, job: Job) {
+  const { data: config } = await client.from('google_contacts_configs').select('*').eq('org_id', job.org_id).eq('sync_enabled', true).maybeSingle();
+  if (!config) {
+    const next = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await updateJob(client, job, { status: 'pending', next_attempt_at: next, last_error: 'Compte Google Contacts non configuré.' });
+    await setPartnerStatus(client, job, 'pending', 'Compte Google Contacts non configuré.', null, next);
+    return { status: 'pending', nextRetryAt: next };
+  }
+  const { data: locked } = await client.rpc('acquire_google_contact_sync_lock', { p_org_id: job.org_id, p_normalized_phone: job.normalized_phone, p_seconds: 90 });
+  if (!locked) return { status: 'pending', message: 'Une synchronisation de ce numéro est déjà en cours.' };
+  try {
+    const token = await accessToken(client, config);
+    // Vérification juste avant toute création : les numéros Google sont normalisés
+    // avec la même fonction partagée que la saisie BestaSolar.
+    const existing = await findContactByPhone(token, job.normalized_phone);
+    if (existing) {
+      await updateJob(client, job, { status: 'already_exists', synced_at: new Date().toISOString(), next_attempt_at: null, last_error: null, google_contact_resource_name: existing.resourceName || null });
+      await setPartnerStatus(client, job, 'already_exists', null, existing.resourceName || null, null);
+      return { status: 'already_exists', resourceName: existing.resourceName || null };
+    }
+    // Le verrou SQL couvre le petit intervalle recherche → création pour éviter
+    // que deux appareils créent le même numéro simultanément.
+    const created = await createContact(token, job.contact_data, job.normalized_phone);
+    await updateJob(client, job, { status: 'synced', synced_at: new Date().toISOString(), next_attempt_at: null, last_error: null, google_contact_resource_name: created.resourceName || null });
+    await setPartnerStatus(client, job, 'synced', null, created.resourceName || null, null);
+    return { status: 'synced', resourceName: created.resourceName || null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Synchronisation Google impossible.';
+    const next = retryAt((job.attempts || 0) + 1);
+    console.error('google_contact_sync_failed', { orgId: job.org_id, partnerId: job.partner_id, message });
+    await updateJob(client, job, { status: 'failed', attempts: (job.attempts || 0) + 1, last_error: message.slice(0, 1000), next_attempt_at: next });
+    await setPartnerStatus(client, job, 'failed', message, null, next);
+    return { status: 'failed', error: message, nextRetryAt: next };
+  } finally {
+    await client.rpc('release_google_contact_sync_lock', { p_org_id: job.org_id, p_normalized_phone: job.normalized_phone });
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  try {
+    const body = await req.json().catch(() => ({}));
+    const client = db();
+    if (body.action === 'retry-pending') {
+      if (!Deno.env.get('GOOGLE_CONTACTS_CRON_SECRET') || req.headers.get('x-google-contacts-cron-secret') !== Deno.env.get('GOOGLE_CONTACTS_CRON_SECRET')) return json({ error: 'Non autorisé.' }, 401);
+      const { data: jobs } = await client.from('google_contact_sync_jobs').select('*').in('status', ['pending', 'failed']).lte('next_attempt_at', new Date().toISOString()).limit(50);
+      const results = [];
+      for (const job of (jobs || [])) results.push(await processJob(client, job as Job));
+      return json({ processed: results.length, results });
+    }
+    const { orgId } = await currentOrg(req);
+    const contact = body.contact as Contact;
+    const partnerId = String(body.partnerId || contact?.id || '');
+    const normalizedPhone = normalizePhoneNumber(contact?.phone, 'BJ');
+    if (!partnerId || !normalizedPhone) return json({ status: 'failed', error: 'Partenaire ou numéro de téléphone invalide.' }, 400);
+    const { data: existing } = await client.from('google_contact_sync_jobs').select('*').eq('org_id', orgId).eq('partner_id', partnerId).maybeSingle();
+    if (existing && existing.normalized_phone === normalizedPhone && ['synced', 'already_exists'].includes(existing.status)) return json({ status: existing.status, resourceName: existing.google_contact_resource_name || null });
+    const jobInput = { org_id: orgId, partner_id: partnerId, normalized_phone: normalizedPhone, contact_data: { ...contact, phone: normalizedPhone }, status: 'pending', next_attempt_at: new Date().toISOString(), last_error: null };
+    const { data: job, error } = await client.from('google_contact_sync_jobs').upsert(jobInput, { onConflict: 'org_id,partner_id' }).select().single();
+    if (error || !job) throw new Error('File de synchronisation indisponible.');
+    return json(await processJob(client, job as Job));
+  } catch (error) {
+    console.error('google_contact_sync_request_failed', error instanceof Error ? error.message : error);
+    return json({ status: 'failed', error: error instanceof Error ? error.message : 'Synchronisation impossible.' }, 500);
+  }
+});
