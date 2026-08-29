@@ -133,7 +133,9 @@ export default function AppLayout() {
               </div>
             )}
             <div className="sidebar-brand-tools">
-              <NotificationBell />
+              {/* En mode public étendu, la cloche est affichée sous le logo :
+                  elle ne recouvre plus le nom de la marque sur petits écrans. */}
+              {(isPro || repliee) && <NotificationBell />}
               <button
                 type="button"
                 className="sidebar-repli"
@@ -146,7 +148,12 @@ export default function AppLayout() {
               </button>
             </div>
           </div>
-          {!isPro && !repliee && <div className="sidebar-subtitle">Lomé, Togo</div>}
+          {!isPro && !repliee && (
+            <div className="sidebar-brand-public-meta">
+              <div className="sidebar-subtitle">Lomé, Togo</div>
+              <NotificationBell />
+            </div>
+          )}
         </div>
         <nav className="sidebar-nav" aria-label="Navigation principale">
           {sidebarItems.map((item) => (

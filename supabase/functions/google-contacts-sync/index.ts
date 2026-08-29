@@ -9,7 +9,7 @@ const db = () => createClient(Deno.env.get('SUPABASE_URL') || '', Deno.env.get('
 const retryAt = (attempts: number) => new Date(Date.now() + Math.min(60 * 60 * 1000, 5 * 60 * 1000 * (2 ** Math.min(attempts, 4)))).toISOString();
 
 async function currentOrg(req: Request) {
-  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\\s+/i, '');
+  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Authentification requise.');
   const client = db();
   const { data: auth } = await client.auth.getUser(token);
@@ -59,7 +59,7 @@ async function findContactByPhone(token: string, phone: string) {
 }
 
 async function createContact(token: string, contact: Contact, normalizedPhone: string) {
-  const words = String(contact.name || 'Partenaire BestaSolar').trim().split(/\\s+/);
+  const words = String(contact.name || 'Partenaire BestaSolar').trim().split(/\s+/);
   const payload: Record<string, unknown> = {
     names: [{ givenName: words[0] || 'Partenaire', familyName: words.slice(1).join(' ') || undefined }],
     phoneNumbers: [{ value: normalizedPhone, type: 'mobile' }],

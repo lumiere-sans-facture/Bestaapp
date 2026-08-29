@@ -15,7 +15,7 @@ const admin = () => createClient(
 );
 
 async function requireManager(req: Request) {
-  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\\s+/i, '');
+  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Authentification requise.');
   const db = admin();
   const { data: auth, error: authError } = await db.auth.getUser(token);
@@ -29,7 +29,7 @@ async function requireManager(req: Request) {
 
 function callbackPage(siteUrl: string, ok: boolean, message: string) {
   const safe = message.replace(/[<>&]/g, '');
-  const target = `${siteUrl.replace(/\\/$/, '')}/plus/google-contacts?google_contacts=${ok ? 'connected' : 'error'}`;
+  const target = `${siteUrl.replace(/\/$/, '')}/plus/google-contacts?google_contacts=${ok ? 'connected' : 'error'}`;
   return new Response(`<!doctype html><html lang="fr"><meta charset="utf-8"><meta http-equiv="refresh" content="2;url=${target}"><title>Google Contacts</title><body style="font-family:system-ui;padding:2rem"><h1>${ok ? 'Compte Google connecté' : 'Connexion impossible'}</h1><p>${safe}</p><p>Retour à BestaSolar…</p><script>window.opener?.postMessage({source:'bestasolar-google-contacts',ok:${ok}}, '${siteUrl}');</script></body></html>`, {
     status: ok ? 200 : 400, headers: { 'Content-Type': 'text/html; charset=utf-8' },
   });

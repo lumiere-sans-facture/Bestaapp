@@ -110,6 +110,14 @@ await vierge.goto(B + '/');
 await vierge.waitForSelector('.landing', { timeout: 10000 });
 ok(await vierge.locator('h1').first().innerText().then((t) => t.startsWith('Vendez plus')),
    'retour ordinaire : la vitrine s’affiche malgré l’attribution enregistrée');
+// …et « Se connecter » ouvre bien la CONNEXION, pas l'inscription : l'attribution
+// vit trente jours, et détournait cette porte pendant tout ce temps — un bogue
+// invisible sur un navigateur neuf, bien réel sur celui d'un vrai visiteur.
+await vierge.locator('.landing header a', { hasText: 'Se connecter' }).click();
+await vierge.waitForTimeout(800);
+const titreVierge = await vierge.locator('.login-form-title').first().innerText().catch(() => '');
+ok(new URL(vierge.url()).pathname === '/connexion' && /Connexion/i.test(titreVierge),
+   `avec une attribution en mémoire, « Se connecter » ouvre la connexion (${titreVierge.trim() || '?'})`);
 await vierge.close();
 
 // ---- 7. MOBILE : AUCUN DÉBORDEMENT HORIZONTAL ----
