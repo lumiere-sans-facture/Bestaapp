@@ -146,7 +146,45 @@ casse rien et n'efface aucune donnée.
 
 ## 7. Déployer les deux fonctions
 
-Dans un terminal, **à la racine du dépôt** (une copie locale à jour sur `main`).
+### 7a. Avoir le dépôt à jour sur la machine
+
+Le déploiement lit les fichiers **sur votre disque** : c'est la version qui s'y
+trouve qui part chez Supabase, pas celle de GitHub. Une copie périmée déploie
+du code périmé, sans un mot.
+
+**Vous n'avez pas encore de copie locale** — ouvrez un terminal dans un dossier
+de travail (`Documents`, par exemple) :
+
+```bash
+git clone https://github.com/lumiere-sans-facture/Bestaapp.git
+cd Bestaapp
+```
+
+**Vous en avez déjà une** — placez-vous dedans, puis récupérez :
+
+```bash
+cd chemin/vers/Bestaapp
+git checkout claude/kit-selection-preconfigured-ixj6o0
+git pull
+```
+
+> ⚠️ **La branche compte.** Les fonctions ne sont pas déployées par Vercel :
+> vous les envoyez à la main, depuis les fichiers de votre disque. Prenez la
+> branche de travail, où vivent les corrections les plus récentes — `main` peut
+> être en retard sur elles.
+
+**Vérifiez que vous avez bien la version corrigée** avant de déployer :
+
+```bash
+git log --oneline -3
+```
+
+Cherchez le commit *« Google Contacts : antislashs doublés »*. S'il n'y est pas,
+le `git pull` n'a pas pris — vérifiez la branche.
+
+### 7b. Déployer
+
+Toujours dans ce dossier :
 
 ```bash
 npx supabase@latest login
@@ -156,8 +194,13 @@ npx supabase@latest functions deploy google-contacts-sync  --project-ref VOTRE-R
 ```
 
 La connexion ouvre une page dans le navigateur, puis rend la main au terminal.
-Vérifiez ensuite dans Supabase : **Edge Functions** doit lister les deux,
-actives.
+
+**Lisez la sortie de chaque commande.** Elle doit se terminer sans erreur ; un
+échec de compilation s'y affiche et le déploiement n'a alors pas eu lieu — même
+si la fonction précédente existe encore côté Supabase, et répond.
+
+Vérifiez ensuite dans Supabase : **Edge Functions** doit lister les deux, avec
+un horodatage de déploiement qui correspond à l'instant présent.
 
 > ⚠️ **Ne passez pas par l'éditeur de fonctions du navigateur.**
 > `google-contacts-sync` importe `shared/phone.js`, un fichier situé à la
