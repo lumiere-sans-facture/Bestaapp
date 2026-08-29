@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePhoneNumber, samePhoneNumber } from '../phone';
+import { findContactByNormalizedPhone, normalizePhoneNumber, samePhoneNumber } from '../phone';
 
 describe('normalizePhoneNumber — Bénin', () => {
   const equivalent = [
@@ -32,5 +32,18 @@ describe('samePhoneNumber', () => {
 
   it('ne confond pas deux numéros différents', () => {
     expect(samePhoneNumber('61732956', '61732957', 'BJ')).toBe(false);
+  });
+});
+
+
+describe('findContactByNormalizedPhone', () => {
+  it('détecte un contact Google existant malgré le changement 8 → 10 chiffres', () => {
+    const contacts = [{ resourceName: 'people/123', phoneNumbers: [{ value: '+229 61 73 29 56' }] }];
+    expect(findContactByNormalizedPhone(contacts, '+2290161732956', 'BJ')).toEqual(contacts[0]);
+  });
+
+  it('ne retourne aucun contact lorsqu’aucun numéro normalisé ne correspond', () => {
+    const contacts = [{ resourceName: 'people/123', phoneNumbers: [{ value: '01 61 73 29 57' }] }];
+    expect(findContactByNormalizedPhone(contacts, '61732956', 'BJ')).toBeNull();
   });
 });
