@@ -19,6 +19,8 @@ import {
   profilParId, supabaseConfigure, modeSandbox,
 } from '../_lib/encaissement.js';
 import { transactionIdValide, verdictTransaction } from '../../src/utils/verificationPaiement.js';
+import { formule, formuleValide, FORMULE_DEFAUT } from '../../src/utils/subscription.js';
+import { limiter, erreurServeur, PLAFONDS } from '../_lib/garde.js';
 
 
 /** Métadonnée posée par le widget : à qui, et pour quoi. */
@@ -30,6 +32,10 @@ const metaDeLaTransaction = (reponse) => {
 };
 
 export default async function handler(req, res) {
+  // Adresse publique que n'importe qui peut appeler : plafond plus large que
+  // le chemin principal (KkiaPay réessaie), mais plafond quand même.
+  if (limiter(req, res, PLAFONDS.paiementWebhook, 'paiement-webhook')) return;
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Méthode non autorisée' });
     return;
@@ -51,7 +57,7 @@ export default async function handler(req, res) {
     reponse = await statutTransaction(transactionId, { sandbox: await modeSandbox() });
   } catch (e) {
     // 502 : KkiaPay réessaiera. Un 200 ferait passer l'incident pour traité.
-    res.status(502).json({ error: 'Agrégateur injoignable', detail: e.message });
+    erreurServeur(req, res, 502, 'Agrégateur injoignable', e, { transactionId });
     return;
   }
 
@@ -93,12 +99,23 @@ export default async function handler(req, res) {
       res.status(200).json({ traite: true, active: true, deja: !!resultat.deja });
       return;
     }
+    // Abonnement : la métadonnée dit QUELLE formule, jamais combien elle
+    // coûte — le tarif exigé sort du catalogue, comme sur le chemin
+    // principal. Une formule inconnue retombe sur la mensuelle : l'argent est
+    // arrivé, on crédite ce qu'il couvre plutôt que de perdre le paiement.
+    const formuleId = formuleValide(meta.formule) ? meta.formule : FORMULE_DEFAUT;
+    const attendu = formule(formuleId).prix;
+    if (verdict.montant < attendu) {
+      res.status(200).json({ traite: true, active: false, motif: 'Montant reçu inférieur au tarif de la formule.' });
+      return;
+    }
     const resultat = await crediterAbonnement({
       profil, transactionId, montant: verdict.montant, methode: 'kkiapay',
+      formule: formuleId,
     });
     res.status(200).json({ traite: true, active: true, deja: !!resultat.deja });
   } catch (e) {
-    res.status(500).json({ error: 'Enregistrement du paiement impossible', detail: e.message });
+    erreurServeur(req, res, 500, 'Enregistrement du paiement impossible', e, { transactionId });
   }
 }
 

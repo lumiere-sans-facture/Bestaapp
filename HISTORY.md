@@ -5,7 +5,64 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-29
+- **Page publique d'accueil** : un visiteur non connecté arrive sur la vitrine et non sur le formulaire — promesse, aperçu du tableau de bord, les quatre étapes du conseiller, les schémas des quatre architectures (hybride, secours, site isolé, pompage), les avantages, les formules, les parcours partenaires, les témoignages et la FAQ. Bouton « Se connecter » pour qui a déjà un compte ; un lien de parrainage continue d'ouvrir l'inscription directement
+- Schémas de principe : sur téléphone, ils gardent la géométrie du grand écran — source à gauche, onduleur au centre, charge à droite — au lieu de défiler hors cadre, où l'on ne voyait que le premier bloc
+- **Abonnement pris dès l'inscription** : choisir « Pro Confort » ou « Pro Premium » sur la page d'accueil mène au paiement de CETTE formule, une fois le compte créé. Trois formules réelles (5 000 F/mois, 12 750 F/3 mois, 45 000 F/an), lues par le navigateur ET par le serveur : celui-ci exige le tarif de la formule et crédite sa durée, jamais ce que la requête annonce
+- Le revenu mensuel de l'écran d'administration compte chaque abonnement pour ce qu'il rapporte par mois : un abonné annuel pèse 3 750 F, plus 5 000
+- **Connexion Google** : l'inscription d'un nouvel arrivant ne se perd plus. Google renvoie sur la racine du site, devenue la vitrine ; le formulaire « complétez votre profil » passe désormais avant elle. La configuration nécessaire (fournisseur Supabase, URI de rappel Google Cloud, `VITE_ENABLE_GOOGLE_AUTH`) est enfin documentée
+- **Google Contacts** : les partenaires se synchronisent vers un compte Google de l'entreprise, avec reprise automatique des envois en attente et détection des doublons de téléphone (nécessite la migration et les Edge Functions — voir `supabase/GOOGLE_CONTACTS.md`)
+- **Quatre kits solaires d'août 2026** (5 kWh Deye, 10 kWh Taico, 25 kWh Felicity et le 3,8 kWh), catalogue trié par capacité de batterie ; l'assistant propose toutes les variantes d'une même capacité et laisse choisir, et les capacités décimales sont acceptées
+- Dimensionnement de pompe : annoncé comme « bientôt disponible » plutôt que de laisser une carte muette
+
+## 2026-08-24
+- Nouveaux utilisateurs : mini-guide d’accueil en trois étapes avec flèches vers le suivi clients, les devis et les formations ; responsive PC/mobile, il ne s’affiche qu’après la création réelle du profil et ne revient plus après « Passer » ou « Terminer »
+
+## 2026-08-22
+- **Sécurité** : audit complet et correctifs —
+  - plafond de requêtes sur les cinq points d'entrée API (10/min pour la vérification de paiement, 20 pour le journal d'erreurs ouvert, 60 pour le webhook, 30 et 20 pour les relais solaire et YouTube), avec `Retry-After` et en-têtes `X-RateLimit-*` ;
+  - plus aucun détail technique dans les réponses d'erreur : message générique au client, cause exacte (exception, message Postgres, réponse de l'agrégateur, noms de variables d'environnement) au journal serveur ;
+  - journal de sécurité horodaté et attribué (IP réelle, méthode, chemin) pour les plafonds atteints, les authentifications refusées et les erreurs 4xx/5xx ;
+  - `.gitignore` durci : `.env.local` — le nom que la documentation du projet demande de créer — n'était pas ignoré, pas plus que les clés, certificats et jetons de déploiement ;
+  - `supabase/verification-securite.sql` : quatre requêtes à passer après chaque déploiement SQL pour vérifier que la base est bien à jour (RLS, policies ouvertes de l'ancien schéma mono-équipe, fonctions `security definer`) ;
+  - `SECURITE.md` : posture complète, y compris les limites assumées.
+- Simulateur ROI : le **prix du kWh se choisit par pays de l'UEMOA** (les huit, avec leur opérateur — SBEE, SONABEL, CIE, EAGB, EDM, NIGELEC, Senelec, CEET), **Bénin par défaut** ; le curseur reste ajustable et l'écart au tarif indicatif est signalé
+- Simulateur ROI : l'estimation par facture retient désormais **toujours 60 % la nuit et 40 % en journée** — une facture ne dit pas quand le client consomme, et c'est la part nocturne qui dimensionne la batterie. Le mode « appareils » garde, lui, les heures réelles de chaque appareil
+- Simulateur ROI : la consommation s'estime au choix **d'après les appareils** ou **d'après la facture** du client (avec la répartition jour / nuit), et la **durée de vie retenue** se règle — 10, 15 ou 25 ans. L'estimation par facture annualise sur douze factures réelles : sans coupure, la ligne « Réseau CEET » vaut exactement douze fois ce que le client paie — c'est le seul chiffre qu'il a sous les yeux
+- **Simulateur ROI** : nouvel écran (barre latérale et menu « Plus », ouvert à toute l'équipe), bâti sur ce que l'app sait déjà calculer. À gauche les saisies : les appareils du client (le catalogue de l'assistant de devis — lampes, réfrigérateur, ventilateurs…), les coupures et les prix, puis le kit que l'assistant proposerait pour cette consommation, au prix du catalogue de l'entreprise — ou le montant d'un devis déjà émis, avec son étude reprise en un clic. À droite les résultats : remboursement, économie de la 1re année, gain sur 25 ans, CO₂ évité, la décomposition du coût actuel et la projection tracée. Aucun réglage abstrait (ni « taux de couverture », ni consommation du groupe en litres/heure) : les litres de gazole se déduisent des kWh, et l'écran met les deux prix du kWh face à face — réseau contre groupe. Un projet qui ne se rembourse pas est annoncé comme tel, et les hypothèses de calcul restent consultables
+- Barre latérale : la cloche de notifications rejoint le coin de l'app, à côté du logo (elle ne double plus le bandeau de chaque page sur grand écran ; sur mobile, où il n'y a pas de barre latérale, elle y reste)
+- Barre latérale : fléchette de repli — le menu se réduit à un rail d'icônes (264 → 76 px) et le contenu récupère la place ; libellés en infobulle, cloche, voyant de synchronisation et déconnexion restent accessibles, et le choix est conservé d'un écran à l'autre
+- **Mode hors-ligne** : l'app s'ouvre et reste utilisable sans réseau, et tout remonte seul au retour de la connexion
+  - la session est restaurée depuis le profil mémorisé sur l'appareil — sans réseau, l'app renvoyait l'utilisateur à l'écran de connexion, qu'il ne pouvait pas franchir non plus (ouverture : 7,4 s → 0,2 s)
+  - une modification faite hors-ligne (étape d'un client, prix d'un kit, statut d'un devis) survit au relancement : une file d'attente persistante la fait primer sur la copie du serveur, plus ancienne
+  - une app lancée sans serveur se reconnecte toute seule dès son retour (reprise à délai croissant, immédiate au retour du réseau ou de l'app) — avant, il fallait recharger la page
+  - le voyant distingue « Hors ligne — le travail est enregistré ici » d'un vrai refus du serveur, annonce le nombre d'éléments en attente et propose « Synchroniser maintenant »
+
+## 2026-08-21
+- Kits : nouveau **Kit 16 kWh** (batterie Beve 16 kWh, 10 × 590 Wc, onduleur Beve 6 kVA, 14 lignes, 2 319 000 F hors structure) — les kits officiels ajoutés par une mise à jour rejoignent désormais les installations existantes, une seule fois, sans ressusciter un kit supprimé par le gérant
+- Paramètres : tous les onglets (Profil, Apparence, Moyens de paiement, Sauvegarde, Administration) recadrés comme l'écran qui y mène — en-tête titre + phrase d'explication, un seul retour (la flèche de l'en-tête, que le bouton « Retour » doublait sur mobile), libellés de section en majuscules et même espacement des cartes partout
+
+## 2026-08-20
+- Apparence : écran dédié (Paramètres → Apparence) avec des cartes d'option illustrées, et retrait des icônes de thème de la barre latérale
+- Clients : carnet en cartes (pastille d'initiales, téléphone/email/adresse, nombre de devis) et fiche client plein écran sur `/clients/:id` — onglets Résumé / Devis / Contact / Notes, quatre indicateurs, activité sur 6 mois et devis récents
+- Clients : champ email ajouté à la fiche client (saisie, affichage, recherche)
+- Paramètres : nouvel écran qui réunit tout ce qui se règle (profil, abonnement, apparence, moyens de paiement, sauvegarde, administration, diagnostic) — la barre latérale et le menu « Plus » n'énumèrent plus que le travail quotidien
+- Plus → Compte : « Apparence » devient une ligne comme les autres (icône, sous-titre = thème actuel, flèche), le réglage s'ouvre dans une fiche au lieu d'être toujours affiché
+- Chargement : l'écran plein « Chargement… » cède la place à un squelette animé qui reprend la forme de l'app (barre latérale, en-tête) — la structure reste visible tout de suite, seul le contenu se dessine en attendant
+- Connexion (inscription) : bandeau tarifs/fonctionnalités retiré sous « Créer mon compte » ; texte du volet de marque recentré sur le dimensionnement solaire (fiche complète générée en quelques minutes)
+- Connexion : nouvelle mise en page à deux volets sur grand écran (formulaire à gauche, présentation de l'app à droite) — repli sur le formulaire seul en dessous de 900px
+- Logo officiel BestaSolar Pro : barre latérale (mode public, version blanche sans plaque) et documents imprimables (devis, factures) ; devient aussi le favicon et l'icône iOS (icône « B » dédiée) — écran de connexion inchangé (icône Sun)
+- Apparence : clair par défaut (ne suit plus l'OS tant que « Système » n'est pas choisi exprès) ; la page de connexion reste toujours claire, quel que soit le thème réglé sur l'appareil
+- Apparence : mode clair / sombre / système, réglable depuis Plus → Apparence (mobile) ou la barre latérale (desktop), sans backend — préférence d'appareil posée avant le premier rendu (pas de clignotement)
+- Devis : bouton « Relancer par WhatsApp » sur les affaires en cours, message pré-rempli et trace de la dernière relance
+- Notifications : cloche dans l'en-tête, sur tous les écrans — reprend le flux d'alertes du tableau de bord (pistes sans activité, devis sans suite, abonnement, commissions à payer)
+
 ## 2026-08-18
+- Tableau de bord : le suivi de stock disparaît, remplacé par « Devis sans suite » et « Transformation devis → commande » — deux indicateurs commerciaux, cliquables vers la liste filtrée
+- Boutique : les champs stock passent derrière un interrupteur par produit (« Suivre le stock »), désactivé par défaut — plus de décrément automatique à la confirmation de commande
+- Inscription : numéro de téléphone avec choix du pays (Togo +228 / Bénin +229) plutôt qu'un indicatif deviné
+- Inscription : message de succès reformulé pour orienter aussi qui a déjà un compte (connexion / mot de passe oublié), sans révéler si l'email existe déjà
+- CAPTCHA retiré entièrement (connexion, inscription, mot de passe oublié) : Supabase ne peut pas le réserver à la connexion sans casser l'inscription — la protection réelle reste le verrouillage progressif et les Rate Limits Supabase
 - Inscription : CAPTCHA retiré (gardé sur mot de passe oublié et connexion après 3 échecs)
 - Connexion : le CAPTCHA n'apparaît plus qu'à partir du 3e échec sur un même email, moins de friction pour la saisie normale
 - Session : durée de vie (30 j) et inactivité (7 j) bornées côté app, en attendant le palier payant Supabase qui fait ça nativement

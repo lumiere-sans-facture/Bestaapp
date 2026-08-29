@@ -1,0 +1,160 @@
+/* Page publique d'accueil : elle s'affiche pour un visiteur non connecté,
+   ses deux mécaniques (onglets des schémas, accordéon FAQ) répondent, et les
+   appels à l'action mènent bien à l'inscription. */
+import { chromium } from '@playwright/test';
+const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const R = []; const ok = (c, m) => { R.push(`${c ? '✓ ' : '❌'} ${m}`); return c; };
+const jsErr = [];
+const B = 'http://127.0.0.1:3000';
+const UTILISATEUR_CONNECTE = { id: 'u-landing', email: 'landing@bestasolar.bj', name: 'Awa', role: 'gerant', phone: '+229', avatar: 'A' };
+
+const page = await nav.newPage({ viewport: { width: 1366, height: 900 } });
+page.on('pageerror', (e) => jsErr.push(String(e)));
+// Les polices Google sont bloquées dans l'environnement de test : ces
+// échecs de chargement réseau ne sont pas des erreurs de l'application.
+page.on('console', (m) => {
+  if (m.type() !== 'error') return;
+  if (/net::ERR_|Failed to load resource/.test(m.text())) return;
+  jsErr.push('console: ' + m.text());
+});
+
+// ---- 1. LE VISITEUR ARRIVE SUR LA VITRINE, PAS SUR LE FORMULAIRE ----
+await page.goto(B + '/');
+await page.waitForSelector('.landing', { timeout: 15000 });
+ok(await page.locator('h1').first().innerText() === 'Vendez plus de solaire, sans perdre un seul client en route.',
+   'la promesse du bandeau est affichée');
+ok(await page.locator('.login-form-title, input[type="password"]').count() === 0,
+   'le formulaire de connexion ne s’affiche pas à la racine');
+ok(await page.locator('img[src="/besta-solar-pro-logo.png"]').count() === 1, 'logo d’en-tête chargé');
+
+// ---- 1 ter. ACTUALISER L’ACCUEIL CONNECTÉ GARDE LA VITRINE ----
+const connecte = await nav.newPage({ viewport: { width: 1366, height: 900 } });
+await connecte.goto(B + '/');
+await connecte.evaluate((u) => localStorage.setItem('bestasolar_user', JSON.stringify(u)), UTILISATEUR_CONNECTE);
+await connecte.reload();
+await connecte.waitForSelector('.landing', { timeout: 15000 });
+ok(new URL(connecte.url()).pathname === '/', `session active : / reste l’accueil (${connecte.url()})`);
+ok(await connecte.locator('.dashboard-main, .app-layout').count() === 0,
+   'session active : actualiser l’accueil ne monte pas le tableau de bord');
+await connecte.close();
+
+// Les sections attendues sont toutes là.
+for (const id of ['accueil', 'conseiller', 'schemas', 'avantages', 'tarifs', 'carriere', 'faq']) {
+  ok(await page.locator(`#${id}`).count() === 1, `section #${id} présente`);
+}
+
+// ---- 1 bis. LA PORTE DES CLIENTS DÉJÀ INSCRITS ----
+const connexion = page.locator('.landing header a', { hasText: 'Se connecter' });
+ok(await connexion.count() === 1, 'l’en-tête porte un bouton « Se connecter »');
+ok(await connexion.getAttribute('href') === '/connexion', 'il mène à la connexion');
+await connexion.click();
+await page.waitForTimeout(700);
+ok(page.url().endsWith('/connexion'), `clic → /connexion (${page.url()})`);
+ok(await page.locator('input[type="password"]').count() > 0, 'le formulaire de connexion est monté');
+await page.goto(B + '/');
+await page.waitForSelector('.landing');
+
+// ---- 2. ONGLETS DES SCHÉMAS ----
+const panneauVisible = () => page.evaluate(() => {
+  const t = document.querySelector('#schemas');
+  const p = Array.from(t.querySelectorAll('div')).filter((d) => d.style.display === 'block');
+  return p.length;
+});
+ok(await panneauVisible() === 1, 'un seul schéma visible au départ');
+ok(await page.locator('button:has-text("Système hybride")').count() === 1, 'onglet « Système hybride » présent');
+const avant = await page.locator('#schemas').innerText();
+await page.locator('button:has-text("Pompage solaire")').click();
+await page.waitForTimeout(250);
+const apres = await page.locator('#schemas').innerText();
+ok(avant !== apres, 'changer d’onglet change le schéma affiché');
+ok(apres.includes('Pompe immergée'), 'le schéma « Pompage » montre bien la pompe');
+ok(await panneauVisible() === 1, 'toujours un seul schéma visible après bascule');
+
+// ---- 3. ACCORDÉON FAQ ----
+const q2 = page.locator('#faq button').nth(1);
+const rep2 = () => page.evaluate(() => {
+  const b = document.querySelectorAll('#faq button')[1];
+  return b.parentElement.querySelector('div[style*="max-height"]')?.style.maxHeight;
+});
+ok(await rep2() === '0px', 'la 2e question est fermée au départ');
+await q2.click();
+await page.waitForTimeout(450);
+ok(await rep2() === '360px', 'cliquer ouvre la réponse');
+await q2.click();
+await page.waitForTimeout(450);
+ok(await rep2() === '0px', 'recliquer la referme');
+
+// ---- 4. LES APPELS À L'ACTION MÈNENT À L'INSCRIPTION ----
+await page.locator('a:has-text("Démarrer maintenant")').first().click();
+await page.waitForTimeout(600);
+ok(page.url().endsWith('/inscription'), `le CTA mène à /inscription (${page.url()})`);
+ok(await page.locator('input, .login-card, form').count() > 0, 'la page d’entrée est bien montée');
+
+// ---- 5. LIEN LÉGAL ----
+await page.goto(B + '/');
+await page.waitForSelector('.landing');
+ok(await page.locator('a[href="/privacy.html"]').count() === 1,
+   'le lien « Mentions légales » pointe vers la page de confidentialité, pas la FAQ');
+
+// ---- 6. UN LIEN DE PARRAINAGE OUVRE DIRECTEMENT L'INSCRIPTION ----
+// L'affilié envoie son lien pour faire créer un compte : la vitrine
+// s'intercalait entre le clic et le formulaire.
+const vierge = await nav.newPage({ viewport: { width: 1366, height: 900 } });
+await vierge.goto(B + '/?ref=BESTA-SIDDIK');
+await vierge.waitForTimeout(1200);
+const contenu = await vierge.locator('body').innerText();
+ok(!contenu.includes('Vendez plus de solaire'), 'lien de parrainage : la vitrine ne s’intercale pas');
+ok(/Créer mon compte|Code partenaire|Se connecter/.test(contenu), 'lien de parrainage : le formulaire est ouvert');
+// …mais un retour ORDINAIRE, sans le paramètre, revoit bien la vitrine.
+await vierge.goto(B + '/');
+await vierge.waitForSelector('.landing', { timeout: 10000 });
+ok(await vierge.locator('h1').first().innerText().then((t) => t.startsWith('Vendez plus')),
+   'retour ordinaire : la vitrine s’affiche malgré l’attribution enregistrée');
+await vierge.close();
+
+// ---- 7. MOBILE : AUCUN DÉBORDEMENT HORIZONTAL ----
+await page.setViewportSize({ width: 390, height: 844 });
+await page.waitForTimeout(400);
+const debord = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+ok(debord <= 1, `pas de défilement horizontal sur mobile (débordement ${debord}px)`);
+
+// Deux boutons dans un en-tête collant : sans resserrement, ils passaient à
+// la ligne et l'en-tête doublait de hauteur, sur toute la page.
+const entete = await page.evaluate(() => Math.round(document.querySelector('.landing header').getBoundingClientRect().height));
+ok(entete < 80, `l’en-tête tient sur une ligne sur mobile (${entete}px)`);
+ok(await page.locator('.landing header a', { hasText: 'Se connecter' }).count() === 1,
+   'la connexion reste accessible sur téléphone');
+
+// Le schéma garde sur mobile la géométrie du grand écran : source à gauche,
+// onduleur au centre, charge à droite, satellites au-dessus et en dessous.
+// La maquette le laissait défiler de côté — on ne voyait que le premier bloc.
+for (let i = 0; i < 4; i += 1) {
+  await page.locator('#schemas button').nth(i).click();
+  await page.waitForTimeout(300);
+  const r = await page.evaluate((n) => {
+    const g = document.querySelectorAll('.lp-schema')[n];
+    const boite = g.parentElement;
+    const cadre = (el) => { const b = el.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; };
+    const blocs = [...g.querySelectorAll('.lp-schema-bloc')];
+    const colonnes = new Set(blocs.map((b) => Math.round(cadre(b).x / 20)));
+    const lignes = new Set(blocs.map((b) => Math.round(cadre(b).y / 20)));
+    return {
+      defile: boite.scrollWidth > boite.clientWidth + 1,
+      horsCadre: [...g.querySelectorAll('*')].filter((e) => e.getBoundingClientRect().right > boite.getBoundingClientRect().right + 1).length,
+      colonnes: colonnes.size,
+      lignes: lignes.size,
+    };
+  }, i);
+  // Trois colonnes de cartes au minimum : c'est ce qui distingue un schéma
+  // d'une liste. Le nombre de niveaux varie selon l'architecture — le site
+  // isolé n'a pas de source au-dessus.
+  ok(!r.defile && r.horsCadre === 0 && r.colonnes >= 3,
+     `schéma ${i + 1} sur mobile : ${r.colonnes} colonnes de cartes, rien hors cadre, aucun défilement latéral`);
+}
+
+// ---- 8. AUCUNE ERREUR JS ----
+ok(jsErr.length === 0, `aucune erreur JS${jsErr.length ? ' — ' + jsErr.slice(0, 3).join(' | ') : ''}`);
+
+console.log(R.join('\n'));
+await nav.close();
+process.exit(R.some((l) => l.startsWith('❌')) ? 1 : 0);

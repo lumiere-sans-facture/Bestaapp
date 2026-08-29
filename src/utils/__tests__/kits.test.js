@@ -1,24 +1,39 @@
 import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
-import { buildKitQuotation, suggestKitForBattery, MOUNTING_TYPES } from '../solarSizing';
+import { buildKitQuotation, suggestKitForBattery, suggestKitsForBattery, MOUNTING_TYPES } from '../solarSizing';
 
 const byId = (id) => SOLAR_KITS.find((k) => k.id === id);
 
 describe('buildKitQuotation', () => {
-  // Totaux exacts des 5 devis kits officiels (prix tout compris, sans TVA),
+  // Totaux exacts des 10 devis kits officiels (prix tout compris, sans TVA),
   // sur le support par défaut (tôle) : la ligne « Structure de montage » du
   // kit est recalculée au panneau, pas au prix fixe de data/kits.js.
+  //
+  // Ces totaux sont donc ceux que l'app DEVISE, pas ceux du bordereau
+  // fournisseur : la recalcule de la structure les en écarte, exactement
+  // comme pour le kit 16 kWh (bordereau 2 319 000, devis 2 419 000). Les
+  // relever depuis le bordereau donne des attentes que le code ne peut pas
+  // satisfaire.
+  //
+  // L'ordre suit celui de SOLAR_KITS — trié par capacité de batterie.
   const TOTALS = {
     'kit-2.5kwh-eco': 625000,
     'kit-2.5kwh-premium': 715000,
+    // Le kit 3,8 kWh ne comporte pas de support sur son bordereau : le devis
+    // ajoute donc la structure standard (3 × 10 000 F sur tôle).
+    'kit-3.8kwh-2kva': 775000,
     'kit-5kwh': 1180000,
-    // 20 et 32 kWh : leur composition ne portait aucune structure ; le devis
-    // l'ajoute désormais au panneau (12 × 10 000, 16 × 10 000 sur tôle).
+    'kit-5kwh-deye': 1453000,
+    'kit-10kwh-taico': 2119000,
+    // 16, 20 et 32 kWh : leur composition ne porte aucune structure ; le devis
+    // l'ajoute au panneau (10 × 10 000, 12 × 10 000, 16 × 10 000 sur tôle).
+    'kit-16kwh': 2419000,
     'kit-20kwh': 3344000,
+    'kit-25kwh-felicity': 4315000,
     'kit-32kwh': 4518000,
   };
 
-  it('propose les 5 kits officiels', () => {
+  it('propose les 10 kits officiels', () => {
     expect(SOLAR_KITS.map((k) => k.id)).toEqual(Object.keys(TOTALS));
   });
 
@@ -50,6 +65,15 @@ describe('buildKitQuotation', () => {
     expect(sum).toBe(q.total);
   });
 
+  it('le kit 16 kWh vaut 2 319 000 F dans sa composition d’origine (hors structure)', () => {
+    // Total du devis officiel BestaSolar : la structure de montage n'y figure
+    // pas, elle est ajoutée par le devis selon le support choisi.
+    const kit = byId('kit-16kwh');
+    const somme = kit.lines.reduce((s, l) => s + l.qty * l.pu, 0);
+    expect(somme).toBe(2319000);
+    expect(buildKitQuotation(kit, 'tole', false).total).toBe(somme);
+  });
+
   it('le kit 32 kWh détaille ses 2 modules batterie de 16 kWh', () => {
     expect(byId('kit-32kwh').batteryModules).toEqual([{ capacity: 16, qty: 2 }]);
   });
@@ -77,7 +101,7 @@ describe('buildKitQuotation', () => {
     expect(sol).toBeGreaterThan(dalle);
   });
 
-  it('un kit sans ligne « Structure de montage » (20/32 kWh) en reçoit une', () => {
+  it('un kit sans ligne « Structure de montage » (16/20/32 kWh) en reçoit une', () => {
     // Le sélecteur de support de l'assistant restait sans effet sur ces kits :
     // le devis sortait sans structure, quel que soit le terrain.
     const kit = byId('kit-20kwh');
@@ -186,9 +210,26 @@ describe('suggestKitForBattery', () => {
     expect(suggestKitForBattery(kits, 12).id).toBe('k12');
   });
 
+  it('propose toutes les variantes de la même capacité retenue', () => {
+    const variantes = [
+      { id: 'k5-a', battery: 5 },
+      { id: 'k5-b', battery: 5 },
+      { id: 'k10', battery: 10 },
+    ];
+    expect(suggestKitsForBattery(variantes, 4).map((k) => k.id)).toEqual(['k5-a', 'k5-b']);
+    expect(suggestKitsForBattery(variantes, 5).map((k) => k.id)).toEqual(['k5-a', 'k5-b']);
+    expect(suggestKitsForBattery(variantes, 11).map((k) => k.id)).toEqual(['k10']);
+  });
+
+  it('expose les deux kits officiels de 5 kWh pour un besoin de 5 kWh', () => {
+    expect(suggestKitsForBattery(SOLAR_KITS, 5).map((k) => k.id))
+      .toEqual(['kit-5kwh', 'kit-5kwh-deye']);
+  });
+
   it('retombe sur le kit le plus proche si aucun ne couvre le besoin', () => {
     // Besoin 25 kWh : aucun kit n'atteint 25 kWh, on retombe sur le plus gros (20 kWh).
     expect(suggestKitForBattery(kits, 25).id).toBe('k20');
+    expect(suggestKitsForBattery(kits, 25).map((k) => k.id)).toEqual(['k20']);
   });
 
   it('gère une liste vide ou un besoin nul', () => {

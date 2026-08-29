@@ -1,4 +1,5 @@
 import { ChevronLeft } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 export default function PageHeader({ title, subtitle, children, actions, onBack }) {
   return (
@@ -14,7 +15,13 @@ export default function PageHeader({ title, subtitle, children, actions, onBack 
           {subtitle && <div className="page-subtitle">{subtitle}</div>}
           {children}
         </div>
-        {actions && <div className="page-header-actions">{actions}</div>}
+        <div className="page-header-actions">
+          {actions}
+          {/* Sur grand écran, la cloche vit au coin de la barre latérale : ici
+              elle ferait doublon, une même alerte à deux endroits de l'écran.
+              Sur mobile il n'y a pas de barre latérale — elle reste donc. */}
+          <span className="page-header-bell"><NotificationBell /></span>
+        </div>
       </div>
     </header>
   );

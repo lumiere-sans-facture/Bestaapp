@@ -1,4 +1,31 @@
 node_modules/
-.env
-
 dist
+
+# ---------------------------------------------------------------------------
+# Secrets — AUCUN de ces fichiers ne doit entrer dans l'historique Git.
+# `.env` seul ne suffisait pas : `.env.example` demande de copier le fichier
+# en `.env.local`, qui n'était pas ignoré. Suivre la documentation du projet
+# suffisait donc à préparer un commit de la clé service_role.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# Clés, certificats, comptes de service
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+service-account*.json
+gha-creds-*.json
+
+# Jetons de déploiement
+.vercel
+.netlify
+
+# Sorties locales
+*.log
+coverage/
+.DS_Store

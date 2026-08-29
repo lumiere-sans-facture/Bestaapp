@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, Crown, Check, X, TrendingUp, Users, Clock, Handshake } from 'lucide-react';
+import { Crown, Check, X, TrendingUp, Users, Clock, Handshake } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate } from '../../utils/format';
-import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft } from '../../utils/subscription';
+import { effectiveStatus, daysLeft, prixMensuelEquivalent } from '../../utils/subscription';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import {
   adminSubscriptionsOverview,
@@ -18,7 +18,7 @@ const STATUS_LABEL = {
   en_attente_paiement: ['En attente', 'badge-warning'],
 };
 
-export default function SubscriptionsAdmin({ onBack }) {
+export default function SubscriptionsAdmin() {
   const {
     subscriptions, subscriptionPayments, team,
     confirmSubscriptionPayment, rejectSubscriptionPayment, getUserById,
@@ -44,7 +44,11 @@ export default function SubscriptionsAdmin({ onBack }) {
   const subs = serverMode ? remote?.subscriptions || [] : subscriptions || [];
   const payments = serverMode ? remote?.payments || [] : subscriptionPayments || [];
   const activeSubs = subs.filter((s) => effectiveStatus(s) === 'actif');
-  const mrr = activeSubs.length * SUBSCRIPTION_PRICE;
+  // Revenu mensuel récurrent : chaque abonnement compte pour ce qu'il rapporte
+  // PAR MOIS, pas pour le tarif mensuel. Un abonné annuel à 45 000 F pèse
+  // 3 750 F par mois ; les compter tous à 5 000 F gonflait le chiffre d'un
+  // tiers sur la formule la plus vendue.
+  const mrr = activeSubs.reduce((t, s) => t + prixMensuelEquivalent(s.formule), 0);
   const pendingPayments = payments.filter((p) => p.statut === 'initie');
   // Libellé d'une ligne : en mode serveur, le nom du membre / de l'entreprise
   // arrive avec la ligne ; en mode local, on résout l'id utilisateur.
@@ -78,12 +82,7 @@ export default function SubscriptionsAdmin({ onBack }) {
   };
 
   return (
-    <>
-      <button className="btn btn-outline btn-sm back-button back-to-plus" onClick={onBack}>
-        <ChevronLeft size={16} /> Retour
-      </button>
-      <div className="section-title">Abonnements Devis Pro</div>
-
+    <div className="settings-tab">
       <div className="commission-totals">
         <div className="commission-total-card paid">
           <div className="commission-total-value"><TrendingUp size={15} /> {formatCFA(mrr)}</div>
@@ -190,6 +189,6 @@ export default function SubscriptionsAdmin({ onBack }) {
         confirmLabel="Refuser"
         danger
       />
-    </>
+    </div>
   );
 }

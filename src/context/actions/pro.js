@@ -1,27 +1,31 @@
-// Domaine Devis Pro (abonnement premium 5 000 F/mois) : abonnements + paiements
-// Mobile Money, identité d'entreprise du technicien et facturation.
+// Domaine Devis Pro (abonnement premium, trois formules) : abonnements et
+// paiements Mobile Money, identité d'entreprise du technicien et facturation.
 import { defaultEcheance } from '../../utils/paiement';
 import { abonnementApresPaiement } from '../../utils/verificationPaiement';
+import { formule, FORMULE_DEFAUT } from '../../utils/subscription';
 import { prochainNumeroFacture } from '../../utils/facture';
 
 export function createProActions(setState) {
   return {
     // Le technicien initie le paiement Mobile Money (stub) : l'abonnement
     // passe « en attente de paiement » jusqu'à validation par le gérant.
-    requestSubscription: (userId, { methode, phone, reference }) =>
+    requestSubscription: (userId, { methode, phone, reference, formule: formuleId }) =>
       setState((s) => {
         const subId = `sub-${userId}`;
+        const f = formule(formuleId || FORMULE_DEFAUT);
         const existing = (s.subscriptions || []).find((x) => x.id === subId);
+        // La formule demandée écrase la précédente : c'est celle-ci que le
+        // gérant valide, et celle-ci dont la durée sera créditée.
         const sub = existing
-          ? { ...existing, status: 'en_attente_paiement' }
+          ? { ...existing, status: 'en_attente_paiement', formule: f.id, montant: f.prix, recurrence: f.id }
           : {
               id: subId, userId, type: 'devis_pro', status: 'en_attente_paiement',
-              dateDebut: null, dateFin: null, montant: 5000, recurrence: 'mensuel',
+              dateDebut: null, dateFin: null, montant: f.prix, formule: f.id, recurrence: f.id,
               lastPaymentAt: null,
             };
         const payment = {
           id: crypto.randomUUID(),
-          subscriptionId: subId, userId, montant: 5000,
+          subscriptionId: subId, userId, montant: f.prix, formule: f.id,
           methode, phone: phone || '', referenceTransaction: reference || '',
           statut: 'initie', date: new Date().toISOString(),
         };
@@ -37,26 +41,27 @@ export function createProActions(setState) {
     // les mêmes identifiants que le serveur (`pay-<transaction>`), pour que la
     // réplication fasse converger les deux au lieu de créer un doublon ou de
     // renvoyer un « en attente » qui écraserait l'activation.
-    activerAbonnementVerifie: (userId, { reference, montant, dateFin }) =>
+    activerAbonnementVerifie: (userId, { reference, montant, dateFin, formule: formuleId }) =>
       setState((s) => {
         const subId = `sub-${userId}`;
+        const f = formule(formuleId || FORMULE_DEFAUT);
         const existant = (s.subscriptions || []).find((x) => x.id === subId);
         const base = existant || {
           id: subId, userId, type: 'devis_pro', dateDebut: null, dateFin: null,
-          montant: montant || 5000, recurrence: 'mensuel', lastPaymentAt: null,
+          montant: montant || f.prix, recurrence: f.id, lastPaymentAt: null,
         };
         const maintenant = new Date().toISOString();
         // La date de fin fait autorité côté serveur : la recalculer ici
         // risquerait un jour d'écart selon l'horloge de l'appareil.
         const sub = {
-          ...base, status: 'actif',
+          ...base, status: 'actif', formule: f.id, montant: montant || f.prix, recurrence: f.id,
           dateDebut: base.dateDebut || maintenant,
           dateFin: dateFin || base.dateFin,
           lastPaymentAt: maintenant,
         };
         const payId = `pay-${reference}`;
         const paiement = {
-          id: payId, subscriptionId: subId, userId, montant: montant || 5000,
+          id: payId, subscriptionId: subId, userId, montant: montant || f.prix, formule: f.id,
           methode: 'kkiapay', phone: '', referenceTransaction: reference,
           statut: 'confirme', verifieServeur: true, date: maintenant,
         };

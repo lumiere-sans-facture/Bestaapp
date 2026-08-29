@@ -183,7 +183,7 @@ export async function marquerCommandePayee({ profil, commandeId, transactionId, 
  * Crédite 30 jours d'abonnement au profil, et consigne le paiement.
  * @returns {Promise<{active: boolean, deja?: boolean, dateFin?: string}>}
  */
-export async function crediterAbonnement({ profil, transactionId, montant, methode = 'kkiapay' }) {
+export async function crediterAbonnement({ profil, transactionId, montant, methode = 'kkiapay', formule: formuleId }) {
   if (!(await reserverTransaction(transactionId, profil, montant))) {
     return { active: false, deja: true };
   }
@@ -199,9 +199,14 @@ export async function crediterAbonnement({ profil, transactionId, montant, metho
       dateDebut: null, dateFin: null, montant: SUBSCRIPTION_PRICE, recurrence: 'mensuel',
       lastPaymentAt: null,
     };
+    // La formule vient de l'appelant, qui l'a déjà confrontée au catalogue —
+    // et elle est INSCRITE SUR L'ABONNEMENT avant le calcul : c'est elle qui
+    // décide des jours crédités. Sans formule (webhook d'un ancien paiement),
+    // celle déjà enregistrée sert, à défaut la mensuelle.
+    const avecFormule = formuleId ? { ...actuel, formule: formuleId } : actuel;
     // Même règle que la validation manuelle du gérant : les jours déjà payés
     // ne sont jamais perdus (utils/verificationPaiement.js).
-    const sub = abonnementApresPaiement(actuel);
+    const sub = abonnementApresPaiement(avecFormule);
 
     const maintenant = new Date().toISOString();
     const { error: e1 } = await db.from('subscriptions')

@@ -5,7 +5,9 @@
 // client utilisent `etapeDuClient` pour la synthèse.
 // La numérotation des documents est déduite de l'existant : un compteur local
 // n'est pas répliqué et produirait des numéros en double entre appareils.
-import { DAY_MS } from './date';
+import { DAY_MS, ageInDays } from './date';
+import { formatCFA } from './format';
+import { COMPANY } from '../config/company';
 
 /** Étape d'un devis : la sienne, sinon celle de son client (devis créés avant
  *  le suivi par devis), sinon « nouveau » — jamais « proposition » par défaut :
@@ -208,6 +210,58 @@ export function devisAExpirer(devisList = [], leads = [], seuil = 7, maintenant 
     .map((d) => ({ devis: d, lead: clientDe.get(d.leadId) || null, jours: joursAvantExpiration(d, maintenant) }))
     .filter((x) => x.jours != null && x.jours <= seuil)
     .sort((a, b) => a.jours - b.jours);
+}
+
+/** Délai par défaut, en jours, avant qu'un devis sans issue soit dit « sans suite ». */
+export const SEUIL_SANS_SUITE_JOURS = 7;
+
+/**
+ * Ce devis est-il « sans suite » : émis (pas un brouillon) depuis plus de
+ * `seuil` jours, toujours en cours (ni vendu, ni perdu, ni expiré), et sans
+ * relance enregistrée depuis l'envoi.
+ *
+ * Le suivi de relance n'existe aujourd'hui que sur les factures Pro
+ * (`relances`/`derniereRelance`, voir context/actions/pro.js#addRelance) —
+ * rien ne l'alimente encore côté devis. La fonction lit `derniereRelance`
+ * si elle existe, mais reste correcte sans : un devis jamais relancé n'a
+ * simplement jamais de relance postérieure à son envoi.
+ */
+export function estDevisSansSuite(devis, lead = null, seuil = SEUIL_SANS_SUITE_JOURS, maintenant = new Date()) {
+  if (!devis || devis.type === 'pro') return false;
+  if (etatDevis(devis, lead, maintenant) !== 'en-cours') return false;
+  const envoye = devis.date || devis.createdAt;
+  if (!envoye || ageInDays(envoye, maintenant) <= seuil) return false;
+  const { derniereRelance } = devis;
+  return !derniereRelance || new Date(derniereRelance) <= new Date(envoye);
+}
+
+/** Message de relance pré-rempli (WhatsApp/SMS), en français, pour un devis sans suite. */
+export function devisRelanceMessage(devis, lead = null) {
+  const nom = lead?.name || devis?.clientName || 'Cher client';
+  const fin = dateExpiration(devis);
+  const lines = [
+    `Bonjour ${nom},`,
+    `Votre devis ${devis?.devisNumber || ''} d'un montant de ${formatCFA(devis?.total)} est toujours disponible.`,
+  ];
+  if (fin) lines.push(`Il reste valable jusqu'au ${new Date(`${fin}T00:00:00`).toLocaleDateString('fr-FR')}.`);
+  lines.push('N’hésitez pas à nous recontacter pour toute question.', 'Merci de votre confiance,', COMPANY.name);
+  return lines.join('\n');
+}
+
+/**
+ * Devis sans suite (voir `estDevisSansSuite`), du plus négligé au moins
+ * négligé — c'est la liste qui vaut la peine d'être relancée en premier.
+ */
+export function devisSansSuite(devisList = [], leads = [], seuil = SEUIL_SANS_SUITE_JOURS, maintenant = new Date()) {
+  const clientDe = new Map(leads.map((l) => [l.id, l]));
+  return devisList
+    .filter((d) => estDevisSansSuite(d, clientDe.get(d.leadId), seuil, maintenant))
+    .map((d) => ({
+      devis: d,
+      lead: clientDe.get(d.leadId) || null,
+      jours: Math.round(ageInDays(d.date || d.createdAt, maintenant)),
+    }))
+    .sort((a, b) => b.jours - a.jours);
 }
 
 /**

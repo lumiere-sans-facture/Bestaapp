@@ -1,20 +1,38 @@
-import { lazy, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
 import { ModeProvider, useMode } from './context/ModeContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
+import { capturerFormuleUrl, lireFormuleChoisie } from './utils/formuleChoisie';
+import { ecranDentree } from './utils/entree';
 import AppLayout from './components/AppLayout';
 import AppErrorBoundary from './components/AppErrorBoundary';
+import LoadingShell from './components/LoadingShell';
 import Login from './screens/Login';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
 import { installerAnalytique, suivrePage } from './lib/analytique';
 
 // Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
-captureRefFromUrl();
+const REF_DU_LIEN = captureRefFromUrl();
+
+// Formule choisie sur la page d'accueil (« Choisir Pro Premium »), captée
+// avant tout rendu : elle doit survivre à la création du compte, qui
+// recharge l'application.
+capturerFormuleUrl();
+
+// Venu par un lien de parrainage ou d'invitation d'équipe : ce visiteur-là
+// vient créer son compte, pas lire la vitrine — on lui ouvre le formulaire
+// directement, code prérempli, comme avant l'arrivée de la page d'accueil.
+// Le test porte sur CE chargement de page, jamais sur l'attribution stockée :
+// elle vaut 30 jours, et masquerait la vitrine pendant tout ce temps.
+const VENU_PAR_LIEN = Boolean(REF_DU_LIEN) || (() => {
+  try { return Boolean(new URLSearchParams(window.location.search).get('equipe')); } catch { return false; }
+})();
 
 // Erreurs hors React (minuteurs, gestionnaires d'événements) et promesses
 // rejetées sans `catch` : installées au chargement, avant tout rendu.
@@ -43,6 +61,10 @@ const ProClients = lazyWithPreload(() => import('./screens/pro/ProClients'));
 const ProCompany = lazyWithPreload(() => import('./screens/pro/ProCompany'));
 const ProSubscription = lazyWithPreload(() => import('./screens/pro/ProSubscription'));
 
+// Page d'accueil publique : accessible à la racine, y compris après une
+// actualisation lorsque l'utilisateur est déjà connecté.
+const Landing = lazy(() => import('./screens/Landing'));
+
 const ALL_SCREENS = [Dashboard, Pipeline, Clients, Boutique, Devis, Plus, ProDashboard, ProDocuments, ProClients, ProCompany, ProSubscription];
 
 // Précharge tous les chunks dès que le navigateur est inactif : la navigation
@@ -61,7 +83,7 @@ function usePreloadScreens() {
 }
 
 function AppRoutes() {
-  const { user, isLoading, recovery } = useAuth();
+  const { user, isLoading, recovery, pendingAuthUser } = useAuth();
   const navigate = useNavigate();
   // Page vue : UN SEUL point d'émission, à la racine des routes. Le chemin est
   // normalisé (« /clients/c-4f2a » → « /clients/:id ») avant tout envoi.
@@ -81,14 +103,44 @@ function AppRoutes() {
     dernierCompte.current = id;
   }, [user?.id, navigate]);
 
-  if (isLoading) {
-    return <div className="splash-screen">Chargement…</div>;
+  // L'ordre de priorité vit dans utils/entree.js, où il se teste : deux
+  // parcours en cours d'achèvement (réinitialisation du mot de passe, retour
+  // de Google d'un nouvel arrivant) passent AVANT la vitrine. Sans cela, le
+  // retour de Google — qui atterrit sur la racine — tombait sur la page
+  // d'accueil et l'inscription se perdait là, sans un mot.
+  const ecran = ecranDentree({ isLoading, recovery, pendingAuthUser, user });
+
+  if (ecran === 'chargement') {
+    return <LoadingShell />;
   }
 
-  // Lien « mot de passe oublié » : le nouveau mot de passe passe avant tout.
-  if (recovery) return <Login />;
+  if (ecran === 'connexion') return <Login />;
 
-  if (!user) return <Login />;
+  // L'accueil reste une vitrine, même pour une session active : actualiser /
+  // ne doit jamais transformer l'adresse en tableau de bord. Seul un lien de
+  // parrainage garde sa priorité et ouvre l’inscription.
+  //
+  // Cette règle vient APRÈS `ecran === 'connexion'` : un retour de Google
+  // atterrit sur la racine, et doit trouver son formulaire à terminer, pas la
+  // vitrine.
+  if (pathname === '/' && (user || !VENU_PAR_LIEN)) {
+    return <Suspense fallback={<LoadingShell />}><Landing /></Suspense>;
+  }
+
+  // Visiteur non connecté : les formulaires sont accessibles à côté. Toute
+  // autre adresse (un signet vers /dashboard, par exemple) ouvre la connexion.
+  if (ecran === 'public') {
+    return (
+      <Suspense fallback={<LoadingShell />}>
+        <Routes>
+          <Route path="/" element={VENU_PAR_LIEN ? <Login vueInitiale="signup" /> : <Landing />} />
+          <Route path="/inscription" element={<Login vueInitiale="signup" />} />
+          <Route path="/connexion" element={<Login />} />
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </Suspense>
+    );
+  }
 
   return (
     <DataProvider>
@@ -106,9 +158,30 @@ function AppRoutes() {
 // Bascule exclusive : une seule arborescence de routes montée à la fois.
 // mode === 'pro'    → routes Pro dans AppLayout (zéro donnée publique visible)
 // mode === 'public' → routes publiques dans AppLayout
+/**
+ * Le client venu d'une formule de la page d'accueil arrive au paiement, pas
+ * au tableau de bord : cliquer « Choisir Pro Premium » puis atterrir sur un
+ * écran sans rapport, c'est perdre la vente entre les deux.
+ *
+ * Une seule fois par session, et seulement s'il reste quelque chose à payer :
+ * un abonné actif n'a rien à faire sur l'écran d'abonnement.
+ */
+function useOuvrirPaiementSiFormuleChoisie(proActive) {
+  const navigate = useNavigate();
+  const fait = useRef(false);
+  useEffect(() => {
+    if (fait.current) return;
+    fait.current = true;
+    if (proActive) return;
+    if (!lireFormuleChoisie()) return;
+    navigate('/plus/gopro', { replace: true });
+  }, [proActive, navigate]);
+}
+
 function ModeSwitch() {
-  const { mode } = useMode();
+  const { mode, proActive } = useMode();
   usePreloadScreens();
+  useOuvrirPaiementSiFormuleChoisie(proActive);
 
   if (mode === 'pro') {
     return (
@@ -131,6 +204,8 @@ function ModeSwitch() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/clients" element={<Clients />} />
+        {/* Fiche client plein écran : même écran, piloté par l'URL (comme /plus/:section). */}
+        <Route path="/clients/:id" element={<Clients />} />
         <Route path="/boutique" element={<Boutique />} />
         <Route path="/devis" element={<Devis />} />
         <Route path="/plus" element={<Plus />} />
@@ -146,11 +221,13 @@ export default function App() {
     // Le filet enveloppe TOUT, y compris les fournisseurs de contexte : une
     // erreur dans l'un d'eux plantait l'app entière sans laisser de trace.
     <AppErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </AppErrorBoundary>
   );
 }

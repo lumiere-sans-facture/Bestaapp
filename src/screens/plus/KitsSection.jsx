@@ -4,7 +4,7 @@ import { useData } from '../../context/DataContext';
 import { SOLAR_KITS } from '../../data/kits';
 import { formatCFA } from '../../utils/format';
 import { prixPublic } from '../../utils/price';
-import { nouveauKit, nouvelleLigneKit, kitTotal, kitEstValide, resumeKit, resolveLignePrice, UNITES_KIT } from '../../utils/kits';
+import { nouveauKit, nouvelleLigneKit, kitTotal, kitEstValide, resumeKit, resolveLignePrice, trierKitsParCapacite, UNITES_KIT } from '../../utils/kits';
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import Field from '../../components/Field';
@@ -23,7 +23,8 @@ export default function KitsSection({ onBack }) {
   const [aSupprimer, setASupprimer] = useState(null);
   const toast = useToast();
 
-  const liste = kits || [];
+  // Affichage croissant par capacité, sans réordonner les données sauvegardées.
+  const liste = trierKitsParCapacite(kits);
   const manquants = SOLAR_KITS.filter((o) => !liste.some((k) => k.id === o.id));
 
   const ouvrirNouveau = () => setEdition({ kit: nouveauKit(), estNouveau: true });
@@ -146,8 +147,9 @@ export default function KitsSection({ onBack }) {
             {/* Caractéristiques techniques : elles servent à SUGGÉRER le kit
                 selon la consommation du client, et alimentent le devis. */}
             <div className="form-row-2">
-              <Field label="Batterie (kWh)">
-                <input className="input" type="number" min="0" step="0.5" value={edition.kit.battery}
+              <Field label="Capacité de stockage (kWh)">
+                <input className="input" type="number" min="0" step="any" inputMode="decimal"
+                  aria-label="Capacité de stockage (kWh)" value={edition.kit.battery}
                   onChange={(e) => majKit({ battery: e.target.value })} />
               </Field>
               <Field label="Onduleur (kVA)">
@@ -164,8 +166,8 @@ export default function KitsSection({ onBack }) {
               </Field>
             </div>
             <div className="field-hint" style={{ marginBottom: 14 }}>
-              La capacité batterie sert à proposer automatiquement le bon kit selon
-              la consommation calculée du client.
+              La capacité de stockage sert à proposer automatiquement le bon kit selon
+              la consommation calculée du client. Toute valeur décimale est acceptée (ex. 1,2 ou 5,12 kWh).
             </div>
 
             <div className="sheet-section-title">Composition</div>

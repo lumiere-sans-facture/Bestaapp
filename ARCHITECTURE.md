@@ -46,7 +46,7 @@
 |---|---|---|
 | **Local-first** | L'app fonctionne à 100 % sans backend ; `localStorage` est la source de vérité, Supabase une réplication optionnelle. | `context/DataContext.jsx` |
 | **Backend auto-détecté** | Si `VITE_SUPABASE_*` (ou les variables injectées par l'intégration Vercel↔Supabase) sont présentes, la sync s'active ; sinon mode local. Aucune branche de code morte. | `lib/supabase.js` |
-| **Sync non-destructive** | Réplication par *upsert* + table `tombstones` pour les suppressions → pas de perte de données créées hors-ligne par un autre appareil. | `lib/remoteSync.js`, `DataContext.jsx` |
+| **Sync non-destructive** | Réplication par *upsert* + table `tombstones` pour les suppressions + file d'attente persistante → aucune perte de ce qui a été créé OU modifié hors-ligne. | `lib/remoteSync.js`, `utils/fileSync.js` |
 | **Mode public / Pro étanche** | Une seule arborescence de routes montée à la fois ; zéro fuite de données entre l'espace commercial (public) et l'espace entreprise du technicien (Pro). | `App.jsx` (`ModeSwitch`) |
 | **Une base de code, 3 cibles** | Le même `dist/` est servi par Vercel (web) et empaqueté par Capacitor (Android/iOS). | `capacitor.config.json`, `vite.config.js` |
 
@@ -124,6 +124,7 @@ Bestaapp/
     │
     └── utils/                  ── LOGIQUE MÉTIER PURE (testable) ──
         ├── solarSizing.js      Dimensionnement + génération de devis solaire
+        ├── roi.js              Retour sur investissement (coût réel, projection 25 ans, CO₂)
         ├── referral.js         Affiliation (capture ?ref=, codes, last-click 30j)
         ├── subscription.js     Règles d'abonnement Devis Pro
         ├── stats.js            Agrégations mensuelles (dashboard)
@@ -257,19 +258,34 @@ Système     resetData
 
 ```
 DÉMARRAGE
-  pullAll()
+  connecter() → pullAll()
     ├─ base vide      → push de l'état local (cet appareil amorce la base)
-    └─ base peuplée   → applyRemote() : merge (remote ∪ local-only) − tombstones
+    └─ base peuplée   → applyRemote() : fusion (remote ∪ local-only ∪ file d'attente) − tombstones
   setSyncStatus('online') ; subscribeToChanges()
+  échec → statut 'error' (ou 'offline') et REPRISE : délai croissant 5 s → 1 min,
+          et immédiate sur `online` / `focus` / retour à l'écran
 
 CHANGEMENT LOCAL (effect sur `state`)
+  file d'attente = ids modifiés depuis le dernier état répliqué → localStorage
   diff par collection (référence !==) → pushCollections(modifiées)
   diff des ids disparus → pushTombstone(table, id)
   anti-écho : lastPushAt (ignore nos propres événements < 2,5 s)
 
 CHANGEMENT DISTANT (Realtime)
-  debounce 600 ms → refreshFromRemote() → applyRemote() (merge, jamais d'écrasement)
+  debounce 600 ms → refreshFromRemote() → applyRemote() (fusion, jamais d'écrasement)
 ```
+
+**File d'attente** (`utils/fileSync.js`) : la liste des éléments modifiés ici et pas encore
+confirmés par le serveur SURVIT à la fermeture de l'app. À la fusion, ils priment sur la
+version reçue. Sans elle, une modification faite hors-ligne était écrasée au lancement
+suivant par la copie serveur, plus ancienne — silencieusement, et seulement pour les
+*modifications* : les créations, absentes du serveur, étaient bien conservées.
+
+**Ouverture hors-ligne** : le profil vit côté serveur. Sans copie locale
+(`utils/profilCache.js`), une session pourtant valide ne pouvait pas être restaurée sans
+réseau et l'utilisateur atterrissait sur l'écran de connexion — infranchissable, lui aussi,
+sans réseau. L'app adopte le profil mémorisé immédiatement, puis le rafraîchit en arrière-plan
+(si le serveur répond clairement « aucun profil », la session est refermée).
 
 C'est le composant le plus délicat ; il est volontairement concentré dans un seul fichier,
 derrière `remoteSync.js`, pour rester auditable.

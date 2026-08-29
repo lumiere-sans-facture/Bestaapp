@@ -16,7 +16,7 @@ import EmptyState from '../components/EmptyState';
 import { useToast } from '../components/Toast';
 import { prixPublic, PUBLIC_MARKUP } from '../utils/price';
 
-const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', category: 'kits', image: '' };
+const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', suiviStock: false, category: 'kits', image: '' };
 
 export default function Boutique() {
   const { user } = useAuth();
@@ -80,6 +80,7 @@ export default function Boutique() {
       description: product.description,
       basePrice: String(product.basePrice),
       stock: String(product.stock),
+      suiviStock: Boolean(product.suiviStock),
       category: product.category,
       image: product.image,
     });
@@ -105,6 +106,7 @@ export default function Boutique() {
       description: form.description.trim(),
       basePrice: Math.max(0, Number(form.basePrice) || 0),
       stock: Math.max(0, Math.round(Number(form.stock) || 0)),
+      suiviStock: form.suiviStock,
       category: form.category,
       image: form.image,
     };
@@ -135,7 +137,7 @@ export default function Boutique() {
         const w = extractPowerWatts(p.name);
         return w !== null && w >= powerFilter.min && w < powerFilter.max;
       })
-      .sort((a, b) => (a.stock === 0) - (b.stock === 0));
+      .sort((a, b) => (a.suiviStock && a.stock === 0) - (b.suiviStock && b.stock === 0));
   // getPrice n'est pas listé : il est stable (ne dépend d'aucun état) et
   // serait recréé à chaque rendu, invalidant le mémo en vain.
   }, [products, selectedCategory, search, priceRange, powerRange]);
@@ -226,7 +228,7 @@ export default function Boutique() {
         </div>
         <div className="products-grid">
           {filtered.map((product) => {
-            const outOfStock = product.stock === 0;
+            const outOfStock = product.suiviStock && product.stock === 0;
             return (
               <div key={product.id} className={`product-card ${outOfStock ? 'product-unavailable' : ''}`}>
                 <button className="product-top product-open" onClick={() => setDetailId(product.id)}>
@@ -366,10 +368,12 @@ export default function Boutique() {
               <div className="sheet-section-title">Prix et disponibilité</div>
               <div className="sheet-row"><span className="sheet-label">Prix public</span><span className="sheet-value amount">{formatCFA(prixPublic(detailProduct.basePrice))}</span></div>
               <div className="sheet-row"><span className="sheet-label">Prix partenaire</span><span className="sheet-value">{formatCFA(detailProduct.basePrice)}</span></div>
-              <div className="sheet-row">
-                <span className="sheet-label">Stock</span>
-                <span className="sheet-value">{detailProduct.stock > 0 ? `${detailProduct.stock} disponible(s)` : 'Rupture'}</span>
-              </div>
+              {detailProduct.suiviStock && (
+                <div className="sheet-row">
+                  <span className="sheet-label">Stock</span>
+                  <span className="sheet-value">{detailProduct.stock > 0 ? `${detailProduct.stock} disponible(s)` : 'Rupture'}</span>
+                </div>
+              )}
             </div>
             <div className="cart-actions">
               {isManager && (
@@ -379,7 +383,7 @@ export default function Boutique() {
               )}
               <button
                 className="btn btn-accent btn-block"
-                disabled={detailProduct.stock === 0}
+                disabled={detailProduct.suiviStock && detailProduct.stock === 0}
                 onClick={() => { handleAddToCart(detailProduct); setDetailId(null); }}
               >
                 <ShoppingCart size={17} /> Ajouter au panier
@@ -503,10 +507,17 @@ export default function Boutique() {
                 <div className="field-hint">Prix public (+{Math.round((PUBLIC_MARKUP - 1) * 100)} %) : {formatCFA(prixPublic(form.basePrice))}</div>
               )}
             </Field>
-            <Field label="Stock *">
-              <input className="input" type="number" min="0" required value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="0" />
-            </Field>
+            {form.suiviStock && (
+              <Field label="Stock *">
+                <input className="input" type="number" min="0" required value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="0" />
+              </Field>
+            )}
           </div>
+          <label className="checkbox-row">
+            <input type="checkbox" checked={form.suiviStock}
+              onChange={(e) => setForm({ ...form, suiviStock: e.target.checked })} />
+            <span>Suivre le stock de ce produit</span>
+          </label>
           <Field label="Catégorie">
             <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               {productCategories.map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}

@@ -56,6 +56,11 @@ exception près** : une fois `multitenant.sql` passé, ne PAS rejouer
 l'isolation par organisation. Pour rétablir le temps réel sans toucher aux
 droits, utiliser `temps-reel.sql`.
 
+**Une fois les six scripts passés, exécuter `verification-securite.sql`** —
+lecture seule, quatre requêtes, deux minutes. C'est la seule preuve que la
+base est réellement fermée : le code peut être irréprochable et les données
+ouvertes si un script n'a pas été rejoué ici. Marche à suivre en **11.5**.
+
 ### Scripts d'entretien (à la demande, jamais au déploiement)
 
 | Script | Quand s'en servir |
@@ -74,34 +79,43 @@ droits, utiliser `temps-reel.sql`.
 - **Authentication → URL Configuration** :
   - *Site URL* : l'URL de production (`https://app.bestasolar.com`).
   - *Redirect URLs* : ajouter la même URL (nécessaire au lien « mot de passe oublié »).
+- **Connexion Google (facultative) — TROIS réglages, et le bouton disparaît si
+  l'un manque** :
+  1. *Authentication → Providers → Google* : activé, avec le *Client ID* et le
+     *Client Secret* d'un identifiant OAuth de la console Google Cloud.
+  2. Dans la console Google Cloud, *URI de redirection autorisés* doit contenir
+     l'adresse de rappel du projet Supabase :
+     `https://VOTRE-PROJET.supabase.co/auth/v1/callback`.
+  3. Dans **Vercel**, la variable `VITE_ENABLE_GOOGLE_AUTH=true`. Sans elle, le
+     bouton « Continuer avec Google » n'est même pas affiché — l'app n'a alors
+     rien de cassé, elle ne propose simplement pas ce moyen d'entrée.
+
+  Le retour de Google atterrit sur la RACINE du site (`window.location.origin`) :
+  cette adresse doit donc figurer dans les *Redirect URLs* ci-dessus, pour
+  chaque environnement (production ET recette).
 - **Authentication → Rate Limits** : resserrer la limite de tentatives de
   connexion (`sign_in_attempts` — la valeur par défaut est large). C'est la
   VRAIE limite anti-brute-force ; le compteur de l'écran de connexion
   (`utils/loginThrottle.js`) n'est qu'une couche supplémentaire côté
   navigateur, contournable par un appel direct à l'API.
-- **Authentication → Attack Protection → CAPTCHA protection** : laisser
-  **désactivé**, par choix — voir l'encadré ci-dessous.
+- **Authentication → Attack Protection → CAPTCHA protection** : **désactivé**,
+  définitivement — voir l'encadré ci-dessous. ⚠️ Si l'inscription échoue avec
+  `captcha protection: request disallowed (no captcha_token found)`, c'est que
+  ce réglage traîne encore activé sur cet environnement : il n'y a plus aucun
+  widget CAPTCHA dans l'app pour fournir le jeton qu'il exige.
 
-> **CAPTCHA : pourquoi désactivé côté Supabase alors que le widget existe.**
-> Le CAPTCHA de Supabase est tout-ou-rien : soit chaque appel de connexion
-> exige un jeton résolu (le défi doit alors s'afficher dès le premier
-> chargement du formulaire), soit aucun. Or l'écran de connexion n'affiche
-> le défi hCaptcha/Turnstile qu'à partir du **3e échec** sur un même email
-> (`CAPTCHA_AFTER_ATTEMPTS`, `utils/loginThrottle.js`) — moins de friction
-> pour la saisie normale. Choix assumé : Supabase reste désactivé, le
-> défi n'est qu'une friction ajoutée par l'écran (un script qui appelle
-> l'API directement, en contournant l'écran, ne le rencontre jamais). Ce
-> qui reste actif indépendamment, et protège vraiment : le verrouillage
-> progressif après 5 échecs (`loginThrottle.js`) et la limite par IP
-> ci-dessus (*Rate Limits*).
+> **Pourquoi pas de CAPTCHA du tout, ni sur l'app ni sur Supabase.**
+> Le CAPTCHA de Supabase est tout-ou-rien : un seul interrupteur pour
+> connexion, inscription et mot de passe oublié ensemble — impossible de le
+> réserver à la connexion sans casser l'inscription (vérifié dans la doc
+> Supabase). Comme l'inscription doit rester sans friction, le réglage reste
+> désactivé partout, et le widget hCaptcha/Turnstile a été retiré de l'app
+> plutôt que de laisser une friction d'écran qui ne protège plus rien.
 >
-> Pour activer quand même une clé de site (`VITE_HCAPTCHA_SITE_KEY` ou
-> `VITE_TURNSTILE_SITE_KEY`, voir `.env.example`) sans le protéger côté
-> Supabase : le défi reste purement une friction d'écran. L'activer aussi
-> côté Supabase revient à l'exiger dès le premier essai — modifier alors
-> `CAPTCHA_AFTER_ATTEMPTS` à `0` dans `loginThrottle.js`, sinon les deux
-> premières tentatives échoueraient avec une erreur CAPTCHA au lieu du
-> message « Identifiants incorrects » habituel.
+> Ce qui protège réellement les tentatives de connexion répétées, sans
+> CAPTCHA : le verrouillage progressif après 5 échecs (`utils/loginThrottle.js`
+> — 15 min à 2 h, par email) et la limite par IP ci-dessus (*Rate Limits*),
+> réglage Supabase indépendant du CAPTCHA.
 - **Authentication → Sessions** : fixer une durée de vie de session
   (« Time-box user sessions ») et un délai d'inactivité (« Inactivity
   timeout ») — **réservé au plan payant Supabase**. Par défaut, Supabase
@@ -469,8 +483,10 @@ Dans cet ordre, à chaque fois :
    *Redirect URLs* — avec **l'adresse propre à cet environnement**.
 3. Se déclarer admin plateforme (§ 4) : les comptes ne sont **pas** partagés
    entre les deux bases, c'est deux fois le même geste.
-4. *Rate Limits*, *Attack Protection* (CAPTCHA) et *Sessions* (§ 3) — sinon
-   l'environnement de test reste sans les mêmes garde-fous que la production.
+4. *Rate Limits*, *Attack Protection* (CAPTCHA **désactivé**) et *Sessions*
+   (§ 3) — sinon l'environnement de test reste sans les mêmes garde-fous que
+   la production, ou pire, avec un CAPTCHA oublié activé qui casse
+   l'inscription.
 
 ⚠️ **Le piège de la mise en production.** Fusionner vers `main` déploie le
 CODE, pas le schéma. Du code neuf devant une base restée en arrière donne une
@@ -519,6 +535,42 @@ Ouvrir l'app de cet environnement :
 | *Plus* affiche « Mode local — données sur cet appareil » | les variables Supabase manquent sur ce projet Vercel |
 | Voyant rouge de synchronisation | la base répond mais **il manque des tables** : scripts SQL non passés |
 | *Plus → Diagnostic* en vert, « Mot de passe oublié » reçu | l'environnement est complet |
+
+### 11.5 Vérifier que la base est bien FERMÉE
+
+Complet ne veut pas dire fermé : une base peut répondre à tout, voyant vert,
+et laisser chaque entreprise lire les données des autres. Seule la base sait
+quels droits y sont réellement posés — le code ne peut pas le dire.
+
+**À faire après chaque déploiement SQL, dans les DEUX projets Supabase.**
+
+1. Dashboard Supabase → choisir le projet (recette **ou** production) →
+   **SQL Editor** → *New query*.
+2. Coller le **BILAN** de `supabase/verification-securite.sql` — le bloc qui
+   va de `with anomalies as (` au `;` qui suit `order by 1, 2` → **Run**.
+   Le fichier ne contient que des `select` : il ne modifie rien, il est
+   rejouable autant de fois qu'on veut.
+3. Lire l'unique tableau de résultat :
+
+| Ce qui s'affiche | Ce que ça veut dire |
+|---|---|
+| une ligne **« ✅ aucune anomalie »** | la base est fermée, rien à faire |
+| `1. table sans RLS` | la table nommée est lisible par n'importe quel visiteur → rejouer `multitenant.sql` |
+| `2. RLS sans policy` | la table nommée n'est plus lisible par personne (donnée perdue de vue côté app) |
+| `3. policy « tout ouvert »` | ⚠️ le plus grave : `multitenant.sql` n'est pas passé ici, **chaque entreprise voit toutes les autres** → le rejouer immédiatement |
+| `4. search_path non figé` | rejouer `multitenant.sql` (il redéfinit les fonctions avec leur `search_path` figé) |
+
+⚠️ **Ne pas coller le fichier entier d'un bloc** : le SQL Editor de Supabase
+n'affiche que le résultat de la **dernière** instruction d'un script. On ne
+verrait donc que le contrôle 4 — et on croirait les trois autres passés. Les
+quatre requêtes détaillées, sous le bilan, se lancent **une par une** :
+sélectionner la requête dans l'éditeur, puis *Run*.
+
+4. **Recommencer dans l'autre projet.** Recette et production sont deux bases
+   distinctes : l'une peut être impeccable et l'autre grande ouverte.
+
+Le détail du modèle de sécurité et ses limites assumées sont dans
+`SECURITE.md`, à la racine du dépôt.
 
 ## Ce que fait l'app selon la configuration
 

@@ -599,13 +599,25 @@ export const buildQuotation = (sizing, { products = [], includeMaintenance = tru
  * @param {number} batteryNeed  capacité batterie requise (kWh)
  * @returns {object|null}  le kit suggéré, ou null si la liste est vide
  */
-export const suggestKitForBattery = (kits = [], batteryNeed = 0) => {
-  if (!kits.length) return null;
+/**
+ * Kits suggérés pour un besoin batterie : garde toutes les variantes de la
+ * capacité la plus adaptée. Deux kits 5 kWh restent donc tous les deux
+ * proposés, afin que le technicien choisisse la marque ou la composition.
+ */
+export const suggestKitsForBattery = (kits = [], batteryNeed = 0) => {
+  if (!kits.length) return [];
   const need = Number(batteryNeed) || 0;
   const suffisants = kits.filter((k) => k.battery >= need);
   const pool = suffisants.length ? suffisants : kits;
-  return [...pool].sort((a, b) => Math.abs(a.battery - need) - Math.abs(b.battery - need))[0];
+  const capacity = suffisants.length
+    ? Math.min(...pool.map((k) => k.battery))
+    : Math.max(...pool.map((k) => k.battery));
+  return pool.filter((k) => k.battery === capacity);
 };
+
+/** Compatibilité : le premier kit suggéré reste disponible pour les appels unitaires. */
+export const suggestKitForBattery = (kits = [], batteryNeed = 0) =>
+  suggestKitsForBattery(kits, batteryNeed)[0] || null;
 
 const PANEL_LINE_RE = /panneau/i;
 const ONDULEUR_LINE_RE = /onduleur/i;

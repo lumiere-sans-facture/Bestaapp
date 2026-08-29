@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   buildAffaires, devisStage, devisDuClient,
   dateExpiration, joursAvantExpiration, etatDevis, devisAExpirer, montantVente,
+  estDevisSansSuite, devisSansSuite, devisRelanceMessage,
 } from '../affaires';
 import { missingCommissionsForDevis, reconcileMissingCommissions } from '../commissionSync';
+import { COMPANY } from '../../config/company';
 
 const RATES = { 1: 0.03, 2: 0.015 };
 
@@ -291,5 +293,68 @@ describe('cycle de vie d’un devis', () => {
   it('retient le montant FIGÉ à la vente, pas le total courant', () => {
     expect(montantVente({ total: 900000 })).toBe(900000);
     expect(montantVente({ total: 1200000, montantVente: 900000 })).toBe(900000);
+  });
+
+  describe('devis sans suite', () => {
+    it("n'est pas sans suite avant le seuil", () => {
+      expect(estDevisSansSuite(devisDu('2026-08-10'), null, 7, LE_15)).toBe(false);
+    });
+
+    it('devient sans suite passé le seuil, sans relance', () => {
+      expect(estDevisSansSuite(devisDu('2026-08-01'), null, 7, LE_15)).toBe(true);
+    });
+
+    it('une relance postérieure à l’envoi le retire de la liste', () => {
+      expect(estDevisSansSuite(devisDu('2026-08-01', { derniereRelance: '2026-08-10' }), null, 7, LE_15)).toBe(false);
+    });
+
+    it('une relance antérieure à l’envoi ne compte pas', () => {
+      expect(estDevisSansSuite(devisDu('2026-08-01', { derniereRelance: '2026-07-01' }), null, 7, LE_15)).toBe(true);
+    });
+
+    it('un devis vendu, perdu, expiré ou brouillon n’est jamais « sans suite »', () => {
+      expect(estDevisSansSuite(devisDu('2026-01-01', { stage: 'gagne' }), null, 7, LE_15)).toBe(false);
+      expect(estDevisSansSuite(devisDu('2026-01-01', { stage: 'perdu' }), null, 7, LE_15)).toBe(false);
+      expect(estDevisSansSuite(devisDu('2026-01-01'), null, 7, LE_15)).toBe(false); // expiré (validité 30 j)
+      expect(estDevisSansSuite(devisDu('2026-01-01', { statut: 'brouillon' }), null, 7, LE_15)).toBe(false);
+    });
+
+    it('écarte les documents Pro', () => {
+      expect(estDevisSansSuite(devisDu('2026-08-01', { type: 'pro' }), null, 7, LE_15)).toBe(false);
+    });
+
+    it('devisSansSuite liste du plus négligé au moins négligé', () => {
+      const leads = [{ id: 'l1', name: 'Client A' }];
+      const liste = [
+        devisDu('2026-08-01', { id: 'quatorze-jours' }),
+        devisDu('2026-08-06', { id: 'neuf-jours' }),
+        devisDu('2026-08-10', { id: 'dans-le-seuil' }),
+        devisDu('2026-08-01', { id: 'relance-recente', derniereRelance: '2026-08-12' }),
+      ];
+      expect(devisSansSuite(liste, leads, 7, LE_15).map((x) => x.devis.id))
+        .toEqual(['quatorze-jours', 'neuf-jours']);
+    });
+  });
+
+  describe('devisRelanceMessage', () => {
+    it("reprend le nom du client, le numéro, le montant et la date d'expiration", () => {
+      const devis = devisDu('2026-08-01', { devisNumber: 'BS-20260801-0001', total: 1500000 });
+      const msg = devisRelanceMessage(devis, { name: 'Awa Koffi' });
+      expect(msg).toContain('Bonjour Awa Koffi,');
+      expect(msg).toContain('BS-20260801-0001');
+      expect(msg).toContain('1 500 000');
+      expect(msg).toContain('31/08/2026');
+      expect(msg).toContain(COMPANY.name);
+    });
+
+    it('retombe sur le nom client du devis puis sur un générique, sans piste', () => {
+      expect(devisRelanceMessage({ total: 1000, clientName: 'Jean Client' })).toContain('Bonjour Jean Client,');
+      expect(devisRelanceMessage({ total: 1000 })).toContain('Bonjour Cher client,');
+    });
+
+    it("omet la ligne d'échéance quand le devis n'est pas datable", () => {
+      const msg = devisRelanceMessage({ total: 1000 });
+      expect(msg).not.toContain('reste valable');
+    });
   });
 });

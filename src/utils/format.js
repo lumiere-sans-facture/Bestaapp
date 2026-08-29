@@ -7,6 +7,24 @@ export const formatNombre = (v) =>
 
 export const formatCFA = (amount) => formatNombre(amount) + ' F';
 
+/**
+ * Montant abrégé pour les grands nombres : « 108,4 M F », « 720 k F ».
+ * Réservé aux TUILES d'indicateurs, où « 108 405 662 F » passe à la ligne et
+ * devient illisible. Les tableaux et les documents gardent `formatCFA` : un
+ * montant qu'on additionne ou qu'on facture ne s'arrondit jamais.
+ */
+export const formatCFACourt = (amount) => {
+  const n = Math.round(Number(amount) || 0);
+  const abs = Math.abs(n);
+  if (abs < 100000) return formatCFA(n);
+  const [valeur, unite] = abs >= 1000000 ? [n / 1000000, 'M'] : [n / 1000, 'k'];
+  // Une décimale, jamais deux : « 2,5 M » arrondi à « 3 M » perdrait un demi
+  // million, et « 2,53 M » ne se lit pas d'un coup d'œil sur une tuile. Le
+  // « ,0 » d'un compte rond est retiré (« 720 k », pas « 720,0 k »).
+  const arrondi = Math.round(valeur * 10) / 10;
+  return `${String(arrondi).replace('.', ',')} ${unite} F`;
+};
+
 export const formatDate = (iso) =>
   iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 

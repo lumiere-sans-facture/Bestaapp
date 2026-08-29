@@ -31,11 +31,14 @@ describe('normaliserMomo', () => {
 });
 
 describe('momoValide', () => {
-  it('accepte le Togo (8 chiffres) et le Bénin (8 ou 10)', () => {
+  it('accepte le Togo (8 chiffres) et le Bénin (10 chiffres)', () => {
     expect(momoValide('+228 90 12 34 56')).toBe(true);
     expect(momoValide('90123456')).toBe(true);
-    expect(momoValide('+229 97 00 00 00')).toBe(true);
     expect(momoValide('+229 01 97 00 00 00')).toBe(true); // format béninois à 10 chiffres
+  });
+
+  it('refuse l’ancien format béninois à 8 chiffres (plan ARCEP depuis le 30/11/2024)', () => {
+    expect(momoValide('+229 97 00 00 00')).toBe(false);
   });
 
   it('refuse un numéro tronqué ou trop long', () => {

@@ -14,6 +14,7 @@
 //     policy) : seul le service_role y accède.
 import { createClient } from '@supabase/supabase-js';
 import { nettoyer } from '../src/utils/journalErreurs.js';
+import { limiter, erreurServeur, journaliser, PLAFONDS } from './_lib/garde.js';
 
 const MAX_RAPPORTS = 30;
 const url = () => process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
@@ -41,6 +42,10 @@ const ligne = (r) => ({
 });
 
 export default async function handler(req, res) {
+  // Point d'entrée SANS authentification qui écrit en base : sans plafond,
+  // une simple boucle gonflait la table des erreurs à volonté.
+  if (limiter(req, res, PLAFONDS.erreur, 'erreur')) return;
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Méthode non autorisée' });
     return;
@@ -68,7 +73,14 @@ export default async function handler(req, res) {
     // Table absente (erreurs.sql pas encore exécuté) : inutile que l'appareil
     // rejoue indéfiniment un lot qui ne passera jamais.
     const absente = /does not exist|schema cache/i.test(e.message || '');
-    res.status(absente ? 200 : 500).json({ error: e.message, enregistres: 0 });
+    if (absente) {
+      journaliser('journal-erreurs-absent', req, { detail: String(e.message || '').slice(0, 200) });
+      res.status(200).json({ error: 'Journal des erreurs indisponible', enregistres: 0 });
+      return;
+    }
+    // Le message de Postgres cite la table, la colonne et parfois la requête :
+    // il reste au journal serveur.
+    erreurServeur(req, res, 500, 'Enregistrement impossible', e, { enregistres: 0 });
   }
 }
 

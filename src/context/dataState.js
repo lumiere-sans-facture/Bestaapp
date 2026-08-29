@@ -1,7 +1,7 @@
 // État applicatif : forme initiale, chargement depuis localStorage (avec
 // migrations de seed) et persistance. Aucune dépendance React — logique pure.
 import * as seed from '../data/seed';
-import { SOLAR_KITS } from '../data/kits';
+import { SOLAR_KITS, KITS_DOTES_AVANT_REGISTRE } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
 import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -34,6 +34,9 @@ export const buildInitialState = () => ({
   // démarrer à zéro le rendrait inutilisable. Ils appartiennent ensuite à
   // l'entreprise, qui les modifie depuis « Mes kits ».
   kits: SOLAR_KITS,
+  // Kits officiels déjà dotés : mémorisé pour ne doter chaque kit qu'UNE FOIS
+  // — un kit supprimé par le gérant ne doit jamais réapparaître.
+  kitsDotes: SOLAR_KITS.map((k) => k.id),
   // Onduleurs proposés en alternative quand celui d'un kit ne prend pas assez
   // de panneaux pour le besoin calculé — même logique de dotation que les kits.
   inverters: INVERTER_MODELS,
@@ -95,6 +98,16 @@ export const loadState = (scope = null) => {
       // jamais réinjecter ensuite, sinon un kit supprimé par le gérant
       // reviendrait à chaque ouverture de l'application.
       if (!Array.isArray(saved.kits)) saved.kits = SOLAR_KITS;
+      // Dotation des NOUVEAUX kits officiels (même principe que les cours) :
+      // un kit ajouté par une mise à jour rejoint les états existants, une
+      // seule fois — sans quoi il resterait invisible pour tous ceux qui ont
+      // déjà ouvert l'application, et sans ressusciter un kit supprimé.
+      const kitsDotes = new Set(saved.kitsDotes || KITS_DOTES_AVANT_REGISTRE);
+      const nouveauxKits = SOLAR_KITS.filter(
+        (k) => !kitsDotes.has(k.id) && !(saved.kits || []).some((x) => x.id === k.id)
+      );
+      if (nouveauxKits.length) saved.kits = [...(saved.kits || []), ...nouveauxKits];
+      saved.kitsDotes = [...new Set([...kitsDotes, ...SOLAR_KITS.map((k) => k.id)])];
       // Migration « Onduleurs » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.inverters)) saved.inverters = INVERTER_MODELS;
       // Migration « Kits pompage » : même principe, dotation une seule fois.
@@ -166,6 +179,36 @@ export const loadState = (scope = null) => {
     // données corrompues : on repart du seed
   }
   return buildInitialState();
+};
+
+// ---- File d'attente de synchronisation ----
+// Ce qui a été modifié sur cet appareil et n'est pas encore confirmé par le
+// serveur. Rangée à PART de l'état : ce n'est pas une donnée métier, elle ne
+// doit ni être répliquée ni voyager dans une sauvegarde. Même découpage par
+// périmètre que l'état, pour la même raison (deux comptes sur un appareil).
+const FILE_SYNC_KEY = 'bestasolar_file_sync';
+const fileKeyFor = (scope) => (scope ? `${FILE_SYNC_KEY}_${scope}` : FILE_SYNC_KEY);
+
+/** File relue au lancement — `{}` si absente, illisible ou stockage refusé. */
+export const loadFileSync = (scope = null) => {
+  try {
+    const brut = JSON.parse(localStorage.getItem(fileKeyFor(scope)));
+    return brut && typeof brut === 'object' && !Array.isArray(brut) ? brut : {};
+  } catch {
+    return {};
+  }
+};
+
+/** Écrit la file (et l'efface quand plus rien n'attend). */
+export const persistFileSync = (file, scope = null) => {
+  try {
+    const cle = fileKeyFor(scope);
+    if (!file || !Object.keys(file).length) localStorage.removeItem(cle);
+    else localStorage.setItem(cle, JSON.stringify(file));
+    return true;
+  } catch {
+    return false; // quota dépassé / navigation privée : la session en cours reste juste
+  }
 };
 
 /**

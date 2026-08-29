@@ -123,6 +123,20 @@ ET son projet Supabase :
   branche (`git merge main`), sinon la fusion suivante l'écraserait.
 - Ne pas créer de PR sans demande explicite.
 
+⚠️ **Plusieurs agents travaillent sur ce dépôt** (sessions Claude, Codex).
+La branche de travail est leur point de RENCONTRE : c'est là que les chantiers
+se croisent et se testent ensemble, sur l'app de recette. Une poussée refusée
+(`non-fast-forward`) est donc normale — on fusionne, on relance tests, lint,
+build et parcours navigateur sur l'ENSEMBLE, et on publie.
+
+Ce qui ne se fait pas, en revanche : **modifier le chantier d'un autre**.
+Fusionner son code, oui ; le réécrire, non — sauf demande explicite, ou erreur
+grave qui bloque tout le monde (une suite de tests rouge, par exemple), et
+dans ce cas le dire clairement plutôt que de le corriger en silence. Si la
+fusion casse quelque chose chez lui, le signaler ; ne pas l'arranger d'office.
+
+Seule `main` est protégée : n'y arrive qu'une version finale validée.
+
 ⚠️ **Le code n'est que la moitié du déploiement.** Les scripts SQL de
 `supabase/` et les réglages d'authentification (SMTP, *Redirect URLs*,
 « Confirm email ») doivent être passés **dans les DEUX projets Supabase**.
