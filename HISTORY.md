@@ -5,6 +5,16 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-08-29
+- **Page publique d'accueil** : un visiteur non connecté arrive sur la vitrine et non sur le formulaire — promesse, aperçu du tableau de bord, les quatre étapes du conseiller, les schémas des quatre architectures (hybride, secours, site isolé, pompage), les avantages, les formules, les parcours partenaires, les témoignages et la FAQ. Bouton « Se connecter » pour qui a déjà un compte ; un lien de parrainage continue d'ouvrir l'inscription directement
+- Schémas de principe : sur téléphone, ils gardent la géométrie du grand écran — source à gauche, onduleur au centre, charge à droite — au lieu de défiler hors cadre, où l'on ne voyait que le premier bloc
+- **Abonnement pris dès l'inscription** : choisir « Pro Confort » ou « Pro Premium » sur la page d'accueil mène au paiement de CETTE formule, une fois le compte créé. Trois formules réelles (5 000 F/mois, 12 750 F/3 mois, 45 000 F/an), lues par le navigateur ET par le serveur : celui-ci exige le tarif de la formule et crédite sa durée, jamais ce que la requête annonce
+- Le revenu mensuel de l'écran d'administration compte chaque abonnement pour ce qu'il rapporte par mois : un abonné annuel pèse 3 750 F, plus 5 000
+- **Connexion Google** : l'inscription d'un nouvel arrivant ne se perd plus. Google renvoie sur la racine du site, devenue la vitrine ; le formulaire « complétez votre profil » passe désormais avant elle. La configuration nécessaire (fournisseur Supabase, URI de rappel Google Cloud, `VITE_ENABLE_GOOGLE_AUTH`) est enfin documentée
+- **Google Contacts** : les partenaires se synchronisent vers un compte Google de l'entreprise, avec reprise automatique des envois en attente et détection des doublons de téléphone (nécessite la migration et les Edge Functions — voir `supabase/GOOGLE_CONTACTS.md`)
+- **Quatre kits solaires d'août 2026** (5 kWh Deye, 10 kWh Taico, 25 kWh Felicity et le 3,8 kWh), catalogue trié par capacité de batterie ; l'assistant propose toutes les variantes d'une même capacité et laisse choisir, et les capacités décimales sont acceptées
+- Dimensionnement de pompe : annoncé comme « bientôt disponible » plutôt que de laisser une carte muette
+
 ## 2026-08-24
 - Nouveaux utilisateurs : mini-guide d’accueil en trois étapes avec flèches vers le suivi clients, les devis et les formations ; responsive PC/mobile, il ne s’affiche qu’après la création réelle du profil et ne revient plus après « Passer » ou « Terminer »
 
