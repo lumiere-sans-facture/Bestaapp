@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, Calculator, ContactRound } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, Calculator } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -659,7 +659,7 @@ export default function Plus() {
           <div className="plus-section-label">Configuration</div>
           <div className="plus-card card">
             <MenuItem icon={CreditCard} title="Moyens de paiement" subtitle={paiementActif ? `${paiementActif.nom} · ${paiementActif.mode}` : 'Aucun agrégateur activé — Mobile Money manuel'} onClick={() => setActiveTab('paiements')} />
-            <MenuItem icon={ContactRound} title="Synchronisation Google Contacts" subtitle="Connecter le compte qui reçoit les nouveaux partenaires" onClick={() => setActiveTab('googlecontacts')} />
+            <MenuItem icon={Share2} title="Synchronisation Google Contacts" subtitle="Connecter le compte qui reçoit les nouveaux partenaires" onClick={() => setActiveTab('googlecontacts')} />
             <MenuItem icon={DatabaseBackup} title="Sauvegarde des données" subtitle="Exporter / restaurer toutes les données" onClick={() => setActiveTab('backup')} />
             {/* Administration du SaaS : en mode backend, réservée à l'admin
                 plateforme (le serveur refuse de toute façon l'activation
