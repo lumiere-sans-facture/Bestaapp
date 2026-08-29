@@ -210,13 +210,35 @@ un horodatage de déploiement qui correspond à l'instant présent.
 
 ## 8. Installer les clés dans les secrets
 
-C'est ici que vont les deux valeurs de l'étape 5.
+C'est ici que vont les deux valeurs de l'étape 5. Quatre des cinq secrets sont
+déjà connus ; le cinquième, vous l'inventez.
 
-Le secret du cron est une chaîne libre, longue et aléatoire :
+### `GOOGLE_CONTACTS_CRON_SECRET` : un mot de passe que vous choisissez
+
+Ce n'est pas une valeur fournie par Google ni par Supabase. C'est un mot de
+passe que vous créez, et qui protège **une seule chose** : l'action
+`retry-pending` de `google-contacts-sync`, celle qui reprend les envois restés
+en attente.
+
+Pourquoi un mot de passe plutôt qu'une session ? Parce que cette action est
+appelée par un planificateur, pas par un humain : il n'y a personne à
+identifier. Le planificateur prouve donc qui il est en présentant ce secret
+dans l'en-tête `x-google-contacts-cron-secret`. Sans lui, n'importe qui
+pourrait déclencher le traitement de la file.
+
+Tant que le secret n'est pas défini côté serveur, l'action répond `401` et
+**rien ne se reprend tout seul** — c'est un refus par défaut, voulu. Le reste
+fonctionne sans lui : connecter un compte Google et synchroniser un
+partenaire ne le regardent pas.
+
+Générez-en un, long et imprévisible :
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
+
+Gardez-le : il vous servira une seconde fois, au moment de programmer la
+reprise automatique (dernière section).
 
 Puis, en une seule commande — sous Windows, écrivez-la sur une seule ligne si
 les `\` en fin de ligne posent problème :
