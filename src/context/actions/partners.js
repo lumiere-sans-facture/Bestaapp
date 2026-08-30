@@ -17,7 +17,7 @@ export function createPartnerActions(setState) {
         partners: [
           {
             ...created,
-            code: generatePartnerCode(partner.name, s.partners.map((p) => p.code).filter(Boolean)),
+            code: generatePartnerCode(partner.name, s.partners.map((p) => p.code).filter(Boolean), id),
             status: 'actif',
             registeredAt: new Date().toISOString().slice(0, 10),
             ...(partner.phone?.trim() ? { google_contact_sync_status: 'pending' } : {}),
@@ -84,11 +84,12 @@ export function createPartnerActions(setState) {
         const parrain = (refPartner && refPartner.userId !== user.id ? refPartner : null)
           || (codeOrg ? s.partners.find((p) => p.code === codeOrg) : null)
           || null;
+        const partnerId = `p-user-${user.id}`;
         return {
           ...s,
           partners: [
             {
-              id: `p-user-${user.id}`,
+              id: partnerId,
               userId: user.id,
               name: user.name,
               phone: user.phone || '',
@@ -101,7 +102,7 @@ export function createPartnerActions(setState) {
               sponsorCode: parrain?.code || codeOrg,
               status: 'actif',
               registeredAt: new Date().toISOString().slice(0, 10),
-              code: generatePartnerCode(user.name, s.partners.map((p) => p.code).filter(Boolean)),
+              code: generatePartnerCode(user.name, s.partners.map((p) => p.code).filter(Boolean), partnerId),
             },
             ...s.partners,
           ],
@@ -179,7 +180,7 @@ export function createPartnerActions(setState) {
                 sponsorId: null,
                 status: 'actif',
                 registeredAt: new Date().toISOString().slice(0, 10),
-                code: generatePartnerCode(beneficiaire.name || 'Membre', partners.map((p) => p.code).filter(Boolean)),
+                code: generatePartnerCode(beneficiaire.name || 'Membre', partners.map((p) => p.code).filter(Boolean), partnerId),
               },
               ...partners,
             ];
@@ -242,3 +243,4 @@ export function createPartnerActions(setState) {
       })),
   };
 }
+

@@ -21,13 +21,14 @@ describe('codeBaseFromName', () => {
 });
 
 describe('generatePartnerCode', () => {
-  it('produit BESTA-<NOM> sans collision', () => {
-    expect(generatePartnerCode('Aminata', [])).toBe('BESTA-AMINATA');
+  it('produit un code lisible avec suffixe unique', () => {
+    expect(generatePartnerCode('Aminata', [], 'partner-1')).toMatch(/^BESTA-AMINATA-[A-Z2-9]{6}$/);
   });
-  it('ajoute un suffixe en cas de collision', () => {
-    const code = generatePartnerCode('Aminata', ['BESTA-AMINATA']);
-    expect(code).not.toBe('BESTA-AMINATA');
-    expect(code.startsWith('BESTA-AMINATA-')).toBe(true);
-    expect(code.length).toBe('BESTA-AMINATA-'.length + 2);
+  it('distingue deux homonymes et reste stable pour la même identité', () => {
+    const premier = generatePartnerCode('Aminata', [], 'partner-1');
+    const second = generatePartnerCode('Aminata', [premier], 'partner-2');
+    expect(second).not.toBe(premier);
+    expect(generatePartnerCode('Aminata', [], 'partner-1')).toBe(premier);
   });
 });
+

@@ -67,6 +67,10 @@ export function createLeadActions(setState) {
         const sponsor = parrainL1
           ? s.partners.find((p) => p.id === parrainL1)?.sponsorId || null
           : null;
+        // Cette attribution ne doit jamais changer lors d'une réaffectation
+        // commerciale : elle constitue la trace de la personne qui a créé la
+        // fiche client et sera reprise dans Google Contacts.
+        const enregistrant = s.partners.find((p) => p.userId === lead.assignedTo);
         return {
           ...s,
           referrals,
@@ -79,6 +83,10 @@ export function createLeadActions(setState) {
               stage: 'nouveau',
               createdAt: new Date().toISOString().slice(0, 10),
               lastActivity: new Date().toISOString().slice(0, 10),
+              registeredByUserId: lead.assignedTo || null,
+              registeredByPartnerId: enregistrant?.id || null,
+              registeredByPartnerName: enregistrant?.name || null,
+              registeredByPartnerCode: enregistrant?.code || null,
               ...(lead.phone?.trim() ? { google_contact_sync_status: 'pending' } : {}),
             },
             ...s.leads,
@@ -220,3 +228,4 @@ export function createLeadActions(setState) {
       })),
   };
 }
+
