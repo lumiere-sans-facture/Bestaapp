@@ -14,18 +14,42 @@ export const codeBaseFromName = (name = '') =>
     .split(/\s+/)[0]
     .slice(0, 10) || 'PARTENAIRE';
 
-/**
- * Code lisible basé sur le nom : BESTA-AMINATA.
- * En cas d'homonyme, un suffixe court est ajouté : BESTA-AMINATA-K7.
- */
-export const generatePartnerCode = (name, existingCodes = []) => {
-  const base = codeBaseFromName(name);
-  let code = `BESTA-${base}`;
-  while (existingCodes.includes(code)) {
-    const suffix = Array.from({ length: 2 }, () => CHARSET[Math.floor(Math.random() * CHARSET.length)]).join('');
-    code = `BESTA-${base}-${suffix}`;
+/** Suffixe déterministe d'une identité partenaire.
+ * Une même identité garde le même code sur deux appareils ; deux UUID
+ * différents reçoivent un suffixe différent avec une probabilité de collision
+ * négligeable, ensuite verrouillée en base de données. */
+const suffixFromSeed = (seed, attempt = 0) => {
+  let hash = 0x811c9dc5;
+  for (const char of `${seed}:${attempt}`) {
+    hash = Math.imul(hash ^ char.charCodeAt(0), 0x01000193) >>> 0;
   }
-  return code;
+  let suffix = '';
+  for (let i = 0; i < 6; i += 1) {
+    // Mélange supplémentaire : les six caractères ne dépendent pas seulement
+    // des cinq bits de poids faible du hash initial.
+    hash ^= hash << 13;
+    hash ^= hash >>> 17;
+    hash ^= hash << 5;
+    hash >>>= 0;
+    suffix += CHARSET[hash % CHARSET.length];
+  }
+  return suffix;
+};
+
+/**
+ * Code lisible et toujours distinct : BESTA-AMINATA-K8R4MZ.
+ * `identity` est l'id immutable du partenaire (UUID ou p-user-...) : le code
+ * reste stable si l'application est ouverte simultanément sur deux appareils.
+ */
+export const generatePartnerCode = (name, existingCodes = [], identity = '') => {
+  const base = codeBaseFromName(name);
+  const used = new Set(existingCodes.map((code) => String(code || '').trim().toUpperCase()));
+  const seed = identity || `${base}:${Math.random()}:${Date.now()}`;
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    const code = `BESTA-${base}-${suffixFromSeed(seed, attempt)}`;
+    if (!used.has(code)) return code;
+  }
+  throw new Error('Génération du code partenaire impossible.');
 };
 
 export const partnerLink = (code) => `${window.location.origin}/?ref=${code}`;
@@ -98,3 +122,4 @@ export const resolveAutoPartner = (lead, partners, creatorUserId = null) => {
   }
   return null;
 };
+
