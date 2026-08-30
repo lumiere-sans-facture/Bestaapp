@@ -30,6 +30,8 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
   const serie = computeMonthlyDevis(devisClient);
   const maxSerie = Math.max(1, ...serie.map((m) => m.devis));
   const telNettoye = (client.phone || '').replace(/\D/g, '');
+  const enregistrant = client.registeredByPartnerName || client.registeredByName || '';
+  const codeEnregistrant = client.registeredByPartnerCode || '';
 
   const stats = [
     { key: 'total', icon: FolderOpen, label: 'Devis au total', value: devisClient.length },
@@ -200,6 +202,12 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
               <span className="sheet-value">{apporteur.name} <span className="partner-code-chip">{apporteur.code}</span></span>
             </div>
           )}
+          {enregistrant && (
+            <div className="sheet-row">
+              <span className="sheet-label"><UserCheck size={14} /> Enregistré par</span>
+              <span className="sheet-value">{enregistrant}{codeEnregistrant && <> <span className="partner-code-chip">{codeEnregistrant}</span></>}</span>
+            </div>
+          )}
           <div className="client-sheet-actions">
             <button className="btn btn-primary" onClick={onNouveauDevis}><FileText size={16} /> Créer un devis</button>
             {telNettoye && (
@@ -224,3 +232,4 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
     </>
   );
 }
+
