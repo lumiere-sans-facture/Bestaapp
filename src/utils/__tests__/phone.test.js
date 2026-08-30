@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findContactByNormalizedPhone, normalizePhoneNumber, samePhoneNumber } from '../phone';
+import { findContactByNormalizedPhone, normalizePhoneNumber, PAYS_PAR_DEFAUT, samePhoneNumber } from '../phone';
 
 describe('normalizePhoneNumber — Bénin', () => {
   const equivalent = [
@@ -45,5 +45,33 @@ describe('findContactByNormalizedPhone', () => {
   it('ne retourne aucun contact lorsqu’aucun numéro normalisé ne correspond', () => {
     const contacts = [{ resourceName: 'people/123', phoneNumbers: [{ value: '01 61 73 29 57' }] }];
     expect(findContactByNormalizedPhone(contacts, '61732956', 'BJ')).toBeNull();
+  });
+});
+
+describe('normalizePhoneNumber — Togo', () => {
+  it('interprète une saisie locale dans le pays du marché', () => {
+    // C'est le défaut : l'app s'adresse au Togo, un numéro sans indicatif y est
+    // togolais. Aucun pays passé à l'appel, exactement comme la synchronisation.
+    expect(PAYS_PAR_DEFAUT).toBe('TG');
+    expect(normalizePhoneNumber('90 12 34 56')).toBe('+22890123456');
+  });
+
+  it.each(['+228 90 12 34 56', '00228 90123456', '22890123456'])(
+    'reconnaît %s comme un numéro togolais déjà complet',
+    (phone) => {
+      expect(normalizePhoneNumber(phone, 'TG')).toBe('+22890123456');
+    },
+  );
+
+  it('ne re-préfixe jamais un numéro qui porte déjà son indicatif', () => {
+    // Le pays demandé ne doit pas écraser l'indicatif écrit : un numéro béninois
+    // lu par une session togolaise (et l'inverse) reste dans son pays.
+    expect(normalizePhoneNumber('+2290161732956', 'TG')).toBe('+2290161732956');
+    expect(normalizePhoneNumber('+22890123456', 'BJ')).toBe('+22890123456');
+    expect(normalizePhoneNumber('+33 6 12 34 56 78', 'TG')).toBe('+33612345678');
+  });
+
+  it('distingue un togolais et un béninois aux chiffres identiques', () => {
+    expect(samePhoneNumber('+22890123456', '+22990123456', 'TG')).toBe(false);
   });
 });

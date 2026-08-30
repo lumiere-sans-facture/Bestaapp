@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { findContactByNormalizedPhone, normalizePhoneNumber } from '../../../shared/phone.js';
+import { findContactByNormalizedPhone, normalizePhoneNumber, PAYS_PAR_DEFAUT } from '../../../shared/phone.js';
 
 type Contact = { id?: string; name?: string; phone?: string; email?: string; company?: string; [key: string]: unknown };
 type Job = { id: string; org_id: string; partner_id: string; normalized_phone: string; contact_data: Contact; attempts: number; status: string };
@@ -55,7 +55,7 @@ async function findContactByPhone(token: string, phone: string) {
     const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error?.message || 'Lecture des contacts Google impossible.');
-    const match = findContactByNormalizedPhone(payload.connections || [], phone, 'BJ');
+    const match = findContactByNormalizedPhone(payload.connections || [], phone, PAYS_PAR_DEFAUT);
     if (match) return match;
     pageToken = payload.nextPageToken;
   } while (pageToken);
@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     const { orgId } = await currentOrg(req);
     const contact = body.contact as Contact;
     const partnerId = String(body.partnerId || contact?.id || '');
-    const normalizedPhone = normalizePhoneNumber(contact?.phone, 'BJ');
+    const normalizedPhone = normalizePhoneNumber(contact?.phone, PAYS_PAR_DEFAUT);
     if (!partnerId || !normalizedPhone) return json({ status: 'failed', error: 'Partenaire ou numéro de téléphone invalide.' }, 400);
     const { data: existing } = await client.from('google_contact_sync_jobs').select('*').eq('org_id', orgId).eq('partner_id', partnerId).maybeSingle();
     if (existing && existing.normalized_phone === normalizedPhone && ['synced', 'already_exists'].includes(existing.status)) return json({ status: existing.status, resourceName: existing.google_contact_resource_name || null });
