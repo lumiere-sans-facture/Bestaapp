@@ -14,7 +14,11 @@ async function currentOrg(req: Request) {
   const client = db();
   const { data: auth } = await client.auth.getUser(token);
   if (!auth.user) throw new Error('Session invalide.');
-  const { data: profile } = await client.from('profiles').select('org_id').eq('id', auth.user.id).single();
+  // Même jonction que dans google-contacts-oauth : `profiles.id` est une clé texte
+  // de l'app, sans lien avec `auth.users.id`. On retrouve le profil par e-mail.
+  const email = (auth.user.email || '').toLowerCase();
+  if (!email) throw new Error('Compte sans adresse e-mail.');
+  const { data: profile } = await client.from('profiles').select('org_id').eq('email', email).single();
   if (!profile?.org_id) throw new Error('Organisation introuvable.');
   return { client, orgId: profile.org_id as string };
 }

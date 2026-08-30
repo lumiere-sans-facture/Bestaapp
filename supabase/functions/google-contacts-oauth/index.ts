@@ -20,8 +20,13 @@ async function requireManager(req: Request) {
   const db = admin();
   const { data: auth, error: authError } = await db.auth.getUser(token);
   if (authError || !auth.user) throw new Error('Session invalide.');
+  // `profiles.id` est une clé texte propre à l'app (voir supabase/schema.sql) : elle
+  // n'a aucun rapport avec `auth.users.id`. L'e-mail est le point de jonction utilisé
+  // partout ailleurs (AuthContext.fetchProfile) — on s'aligne dessus.
+  const email = (auth.user.email || '').toLowerCase();
+  if (!email) throw new Error('Compte sans adresse e-mail.');
   const { data: profile, error } = await db.from('profiles')
-    .select('id, org_id, role').eq('id', auth.user.id).single();
+    .select('id, org_id, role').eq('email', email).single();
   if (error || !profile?.org_id) throw new Error('Organisation introuvable.');
   if (profile.role !== 'gerant') throw new Error('Réservé au gérant de l’organisation.');
   return { db, userId: auth.user.id, orgId: profile.org_id as string };
