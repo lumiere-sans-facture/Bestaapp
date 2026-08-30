@@ -79,6 +79,7 @@ export function createLeadActions(setState) {
               stage: 'nouveau',
               createdAt: new Date().toISOString().slice(0, 10),
               lastActivity: new Date().toISOString().slice(0, 10),
+              ...(lead.phone?.trim() ? { google_contact_sync_status: 'pending' } : {}),
             },
             ...s.leads,
           ],
@@ -91,10 +92,43 @@ export function createLeadActions(setState) {
       setState((s) => ({
         ...s,
         leads: s.leads.map((l) =>
-          l.id === leadId
-            ? { ...l, ...patch, lastActivity: new Date().toISOString().slice(0, 10) }
-            : l
+          l.id !== leadId ? l : (() => {
+            // Une fiche créée avant l'activation de Google Contacts, ou dont
+            // le numéro a été modifié, est remise dans la file à sa prochaine
+            // sauvegarde. Une simple modification d'un autre champ ne crée
+            // jamais un doublon pour un contact déjà synchronisé.
+            const phone = typeof patch.phone === 'string' ? patch.phone.trim() : '';
+            const needsSync = Boolean(phone) && (phone !== (l.phone || '').trim() || !l.google_contact_sync_status);
+            return {
+              ...l,
+              ...patch,
+              lastActivity: new Date().toISOString().slice(0, 10),
+              ...(needsSync ? {
+                google_contact_sync_status: 'pending',
+                google_contact_sync_error: null,
+                google_contact_sync_next_retry_at: null,
+              } : {}),
+            };
+          })()
         ),
+      })),
+
+    // Retour de l'Edge Function pour une fiche Client. Le statut est
+    // répliqué avec la piste, ce qui évite toute seconde création sur un
+    // autre appareil.
+    setLeadGoogleContactSync: (leadId, result = {}) =>
+      setState((s) => ({
+        ...s,
+        leads: s.leads.map((lead) => (lead.id === leadId ? {
+          ...lead,
+          google_contact_sync_status: result.status || 'pending',
+          ...(result.resourceName ? { google_contact_resource_name: result.resourceName } : {}),
+          ...(result.status === 'synced' || result.status === 'already_exists'
+            ? { google_contact_synced_at: new Date().toISOString(), google_contact_sync_error: null, google_contact_sync_next_retry_at: null }
+            : {}),
+          ...(result.error ? { google_contact_sync_error: result.error } : {}),
+          ...(result.nextRetryAt ? { google_contact_sync_next_retry_at: result.nextRetryAt } : {}),
+        } : lead)),
       })),
 
     // Le vendeur applique l'étape immédiatement — le « gagné » génère les
