@@ -1,7 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { findContactByNormalizedPhone, normalizePhoneNumber, PAYS_PAR_DEFAUT } from '../../../shared/phone.js';
 
-type Contact = { id?: string; name?: string; phone?: string; email?: string; company?: string; [key: string]: unknown };
+type Contact = {
+  id?: string; name?: string; phone?: string; email?: string; company?: string;
+  registeredByName?: string; registeredByCode?: string; [key: string]: unknown;
+};
 type ContactType = 'partner' | 'lead';
 type Job = { id: string; org_id: string; partner_id: string; contact_type?: ContactType; normalized_phone: string; contact_data: Contact; attempts: number; status: string };
 const cors = { 'Access-Control-Allow-Origin': Deno.env.get('SITE_URL') || '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
@@ -81,6 +84,16 @@ async function createContact(token: string, contact: Contact, normalizedPhone: s
   };
   if (contact.email) payload.emailAddresses = [{ value: String(contact.email), type: 'work' }];
   if (contact.company) payload.organizations = [{ name: String(contact.company), type: 'work' }];
+  const enregistrant = [String(contact.registeredByName || '').trim(), String(contact.registeredByCode || '').trim()]
+    .filter(Boolean).join(' — ');
+  if (enregistrant) {
+    // Champ personnalisé visible dans Google Contacts : la source de la fiche
+    // reste identifiable même après un export ou un changement d'appareil.
+    payload.userDefined = [
+      { key: 'Source', value: 'BestaSolar' },
+      { key: 'Enregistré par', value: enregistrant },
+    ];
+  }
   const response = await fetch('https://people.googleapis.com/v1/people:createContact', {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
@@ -156,3 +169,4 @@ Deno.serve(async (req) => {
     return json({ status: 'failed', error: error instanceof Error ? error.message : 'Synchronisation impossible.' }, 500);
   }
 });
+
