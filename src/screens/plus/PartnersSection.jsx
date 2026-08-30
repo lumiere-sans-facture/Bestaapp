@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick, Search, Star } from 'lucide-react';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, initials, formatTaux } from '../../utils/format';
-import { partnerLink, REF_TTL_DAYS, getActiveRef } from '../../utils/referral';
+import { partnerLink, REF_TTL_DAYS, getActiveRef, memeCode } from '../../utils/referral';
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import { useToast } from '../../components/Toast';
@@ -57,7 +57,7 @@ export default function PartnersSection({ onBack }) {
     const paid = myComs.filter((c) => c.status === 'payée').reduce((s, c) => s + c.amount, 0);
     const pending = myComs.filter((c) => c.status === 'en_attente').reduce((s, c) => s + c.amount, 0);
     const filleuls = partners.filter((p) => p.sponsorId === partner.id);
-    const myReferrals = (referrals || []).filter((r) => r.partnerCode === partner.code);
+    const myReferrals = (referrals || []).filter((r) => memeCode(r.partnerCode, partner.code));
     const clicks = myReferrals.filter((r) => r.type === 'clic').length;
     const conversions = myReferrals.filter((r) => r.type !== 'clic');
     return { l1Leads, l2Leads, won, paid, pending, filleuls, myReferrals, clicks, conversions };
@@ -70,7 +70,7 @@ export default function PartnersSection({ onBack }) {
     // Rattachement automatique : le parrain est pré-rempli depuis le lien
     // d'affiliation actif sur l'appareil, le cas échéant.
     const ref = getActiveRef();
-    const refPartner = ref ? partners.find((p) => p.code === ref.code && p.status === 'actif') : null;
+    const refPartner = ref ? partners.find((p) => memeCode(p.code, ref.code) && p.status === 'actif') : null;
     setForm({ ...EMPTY_FORM, sponsorId: refPartner?.id || '' });
     setEditing('new');
   };

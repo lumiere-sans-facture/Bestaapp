@@ -14,8 +14,8 @@ beforeAll(() => {
 });
 
 const partners = [
-  { id: 'p1', name: 'Mamadou', code: 'BESTA-MAMADOU', status: 'actif' },
-  { id: 'p-user-u2', name: 'Fatou', code: 'BESTA-FATOU', status: 'actif', userId: 'u2' },
+  { id: 'p1', name: 'Mamadou', code: 'MAMADOU', status: 'actif' },
+  { id: 'p-user-u2', name: 'Fatou', code: 'FATOU', status: 'actif', userId: 'u2' },
 ];
 
 describe('resolveAutoPartner', () => {

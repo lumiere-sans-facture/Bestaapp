@@ -46,7 +46,7 @@ const sizing = calculateSystemSize(consumption, 'off-grid', 4.3, undefined, unde
 const html = buildSizingSheetHtml({
   ...(process.argv.includes('--pro') ? { company: abonne } : {}),
   client: { name: 'Felix Sossa', phone: '+228 94 22 33 44', ville: 'Lomé' },
-  apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' },
+  apporteur: { name: 'Aminata Kesso', code: 'AMINATA' },
   appliances: appareils,
   manualMode: false,
   consumption,

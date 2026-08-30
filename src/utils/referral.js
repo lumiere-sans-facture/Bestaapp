@@ -14,16 +14,40 @@ export const codeBaseFromName = (name = '') =>
     .split(/\s+/)[0]
     .slice(0, 10) || 'PARTENAIRE';
 
+// Ancien préfixe des codes partenaires. Il a été retiré du format, mais des
+// liens « ?ref=BESTA-… » circulent toujours (WhatsApp, affiches, cartes) :
+// tout code reçu est donc débarrassé de ce préfixe avant comparaison.
+const PREFIXE_HISTORIQUE = 'BESTA-';
+
 /**
- * Code lisible basé sur le nom : BESTA-AMINATA.
- * En cas d'homonyme, un suffixe court est ajouté : BESTA-AMINATA-K7.
+ * Forme canonique d'un code partenaire : majuscules, sans espaces, et sans le
+ * préfixe historique. C'est la SEULE forme sur laquelle on compare deux codes.
+ */
+export const normaliseCode = (code = '') => {
+  const propre = String(code || '').trim().toUpperCase();
+  return propre.startsWith(PREFIXE_HISTORIQUE) ? propre.slice(PREFIXE_HISTORIQUE.length) : propre;
+};
+
+/** Deux codes désignent-ils le même partenaire, quelle que soit leur écriture ? */
+export const memeCode = (a, b) => {
+  const gauche = normaliseCode(a);
+  return Boolean(gauche && gauche === normaliseCode(b));
+};
+
+/**
+ * Code lisible basé sur le nom : AMINATA.
+ * En cas d'homonyme, un suffixe court est ajouté : AMINATA-K7.
  */
 export const generatePartnerCode = (name, existingCodes = []) => {
-  const base = codeBaseFromName(name);
-  let code = `BESTA-${base}`;
-  while (existingCodes.includes(code)) {
+  const nom = codeBaseFromName(name);
+  // « BESTA » est réservé : un code commençant par lui serait raccourci à tort
+  // en retirant le préfixe historique.
+  const base = nom === 'BESTA' ? 'PARTENAIRE' : nom;
+  const pris = existingCodes.map(normaliseCode);
+  let code = base;
+  while (pris.includes(code)) {
     const suffix = Array.from({ length: 2 }, () => CHARSET[Math.floor(Math.random() * CHARSET.length)]).join('');
-    code = `BESTA-${base}-${suffix}`;
+    code = `${base}-${suffix}`;
   }
   return code;
 };
@@ -35,13 +59,13 @@ export const partnerLink = (code) => `${window.location.origin}/?ref=${code}`;
 const REF_KEY = 'bestasolar_ref';
 export const REF_TTL_DAYS = 30;
 
-/** À appeler au chargement de l'app : capture ?ref=BESTA-XXXX et nettoie l'URL. */
+/** À appeler au chargement de l'app : capture ?ref=NOM-XX et nettoie l'URL. */
 export const captureRefFromUrl = () => {
   try {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (!ref) return null;
-    const code = ref.trim().toUpperCase();
+    const code = normaliseCode(ref);
     // last-click : un nouveau clic remplace l'attribution précédente
     localStorage.setItem(REF_KEY, JSON.stringify({
       code,
@@ -90,7 +114,7 @@ export const resolveAutoPartner = (lead, partners, creatorUserId = null) => {
   }
   const ref = getActiveRef();
   if (ref) {
-    const refPartner = partners.find((p) => p.code === ref.code && p.status === 'actif');
+    const refPartner = partners.find((p) => memeCode(p.code, ref.code) && p.status === 'actif');
     if (refPartner) return refPartner;
   }
   if (creatorUserId) {

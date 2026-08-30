@@ -1,6 +1,6 @@
 // Domaine programme d'affiliation : réseau de partenaires, validation des
 // conversions et paiement des commissions de parrainage.
-import { generatePartnerCode } from '../../utils/referral';
+import { generatePartnerCode, memeCode, normaliseCode } from '../../utils/referral';
 import { missingCommissionsForLead, reconcileMissingCommissions, rattacherCommissionsClient } from '../../utils/commissionSync';
 import { COMMISSION_RATES, partnerFromActiveRef } from './shared';
 
@@ -63,13 +63,14 @@ export function createPartnerActions(setState) {
     //    commission de 1,5 % n'est jamais attribuée.
     ensurePartnerForUser: (user) =>
       setState((s) => {
-        const codeOrg = (user.org?.referred_by || '').trim().toUpperCase() || null;
+        // Le code venu du serveur peut encore porter l'ancien préfixe BESTA-.
+        const codeOrg = normaliseCode(user.org?.referred_by) || null;
         const existant = s.partners.find((p) => p.userId === user.id);
         if (existant) {
           // Réparation des profils créés avant que le code d'organisation ne
           // soit connu : sans parrain, aucune commission de niveau 2.
           if (!codeOrg || existant.sponsorId || existant.sponsorCode) return s;
-          const local = s.partners.find((p) => p.code === codeOrg && p.id !== existant.id);
+          const local = s.partners.find((p) => memeCode(p.code, codeOrg) && p.id !== existant.id);
           return {
             ...s,
             partners: s.partners.map((p) => (p.id === existant.id
@@ -82,7 +83,7 @@ export function createPartnerActions(setState) {
         // devient le parrain — sans saisie manuelle.
         const refPartner = partnerFromActiveRef(s.partners);
         const parrain = (refPartner && refPartner.userId !== user.id ? refPartner : null)
-          || (codeOrg ? s.partners.find((p) => p.code === codeOrg) : null)
+          || (codeOrg ? s.partners.find((p) => memeCode(p.code, codeOrg)) : null)
           || null;
         return {
           ...s,

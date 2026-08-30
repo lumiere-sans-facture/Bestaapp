@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchPlatformPayouts, decidePlatformPayout } from '../lib/remoteSync';
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
 import { estProprietaireEspace } from '../utils/roles';
+import { normaliseCode } from '../utils/referral';
 import { configActive, providerById, MODE_LABEL } from '../utils/paiementProviders';
 import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft, formule, FORMULE_DEFAUT } from '../utils/subscription';
 import { lireFormuleChoisie, oublierFormuleChoisie } from '../utils/formuleChoisie';
@@ -735,7 +736,7 @@ export default function Plus() {
                 ce choix est <strong>définitif</strong>.
               </p>
               <div className="momo-input-row">
-                <input className="input" value={refInput} onChange={(e) => setRefInput(e.target.value.toUpperCase())} placeholder="BESTA-…" aria-label="Code partenaire" />
+                <input className="input" value={refInput} onChange={(e) => setRefInput(normaliseCode(e.target.value))} placeholder="Ex. AMINATA" aria-label="Code partenaire" />
                 <button type="submit" className="btn btn-primary" disabled={refSaving || !refInput.trim()}>
                   {refSaving ? '…' : 'Attribuer'}
                 </button>

@@ -26,10 +26,10 @@ export const LOST_STAGE = { id: 'perdu', label: 'Perdu', color: '#ef4444' };
 // Quand un partenaire apporte une affaire (niveau 1, 3 %), son parrain
 // touche automatiquement la commission de niveau 2 (1,5 %).
 export const partners = [
-  { id: 'p1', name: 'Mamadou Balogun', phone: '+228 97 11 22 33', sponsorId: null, registeredAt: '2025-01-15', status: 'actif', code: 'BESTA-MAMADOU', momoNumber: '+228 97 11 22 33' },
-  { id: 'p2', name: 'Aminata Kesso', phone: '+228 96 44 55 66', sponsorId: 'p1', registeredAt: '2025-02-20', status: 'actif', code: 'BESTA-AMINATA', momoNumber: '+228 96 44 55 66' },
-  { id: 'p3', name: 'Toffa Gname', phone: '+228 95 77 88 99', sponsorId: 'p2', registeredAt: '2025-03-10', status: 'actif', code: 'BESTA-TOFFA', momoNumber: '' },
-  { id: 'p4', name: 'Balogoun Alassane', phone: '+228 94 33 22 11', sponsorId: 'p1', registeredAt: '2025-04-05', status: 'inactif', code: 'BESTA-BALOGOUN', momoNumber: '' },
+  { id: 'p1', name: 'Mamadou Balogun', phone: '+228 97 11 22 33', sponsorId: null, registeredAt: '2025-01-15', status: 'actif', code: 'MAMADOU', momoNumber: '+228 97 11 22 33' },
+  { id: 'p2', name: 'Aminata Kesso', phone: '+228 96 44 55 66', sponsorId: 'p1', registeredAt: '2025-02-20', status: 'actif', code: 'AMINATA', momoNumber: '+228 96 44 55 66' },
+  { id: 'p3', name: 'Toffa Gname', phone: '+228 95 77 88 99', sponsorId: 'p2', registeredAt: '2025-03-10', status: 'actif', code: 'TOFFA', momoNumber: '' },
+  { id: 'p4', name: 'Balogoun Alassane', phone: '+228 94 33 22 11', sponsorId: 'p1', registeredAt: '2025-04-05', status: 'inactif', code: 'BALOGOUN', momoNumber: '' },
 ];
 
 export const leads = [
@@ -158,7 +158,7 @@ export const formations = [
         lecons: [
           {
             id: 'f3m1l1', title: 'Comment fonctionne votre code partenaire', type: 'texte', duration: '5 min',
-            content: 'Chaque partenaire dispose d’un code unique (BESTA-XXXX) et d’un lien de parrainage à partager. Toute personne qui commande via votre lien vous est attribuée pendant 30 jours (dernier clic gagnant).\n\nPartagez votre lien sur WhatsApp, Facebook et en boutique : l’application suit automatiquement les clics et les ventes attribuées.',
+            content: 'Chaque partenaire dispose d’un code unique (son prénom, par exemple AMINATA) et d’un lien de parrainage à partager. Toute personne qui commande via votre lien vous est attribuée pendant 30 jours (dernier clic gagnant).\n\nPartagez votre lien sur WhatsApp, Facebook et en boutique : l’application suit automatiquement les clics et les ventes attribuées.',
           },
           {
             id: 'f3m1l2', title: 'Commissions niveau 1 et niveau 2', type: 'texte', duration: '5 min',

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, ChevronDown, Handshake, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { getActiveRef } from '../utils/referral';
+import { getActiveRef, normaliseCode } from '../utils/referral';
 import { lireFormuleChoisie } from '../utils/formuleChoisie';
 import { vueLogin } from '../utils/entree';
 import { formule } from '../utils/subscription';
@@ -78,7 +78,7 @@ function GoogleIcon() {
  */
 export default function Login({ vueInitiale = null }) {
   const { login, signInWithGoogle, signUp, completeSignup, resetPassword, updatePassword, recovery, pendingAuthUser } = useAuth();
-  // Lien de parrainage (?ref=BESTA-XXX) actif sur cet appareil : on ouvre
+  // Lien de parrainage (?ref=AMINATA) actif sur cet appareil : on ouvre
   // directement l'inscription, code partenaire prérempli.
   const [refCode, setRefCode] = useState(() => (isSupabaseConfigured ? getActiveRef()?.code || '' : ''));
   // Venu par un lien partenaire (le champ est alors prérempli, hint adapté).
@@ -414,7 +414,7 @@ export default function Login({ vueInitiale = null }) {
                 <div className="input-group">
                   <label className="input-label" htmlFor="complete-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
                   <input id="complete-ref" className="input" value={refCode}
-                    onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
+                    onChange={(e) => setRefCode(normaliseCode(e.target.value))} placeholder="Ex. AMINATA" />
                 </div>
               )}
               <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
@@ -451,7 +451,7 @@ export default function Login({ vueInitiale = null }) {
                 <div className="input-group">
                   <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
                   <input id="signup-ref" className="input" value={refCode}
-                    onChange={(e) => setRefCode(e.target.value.toUpperCase())} placeholder="BESTA-…" />
+                    onChange={(e) => setRefCode(normaliseCode(e.target.value))} placeholder="Ex. AMINATA" />
                   <div className="field-hint">
                     {refFromLink
                       ? "Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli."

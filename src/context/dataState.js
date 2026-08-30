@@ -5,7 +5,7 @@ import { SOLAR_KITS, KITS_DOTES_AVANT_REGISTRE } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
 import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
+import { generatePartnerCode, codeBaseFromName, normaliseCode } from '../utils/referral';
 
 export const STORAGE_KEY = 'bestasolar_data';
 
@@ -89,7 +89,7 @@ export const loadState = (scope = null) => {
           : p
       );
       // Migration affiliation : registre des parrainages + codes basés sur le nom.
-      // Les anciens codes aléatoires (BESTA-XXXX) sont régénérés à partir du nom,
+      // Les anciens codes (BESTA-XXXX) perdent leur préfixe ou sont régénérés,
       // et le registre des parrainages est remappé vers les nouveaux codes.
       if (!saved.referrals) saved.referrals = [];
       if (!saved.orders) saved.orders = [];
@@ -155,18 +155,31 @@ export const loadState = (scope = null) => {
       if (!saved.paiementConfigs) saved.paiementConfigs = [];
       if (!saved.factures) saved.factures = [];
       if (!saved.proClients) saved.proClients = [];
-      const isNameBased = (p) => p.code && p.code.startsWith(`BESTA-${codeBaseFromName(p.name)}`);
-      // 1re passe : réserver les codes déjà conformes (basés sur le nom)
-      const codes = saved.partners.filter(isNameBased).map((p) => p.code);
       const remap = {};
-      // 2e passe : régénérer les autres à partir du nom
-      saved.partners = saved.partners.map((p) => {
-        if (isNameBased(p)) return p;
-        const seedCode = seed.partners.find((sp) => sp.id === p.id)?.code;
-        const code = seedCode && !codes.includes(seedCode) ? seedCode : generatePartnerCode(p.name, codes);
-        codes.push(code);
-        if (p.code) remap[p.code] = code;
-        return { ...p, code };
+      const suitLeFormat = (code, name) => Boolean(code) && code.startsWith(codeBaseFromName(name));
+      // 1re passe : le préfixe historique tombe (BESTA-BINTA-ZSUHKZ devient
+      // BINTA-ZSUHKZ), puis on réserve les codes conformes au format. Deux
+      // codes peuvent se retrouver identiques une fois raccourcis (BINTA et
+      // BESTA-BINTA) : le premier garde le sien, l'autre est régénéré.
+      // Les liens « ?ref=BESTA-… » déjà partagés restent valides : normaliseCode
+      // retire ce préfixe de tout code reçu.
+      const codes = [];
+      const nettoyes = saved.partners.map((p) => {
+        const code = normaliseCode(p.code);
+        const garde = suitLeFormat(code, p.name) && !codes.includes(code);
+        if (garde) codes.push(code);
+        return { partenaire: p, ancien: p.code, code, garde };
+      });
+      // 2e passe : régénérer à partir du nom ceux qui n'ont pas gardé le leur.
+      saved.partners = nettoyes.map(({ partenaire, ancien, code, garde }) => {
+        let final = code;
+        if (!garde) {
+          const seedCode = seed.partners.find((sp) => sp.id === partenaire.id)?.code;
+          final = seedCode && !codes.includes(seedCode) ? seedCode : generatePartnerCode(partenaire.name, codes);
+          codes.push(final);
+        }
+        if (ancien && ancien !== final) remap[ancien] = final;
+        return final === partenaire.code ? partenaire : { ...partenaire, code: final };
       });
       if (Object.keys(remap).length) {
         saved.referrals = saved.referrals.map((r) =>

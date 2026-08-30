@@ -164,7 +164,7 @@ describe('buildSizingSheetHtml — 3 pages', () => {
   });
 
   it('mentions légales et prudence commerciale au pied de la page 3', () => {
-    const avec = buildSizingSheetHtml({ ...data, apporteur: { name: 'Aminata Kesso', code: 'BESTA-AMINATA' } });
+    const avec = buildSizingSheetHtml({ ...data, apporteur: { name: 'Aminata Kesso', code: 'AMINATA' } });
     expect(avec).toContain('RCCM RB/PKO/23 A 19308');
     expect(avec).toContain('IFU 0202274882317');
     expect(avec).toContain('Aminata Kesso');

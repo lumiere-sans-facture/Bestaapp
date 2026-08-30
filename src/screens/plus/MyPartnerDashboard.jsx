@@ -3,7 +3,7 @@ import { ChevronLeft, Check, CheckCircle, Copy, MessageCircle, MousePointerClick
 import { useAuth } from '../../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, formatTaux } from '../../utils/format';
-import { partnerLink, REF_TTL_DAYS } from '../../utils/referral';
+import { partnerLink, REF_TTL_DAYS, memeCode } from '../../utils/referral';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { fetchMyReferredOrgs } from '../../lib/remoteSync';
 import StageBadge from '../../components/StageBadge';
@@ -54,7 +54,7 @@ export default function MyPartnerDashboard({ onBack }) {
   const me = partners.find((p) => p.userId === user.id);
   if (!me) return null;
 
-  const mesInscrits = referredOrgs.filter((r) => (r.partner_code || '').toUpperCase() === me.code);
+  const mesInscrits = referredOrgs.filter((r) => memeCode(r.partner_code, me.code));
 
   const l1Leads = leads.filter((l) => l.parrainL1 === me.id);
   const l2Leads = leads.filter((l) => l.parrainL2 === me.id);
@@ -83,7 +83,7 @@ export default function MyPartnerDashboard({ onBack }) {
     .sort((a, b) => new Date(b.wonAt || 0) - new Date(a.wonAt || 0));
   const totalGagne = mesGagnees.reduce((s, l) => s + (l.estimatedValue || 0), 0);
   const mesDevis = (devis || []).filter((d) => d.partnerId === me.id);
-  const myReferrals = (referrals || []).filter((r) => r.partnerCode === me.code);
+  const myReferrals = (referrals || []).filter((r) => memeCode(r.partnerCode, me.code));
   const clicks = myReferrals.filter((r) => r.type === 'clic').length;
   const conversions = myReferrals.filter((r) => r.type !== 'clic');
   const sponsor = me.sponsorId ? getPartnerById(me.sponsorId) : null;

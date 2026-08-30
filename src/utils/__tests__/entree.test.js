@@ -49,7 +49,7 @@ describe('vueLogin — quel formulaire sur l’écran d’entrée', () => {
     // Le bogue vu en production et invisible en recette : l'attribution vit
     // trente jours sur l'appareil, et détournait la route /connexion vers
     // l'inscription — sur le seul navigateur ayant suivi un lien partenaire.
-    expect(vueLogin({ vueDemandee: 'login', refCode: 'BESTA-SIDDIK' })).toBe('login');
+    expect(vueLogin({ vueDemandee: 'login', refCode: 'SIDDIK' })).toBe('login');
   });
 
   it('« Se connecter » l’emporte aussi sur un code d’invitation d’équipe', () => {
@@ -61,7 +61,7 @@ describe('vueLogin — quel formulaire sur l’écran d’entrée', () => {
   });
 
   it('sans vue demandée, un code partenaire ouvre l’inscription', () => {
-    expect(vueLogin({ refCode: 'BESTA-SIDDIK' })).toBe('signup');
+    expect(vueLogin({ refCode: 'SIDDIK' })).toBe('signup');
   });
 
   it('sans vue demandée, un code d’équipe ouvre l’inscription', () => {

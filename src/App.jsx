@@ -16,7 +16,7 @@ import Login from './screens/Login';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
 import { installerAnalytique, suivrePage } from './lib/analytique';
 
-// Capture l'attribution d'affiliation (?ref=BESTA-XXXX) dès le chargement,
+// Capture l'attribution d'affiliation (?ref=AMINATA) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
 const REF_DU_LIEN = captureRefFromUrl();
 

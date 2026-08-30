@@ -26,7 +26,7 @@ describe('buildRecuCommissionHtml', () => {
   };
   const html = buildRecuCommissionHtml({
     commission,
-    partner: { name: 'Aminata Kesso', code: 'BESTA-AMINATA', phone: '+228 96 44 55 66' },
+    partner: { name: 'Aminata Kesso', code: 'AMINATA', phone: '+228 96 44 55 66' },
     lead: { name: 'Hôtel du Parc', estimatedValue: 1850000 },
     payeur: { name: 'Adam Adébiyi' },
     rates: RATES,
@@ -35,7 +35,7 @@ describe('buildRecuCommissionHtml', () => {
   it('contient le n° de reçu, le bénéficiaire et la traçabilité du paiement', () => {
     expect(html).toContain('REC-20260725-C4ABC');
     expect(html).toContain('Aminata Kesso');
-    expect(html).toContain('BESTA-AMINATA');
+    expect(html).toContain('AMINATA');
     expect(html).toContain('Mobile Money');
     expect(html).toContain('MP240725.1234');
     expect(html).toContain('Niveau 1 · 3 %');
@@ -55,7 +55,7 @@ describe('buildRecuCommissionHtml', () => {
 
 describe('buildReleveCommissionsHtml', () => {
   const html = buildReleveCommissionsHtml({
-    partner: { name: 'Mamadou Balogun', code: 'BESTA-MAMADOU', momoNumber: '+228 97 11 22 33' },
+    partner: { name: 'Mamadou Balogun', code: 'MAMADOU', momoNumber: '+228 97 11 22 33' },
     commissions: [
       { id: 'a', leadId: 'l3', amount: 29400, level: 1, status: 'payée', paidAt: '2026-06-10', createdAt: '2026-06-09', payRef: 'TX1' },
       { id: 'b', leadId: 'l8', amount: 26700, level: 1, status: 'payée', paidAt: '2026-05-25', createdAt: '2026-05-20' },

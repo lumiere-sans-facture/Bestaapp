@@ -266,8 +266,19 @@ create policy "own org" on public.orgs for select to authenticated
 -- RPC appelée juste après auth.signUp() — security definer car le nouvel
 -- utilisateur n'a pas encore d'org (donc aucune RLS ne le laisserait insérer).
 -- ============================================================
--- Parrainage : code partenaire (?ref=BESTA-XXX) ayant amené l'inscription.
+-- Parrainage : code partenaire (?ref=AMINATA) ayant amené l'inscription.
 alter table public.orgs add column if not exists referred_by text;
+
+-- Forme canonique d'un code partenaire. Le préfixe « BESTA- » a été retiré du
+-- format — BESTA-BINTA-ZSUHKZ s'écrit désormais BINTA-ZSUHKZ — mais des liens,
+-- des affiches et des cartes le portant circulent encore. Tout code est donc
+-- ramené à cette forme avant d'être stocké ou comparé, exactement comme le
+-- fait `normaliseCode` côté application. Sans cette symétrie, un filleul venu
+-- par un ancien lien ne serait plus rattaché à son parrain.
+create or replace function public.code_partenaire(p_code text)
+  returns text language sql immutable set search_path = public as $$
+  select nullif(regexp_replace(upper(trim(coalesce(p_code, ''))), '^BESTA-', ''), '')
+$$;
 
 -- Les anciennes signatures sont supprimées AVANT de recréer la fonction
 -- (sinon PostgREST verrait plusieurs fonctions homonymes et rejetterait
@@ -284,7 +295,7 @@ begin
     raise exception 'profil déjà existant pour cet email';
   end if;
   v_org := 'org-' || replace(gen_random_uuid()::text, '-', '');
-  v_ref := nullif(upper(trim(coalesce(p_ref_code, ''))), '');
+  v_ref := public.code_partenaire(p_ref_code);
   insert into public.orgs (id, name, plan, invite_code, referred_by)
     values (v_org, p_org_name, 'trial',
             upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
@@ -313,7 +324,7 @@ begin
         'createdAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
       ), now()
     from public.partners pt
-    where upper(pt.data->>'code') = v_ref
+    where public.code_partenaire(pt.data->>'code') = v_ref
     order by pt.updated_at asc
     limit 1;
   end if;
@@ -347,7 +358,7 @@ begin
   ) then
     raise exception 'seul le gérant de l''entreprise peut attribuer le code de parrainage';
   end if;
-  v_code := nullif(upper(trim(coalesce(p_code, ''))), '');
+  v_code := public.code_partenaire(p_code);
   if v_code is null then raise exception 'code de parrainage vide'; end if;
   select referred_by into v_existing from public.orgs where id = v_org;
   if v_existing is not null then
@@ -364,7 +375,7 @@ begin
     raise exception 'réservé à l''admin plateforme';
   end if;
   update public.orgs
-    set referred_by = nullif(upper(trim(coalesce(p_code, ''))), '')
+    set referred_by = public.code_partenaire(p_code)
     where id = p_org_id;
   if not found then raise exception 'organisation inconnue : %', p_org_id; end if;
 end $$;
@@ -529,8 +540,8 @@ create or replace function public.my_referred_orgs()
          )
   from public.orgs o
   where o.referred_by is not null
-    and o.referred_by in (
-      select upper(pt.data ->> 'code') from public.partners pt
+    and public.code_partenaire(o.referred_by) in (
+      select public.code_partenaire(pt.data ->> 'code') from public.partners pt
       where pt.org_id = public.auth_org_id() and coalesce(pt.data ->> 'code', '') <> ''
     )
   order by o.created_at desc
@@ -614,7 +625,7 @@ begin
   if v_ref is not null then
     select pt.org_id, pt.id into v_partner_org, v_partner_id
       from public.partners pt
-      where upper(pt.data ->> 'code') = upper(v_ref)
+      where public.code_partenaire(pt.data ->> 'code') = public.code_partenaire(v_ref)
       order by pt.updated_at asc
       limit 1;
     if v_partner_id is not null and not exists (
@@ -854,17 +865,17 @@ begin
   -- plateforme, l'organisation courante d'abord.
   if v_l1 is not null and v_l2 is null then
     select nullif(trim(pt.data ->> 'sponsorId'), ''),
-           nullif(upper(trim(pt.data ->> 'sponsorCode')), '')
+           public.code_partenaire(pt.data ->> 'sponsorCode')
       into v_l2, v_code
       from public.partners pt where pt.org_id = p_org_id and pt.id = v_l1;
     if v_l2 is null then
       if v_code is null then
-        select nullif(upper(trim(o.referred_by)), '') into v_code
+        select public.code_partenaire(o.referred_by) into v_code
           from public.orgs o where o.id = p_org_id;
       end if;
       if v_code is not null then
         select pt.id into v_l2 from public.partners pt
-          where upper(pt.data ->> 'code') = v_code
+          where public.code_partenaire(pt.data ->> 'code') = v_code
           order by (pt.org_id = p_org_id) desc, pt.updated_at asc limit 1;
       end if;
     end if;
@@ -1139,3 +1150,33 @@ begin
       and data ->> 'status' = 'en_attente_paiement';
 end $$;
 -- ============================================================
+
+-- ============================================================
+-- Migration « code sans préfixe » (idempotente : rejouable sans effet).
+-- Les codes déjà enregistrés perdent leur « BESTA- », DES DEUX CÔTÉS du lien
+-- d'affiliation : celui du partenaire, celui de son parrain, et celui noté sur
+-- l'organisation qu'il a parrainée. Ne migrer qu'un seul côté romprait le
+-- rapprochement et ferait disparaître les commissions.
+-- ============================================================
+update public.partners
+   set data = jsonb_set(data, '{code}', to_jsonb(public.code_partenaire(data ->> 'code'))),
+       updated_at = now()
+ where coalesce(data ->> 'code', '') <> ''
+   and data ->> 'code' is distinct from public.code_partenaire(data ->> 'code');
+
+update public.partners
+   set data = jsonb_set(data, '{sponsorCode}', to_jsonb(public.code_partenaire(data ->> 'sponsorCode'))),
+       updated_at = now()
+ where coalesce(data ->> 'sponsorCode', '') <> ''
+   and data ->> 'sponsorCode' is distinct from public.code_partenaire(data ->> 'sponsorCode');
+
+update public.referrals
+   set data = jsonb_set(data, '{partnerCode}', to_jsonb(public.code_partenaire(data ->> 'partnerCode'))),
+       updated_at = now()
+ where coalesce(data ->> 'partnerCode', '') <> ''
+   and data ->> 'partnerCode' is distinct from public.code_partenaire(data ->> 'partnerCode');
+
+update public.orgs
+   set referred_by = public.code_partenaire(referred_by)
+ where referred_by is not null
+   and referred_by is distinct from public.code_partenaire(referred_by);
