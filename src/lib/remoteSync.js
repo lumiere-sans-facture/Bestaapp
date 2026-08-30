@@ -491,16 +491,25 @@ export const startGoogleContactsOAuth = () =>
 export const disconnectGoogleContacts = () =>
   invokeGoogleContacts('google-contacts-oauth', { action: 'disconnect' });
 
-/** Envoie un partenaire vers la file serveur. Le résultat ne bloque jamais
- *  l'enregistrement local : l'appelant conserve pending/failed pour la reprise. */
-export const syncPartnerGoogleContact = (partner) =>
+/** Envoie un contact BestaSolar vers la file serveur. Le résultat ne bloque
+ *  jamais l'enregistrement local : l'appelant conserve pending/failed pour la
+ *  reprise. Les clients sont stockés dans la collection "leads". */
+export const syncGoogleContact = (contact, contactType = 'partner') =>
   invokeGoogleContacts('google-contacts-sync', {
-    partnerId: partner.id,
+    contactId: contact.id,
+    contactType,
     contact: {
-      id: partner.id,
-      name: partner.name,
-      phone: partner.phone,
-      email: partner.email || '',
-      company: partner.company || partner.entreprise || '',
+      id: contact.id,
+      // Pour une entreprise, le nom de la personne à joindre est plus utile
+      // dans Google Contacts ; le nom de l'entreprise reste dans l'organisation.
+      name: contactType === 'lead' ? (contact.contact || contact.name) : contact.name,
+      phone: contact.phone,
+      email: contact.email || '',
+      company: contactType === 'lead' && contact.clientType === 'entreprise'
+        ? contact.name
+        : (contact.company || contact.entreprise || ''),
     },
   });
+
+// Compatibilité pour les éventuels appels existants hors du DataContext.
+export const syncPartnerGoogleContact = (partner) => syncGoogleContact(partner, 'partner');

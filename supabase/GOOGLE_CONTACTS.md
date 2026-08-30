@@ -1,6 +1,6 @@
 # Google Contacts — installation
 
-Cette intégration synchronise les **partenaires** vers le compte Google Contacts choisi par le gérant de chaque organisation.
+Cette intégration synchronise les **clients** et les **partenaires** vers le compte Google Contacts choisi par le gérant de chaque organisation.
 
 ## 1. Google Cloud
 
@@ -27,6 +27,8 @@ supabase secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... \\
 ## 3. Reprise automatique
 
 Programmez un appel sécurisé toutes les 5 minutes vers `google-contacts-sync` avec le corps `{"action":"retry-pending"}` et l'en-tête `x-google-contacts-cron-secret`. La fonction reprend les jobs `pending` / `failed` arrivés à échéance ; sans réseau, le contact reste enregistré dans BestaSolar.
+
+Les entrées créées depuis **Clients** (collection `leads`) et **Partenaires** sont synchronisées. Après le premier déploiement de cette évolution, exécutez aussi `migrations/20260830_google_contacts_leads.sql`. Les anciens clients ne sont pas envoyés automatiquement : ouvrez leur fiche, puis **Modifier → Enregistrer** pour les mettre explicitement en file.
 
 Le gérant connecte ensuite son compte depuis **Plus → Paramètres → Synchronisation Google Contacts**.
 
