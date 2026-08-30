@@ -3,7 +3,7 @@ import * as seed from '../data/seed';
 import { consumeRefClick } from '../utils/referral';
 import { useAuth } from './AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { fetchTeamProfiles, syncPartnerGoogleContact } from '../lib/remoteSync';
+import { fetchTeamProfiles, syncGoogleContact } from '../lib/remoteSync';
 import { loadState, persist, STORAGE_KEY } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
@@ -122,35 +122,44 @@ export function DataProvider({ children }) {
   }, []);
 
   // Reprise asynchrone de Google Contacts. La mutation locale ne dépend jamais
-  // de ce réseau : seuls les partenaires avec un statut arrivé à échéance sont
-  // tentés, et un seul essai par partenaire est exécuté simultanément.
+  // de ce réseau : les partenaires et les fiches Clients (collection leads)
+  // avec un statut arrivé à échéance sont tentés. Un seul essai par contact est
+  // exécuté simultanément.
   const googleSyncInFlight = useRef(new Set());
   useEffect(() => {
     if (!isSupabaseConfigured) return undefined;
     const now = Date.now();
-    const due = (state.partners || []).filter((partner) => {
-      const status = partner.google_contact_sync_status;
-      const retry = partner.google_contact_sync_next_retry_at;
-      return partner.phone && (status === 'pending' || status === 'failed')
+    const due = [
+      ...(state.partners || []).map((contact) => ({ contact, contactType: 'partner' })),
+      ...(state.leads || []).map((contact) => ({ contact, contactType: 'lead' })),
+    ].filter(({ contact, contactType }) => {
+      const status = contact.google_contact_sync_status;
+      const retry = contact.google_contact_sync_next_retry_at;
+      const key = `${contactType}:${contact.id}`;
+      return contact.phone && (status === 'pending' || status === 'failed')
         && (!retry || Number.isNaN(Date.parse(retry)) || Date.parse(retry) <= now)
-        && !googleSyncInFlight.current.has(partner.id);
+        && !googleSyncInFlight.current.has(key);
     }).slice(0, 3);
     if (!due.length) return undefined;
     let active = true;
-    due.forEach((partner) => {
-      googleSyncInFlight.current.add(partner.id);
-      syncPartnerGoogleContact(partner)
-        .then((result) => { if (active) actions.setPartnerGoogleContactSync(partner.id, result); })
+    due.forEach(({ contact, contactType }) => {
+      const key = `${contactType}:${contact.id}`;
+      const setSyncStatus = contactType === 'lead'
+        ? actions.setLeadGoogleContactSync
+        : actions.setPartnerGoogleContactSync;
+      googleSyncInFlight.current.add(key);
+      syncGoogleContact(contact, contactType)
+        .then((result) => { if (active) setSyncStatus(contact.id, result); })
         .catch((error) => {
-          if (active) actions.setPartnerGoogleContactSync(partner.id, {
+          if (active) setSyncStatus(contact.id, {
             status: 'failed', error: error.message || 'Synchronisation Google impossible.',
             nextRetryAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
           });
         })
-        .finally(() => googleSyncInFlight.current.delete(partner.id));
+        .finally(() => googleSyncInFlight.current.delete(key));
     });
     return () => { active = false; };
-  }, [state.partners, actions, googleRetryTick]);
+  }, [state.partners, state.leads, actions, googleRetryTick]);
 
   // Profil partenaire de l'utilisateur garanti dès l'ouverture de l'app.
   // C'est lui qui porte les commissions : sans profil, une affaire gagnée
