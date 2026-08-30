@@ -147,8 +147,23 @@ export function DataProvider({ children }) {
       const setSyncStatus = contactType === 'lead'
         ? actions.setLeadGoogleContactSync
         : actions.setPartnerGoogleContactSync;
+      // L'auteur de la fiche est figé à la création. Ce repli couvre les
+      // anciens clients créés avant l'ajout du champ de traçabilité.
+      const enregistrant = contactType === 'lead'
+        ? (state.partners || []).find((partner) => partner.id === contact.registeredByPartnerId
+          || partner.userId === contact.registeredByUserId
+          || partner.userId === contact.assignedTo)
+        : null;
+      const membre = contactType === 'lead'
+        ? team.find((member) => member.id === contact.registeredByUserId || member.id === contact.assignedTo)
+        : null;
+      const contactToSync = contactType === 'lead' ? {
+        ...contact,
+        registeredByPartnerName: contact.registeredByPartnerName || enregistrant?.name || membre?.name || '',
+        registeredByPartnerCode: contact.registeredByPartnerCode || enregistrant?.code || '',
+      } : contact;
       googleSyncInFlight.current.add(key);
-      syncGoogleContact(contact, contactType)
+      syncGoogleContact(contactToSync, contactType)
         .then((result) => { if (active) setSyncStatus(contact.id, result); })
         .catch((error) => {
           if (active) setSyncStatus(contact.id, {
@@ -195,3 +210,4 @@ export function useData() {
   if (!ctx) throw new Error('useData doit être utilisé dans <DataProvider>');
   return ctx;
 }
+
