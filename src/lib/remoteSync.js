@@ -508,8 +508,11 @@ export const syncGoogleContact = (contact, contactType = 'partner') =>
       company: contactType === 'lead' && contact.clientType === 'entreprise'
         ? contact.name
         : (contact.company || contact.entreprise || ''),
+      registeredByName: contactType === 'lead' ? (contact.registeredByPartnerName || '') : '',
+      registeredByCode: contactType === 'lead' ? (contact.registeredByPartnerCode || '') : '',
     },
   });
 
 // Compatibilité pour les éventuels appels existants hors du DataContext.
 export const syncPartnerGoogleContact = (partner) => syncGoogleContact(partner, 'partner');
+
