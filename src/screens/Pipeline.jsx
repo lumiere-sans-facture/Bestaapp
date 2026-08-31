@@ -13,6 +13,7 @@ import PageHeader from '../components/PageHeader';
 import Sheet from '../components/Sheet';
 import Field from '../components/Field';
 import ClientIdentityFields, { contactEffectif } from '../components/ClientIdentityFields';
+import { SOURCES_CONTACT } from '../utils/contactSource';
 
 const STALE_DAYS = 5;
 
@@ -108,7 +109,7 @@ export default function Pipeline() {
   const [dragOverZone, setDragOverZone] = useState(null);
   const [noteText, setNoteText] = useState('');
   // Pas de « valeur estimée » à saisir : elle se déduit des devis du client.
-  const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', address: '', notes: '', clientType: 'particulier' });
+  const [newLead, setNewLead] = useState({ name: '', contact: '', phone: '', phone2: '', address: '', notes: '', source: '', clientType: 'particulier' });
 
   // Vue plateforme (gérant BestaSolar) : les affaires de TOUS les comptes
   // remontent dans le kanban, et BestaSolar peut les faire avancer — c'est le
@@ -189,7 +190,7 @@ export default function Pipeline() {
       assignedTo: user.id,
       parrainL1: null, // attribution automatique (lien d'affiliation) gérée par le store
     });
-    setNewLead({ name: '', contact: '', phone: '', address: '', notes: '', clientType: 'particulier' });
+    setNewLead({ name: '', contact: '', phone: '', phone2: '', address: '', notes: '', source: '', clientType: 'particulier' });
     setShowAddForm(false);
   };
 
@@ -668,6 +669,15 @@ export default function Pipeline() {
           />
           <Field label="Téléphone">
             <input className="input" type="tel" value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+228 ..." />
+          </Field>
+          <Field label="2ᵉ téléphone">
+            <input className="input" type="tel" value={newLead.phone2 || ''} onChange={(e) => setNewLead({ ...newLead, phone2: e.target.value })} placeholder="Autre numéro (facultatif)" />
+          </Field>
+          <Field label="Origine du contact">
+            <select className="input" value={newLead.source || ''} onChange={(e) => setNewLead({ ...newLead, source: e.target.value })}>
+              <option value="">Non précisée</option>
+              {SOURCES_CONTACT.map((s) => <option key={s.id} value={s.id}>{s.libelle}</option>)}
+            </select>
           </Field>
           <Field label="Adresse">
             <input className="input" value={newLead.address} onChange={(e) => setNewLead({ ...newLead, address: e.target.value })} placeholder="Quartier, ville" />

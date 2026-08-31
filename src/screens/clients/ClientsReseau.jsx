@@ -1,6 +1,7 @@
-import { Phone, MapPin, Network, RefreshCw, User } from 'lucide-react';
+import { Phone, MapPin, Network, RefreshCw, User, Compass } from 'lucide-react';
 import { initials } from '../../utils/format';
 import EmptyState from '../../components/EmptyState';
+import { libelleSource } from '../../utils/contactSource';
 
 /**
  * Clients du réseau : les clients saisis par les partenaires qui ont ouvert
@@ -11,7 +12,7 @@ import EmptyState from '../../components/EmptyState';
 export default function ClientsReseau({ clients, enCours, erreur, onRecharger, recherche = '' }) {
   const q = recherche.trim().toLowerCase();
   const visibles = q
-    ? clients.filter((c) => [c.nom, c.contact, c.telephone, c.partner_code, c.org_name]
+    ? clients.filter((c) => [c.nom, c.contact, c.telephone, c.telephone_2, c.partner_code, c.org_name]
       .some((v) => (v || '').toLowerCase().includes(q)))
     : clients;
 
@@ -54,6 +55,10 @@ export default function ClientsReseau({ clients, enCours, erreur, onRecharger, r
             <div className="client-card-lines">
               {client.contact && <span className="client-card-line"><User size={14} /> {client.contact}</span>}
               {client.telephone && <span className="client-card-line"><Phone size={14} /> {client.telephone}</span>}
+              {client.telephone_2 && <span className="client-card-line"><Phone size={14} /> {client.telephone_2}</span>}
+              {libelleSource(client.origine) && (
+                <span className="client-card-line"><Compass size={14} /> {libelleSource(client.origine)}</span>
+              )}
               {client.adresse && <span className="client-card-line"><MapPin size={14} /> {client.adresse}</span>}
               {!client.contact && !client.telephone && !client.adresse && (
                 <span className="client-card-line is-empty"><User size={14} /> Aucune coordonnée</span>

@@ -576,10 +576,14 @@ $$;
 -- security definer parce qu'il faut traverser l'isolation ; la clause where
 -- est donc TOUTE la protection : rien n'est renvoyé qui ne descende d'un code
 -- partenaire de mon organisation.
+-- Le type de retour change avec les colonnes : PostgreSQL refuse un
+-- « create or replace » qui le modifie, il faut donc supprimer d'abord.
+drop function if exists public.mes_clients_reseau();
 create or replace function public.mes_clients_reseau()
   returns table (lead_id text, org_id text, org_name text, partner_code text,
-                 nom text, contact text, telephone text, adresse text,
-                 etape text, cree_le text, maj_le timestamptz)
+                 nom text, contact text, telephone text, telephone_2 text,
+                 adresse text, origine text, etape text, cree_le text,
+                 maj_le timestamptz)
   language sql stable security definer set search_path = public as $$
   select l.id, l.org_id, o.name,
          coalesce(
@@ -592,8 +596,8 @@ create or replace function public.mes_clients_reseau()
              order by pt.updated_at asc limit 1)
          ),
          l.data ->> 'name', l.data ->> 'contact', l.data ->> 'phone',
-         l.data ->> 'address', l.data ->> 'stage', l.data ->> 'createdAt',
-         l.updated_at
+         l.data ->> 'phone2', l.data ->> 'address', l.data ->> 'source',
+         l.data ->> 'stage', l.data ->> 'createdAt', l.updated_at
   from public.leads l
   join public.orgs o on o.id = l.org_id
   where public.auth_org_id() is not null

@@ -12,10 +12,11 @@ import EmptyState from '../components/EmptyState';
 import ClientIdentityFields, { contactEffectif } from '../components/ClientIdentityFields';
 import ClientDetail from './clients/ClientDetail';
 import ClientsReseau from './clients/ClientsReseau';
+import { SOURCES_CONTACT } from '../utils/contactSource';
 
 // Pas de « valeur estimée » à saisir : la valeur de l'affaire se déduit
 // automatiquement des devis créés pour le client.
-const EMPTY_FORM = { name: '', contact: '', phone: '', email: '', address: '', notes: '', clientType: 'particulier' };
+const EMPTY_FORM = { name: '', contact: '', phone: '', phone2: '', email: '', address: '', notes: '', source: '', clientType: 'particulier' };
 
 // Formulaire client partagé entre l'ajout et la modification.
 function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIcon }) {
@@ -32,6 +33,17 @@ function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIc
       />
       <Field label="Téléphone">
         <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
+      </Field>
+      <Field label="2ᵉ téléphone">
+        {/* Beaucoup de clients donnent deux numéros — un pour les appels, un
+            pour WhatsApp. Le second se perdait jusqu'ici dans les notes. */}
+        <input className="input" type="tel" value={form.phone2} onChange={(e) => setForm({ ...form, phone2: e.target.value })} placeholder="Autre numéro (facultatif)" />
+      </Field>
+      <Field label="Origine du contact">
+        <select className="input" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+          <option value="">Non précisée</option>
+          {SOURCES_CONTACT.map((s) => <option key={s.id} value={s.id}>{s.libelle}</option>)}
+        </select>
       </Field>
       <Field label="Email">
         <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="client@exemple.com" />
@@ -67,7 +79,7 @@ export default function Clients() {
   const allClients = leadsForUser(user);
   const q = query.trim().toLowerCase();
   const clients = allClients
-    .filter((l) => !q || [l.name, l.contact, l.phone, l.email, l.address].some((v) => (v || '').toLowerCase().includes(q)))
+    .filter((l) => !q || [l.name, l.contact, l.phone, l.phone2, l.email, l.address].some((v) => (v || '').toLowerCase().includes(q)))
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
   const stageInfo = (lead) => (lead.stage === 'perdu' ? lostStage : stages.find((s) => s.id === lead.stage));
@@ -99,9 +111,11 @@ export default function Clients() {
       name: client.name || '',
       contact: client.contact || '',
       phone: client.phone || '',
+      phone2: client.phone2 || '',
       email: client.email || '',
       address: client.address || '',
       notes: client.notes || '',
+      source: client.source || '',
       clientType: client.clientType || 'particulier',
     });
     setEditId(client.id);
