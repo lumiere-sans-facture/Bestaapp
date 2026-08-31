@@ -101,6 +101,7 @@ ouvertes si un script n'a pas été rejoué ici. Marche à suivre en **11.5**.
 | `organisation-interne.sql` | Le bouton « Commander en ligne » n'apparaît pas dans le panier : vérifie quelle entreprise porte `kind = 'interne'` (la seule à pouvoir encaisser pour BestaSolar) et permet de la désigner. |
 | `partage-kits.sql` | Les kits BestaSolar ne sont pas visibles par les comptes techniciens. ⚠ Ce script REMPLACE la politique d'isolation de la table `kits` : à ne passer que si le partage est voulu. |
 | `etat-base.sql` | Lecture seule : dit quelles tables, colonnes et fonctions manquent, avant de lancer quoi que ce soit. |
+| `diagnostic-reseau.sql` | Lecture seule : « Clients du réseau » reste vide. Dit lesquelles de vos entreprises filleules sont réellement rattachées à un de vos codes, lesquelles se sont inscrites sans code, et comment réparer. |
 
 ## 3. Configuration Auth (dashboard Supabase)
 
