@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { nomContactGoogle } from '../utils/contactGoogle';
 
 // Synchronisation des collections métier avec Supabase.
 // Chaque entité est une ligne { id, data } ; la logique métier reste
@@ -491,16 +492,46 @@ export const startGoogleContactsOAuth = () =>
 export const disconnectGoogleContacts = () =>
   invokeGoogleContacts('google-contacts-oauth', { action: 'disconnect' });
 
-/** Envoie un partenaire vers la file serveur. Le résultat ne bloque jamais
+/** Envoie un contact vers la file serveur. `partnerId` est la clé de la file
+ *  côté serveur : l'identifiant du contact, partenaire OU client (les deux
+ *  sont des UUID, aucune collision possible). Le résultat ne bloque jamais
  *  l'enregistrement local : l'appelant conserve pending/failed pour la reprise. */
-export const syncPartnerGoogleContact = (partner) =>
+const syncGoogleContact = ({ id, nom, code, phone, email = '', company = '' }) =>
   invokeGoogleContacts('google-contacts-sync', {
-    partnerId: partner.id,
-    contact: {
-      id: partner.id,
-      name: partner.name,
-      phone: partner.phone,
-      email: partner.email || '',
-      company: partner.company || partner.entreprise || '',
-    },
+    partnerId: id,
+    contact: { id, name: nomContactGoogle(nom, code), phone, email, company },
   });
+
+/** Un partenaire, sous son propre code : « MAMADOU Mamadou Balogun ». */
+export const syncPartnerGoogleContact = (partner) =>
+  syncGoogleContact({
+    id: partner.id,
+    nom: partner.name,
+    code: partner.code,
+    phone: partner.phone,
+    email: partner.email || '',
+    company: partner.company || partner.entreprise || '',
+  });
+
+/** Un client, sous le code du partenaire qui l'a enregistré. */
+export const syncClientGoogleContact = (client, code) =>
+  syncGoogleContact({
+    id: client.id,
+    nom: client.name,
+    code,
+    phone: client.phone,
+    email: client.email || '',
+    company: client.clientType === 'entreprise' ? client.name : '',
+  });
+
+/**
+ * Clients du RÉSEAU : les pistes saisies par les entreprises nées de mes codes
+ * partenaires. Lecture seule — elles vivent chez elles, l'isolation par
+ * organisation reste entière.
+ */
+export async function fetchClientsReseau() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('mes_clients_reseau');
+  if (error) throw new Error(error.message);
+  return data || [];
+}

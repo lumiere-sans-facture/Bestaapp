@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as seed from '../data/seed';
-import { consumeRefClick } from '../utils/referral';
+import { consumeRefClick, memeCode } from '../utils/referral';
 import { useAuth } from './AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { fetchTeamProfiles, syncPartnerGoogleContact } from '../lib/remoteSync';
+import { fetchTeamProfiles, syncClientGoogleContact, syncPartnerGoogleContact } from '../lib/remoteSync';
 import { loadState, persist, STORAGE_KEY } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
+import { useClientsReseau } from './useClientsReseau';
 
 // Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
 // (le contexte est lisible depuis tous les écrans).
@@ -50,7 +51,7 @@ export function DataProvider({ children }) {
     const code = consumeRefClick();
     if (!code) return;
     setState((s) =>
-      s.partners.some((p) => p.code === code && p.status === 'actif')
+      s.partners.some((p) => memeCode(p.code, code) && p.status === 'actif')
         ? { ...s, referrals: [newReferral(code, 'clic'), ...(s.referrals || [])] }
         : s
     );
@@ -152,6 +153,38 @@ export function DataProvider({ children }) {
     return () => { active = false; };
   }, [state.partners, actions, googleRetryTick]);
 
+  // Clients : même file, même reprise que les partenaires. Le nom envoyé porte
+  // le code de l'apporteur — « FATOU-KN8ERZ Soumana » — pour que le carnet
+  // Google se lise par partenaire (voir utils/contactGoogle.js).
+  const leadSyncInFlight = useRef(new Set());
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+    const now = Date.now();
+    const due = (state.leads || []).filter((lead) => {
+      const status = lead.google_contact_sync_status;
+      const retry = lead.google_contact_sync_next_retry_at;
+      return lead.phone && (status === 'pending' || status === 'failed')
+        && (!retry || Number.isNaN(Date.parse(retry)) || Date.parse(retry) <= now)
+        && !leadSyncInFlight.current.has(lead.id);
+    }).slice(0, 3);
+    if (!due.length) return undefined;
+    let active = true;
+    due.forEach((lead) => {
+      leadSyncInFlight.current.add(lead.id);
+      const code = (state.partners || []).find((p) => p.id === lead.parrainL1)?.code || '';
+      syncClientGoogleContact(lead, code)
+        .then((result) => { if (active) actions.setLeadGoogleContactSync(lead.id, result); })
+        .catch((error) => {
+          if (active) actions.setLeadGoogleContactSync(lead.id, {
+            status: 'failed', error: error.message || 'Synchronisation Google impossible.',
+            nextRetryAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+          });
+        })
+        .finally(() => leadSyncInFlight.current.delete(lead.id));
+    });
+    return () => { active = false; };
+  }, [state.leads, state.partners, actions, googleRetryTick]);
+
   // Profil partenaire de l'utilisateur garanti dès l'ouverture de l'app.
   // C'est lui qui porte les commissions : sans profil, une affaire gagnée
   // n'a aucun apporteur à rémunérer et la commission n'est jamais créée —
@@ -159,6 +192,9 @@ export function DataProvider({ children }) {
   useEffect(() => {
     if (user?.id) actions.ensurePartnerForUser(user);
   }, [user?.id, actions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clients du réseau : lecture serveur seule, hors état local (voir le hook).
+  const reseau = useClientsReseau();
 
   // Sélecteurs dérivés de l'état courant
   const helpers = useMemo(() => ({
@@ -175,7 +211,7 @@ export function DataProvider({ children }) {
   }), [state, team]);
 
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, ...reseau, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
       {children}
     </DataContext.Provider>
   );

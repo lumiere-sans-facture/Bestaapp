@@ -547,6 +547,46 @@ create or replace function public.my_referred_orgs()
   order by o.created_at desc
 $$;
 
+-- Clients du RÉSEAU : les pistes saisies par les entreprises que MES codes
+-- partenaires ont fait naître. Un partenaire qui s'inscrit par un lien
+-- d'affiliation ouvre sa PROPRE organisation ; l'isolation par org rend alors
+-- ses clients invisibles pour la tête de réseau, qui ne voyait plus remonter
+-- personne. Cette fonction rétablit la vue — en LECTURE SEULE, et strictement
+-- au niveau 1 : les filleuls de mes filleuls appartiennent à leur propre
+-- réseau, pas au mien.
+--
+-- security definer parce qu'il faut traverser l'isolation ; la clause where
+-- est donc TOUTE la protection : rien n'est renvoyé qui ne descende d'un code
+-- partenaire de mon organisation.
+create or replace function public.mes_clients_reseau()
+  returns table (lead_id text, org_id text, org_name text, partner_code text,
+                 nom text, contact text, telephone text, adresse text,
+                 etape text, cree_le text, maj_le timestamptz)
+  language sql stable security definer set search_path = public as $$
+  select l.id, l.org_id, o.name,
+         coalesce(
+           -- L'apporteur désigné sur la piste…
+           (select public.code_partenaire(pt.data ->> 'code') from public.partners pt
+             where pt.org_id = l.org_id and pt.id = l.data ->> 'parrainL1'),
+           -- …sinon le propriétaire de l'espace, celui qui l'a saisie.
+           (select public.code_partenaire(pt.data ->> 'code') from public.partners pt
+             where pt.org_id = l.org_id and coalesce(pt.data ->> 'userId', '') <> ''
+             order by pt.updated_at asc limit 1)
+         ),
+         l.data ->> 'name', l.data ->> 'contact', l.data ->> 'phone',
+         l.data ->> 'address', l.data ->> 'stage', l.data ->> 'createdAt',
+         l.updated_at
+  from public.leads l
+  join public.orgs o on o.id = l.org_id
+  where public.auth_org_id() is not null
+    and l.org_id <> public.auth_org_id()
+    and public.code_partenaire(o.referred_by) in (
+      select public.code_partenaire(pt.data ->> 'code') from public.partners pt
+      where pt.org_id = public.auth_org_id() and coalesce(pt.data ->> 'code', '') <> ''
+    )
+  order by l.updated_at desc
+$$;
+
 -- Vue ADMIN : tous les abonnements et paiements de TOUTES les organisations
 -- (l'écran « Abonnements Devis Pro » lisait l'état local — il ne voyait donc
 -- jamais les demandes des autres entreprises).

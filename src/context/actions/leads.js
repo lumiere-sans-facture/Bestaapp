@@ -79,11 +79,31 @@ export function createLeadActions(setState) {
               stage: 'nouveau',
               createdAt: new Date().toISOString().slice(0, 10),
               lastActivity: new Date().toISOString().slice(0, 10),
+              // Même mécanique que pour un partenaire : le client est créé
+              // localement d'abord, la file Google Contacts le reprend ensuite.
+              ...(lead.phone?.trim() ? { google_contact_sync_status: 'pending' } : {}),
             },
             ...s.leads,
           ],
         };
       }),
+
+    // Résultat renvoyé par l'Edge Function ou par sa file de reprise. Il reste
+    // attaché au client pour être répliqué comme le reste des données.
+    setLeadGoogleContactSync: (leadId, result = {}) =>
+      setState((s) => ({
+        ...s,
+        leads: s.leads.map((l) => (l.id === leadId ? {
+          ...l,
+          google_contact_sync_status: result.status || 'pending',
+          ...(result.resourceName ? { google_contact_resource_name: result.resourceName } : {}),
+          ...(result.status === 'synced' || result.status === 'already_exists'
+            ? { google_contact_synced_at: new Date().toISOString(), google_contact_sync_error: null, google_contact_sync_next_retry_at: null }
+            : {}),
+          ...(result.error ? { google_contact_sync_error: result.error } : {}),
+          ...(result.nextRetryAt ? { google_contact_sync_next_retry_at: result.nextRetryAt } : {}),
+        } : l)),
+      })),
 
     // Mise à jour des informations d'un client (fiche : coordonnées, type,
     // valeur, notes). L'étape et le parrainage ne passent pas par ici.

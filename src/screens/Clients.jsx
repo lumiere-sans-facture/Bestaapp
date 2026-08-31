@@ -11,6 +11,7 @@ import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
 import ClientIdentityFields, { contactEffectif } from '../components/ClientIdentityFields';
 import ClientDetail from './clients/ClientDetail';
+import ClientsReseau from './clients/ClientsReseau';
 
 // Pas de « valeur estimée » à saisir : la valeur de l'affaire se déduit
 // automatiquement des devis créés pour le client.
@@ -56,7 +57,8 @@ export default function Clients() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
-  const { leadsForUser, devis, stages, lostStage, addLead, updateLead, getPartnerById } = useData();
+  const { leadsForUser, devis, stages, lostStage, addLead, updateLead, getPartnerById,
+    clientsReseau, clientsReseauEnCours, clientsReseauErreur, rechargerClientsReseau } = useData();
   const [query, setQuery] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -193,6 +195,14 @@ export default function Clients() {
                 {q ? 'Aucun client ne correspond à cette recherche.' : 'Aucun client pour le moment — ajoutez votre premier client.'}
               </EmptyState>
             )}
+
+            <ClientsReseau
+              clients={clientsReseau || []}
+              enCours={clientsReseauEnCours}
+              erreur={clientsReseauErreur}
+              onRecharger={rechargerClientsReseau}
+              recherche={query}
+            />
           </>
         )}
       </div>
