@@ -5,7 +5,7 @@ import { SOLAR_KITS, KITS_DOTES_AVANT_REGISTRE } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
 import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { generatePartnerCode, codeBaseFromName } from '../utils/referral';
+import { generatePartnerCode } from '../utils/referral';
 
 export const STORAGE_KEY = 'bestasolar_data';
 
@@ -155,22 +155,35 @@ export const loadState = (scope = null) => {
       if (!saved.paiementConfigs) saved.paiementConfigs = [];
       if (!saved.factures) saved.factures = [];
       if (!saved.proClients) saved.proClients = [];
-      const isNameBased = (p) => p.code && p.code.startsWith(`BESTA-${codeBaseFromName(p.name)}`);
-      // 1re passe : réserver les codes déjà conformes (basés sur le nom)
-      const codes = saved.partners.filter(isNameBased).map((p) => p.code);
+      // Format courant : NOM-XXXXXX. Les anciens BESTA-NOM(-XXXXXX) sont
+      // régénérés afin que les liens et le libellé Google restent cohérents.
+      const isCurrentPartnerCode = (p) => /^[A-Z]{1,10}-[A-Z2-9]{6}$/.test(String(p.code || '').trim().toUpperCase());
+      // 1re passe : réserver les codes déjà conformes.
+      const codes = saved.partners.filter(isCurrentPartnerCode).map((p) => p.code);
       const remap = {};
       // 2e passe : régénérer les autres à partir du nom
       saved.partners = saved.partners.map((p) => {
-        if (isNameBased(p)) return p;
-        const seedCode = seed.partners.find((sp) => sp.id === p.id)?.code;
-        const code = seedCode && !codes.includes(seedCode) ? seedCode : generatePartnerCode(p.name, codes);
+        if (isCurrentPartnerCode(p)) return p;
+        const code = generatePartnerCode(p.name, codes, p.id);
         codes.push(code);
         if (p.code) remap[p.code] = code;
         return { ...p, code };
       });
       if (Object.keys(remap).length) {
+        saved.partners = saved.partners.map((p) =>
+          remap[p.sponsorCode] ? { ...p, sponsorCode: remap[p.sponsorCode] } : p
+        );
         saved.referrals = saved.referrals.map((r) =>
           remap[r.partnerCode] ? { ...r, partnerCode: remap[r.partnerCode] } : r
+        );
+        saved.devis = (saved.devis || []).map((d) =>
+          remap[d.partnerCode] ? { ...d, partnerCode: remap[d.partnerCode] } : d
+        );
+        saved.commissions = (saved.commissions || []).map((c) =>
+          remap[c.partnerCode] ? { ...c, partnerCode: remap[c.partnerCode] } : c
+        );
+        saved.payoutRequests = (saved.payoutRequests || []).map((p) =>
+          remap[p.partnerCode] ? { ...p, partnerCode: remap[p.partnerCode] } : p
         );
       }
       return saved;
@@ -226,3 +239,4 @@ export const persist = (state, scope = null) => {
     return false; // quota dépassé / navigation privée
   }
 };
+
