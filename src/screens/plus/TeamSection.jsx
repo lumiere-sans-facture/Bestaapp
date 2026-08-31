@@ -3,16 +3,19 @@ import { ChevronLeft, Search, Phone, Star, UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { isSupabaseConfigured } from '../../lib/supabase';
-import { fetchMyOrg } from '../../lib/remoteSync';
+import { fetchMyOrg, reunirMonCompteGerant } from '../../lib/remoteSync';
+import { codeReunionGerantsValide, normaliserCodeReunionGerants } from '../../utils/managerMerge';
 import { useToast } from '../../components/Toast';
 import { formatCFA, initials } from '../../utils/format';
 
 export default function TeamSection({ onBack }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { team, leads, devis, commissions, partners } = useData();
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [codeReunion, setCodeReunion] = useState('');
+  const [reunionEnCours, setReunionEnCours] = useState(false);
 
   // Code d'invitation de l'organisation (mode SaaS) : le gérant le partage,
   // le technicien s'inscrit avec depuis l'écran de connexion.
@@ -33,6 +36,27 @@ export default function TeamSection({ onBack }) {
       toast('Lien d\'invitation copié.');
     } catch {
       toast(`Copie impossible — lien : ${lienInvitation}`, { type: 'error' });
+    }
+  };
+
+  const lancerReunion = async (event) => {
+    event.preventDefault();
+    const code = normaliserCodeReunionGerants(codeReunion);
+    if (!codeReunionGerantsValide(code)) {
+      toast('Saisissez le code de réunion complet à 12 caractères.', { type: 'error' });
+      return;
+    }
+    if (!window.confirm('Réunir ce compte avec l’espace du code saisi ? Vos données opérationnelles seront déplacées, votre rôle Gérant sera conservé et vous devrez vous reconnecter.')) return;
+    setReunionEnCours(true);
+    try {
+      const resultat = await reunirMonCompteGerant(code);
+      const nombre = Object.values(resultat.moved || {}).reduce((total, valeur) => total + Number(valeur || 0), 0);
+      window.alert(`Comptes réunis dans « ${resultat.organization_name || 'l’espace principal'} ».${nombre ? ` ${nombre} donnée(s) opérationnelle(s) ont été transférée(s).` : ''} Reconnectez-vous pour voir l’espace partagé.`);
+      logout();
+    } catch (error) {
+      toast(error.message || 'La réunion des comptes a échoué.', { type: 'error' });
+    } finally {
+      setReunionEnCours(false);
     }
   };
 
@@ -63,6 +87,45 @@ export default function TeamSection({ onBack }) {
             <span className="copy-block-value">{lienInvitation}</span>
             <button type="button" className="btn btn-sm btn-outline" onClick={copierCode}>Copier</button>
           </div>
+        </div>
+      )}
+
+
+      {isSupabaseConfigured && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="sheet-section-title"><UserPlus size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Réunir deux comptes gérants</div>
+          <p className="text-sm text-secondary">
+            Deux gérants ne partagent leurs données que s’ils appartiennent à la même entreprise.
+            Le gérant de l’espace principal vous communique son code de réunion ; saisissez-le ici
+            depuis le compte à rattacher.
+          </p>
+          {org?.manager_join_code && (
+            <div className="copy-block" style={{ marginBottom: 10 }}>
+              <span className="copy-block-value">Votre code de réunion : {org.manager_join_code}</span>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => navigator.clipboard.writeText(org.manager_join_code).then(() => toast('Code de réunion copié.')).catch(() => toast('Copie impossible.', { type: 'error' }))}>Copier</button>
+            </div>
+          )}
+          <form onSubmit={lancerReunion}>
+            <label className="label" htmlFor="manager-merge-code">Code reçu de l’espace principal</label>
+            <div className="copy-block">
+              <input
+                id="manager-merge-code"
+                className="input"
+                inputMode="text"
+                autoComplete="off"
+                maxLength={16}
+                placeholder="Ex. A1B2C3D4E5F6"
+                value={codeReunion}
+                onChange={(event) => setCodeReunion(normaliserCodeReunionGerants(event.target.value))}
+              />
+              <button type="submit" className="btn btn-sm btn-primary" disabled={reunionEnCours || !codeReunionGerantsValide(codeReunion)}>
+                {reunionEnCours ? 'Réunion…' : 'Réunir'}
+              </button>
+            </div>
+          </form>
+          <p className="field-hint">
+            Disponible lorsque l’ancien espace ne contient que ce compte. Les abonnements et paiements ne sont jamais déplacés automatiquement.
+          </p>
         </div>
       )}
 
