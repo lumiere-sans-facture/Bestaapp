@@ -37,7 +37,7 @@ const suffixFromSeed = (seed, attempt = 0) => {
 };
 
 /**
- * Code lisible et toujours distinct : BESTA-AMINATA-K8R4MZ.
+ * Code lisible et toujours distinct : AMINATA-K8R4MZ.
  * `identity` est l'id immutable du partenaire (UUID ou p-user-...) : le code
  * reste stable si l'application est ouverte simultanément sur deux appareils.
  */
@@ -46,7 +46,7 @@ export const generatePartnerCode = (name, existingCodes = [], identity = '') => 
   const used = new Set(existingCodes.map((code) => String(code || '').trim().toUpperCase()));
   const seed = identity || `${base}:${Math.random()}:${Date.now()}`;
   for (let attempt = 0; attempt < 1000; attempt += 1) {
-    const code = `BESTA-${base}-${suffixFromSeed(seed, attempt)}`;
+    const code = `${base}-${suffixFromSeed(seed, attempt)}`;
     if (!used.has(code)) return code;
   }
   throw new Error('Génération du code partenaire impossible.');
@@ -59,7 +59,7 @@ export const partnerLink = (code) => `${window.location.origin}/?ref=${code}`;
 const REF_KEY = 'bestasolar_ref';
 export const REF_TTL_DAYS = 30;
 
-/** À appeler au chargement de l'app : capture ?ref=BESTA-XXXX et nettoie l'URL. */
+/** À appeler au chargement de l'app : capture ?ref=NOM-XXXXXX et nettoie l'URL. */
 export const captureRefFromUrl = () => {
   try {
     const params = new URLSearchParams(window.location.search);
