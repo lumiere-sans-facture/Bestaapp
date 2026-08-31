@@ -608,6 +608,41 @@ create or replace function public.mes_clients_reseau()
   order by l.updated_at desc
 $$;
 
+-- Partenaires du RÉSEAU : les personnes qui travaillent dans les entreprises
+-- nées de MES codes. Elles ne sont dans aucune de mes tables — leur profil
+-- partenaire vit chez elles — et n'apparaissaient donc nulle part dans
+-- l'espace du gérant, alors que ce sont ses propres filleuls.
+--
+-- Mêmes garde-fous que mes_clients_reseau : lecture seule, niveau 1
+-- uniquement, réservé au gérant, et la clause where est toute la protection.
+create or replace function public.mes_partenaires_reseau()
+  returns table (partner_id text, org_id text, org_name text, code text,
+                 nom text, telephone text, email text, momo text,
+                 inscrit_le timestamptz, pro_actif boolean)
+  language sql stable security definer set search_path = public as $$
+  select pt.id, pt.org_id, o.name,
+         public.code_partenaire(pt.data ->> 'code'),
+         pt.data ->> 'name', pt.data ->> 'phone', pt.data ->> 'email',
+         pt.data ->> 'momoNumber', o.created_at,
+         exists (
+           select 1 from public.subscriptions s
+           where s.org_id = o.id
+             and s.data ->> 'status' = 'actif'
+             and coalesce(nullif(s.data ->> 'dateFin', ''), '1970-01-01')::timestamptz > now()
+         )
+  from public.orgs o
+  join public.partners pt
+    on pt.org_id = o.id and coalesce(pt.data ->> 'userId', '') <> ''
+  where public.auth_org_id() is not null
+    and public.auth_est_proprietaire_espace()
+    and o.id <> public.auth_org_id()
+    and public.code_partenaire(o.referred_by) in (
+      select public.code_partenaire(p2.data ->> 'code') from public.partners p2
+      where p2.org_id = public.auth_org_id() and coalesce(p2.data ->> 'code', '') <> ''
+    )
+  order by o.created_at desc, pt.updated_at asc
+$$;
+
 -- Vue ADMIN : tous les abonnements et paiements de TOUTES les organisations
 -- (l'écran « Abonnements Devis Pro » lisait l'état local — il ne voyait donc
 -- jamais les demandes des autres entreprises).

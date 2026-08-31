@@ -3,6 +3,7 @@ import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, 
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, initials, formatTaux } from '../../utils/format';
 import { partnerLink, REF_TTL_DAYS, getActiveRef, memeCode } from '../../utils/referral';
+import PartenairesReseau from './PartenairesReseau';
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import { useToast } from '../../components/Toast';
@@ -20,6 +21,7 @@ export default function PartnersSection({ onBack }) {
     partners, leads, commissions, stages, lostStage, referrals, devis,
     addPartner, updatePartner, payAllCommissionsForPartner, getPartnerById,
     updateReferralStatus, getLeadById,
+    partenairesReseau, reseauEnCours, reseauErreur, rechargerReseau,
   } = useData();
   const [selectedId, setSelectedId] = useState(null);
   // null = fermé, 'new' = création, sinon id en édition
@@ -197,6 +199,14 @@ export default function PartnersSection({ onBack }) {
           );
         })}
       </div>
+
+      <PartenairesReseau
+        partenaires={partenairesReseau || []}
+        enCours={reseauEnCours}
+        erreur={reseauErreur}
+        onRecharger={rechargerReseau}
+        recherche={search}
+      />
 
       {/* Fiche partenaire */}
       <Sheet

@@ -7,7 +7,7 @@ import { fetchTeamProfiles, syncClientGoogleContact, syncPartnerGoogleContact } 
 import { loadState, persist, STORAGE_KEY } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
-import { useClientsReseau } from './useClientsReseau';
+import { useReseau } from './useReseau';
 
 // Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
 // (le contexte est lisible depuis tous les écrans).
@@ -193,8 +193,9 @@ export function DataProvider({ children }) {
     if (user?.id) actions.ensurePartnerForUser(user);
   }, [user?.id, actions]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Clients du réseau : lecture serveur seule, hors état local (voir le hook).
-  const reseau = useClientsReseau();
+  // Le réseau (partenaires et leurs clients) : lecture serveur seule, hors
+  // état local — voir le hook.
+  const reseau = useReseau();
 
   // Sélecteurs dérivés de l'état courant
   const helpers = useMemo(() => ({

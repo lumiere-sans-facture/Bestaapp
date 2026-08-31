@@ -58,7 +58,7 @@ export default function Clients() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { leadsForUser, devis, stages, lostStage, addLead, updateLead, getPartnerById,
-    clientsReseau, clientsReseauEnCours, clientsReseauErreur, rechargerClientsReseau } = useData();
+    clientsReseau, reseauEnCours, reseauErreur, rechargerReseau } = useData();
   const [query, setQuery] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -198,9 +198,9 @@ export default function Clients() {
 
             <ClientsReseau
               clients={clientsReseau || []}
-              enCours={clientsReseauEnCours}
-              erreur={clientsReseauErreur}
-              onRecharger={rechargerClientsReseau}
+              enCours={reseauEnCours}
+              erreur={reseauErreur}
+              onRecharger={rechargerReseau}
               recherche={query}
             />
           </>

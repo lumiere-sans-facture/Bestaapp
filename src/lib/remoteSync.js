@@ -535,3 +535,15 @@ export async function fetchClientsReseau() {
   if (error) throw new Error(error.message);
   return data || [];
 }
+
+/**
+ * Partenaires du RÉSEAU : les personnes qui travaillent dans ces mêmes
+ * entreprises. Leur profil partenaire vit chez elles ; sans cette lecture,
+ * elles n'apparaissent nulle part dans l'espace du gérant.
+ */
+export async function fetchPartenairesReseau() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('mes_partenaires_reseau');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
