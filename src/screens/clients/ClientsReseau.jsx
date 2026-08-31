@@ -34,8 +34,8 @@ export default function ClientsReseau({ clients, enCours, erreur, onRecharger, r
         </button>
       </div>
       <p className="text-sm text-secondary" style={{ marginBottom: 10 }}>
-        Enregistrés par vos partenaires depuis leur propre espace. Consultation
-        seule : leur fiche reste chez eux.
+        Enregistrés par vos partenaires depuis leur propre espace, sur toute la
+        profondeur de votre réseau. Consultation seule : leur fiche reste chez eux.
       </p>
 
       {erreur && <EmptyState card>{erreur}</EmptyState>}
@@ -66,6 +66,7 @@ export default function ClientsReseau({ clients, enCours, erreur, onRecharger, r
             </div>
             <div className="client-card-foot">
               <Network size={14} /> {client.org_name || 'Partenaire'}
+              {client.niveau > 1 && <span className="flat-badge"> Niveau {client.niveau}</span>}
             </div>
           </div>
         ))}

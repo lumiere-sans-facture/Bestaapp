@@ -6,12 +6,12 @@
 -- UNE SEULE CHOSE À MODIFIER : l'e-mail du compte gérant, ligne marquée ⚠.
 -- Puis « Run ». Le résultat se lit de haut en bas, en cinq sections.
 --
--- POURQUOI CE SCRIPT EXISTE. La section « Clients du réseau » n'affiche que
--- les clients des entreprises nées d'UN DE VOS CODES partenaires. Le lien est
--- posé une seule fois, à l'inscription du partenaire : la colonne
--- `orgs.referred_by` reçoit le code qu'il a suivi ou saisi. S'il s'est
--- inscrit sans code, cette colonne reste vide et RIEN ne le rattache à vous —
--- ni maintenant, ni plus tard, tant que personne ne la remplit.
+-- POURQUOI CE SCRIPT EXISTE. La section « Clients du réseau » affiche les
+-- clients de tout votre arbre d'affiliation : vos filleuls, leurs filleuls, et
+-- ainsi de suite. Mais chaque maillon repose sur UN code, posé une seule fois,
+-- à l'inscription : la colonne `orgs.referred_by` reçoit le code suivi ou
+-- saisi. Un partenaire inscrit sans code n'est rattaché à rien — et il coupe
+-- du même coup toute la branche née sous lui.
 --
 -- Ce script ne peut pas appeler `mes_clients_reseau()` directement : cette
 -- fonction s'appuie sur le compte connecté, et l'éditeur SQL n'en a pas. Il
@@ -90,8 +90,9 @@ select '5. Diagnostic', '→',
                 || 'C''est la cause : elles ne vous sont reliées par rien. '
                 || 'Corrigez avec admin_set_org_referral(org_id, code) — voir la note en bas de ce script.'
          when b.orgs_code_etranger > 0
-           then '❌ Les entreprises inscrites l''ont été sous des codes qui ne sont pas les vôtres. '
-                || 'Rappel : seul le NIVEAU 1 remonte — les filleuls de vos filleuls appartiennent à leur propre réseau.'
+           then '❌ Les entreprises inscrites l''ont été sous des codes étrangers à votre réseau. '
+                || 'Note : la section 3 ne regarde que le premier maillon ; une entreprise inscrite '
+                || 'sous le code d''un de vos filleuls remonte quand même, via l''arbre complet.'
          else '❌ Aucune autre entreprise n''existe dans cette base : vos partenaires n''ont pas de compte.'
        end
 from bilan b

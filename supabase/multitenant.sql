@@ -564,26 +564,58 @@ create or replace function public.auth_est_proprietaire_espace()
   ), false)
 $$;
 
--- Clients du RÉSEAU : les pistes saisies par les entreprises que MES codes
--- partenaires ont fait naître. Un partenaire qui s'inscrit par un lien
--- d'affiliation ouvre sa PROPRE organisation ; l'isolation par org rend alors
--- ses clients invisibles pour la tête de réseau, qui ne voyait plus remonter
--- personne. Cette fonction rétablit la vue — en LECTURE SEULE, et strictement
--- au niveau 1 : les filleuls de mes filleuls appartiennent à leur propre
--- réseau, pas au mien. Réservée au gérant : voir les clients d'une autre
--- entreprise n'est pas une information d'équipe.
+-- Mon ARBRE d'affiliation, sur toute sa profondeur.
 --
--- security definer parce qu'il faut traverser l'isolation ; la clause where
--- est donc TOUTE la protection : rien n'est renvoyé qui ne descende d'un code
--- partenaire de mon organisation.
+-- Une entreprise entre dans l'arbre si elle s'est inscrite sous un code porté
+-- par une entreprise DÉJÀ dans l'arbre. On part de la mienne, et on descend :
+-- mes filleuls, leurs filleuls, et ainsi de suite. Le niveau renvoyé dit à
+-- quelle distance de moi se trouve chaque entreprise — 1 pour un filleul
+-- direct, 2 pour le filleul d'un filleul.
+--
+-- La profondeur est bornée à 10 : un code mal réparé pourrait fermer une
+-- boucle (A parraine B qui parraine A), et une CTE récursive sans borne
+-- tournerait alors indéfiniment. Dix niveaux dépassent de loin tout réseau
+-- réel ; la borne est un garde-fou, pas une limite fonctionnelle.
+create or replace function public.mes_orgs_reseau()
+  returns table (org_id text, niveau integer)
+  language sql stable security definer set search_path = public as $$
+  with recursive arbre as (
+    select public.auth_org_id() as id, 0 as niveau
+    where public.auth_org_id() is not null
+      and public.auth_est_proprietaire_espace()
+    union all
+    select o.id, a.niveau + 1
+    from arbre a
+    join public.partners pt
+      on pt.org_id = a.id and coalesce(pt.data ->> 'code', '') <> ''
+    join public.orgs o
+      on public.code_partenaire(o.referred_by) = public.code_partenaire(pt.data ->> 'code')
+    where a.niveau < 10 and o.id <> a.id
+  )
+  -- Une même entreprise peut être atteinte par deux chemins : on garde le
+  -- plus court, c'est celui qui décrit la vraie relation.
+  select id, min(niveau)::integer from arbre where niveau > 0 group by id
+$$;
+
+-- Clients du RÉSEAU : les pistes saisies par les entreprises de mon arbre
+-- d'affiliation, sur toute sa profondeur. Un partenaire qui s'inscrit par un
+-- lien d'affiliation ouvre sa PROPRE organisation ; l'isolation par org rend
+-- alors ses clients invisibles pour la tête de réseau, qui ne voyait plus
+-- remonter personne. Cette fonction rétablit la vue — en LECTURE SEULE, et
+-- réservée au gérant : les clients d'une autre entreprise ne sont pas une
+-- information d'équipe.
+--
+-- security definer parce qu'il faut traverser l'isolation ; le périmètre est
+-- donc TOUTE la protection, et il tient dans mes_orgs_reseau() : rien n'est
+-- renvoyé qui ne descende d'un de mes codes partenaires.
 -- Le type de retour change avec les colonnes : PostgreSQL refuse un
 -- « create or replace » qui le modifie, il faut donc supprimer d'abord.
 drop function if exists public.mes_clients_reseau();
 create or replace function public.mes_clients_reseau()
   returns table (lead_id text, org_id text, org_name text, partner_code text,
-                 nom text, contact text, telephone text, telephone_2 text,
-                 adresse text, origine text, etape text, cree_le text,
-                 maj_le timestamptz)
+                 niveau integer, nom text, contact text, telephone text,
+                 telephone_2 text, adresse text, origine text, etape text,
+                 cree_le text, maj_le timestamptz)
   language sql stable security definer set search_path = public as $$
   select l.id, l.org_id, o.name,
          coalesce(
@@ -595,37 +627,31 @@ create or replace function public.mes_clients_reseau()
              where pt.org_id = l.org_id and coalesce(pt.data ->> 'userId', '') <> ''
              order by pt.updated_at asc limit 1)
          ),
+         a.niveau,
          l.data ->> 'name', l.data ->> 'contact', l.data ->> 'phone',
          l.data ->> 'phone2', l.data ->> 'address', l.data ->> 'source',
          l.data ->> 'stage', l.data ->> 'createdAt', l.updated_at
-  from public.leads l
-  join public.orgs o on o.id = l.org_id
-  where public.auth_org_id() is not null
-    -- Réservé au gérant : ce sont les clients d'une AUTRE entreprise, pas de
-    -- quoi ouvrir à toute l'équipe.
-    and public.auth_est_proprietaire_espace()
-    and l.org_id <> public.auth_org_id()
-    and public.code_partenaire(o.referred_by) in (
-      select public.code_partenaire(pt.data ->> 'code') from public.partners pt
-      where pt.org_id = public.auth_org_id() and coalesce(pt.data ->> 'code', '') <> ''
-    )
-  order by l.updated_at desc
+  from public.mes_orgs_reseau() a
+  join public.orgs o on o.id = a.org_id
+  join public.leads l on l.org_id = a.org_id
+  order by a.niveau, l.updated_at desc
 $$;
 
 -- Partenaires du RÉSEAU : les personnes qui travaillent dans les entreprises
--- nées de MES codes. Elles ne sont dans aucune de mes tables — leur profil
--- partenaire vit chez elles — et n'apparaissaient donc nulle part dans
+-- de mon arbre d'affiliation. Elles ne sont dans aucune de mes tables — leur
+-- profil partenaire vit chez elles — et n'apparaissaient donc nulle part dans
 -- l'espace du gérant, alors que ce sont ses propres filleuls.
 --
--- Mêmes garde-fous que mes_clients_reseau : lecture seule, niveau 1
--- uniquement, réservé au gérant, et la clause where est toute la protection.
+-- Mêmes garde-fous que mes_clients_reseau : lecture seule, réservé au gérant,
+-- et le périmètre tient dans mes_orgs_reseau().
+drop function if exists public.mes_partenaires_reseau();
 create or replace function public.mes_partenaires_reseau()
   returns table (partner_id text, org_id text, org_name text, code text,
-                 nom text, telephone text, email text, momo text,
-                 inscrit_le timestamptz, pro_actif boolean)
+                 niveau integer, nom text, telephone text, email text,
+                 momo text, inscrit_le timestamptz, pro_actif boolean)
   language sql stable security definer set search_path = public as $$
   select pt.id, pt.org_id, o.name,
-         public.code_partenaire(pt.data ->> 'code'),
+         public.code_partenaire(pt.data ->> 'code'), a.niveau,
          pt.data ->> 'name', pt.data ->> 'phone', pt.data ->> 'email',
          pt.data ->> 'momoNumber', o.created_at,
          exists (
@@ -634,17 +660,11 @@ create or replace function public.mes_partenaires_reseau()
              and s.data ->> 'status' = 'actif'
              and coalesce(nullif(s.data ->> 'dateFin', ''), '1970-01-01')::timestamptz > now()
          )
-  from public.orgs o
+  from public.mes_orgs_reseau() a
+  join public.orgs o on o.id = a.org_id
   join public.partners pt
-    on pt.org_id = o.id and coalesce(pt.data ->> 'userId', '') <> ''
-  where public.auth_org_id() is not null
-    and public.auth_est_proprietaire_espace()
-    and o.id <> public.auth_org_id()
-    and public.code_partenaire(o.referred_by) in (
-      select public.code_partenaire(p2.data ->> 'code') from public.partners p2
-      where p2.org_id = public.auth_org_id() and coalesce(p2.data ->> 'code', '') <> ''
-    )
-  order by o.created_at desc, pt.updated_at asc
+    on pt.org_id = a.org_id and coalesce(pt.data ->> 'userId', '') <> ''
+  order by a.niveau, o.created_at desc, pt.updated_at asc
 $$;
 
 -- Vue ADMIN : tous les abonnements et paiements de TOUTES les organisations

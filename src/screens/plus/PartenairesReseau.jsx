@@ -33,8 +33,9 @@ export default function PartenairesReseau({ partenaires, enCours, erreur, onRech
         </button>
       </div>
       <p className="text-sm text-secondary" style={{ marginBottom: 10 }}>
-        Inscrits par votre lien d’affiliation, chacun dans sa propre
-        entreprise. Consultation seule : leur fiche reste chez eux.
+        Inscrits par votre lien d’affiliation, chacun dans sa propre entreprise,
+        sur toute la profondeur de votre réseau. Consultation seule : leur fiche
+        reste chez eux.
       </p>
 
       {erreur && <EmptyState card>{erreur}</EmptyState>}
@@ -51,6 +52,7 @@ export default function PartenairesReseau({ partenaires, enCours, erreur, onRech
                 </div>
                 <div className="partner-type">
                   <Network size={12} /> {partenaire.org_name || 'Entreprise partenaire'}
+                  {partenaire.niveau > 1 ? ` · niveau ${partenaire.niveau}` : ' · filleul direct'}
                   {partenaire.inscrit_le ? ` · inscrit le ${formatDate(partenaire.inscrit_le)}` : ''}
                 </div>
               </div>
