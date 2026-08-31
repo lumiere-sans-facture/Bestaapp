@@ -22,7 +22,7 @@ describe('codeBaseFromName', () => {
 
 describe('generatePartnerCode', () => {
   it('produit un code lisible avec suffixe unique', () => {
-    expect(generatePartnerCode('Aminata', [], 'partner-1')).toMatch(/^BESTA-AMINATA-[A-Z2-9]{6}$/);
+    expect(generatePartnerCode('Aminata', [], 'partner-1')).toMatch(/^AMINATA-[A-Z2-9]{6}$/);
   });
   it('distingue deux homonymes et reste stable pour la même identité', () => {
     const premier = generatePartnerCode('Aminata', [], 'partner-1');
