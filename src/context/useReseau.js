@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
-import {
-  fetchClientsReseau, fetchPartenairesReseau,
-  syncClientGoogleContact, syncPartnerGoogleContact,
-} from '../lib/remoteSync';
+import { fetchClientsReseau, fetchPartenairesReseau, syncGoogleContact } from '../lib/remoteSync';
 
 /**
  * Le RÉSEAU vu du gérant : les partenaires nés de nos codes d'affiliation, et
@@ -54,17 +51,18 @@ export function useReseau() {
       ...partenaires.map((p) => ({
         cle: p.partner_id,
         telephone: p.telephone,
-        envoyer: () => syncPartnerGoogleContact({
+        envoyer: () => syncGoogleContact({
           id: p.partner_id, name: p.nom, code: p.code,
           phone: p.telephone, email: p.email || '',
-        }),
+        }, 'partner'),
       })),
       ...clients.map((c) => ({
         cle: c.lead_id,
         telephone: c.telephone,
-        envoyer: () => syncClientGoogleContact(
-          { id: c.lead_id, name: c.nom, phone: c.telephone }, c.partner_code,
-        ),
+        envoyer: () => syncGoogleContact({
+          id: c.lead_id, name: c.nom, contact: c.contact || '',
+          phone: c.telephone, registeredByPartnerCode: c.partner_code || '',
+        }, 'lead'),
       })),
     ];
     if (!envois.length) return undefined;

@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef, normaliseCode } from '../utils/referral';
 import { lireFormuleChoisie } from '../utils/formuleChoisie';
-import { vueLogin } from '../utils/entree';
 import { formule } from '../utils/subscription';
 import { formatCFA } from '../utils/format';
 import { users } from '../data/seed';
@@ -71,14 +70,12 @@ function GoogleIcon() {
  * avec un code d'invitation), mot de passe oublié et réinitialisation.
  * En mode local (sans backend), seul le formulaire de connexion est monté.
  *
- * `vueInitiale` impose la vue : « signup » pour la route /inscription, où
- * mènent les appels à l'action de la page d'accueil, « login » pour
- * /connexion. Sans elle, c'est un code partenaire ou d'invitation qui décide
- * (voir `utils/entree.js`, `vueLogin`).
+ * `vueInitiale` permet d'ouvrir directement l'inscription : c'est la route
+ * /inscription, où mènent les appels à l'action de la page d'accueil publique.
  */
-export default function Login({ vueInitiale = null }) {
+export default function Login({ vueInitiale = 'login' }) {
   const { login, signInWithGoogle, signUp, completeSignup, resetPassword, updatePassword, recovery, pendingAuthUser } = useAuth();
-  // Lien de parrainage (?ref=AMINATA) actif sur cet appareil : on ouvre
+  // Lien de parrainage (?ref=NOM-XXXXXX) actif sur cet appareil : on ouvre
   // directement l'inscription, code partenaire prérempli.
   const [refCode, setRefCode] = useState(() => (isSupabaseConfigured ? getActiveRef()?.code || '' : ''));
   // Venu par un lien partenaire (le champ est alors prérempli, hint adapté).
@@ -91,7 +88,7 @@ export default function Login({ vueInitiale = null }) {
   // Formule retenue sur la page d'accueil : annoncée ici pour que la suite ne
   // surprenne pas — le paiement arrive juste après la création du compte.
   const [formuleChoisie] = useState(() => lireFormuleChoisie());
-  const [view, setView] = useState(() => vueLogin({ vueDemandee: vueInitiale, refCode, teamCode })); // login | signup | forgot | complete
+  const [view, setView] = useState(refCode || teamCode ? 'signup' : vueInitiale); // login | signup | forgot | complete
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -414,7 +411,7 @@ export default function Login({ vueInitiale = null }) {
                 <div className="input-group">
                   <label className="input-label" htmlFor="complete-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
                   <input id="complete-ref" className="input" value={refCode}
-                    onChange={(e) => setRefCode(normaliseCode(e.target.value))} placeholder="Ex. AMINATA" />
+                    onChange={(e) => setRefCode(normaliseCode(e.target.value))} placeholder="NOM-XXXXXX" />
                 </div>
               )}
               <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
@@ -451,7 +448,7 @@ export default function Login({ vueInitiale = null }) {
                 <div className="input-group">
                   <label className="input-label" htmlFor="signup-ref"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 4 }} />Code partenaire (facultatif)</label>
                   <input id="signup-ref" className="input" value={refCode}
-                    onChange={(e) => setRefCode(normaliseCode(e.target.value))} placeholder="Ex. AMINATA" />
+                    onChange={(e) => setRefCode(normaliseCode(e.target.value))} placeholder="NOM-XXXXXX" />
                   <div className="field-hint">
                     {refFromLink
                       ? "Vous arrivez par le lien d'un partenaire BestaSolar — son code est prérempli."
@@ -532,3 +529,4 @@ export default function Login({ vueInitiale = null }) {
     </div>
   );
 }
+

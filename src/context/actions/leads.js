@@ -67,6 +67,10 @@ export function createLeadActions(setState) {
         const sponsor = parrainL1
           ? s.partners.find((p) => p.id === parrainL1)?.sponsorId || null
           : null;
+        // Cette attribution ne doit jamais changer lors d'une réaffectation
+        // commerciale : elle constitue la trace de la personne qui a créé la
+        // fiche client et sera reprise dans Google Contacts.
+        const enregistrant = s.partners.find((p) => p.userId === lead.assignedTo);
         return {
           ...s,
           referrals,
@@ -79,8 +83,10 @@ export function createLeadActions(setState) {
               stage: 'nouveau',
               createdAt: new Date().toISOString().slice(0, 10),
               lastActivity: new Date().toISOString().slice(0, 10),
-              // Même mécanique que pour un partenaire : le client est créé
-              // localement d'abord, la file Google Contacts le reprend ensuite.
+              registeredByUserId: lead.assignedTo || null,
+              registeredByPartnerId: enregistrant?.id || null,
+              registeredByPartnerName: enregistrant?.name || null,
+              registeredByPartnerCode: enregistrant?.code || null,
               ...(lead.phone?.trim() ? { google_contact_sync_status: 'pending' } : {}),
             },
             ...s.leads,
@@ -88,13 +94,41 @@ export function createLeadActions(setState) {
         };
       }),
 
-    // Résultat renvoyé par l'Edge Function ou par sa file de reprise. Il reste
-    // attaché au client pour être répliqué comme le reste des données.
+    // Mise à jour des informations d'un client (fiche : coordonnées, type,
+    // valeur, notes). L'étape et le parrainage ne passent pas par ici.
+    updateLead: (leadId, patch) =>
+      setState((s) => ({
+        ...s,
+        leads: s.leads.map((l) =>
+          l.id !== leadId ? l : (() => {
+            // Une fiche créée avant l'activation de Google Contacts, ou dont
+            // le numéro a été modifié, est remise dans la file à sa prochaine
+            // sauvegarde. Une simple modification d'un autre champ ne crée
+            // jamais un doublon pour un contact déjà synchronisé.
+            const phone = typeof patch.phone === 'string' ? patch.phone.trim() : '';
+            const needsSync = Boolean(phone) && (phone !== (l.phone || '').trim() || !l.google_contact_sync_status);
+            return {
+              ...l,
+              ...patch,
+              lastActivity: new Date().toISOString().slice(0, 10),
+              ...(needsSync ? {
+                google_contact_sync_status: 'pending',
+                google_contact_sync_error: null,
+                google_contact_sync_next_retry_at: null,
+              } : {}),
+            };
+          })()
+        ),
+      })),
+
+    // Retour de l'Edge Function pour une fiche Client. Le statut est
+    // répliqué avec la piste, ce qui évite toute seconde création sur un
+    // autre appareil.
     setLeadGoogleContactSync: (leadId, result = {}) =>
       setState((s) => ({
         ...s,
-        leads: s.leads.map((l) => (l.id === leadId ? {
-          ...l,
+        leads: s.leads.map((lead) => (lead.id === leadId ? {
+          ...lead,
           google_contact_sync_status: result.status || 'pending',
           ...(result.resourceName ? { google_contact_resource_name: result.resourceName } : {}),
           ...(result.status === 'synced' || result.status === 'already_exists'
@@ -102,19 +136,7 @@ export function createLeadActions(setState) {
             : {}),
           ...(result.error ? { google_contact_sync_error: result.error } : {}),
           ...(result.nextRetryAt ? { google_contact_sync_next_retry_at: result.nextRetryAt } : {}),
-        } : l)),
-      })),
-
-    // Mise à jour des informations d'un client (fiche : coordonnées, type,
-    // valeur, notes). L'étape et le parrainage ne passent pas par ici.
-    updateLead: (leadId, patch) =>
-      setState((s) => ({
-        ...s,
-        leads: s.leads.map((l) =>
-          l.id === leadId
-            ? { ...l, ...patch, lastActivity: new Date().toISOString().slice(0, 10) }
-            : l
-        ),
+        } : lead)),
       })),
 
     // Le vendeur applique l'étape immédiatement — le « gagné » génère les
@@ -206,3 +228,4 @@ export function createLeadActions(setState) {
       })),
   };
 }
+

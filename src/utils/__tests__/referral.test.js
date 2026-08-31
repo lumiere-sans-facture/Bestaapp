@@ -21,28 +21,17 @@ describe('codeBaseFromName', () => {
 });
 
 describe('generatePartnerCode', () => {
-  it('produit le seul nom, sans préfixe, quand il est libre', () => {
-    expect(generatePartnerCode('Aminata', [])).toBe('AMINATA');
+  it('produit un code lisible avec suffixe unique', () => {
+    expect(generatePartnerCode('Aminata', [], 'partner-1')).toMatch(/^AMINATA-[A-Z2-9]{6}$/);
   });
-
-  it('réserve « BESTA » : ce mot était le préfixe, il ne peut pas être un code', () => {
-    // Sinon normaliseCode raccourcirait BESTA-K7 en K7 et le partenaire
-    // deviendrait introuvable.
-    expect(generatePartnerCode('Besta Kodjo', [])).toBe('PARTENAIRE');
-  });
-
-  it('tient compte des anciens codes préfixés pour éviter un doublon', () => {
-    const code = generatePartnerCode('Aminata', ['BESTA-AMINATA']);
-    expect(code).not.toBe('AMINATA');
-    expect(code.startsWith('AMINATA-')).toBe(true);
-  });
-  it('ajoute un suffixe en cas de collision', () => {
-    const code = generatePartnerCode('Aminata', ['AMINATA']);
-    expect(code).not.toBe('AMINATA');
-    expect(code.startsWith('AMINATA-')).toBe(true);
-    expect(code.length).toBe('AMINATA-'.length + 2);
+  it('distingue deux homonymes et reste stable pour la même identité', () => {
+    const premier = generatePartnerCode('Aminata', [], 'partner-1');
+    const second = generatePartnerCode('Aminata', [premier], 'partner-2');
+    expect(second).not.toBe(premier);
+    expect(generatePartnerCode('Aminata', [], 'partner-1')).toBe(premier);
   });
 });
+
 
 describe('normaliseCode', () => {
   it('retire le préfixe historique et garde le nom et le suffixe', () => {
@@ -50,13 +39,12 @@ describe('normaliseCode', () => {
   });
 
   it('met en forme une saisie approximative', () => {
-    expect(normaliseCode('  besta-aminata ')).toBe('AMINATA');
-    expect(normaliseCode('aminata')).toBe('AMINATA');
+    expect(normaliseCode('  besta-aminata-k8r4mz ')).toBe('AMINATA-K8R4MZ');
     expect(normaliseCode('')).toBe('');
     expect(normaliseCode(null)).toBe('');
   });
 
-  it('laisse intact un code déjà au nouveau format', () => {
+  it('laisse intact un code déjà au format courant', () => {
     expect(normaliseCode('BINTA-ZSUHKZ')).toBe('BINTA-ZSUHKZ');
   });
 });
@@ -69,11 +57,21 @@ describe('memeCode', () => {
   });
 
   it('ne rapproche pas deux partenaires différents', () => {
-    expect(memeCode('BINTA-ZSUHKZ', 'BINTA')).toBe(false);
+    expect(memeCode('BINTA-ZSUHKZ', 'BINTA-AAAAAA')).toBe(false);
   });
 
   it('deux codes vides ne désignent personne', () => {
     expect(memeCode('', '')).toBe(false);
     expect(memeCode(null, undefined)).toBe(false);
+  });
+});
+
+describe('generatePartnerCode — mot réservé', () => {
+  it('n’attribue jamais un code commençant par BESTA', () => {
+    // Sinon normaliseCode y verrait l'ancien préfixe et raccourcirait
+    // BESTA-K8R4MZ en K8R4MZ : le partenaire deviendrait introuvable.
+    const code = generatePartnerCode('Besta Kodjo', [], 'partner-9');
+    expect(code).toMatch(/^PARTENAIRE-[A-Z2-9]{6}$/);
+    expect(normaliseCode(code)).toBe(code);
   });
 });

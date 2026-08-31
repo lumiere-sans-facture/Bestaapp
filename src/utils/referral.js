@@ -14,15 +14,36 @@ export const codeBaseFromName = (name = '') =>
     .split(/\s+/)[0]
     .slice(0, 10) || 'PARTENAIRE';
 
-// Ancien préfixe des codes partenaires. Il a été retiré du format, mais des
-// liens « ?ref=BESTA-… » circulent toujours (WhatsApp, affiches, cartes) :
-// tout code reçu est donc débarrassé de ce préfixe avant comparaison.
+/** Suffixe déterministe d'une identité partenaire.
+ * Une même identité garde le même code sur deux appareils ; deux UUID
+ * différents reçoivent un suffixe différent avec une probabilité de collision
+ * négligeable, ensuite verrouillée en base de données. */
+const suffixFromSeed = (seed, attempt = 0) => {
+  let hash = 0x811c9dc5;
+  for (const char of `${seed}:${attempt}`) {
+    hash = Math.imul(hash ^ char.charCodeAt(0), 0x01000193) >>> 0;
+  }
+  let suffix = '';
+  for (let i = 0; i < 6; i += 1) {
+    // Mélange supplémentaire : les six caractères ne dépendent pas seulement
+    // des cinq bits de poids faible du hash initial.
+    hash ^= hash << 13;
+    hash ^= hash >>> 17;
+    hash ^= hash << 5;
+    hash >>>= 0;
+    suffix += CHARSET[hash % CHARSET.length];
+  }
+  return suffix;
+};
+
+// Ancien préfixe des codes partenaires. Il a disparu du format, mais des liens
+// « ?ref=BESTA-… », des cartes et des affiches le portant circulent toujours :
+// tout code reçu en est débarrassé avant comparaison. Sans ça, un filleul venu
+// par un ancien lien ne serait plus rattaché à son parrain.
 const PREFIXE_HISTORIQUE = 'BESTA-';
 
-/**
- * Forme canonique d'un code partenaire : majuscules, sans espaces, et sans le
- * préfixe historique. C'est la SEULE forme sur laquelle on compare deux codes.
- */
+/** Forme canonique d'un code : majuscules, sans espaces, sans le préfixe
+ *  historique. C'est la SEULE forme sur laquelle on compare deux codes. */
 export const normaliseCode = (code = '') => {
   const propre = String(code || '').trim().toUpperCase();
   return propre.startsWith(PREFIXE_HISTORIQUE) ? propre.slice(PREFIXE_HISTORIQUE.length) : propre;
@@ -35,21 +56,22 @@ export const memeCode = (a, b) => {
 };
 
 /**
- * Code lisible basé sur le nom : AMINATA.
- * En cas d'homonyme, un suffixe court est ajouté : AMINATA-K7.
+ * Code lisible et toujours distinct : AMINATA-K8R4MZ.
+ * `identity` est l'id immutable du partenaire (UUID ou p-user-...) : le code
+ * reste stable si l'application est ouverte simultanément sur deux appareils.
  */
-export const generatePartnerCode = (name, existingCodes = []) => {
+export const generatePartnerCode = (name, existingCodes = [], identity = '') => {
   const nom = codeBaseFromName(name);
   // « BESTA » est réservé : un code commençant par lui serait raccourci à tort
-  // en retirant le préfixe historique.
+  // par normaliseCode, qui y verrait l'ancien préfixe.
   const base = nom === 'BESTA' ? 'PARTENAIRE' : nom;
-  const pris = existingCodes.map(normaliseCode);
-  let code = base;
-  while (pris.includes(code)) {
-    const suffix = Array.from({ length: 2 }, () => CHARSET[Math.floor(Math.random() * CHARSET.length)]).join('');
-    code = `${base}-${suffix}`;
+  const used = new Set(existingCodes.map(normaliseCode));
+  const seed = identity || `${base}:${Math.random()}:${Date.now()}`;
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    const code = `${base}-${suffixFromSeed(seed, attempt)}`;
+    if (!used.has(code)) return code;
   }
-  return code;
+  throw new Error('Génération du code partenaire impossible.');
 };
 
 export const partnerLink = (code) => `${window.location.origin}/?ref=${code}`;
@@ -59,7 +81,7 @@ export const partnerLink = (code) => `${window.location.origin}/?ref=${code}`;
 const REF_KEY = 'bestasolar_ref';
 export const REF_TTL_DAYS = 30;
 
-/** À appeler au chargement de l'app : capture ?ref=NOM-XX et nettoie l'URL. */
+/** À appeler au chargement de l'app : capture ?ref=NOM-XXXXXX et nettoie l'URL. */
 export const captureRefFromUrl = () => {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -122,3 +144,4 @@ export const resolveAutoPartner = (lead, partners, creatorUserId = null) => {
   }
   return null;
 };
+

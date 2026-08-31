@@ -736,7 +736,7 @@ export default function Plus() {
                 ce choix est <strong>définitif</strong>.
               </p>
               <div className="momo-input-row">
-                <input className="input" value={refInput} onChange={(e) => setRefInput(normaliseCode(e.target.value))} placeholder="Ex. AMINATA" aria-label="Code partenaire" />
+                <input className="input" value={refInput} onChange={(e) => setRefInput(normaliseCode(e.target.value))} placeholder="NOM-XXXXXX" aria-label="Code partenaire" />
                 <button type="submit" className="btn btn-primary" disabled={refSaving || !refInput.trim()}>
                   {refSaving ? '…' : 'Attribuer'}
                 </button>
@@ -1091,3 +1091,4 @@ export default function Plus() {
     </div>
   );
 }
+

@@ -5,7 +5,7 @@ import { SOLAR_KITS, KITS_DOTES_AVANT_REGISTRE } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
 import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { generatePartnerCode, codeBaseFromName, normaliseCode } from '../utils/referral';
+import { generatePartnerCode, normaliseCode } from '../utils/referral';
 
 export const STORAGE_KEY = 'bestasolar_data';
 
@@ -155,35 +155,47 @@ export const loadState = (scope = null) => {
       if (!saved.paiementConfigs) saved.paiementConfigs = [];
       if (!saved.factures) saved.factures = [];
       if (!saved.proClients) saved.proClients = [];
+      // Format courant : NOM-XXXXXX. Un ancien BESTA-NOM-XXXXXX perd son
+      // préfixe et GARDE son suffixe — exactement ce que fait la migration SQL
+      // (20260831_partner_code_format.sql). Lui en régénérer un autre ici
+      // ferait diverger l'appareil et le serveur : le dernier à pousser
+      // gagnerait, et la carte déjà distribuée par le partenaire cesserait de
+      // le désigner. Seuls les codes sans suffixe exploitable sont régénérés.
+      const FORMAT_COURANT = /^[A-Z]{1,10}-[A-Z2-9]{6}$/;
+      const auFormat = (code) => FORMAT_COURANT.test(String(code || '').trim().toUpperCase());
       const remap = {};
-      const suitLeFormat = (code, name) => Boolean(code) && code.startsWith(codeBaseFromName(name));
-      // 1re passe : le préfixe historique tombe (BESTA-BINTA-ZSUHKZ devient
-      // BINTA-ZSUHKZ), puis on réserve les codes conformes au format. Deux
-      // codes peuvent se retrouver identiques une fois raccourcis (BINTA et
-      // BESTA-BINTA) : le premier garde le sien, l'autre est régénéré.
-      // Les liens « ?ref=BESTA-… » déjà partagés restent valides : normaliseCode
-      // retire ce préfixe de tout code reçu.
       const codes = [];
+      // 1re passe : retirer le préfixe et réserver les codes déjà conformes.
+      // Deux codes peuvent devenir identiques une fois raccourcis : le premier
+      // garde le sien, l'autre passe en régénération.
       const nettoyes = saved.partners.map((p) => {
         const code = normaliseCode(p.code);
-        const garde = suitLeFormat(code, p.name) && !codes.includes(code);
+        const garde = auFormat(code) && !codes.includes(code);
         if (garde) codes.push(code);
         return { partenaire: p, ancien: p.code, code, garde };
       });
-      // 2e passe : régénérer à partir du nom ceux qui n'ont pas gardé le leur.
+      // 2e passe : régénérer ceux qui n'ont pas gardé le leur.
       saved.partners = nettoyes.map(({ partenaire, ancien, code, garde }) => {
-        let final = code;
-        if (!garde) {
-          const seedCode = seed.partners.find((sp) => sp.id === partenaire.id)?.code;
-          final = seedCode && !codes.includes(seedCode) ? seedCode : generatePartnerCode(partenaire.name, codes);
-          codes.push(final);
-        }
+        const final = garde ? code : generatePartnerCode(partenaire.name, codes, partenaire.id);
+        if (!garde) codes.push(final);
         if (ancien && ancien !== final) remap[ancien] = final;
         return final === partenaire.code ? partenaire : { ...partenaire, code: final };
       });
       if (Object.keys(remap).length) {
+        saved.partners = saved.partners.map((p) =>
+          remap[p.sponsorCode] ? { ...p, sponsorCode: remap[p.sponsorCode] } : p
+        );
         saved.referrals = saved.referrals.map((r) =>
           remap[r.partnerCode] ? { ...r, partnerCode: remap[r.partnerCode] } : r
+        );
+        saved.devis = (saved.devis || []).map((d) =>
+          remap[d.partnerCode] ? { ...d, partnerCode: remap[d.partnerCode] } : d
+        );
+        saved.commissions = (saved.commissions || []).map((c) =>
+          remap[c.partnerCode] ? { ...c, partnerCode: remap[c.partnerCode] } : c
+        );
+        saved.payoutRequests = (saved.payoutRequests || []).map((p) =>
+          remap[p.partnerCode] ? { ...p, partnerCode: remap[p.partnerCode] } : p
         );
       }
       return saved;
@@ -239,3 +251,4 @@ export const persist = (state, scope = null) => {
     return false; // quota dépassé / navigation privée
   }
 };
+

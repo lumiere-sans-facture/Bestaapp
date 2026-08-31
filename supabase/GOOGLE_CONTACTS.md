@@ -1,6 +1,6 @@
 # Google Contacts — installation
 
-Cette intégration synchronise les **partenaires** vers le compte Google Contacts choisi par le gérant de chaque organisation.
+Cette intégration synchronise les **clients** et les **partenaires** vers le compte Google Contacts choisi par le gérant de chaque organisation.
 
 ## 1. Google Cloud
 
@@ -28,10 +28,15 @@ supabase secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... \\
 
 Programmez un appel sécurisé toutes les 5 minutes vers `google-contacts-sync` avec le corps `{"action":"retry-pending"}` et l'en-tête `x-google-contacts-cron-secret`. La fonction reprend les jobs `pending` / `failed` arrivés à échéance ; sans réseau, le contact reste enregistré dans BestaSolar.
 
-Le gérant connecte ensuite son compte depuis **Plus → Paramètres → Synchronisation Google Contacts**.
+Les entrées créées depuis **Clients** (collection `leads`) et **Partenaires** sont synchronisées. Après le premier déploiement de cette évolution, exécutez aussi `migrations/20260830_google_contacts_leads.sql`. Les anciens clients ne sont pas envoyés automatiquement : ouvrez leur fiche, puis **Modifier → Enregistrer** pour les mettre explicitement en file.
+
+Le gérant connecte ensuite son compte depuis **Plus → Paramètres → Synchronisation Google Contacts**. Ce compte est unique pour toute l'organisation : un client créé par n'importe quel membre est envoyé vers le compte Google du gérant, sans que les membres aient à connecter leur propre compte.
+
+Après le changement de format des codes, exécutez aussi `migrations/20260831_partner_code_format.sql`. Les codes deviennent `NOM-XXXXXX` et les anciennes références de parrainage sont remappées.
 
 ## Sécurité
 
 - Les refresh tokens sont uniquement dans `google_contacts_configs`, sans policy RLS publique ; les Edge Functions utilisent la clé service_role.
 - Le navigateur ne reçoit jamais un token Google, seulement l'adresse e-mail du compte connecté et son état.
 - Les doublons sont évités par numéro Bénin normalisé et un verrou SQL `(org_id, normalized_phone)` juste avant `people.createContact`.
+

@@ -492,42 +492,40 @@ export const startGoogleContactsOAuth = () =>
 export const disconnectGoogleContacts = () =>
   invokeGoogleContacts('google-contacts-oauth', { action: 'disconnect' });
 
-/** Envoie un contact vers la file serveur. `partnerId` est la clé de la file
- *  côté serveur : l'identifiant du contact, partenaire OU client (les deux
- *  sont des UUID, aucune collision possible). Le résultat ne bloque jamais
- *  l'enregistrement local : l'appelant conserve pending/failed pour la reprise. */
-const syncGoogleContact = ({ id, nom, code, phone, email = '', company = '' }) =>
+/** Envoie un contact BestaSolar vers la file serveur. Le résultat ne bloque
+ *  jamais l'enregistrement local : l'appelant conserve pending/failed pour la
+ *  reprise. Les clients sont stockés dans la collection "leads". */
+export const syncGoogleContact = (contact, contactType = 'partner') =>
   invokeGoogleContacts('google-contacts-sync', {
-    partnerId: id,
-    contact: { id, name: nomContactGoogle(nom, code), phone, email, company },
-  });
-
-/** Un partenaire, sous son propre code : « MAMADOU Mamadou Balogun ». */
-export const syncPartnerGoogleContact = (partner) =>
-  syncGoogleContact({
-    id: partner.id,
-    nom: partner.name,
-    code: partner.code,
-    phone: partner.phone,
-    email: partner.email || '',
-    company: partner.company || partner.entreprise || '',
-  });
-
-/** Un client, sous le code du partenaire qui l'a enregistré. */
-export const syncClientGoogleContact = (client, code) =>
-  syncGoogleContact({
-    id: client.id,
-    nom: client.name,
-    code,
-    phone: client.phone,
-    email: client.email || '',
-    company: client.clientType === 'entreprise' ? client.name : '',
+    contactId: contact.id,
+    contactType,
+    contact: {
+      id: contact.id,
+      // Pour une entreprise, le nom de la personne à joindre est plus utile
+      // dans Google Contacts ; le nom de l'entreprise reste dans l'organisation.
+      // Le nom porte le code de l'apporteur — « FATOU-KN8ERZ Soumana » — pour
+      // que le carnet Google se LISE par partenaire, et pas seulement se
+      // fouille : le champ personnalisé « Enregistré par » n'apparaît pas dans
+      // la liste des contacts (voir utils/contactGoogle.js).
+      name: nomContactGoogle(
+        contactType === 'lead' ? (contact.contact || contact.name) : contact.name,
+        contactType === 'lead' ? (contact.registeredByPartnerCode || '') : (contact.code || ''),
+      ),
+      phone: contact.phone,
+      email: contact.email || '',
+      company: contactType === 'lead' && contact.clientType === 'entreprise'
+        ? contact.name
+        : (contact.company || contact.entreprise || ''),
+      registeredByName: contactType === 'lead' ? (contact.registeredByPartnerName || '') : '',
+      registeredByCode: contactType === 'lead' ? (contact.registeredByPartnerCode || '') : '',
+    },
   });
 
 /**
- * Clients du RÉSEAU : les pistes saisies par les entreprises nées de mes codes
- * partenaires. Lecture seule — elles vivent chez elles, l'isolation par
- * organisation reste entière.
+ * Le RÉSEAU, en lecture seule : les partenaires nés de nos codes d'affiliation
+ * et les clients qu'ils enregistrent. Chacun a ouvert sa PROPRE organisation ;
+ * l'isolation les rendait invisibles à la tête de réseau. Ces deux lectures
+ * les montrent sans jamais lever le cloisonnement.
  */
 export async function fetchClientsReseau() {
   if (!supabase) return [];
@@ -536,14 +534,13 @@ export async function fetchClientsReseau() {
   return data || [];
 }
 
-/**
- * Partenaires du RÉSEAU : les personnes qui travaillent dans ces mêmes
- * entreprises. Leur profil partenaire vit chez elles ; sans cette lecture,
- * elles n'apparaissent nulle part dans l'espace du gérant.
- */
 export async function fetchPartenairesReseau() {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('mes_partenaires_reseau');
   if (error) throw new Error(error.message);
   return data || [];
 }
+
+// Compatibilité pour les éventuels appels existants hors du DataContext.
+export const syncPartnerGoogleContact = (partner) => syncGoogleContact(partner, 'partner');
+
