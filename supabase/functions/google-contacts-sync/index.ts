@@ -49,7 +49,10 @@ async function currentOrg(req: Request) {
   // auth.users.id : l'e-mail est le point de jonction fiable.
   const email = (auth.user.email || '').toLowerCase();
   if (!email) throw new Error('Compte sans adresse e-mail.');
-  const { data: profile, error } = await client.from('profiles').select('org_id').eq('email', email).single();
+  // Chaque membre de la même organisation doit synchroniser vers le compte
+  // Google du gérant. La recherche insensible à la casse couvre les profils
+  // dont l'adresse a été saisie avec des majuscules à l'inscription.
+  const { data: profile, error } = await client.from('profiles').select('org_id').ilike('email', email).maybeSingle();
   if (error || !profile?.org_id) throw new Error('Organisation introuvable.');
   return { client, orgId: profile.org_id as string };
 }
