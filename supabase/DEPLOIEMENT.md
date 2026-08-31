@@ -55,15 +55,21 @@ correspond à une fonctionnalité livrée après la première installation :
 | 7 | `migrations/20260830_google_contacts_leads.sql` | La file accepte aussi les CLIENTS, pas seulement les partenaires |
 | 8 | `migrations/20260830_partner_code_uniqueness.sql` | Index UNIQUE sur le code partenaire — un code sert dans un lien public, il ne peut pas désigner deux personnes |
 | 9 | `migrations/20260831_partner_code_format.sql` | Renommage des anciens codes `BESTA-NOM-XXXXXX` en `NOM-XXXXXX`, avec toutes leurs traces (devis, commissions, parrainages, file Google) |
+| 10 | `migrations/20260831_merge_manager_accounts.sql` | Réunir deux comptes gérants dans un même espace, sans écrasement des données |
 
 L'ordre 8 → 9 n'est pas indifférent : l'index unique répare d'abord les
 doublons hérités, le renommage travaille ensuite sur une base saine.
+
+Après la migration 10, **Plus → Équipe** permet au second gérant de saisir le
+code affiché chez le gérant de l’espace principal. La réunion est bloquée si
+l’ancien espace contient d’autres membres ou si une donnée serait écrasée ; les
+abonnements et paiements restent volontairement hors de l’opération.
 
 **En dernier, facultatif :**
 
 | Ordre | Script | Rôle |
 |---|---|---|
-| 10 | `temps-reel.sql` | Diffusion immédiate à toute l'équipe (à rejouer après l'ajout d'une table) |
+| 11 | `temps-reel.sql` | Diffusion immédiate à toute l'équipe (à rejouer après l'ajout d'une table) |
 
 `temps-reel.sql` vient en dernier parce qu'il ne crée rien : il ne fait
 qu'INSCRIRE au temps réel des tables déjà existantes. Passé plus tôt, il
