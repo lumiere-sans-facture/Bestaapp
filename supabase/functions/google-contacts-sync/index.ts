@@ -3,20 +3,38 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // Une Edge Function est déployée de manière isolée : elle ne peut pas
 // importer le module partagé de l'application. La normalisation est donc
 // reproduite ici afin que la comparaison avec Google Contacts reste fiable.
-const PAYS_PAR_DEFAUT = 'BJ';
+const PAYS_PAR_DEFAUT = 'TG';
+const INDICATIFS = { TG: '228', BJ: '229' };
 const digitsOnly = (value: unknown) => String(value ?? '').replace(/[^0-9]/g, '');
+const corrigePlanNational = (indicatif: string, national: string) =>
+  indicatif === '229' && /^\d{8}$/.test(national) ? `01${national}` : national;
 const normalizePhoneNumber = (phone: unknown, country = PAYS_PAR_DEFAUT) => {
-  let digits = digitsOnly(phone);
+  const brut = String(phone ?? '').trim();
+  let digits = digitsOnly(brut);
   if (!digits) return null;
-  if (country.toUpperCase() === 'BJ') {
-    if (digits.startsWith('00229')) digits = digits.slice(5);
-    else if (digits.startsWith('229')) digits = digits.slice(3);
-    if (/^\d{8}$/.test(digits)) return `+22901${digits}`;
-    if (/^01\d{8}$/.test(digits)) return `+229${digits}`;
-    return /^\d{7,12}$/.test(digits) ? `+229${digits}` : null;
+
+  const indicatif = INDICATIFS[country.toUpperCase() as keyof typeof INDICATIFS] || null;
+  // Un indicatif déjà écrit par l'utilisateur est prioritaire sur le pays
+  // par défaut : +228… ne peut donc jamais devenir +229228….
+  let international = brut.startsWith('+');
+  if (digits.startsWith('00')) {
+    digits = digits.slice(2);
+    international = true;
   }
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  return /^\d{7,15}$/.test(digits) ? `+${digits}` : null;
+  const indicatifPorte = Object.values(INDICATIFS)
+    .find((code) => digits.startsWith(code) && digits.length > code.length + 6);
+  if (indicatifPorte) international = true;
+
+  if (international) {
+    const code = Object.values(INDICATIFS).find((item) => digits.startsWith(item));
+    if (code) digits = `${code}${corrigePlanNational(code, digits.slice(code.length))}`;
+    return /^\d{7,15}$/.test(digits) ? `+${digits}` : null;
+  }
+
+  // Une saisie sans indicatif est locale. L'application travaille au Togo.
+  if (!indicatif) return /^\d{7,15}$/.test(digits) ? `+${digits}` : null;
+  const national = corrigePlanNational(indicatif, digits);
+  return /^\d{7,12}$/.test(national) ? `+${indicatif}${national}` : null;
 };
 const findContactByNormalizedPhone = (contacts: any[], phone: string, country = PAYS_PAR_DEFAUT) => {
   const target = normalizePhoneNumber(phone, country);
@@ -108,9 +126,12 @@ async function findContactByPhone(token: string, phone: string) {
 
 async function createContact(token: string, contact: Contact, normalizedPhone: string) {
   const words = String(contact.name || 'Partenaire BestaSolar').trim().split(/\s+/);
+  // Google Contacts doit recevoir le numéro exact qui a été renseigné. La
+  // version normalisée sert seulement aux doublons et aux verrous internes.
+  const phoneValue = String(contact.phone || '').trim() || normalizedPhone;
   const payload: Record<string, unknown> = {
     names: [{ givenName: words[0] || 'Partenaire', familyName: words.slice(1).join(' ') || undefined }],
-    phoneNumbers: [{ value: normalizedPhone, type: 'mobile' }],
+    phoneNumbers: [{ value: phoneValue, type: 'mobile' }],
   };
   if (contact.email) payload.emailAddresses = [{ value: String(contact.email), type: 'work' }];
   if (contact.company) payload.organizations = [{ name: String(contact.company), type: 'work' }];
@@ -186,11 +207,12 @@ Deno.serve(async (req) => {
     const contact = body.contact as Contact;
     const contactId = String(body.contactId || body.partnerId || contact?.id || '');
     const contactType: ContactType = body.contactType === 'lead' ? 'lead' : 'partner';
-    const normalizedPhone = normalizePhoneNumber(contact?.phone, PAYS_PAR_DEFAUT);
+    const rawPhone = String(contact?.phone || '').trim();
+    const normalizedPhone = normalizePhoneNumber(rawPhone, PAYS_PAR_DEFAUT);
     if (!contactId || !normalizedPhone) return json({ status: 'failed', error: 'Contact ou numéro de téléphone invalide.' }, 400);
     const { data: existing } = await client.from('google_contact_sync_jobs').select('*').eq('org_id', orgId).eq('partner_id', contactId).maybeSingle();
     if (existing && existing.normalized_phone === normalizedPhone && ['synced', 'already_exists'].includes(existing.status)) return json({ status: existing.status, resourceName: existing.google_contact_resource_name || null });
-    const jobInput = { org_id: orgId, partner_id: contactId, contact_type: contactType, normalized_phone: normalizedPhone, contact_data: { ...contact, phone: normalizedPhone }, status: 'pending', next_attempt_at: new Date().toISOString(), last_error: null };
+    const jobInput = { org_id: orgId, partner_id: contactId, contact_type: contactType, normalized_phone: normalizedPhone, contact_data: { ...contact, phone: rawPhone }, status: 'pending', next_attempt_at: new Date().toISOString(), last_error: null };
     const { data: job, error } = await client.from('google_contact_sync_jobs').upsert(jobInput, { onConflict: 'org_id,partner_id' }).select().single();
     if (error || !job) throw new Error('File de synchronisation indisponible.');
     return json(await processJob(client, job as Job));
