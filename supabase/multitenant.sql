@@ -547,13 +547,31 @@ create or replace function public.my_referred_orgs()
   order by o.created_at desc
 $$;
 
+-- Propriétaire de l'espace : le gérant, l'admin plateforme, ou l'inscrit seul
+-- dans une organisation SANS gérant — il en est le propriétaire de fait.
+-- Exactement la règle de utils/roles.js (estProprietaireEspace) : les deux
+-- doivent dire la même chose, sinon l'écran montre ce que la base refuse.
+create or replace function public.auth_est_proprietaire_espace()
+  returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((
+    select p.role = 'gerant' or p.is_platform_admin
+        or not exists (
+          select 1 from public.profiles g
+          where g.org_id = p.org_id and g.role = 'gerant'
+        )
+    from public.profiles p
+    where lower(p.email) = lower(auth.jwt() ->> 'email')
+  ), false)
+$$;
+
 -- Clients du RÉSEAU : les pistes saisies par les entreprises que MES codes
 -- partenaires ont fait naître. Un partenaire qui s'inscrit par un lien
 -- d'affiliation ouvre sa PROPRE organisation ; l'isolation par org rend alors
 -- ses clients invisibles pour la tête de réseau, qui ne voyait plus remonter
 -- personne. Cette fonction rétablit la vue — en LECTURE SEULE, et strictement
 -- au niveau 1 : les filleuls de mes filleuls appartiennent à leur propre
--- réseau, pas au mien.
+-- réseau, pas au mien. Réservée au gérant : voir les clients d'une autre
+-- entreprise n'est pas une information d'équipe.
 --
 -- security definer parce qu'il faut traverser l'isolation ; la clause where
 -- est donc TOUTE la protection : rien n'est renvoyé qui ne descende d'un code
@@ -579,6 +597,9 @@ create or replace function public.mes_clients_reseau()
   from public.leads l
   join public.orgs o on o.id = l.org_id
   where public.auth_org_id() is not null
+    -- Réservé au gérant : ce sont les clients d'une AUTRE entreprise, pas de
+    -- quoi ouvrir à toute l'équipe.
+    and public.auth_est_proprietaire_espace()
     and l.org_id <> public.auth_org_id()
     and public.code_partenaire(o.referred_by) in (
       select public.code_partenaire(pt.data ->> 'code') from public.partners pt
