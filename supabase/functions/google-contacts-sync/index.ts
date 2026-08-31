@@ -1,5 +1,32 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { findContactByNormalizedPhone, normalizePhoneNumber, PAYS_PAR_DEFAUT } from '../../../shared/phone.js';
+
+// Une Edge Function est déployée de manière isolée : elle ne peut pas
+// importer le module partagé de l'application. La normalisation est donc
+// reproduite ici afin que la comparaison avec Google Contacts reste fiable.
+const PAYS_PAR_DEFAUT = 'BJ';
+const digitsOnly = (value: unknown) => String(value ?? '').replace(/[^0-9]/g, '');
+const normalizePhoneNumber = (phone: unknown, country = PAYS_PAR_DEFAUT) => {
+  let digits = digitsOnly(phone);
+  if (!digits) return null;
+  if (country.toUpperCase() === 'BJ') {
+    if (digits.startsWith('00229')) digits = digits.slice(5);
+    else if (digits.startsWith('229')) digits = digits.slice(3);
+    if (/^\d{8}$/.test(digits)) return `+22901${digits}`;
+    if (/^01\d{8}$/.test(digits)) return `+229${digits}`;
+    return /^\d{7,12}$/.test(digits) ? `+229${digits}` : null;
+  }
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  return /^\d{7,15}$/.test(digits) ? `+${digits}` : null;
+};
+const findContactByNormalizedPhone = (contacts: any[], phone: string, country = PAYS_PAR_DEFAUT) => {
+  const target = normalizePhoneNumber(phone, country);
+  if (!target) return null;
+  return (contacts || []).find((contact) =>
+    (contact?.phoneNumbers || contact?.phones || []).some((item: any) =>
+      normalizePhoneNumber(typeof item === 'string' ? item : item?.value, country) === target
+    )
+  ) || null;
+};
 
 type Contact = {
   id?: string; name?: string; phone?: string; email?: string; company?: string;
