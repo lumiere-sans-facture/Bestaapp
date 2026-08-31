@@ -33,14 +33,37 @@ Aucune adresse n'est codée en dur dans l'app : liens d'affiliation
 
 Dans **SQL Editor** du dashboard Supabase :
 
+Avant de commencer, `etat-base.sql` (lecture seule) dit ce qui manque
+réellement — utile sur une base déjà installée, pour ne rejouer que le reste.
+
+**Le socle** — dans cet ordre, sans en sauter :
+
 | Ordre | Script | Rôle |
 |---|---|---|
 | 1 | `schema.sql` | Tables + temps réel + tombstones |
 | 2 | `security.sql` | Accès réservé aux porteurs d'un profil (bloque les inscrits inconnus) |
-| 3 | `multitenant.sql` | Organisations, isolation par entreprise (RLS), inscription self-service, codes d'invitation, verrou serveur des abonnements |
+| 3 | `multitenant.sql` | Organisations, **isolation par entreprise (RLS)**, inscription self-service, codes d'invitation, verrou serveur des abonnements, et lectures du réseau d'affiliation (`mes_clients_reseau`, `mes_partenaires_reseau`, réservées au gérant) |
 | 4 | `paiements.sql` | Moyens de paiement configurables depuis l'espace gérant (clés PUBLIQUES uniquement) |
 | 5 | `erreurs.sql` | Journal des plantages — sans lui, aucune panne ne vous remonte |
-| 6 | `temps-reel.sql` | **En dernier, et facultatif** — diffusion immédiate à toute l'équipe (à rejouer après l'ajout d'une table) |
+
+**Les migrations** — après le socle, dans l'ordre de leurs dates. Chacune
+correspond à une fonctionnalité livrée après la première installation :
+
+| Ordre | Script | Rôle |
+|---|---|---|
+| 6 | `migrations/20260829_google_contacts.sql` | Tables Google Contacts : configuration OAuth, file de synchronisation, verrous |
+| 7 | `migrations/20260830_google_contacts_leads.sql` | La file accepte aussi les CLIENTS, pas seulement les partenaires |
+| 8 | `migrations/20260830_partner_code_uniqueness.sql` | Index UNIQUE sur le code partenaire — un code sert dans un lien public, il ne peut pas désigner deux personnes |
+| 9 | `migrations/20260831_partner_code_format.sql` | Renommage des anciens codes `BESTA-NOM-XXXXXX` en `NOM-XXXXXX`, avec toutes leurs traces (devis, commissions, parrainages, file Google) |
+
+L'ordre 8 → 9 n'est pas indifférent : l'index unique répare d'abord les
+doublons hérités, le renommage travaille ensuite sur une base saine.
+
+**En dernier, facultatif :**
+
+| Ordre | Script | Rôle |
+|---|---|---|
+| 10 | `temps-reel.sql` | Diffusion immédiate à toute l'équipe (à rejouer après l'ajout d'une table) |
 
 `temps-reel.sql` vient en dernier parce qu'il ne crée rien : il ne fait
 qu'INSCRIRE au temps réel des tables déjà existantes. Passé plus tôt, il
@@ -56,8 +79,8 @@ exception près** : une fois `multitenant.sql` passé, ne PAS rejouer
 l'isolation par organisation. Pour rétablir le temps réel sans toucher aux
 droits, utiliser `temps-reel.sql`.
 
-**Une fois les six scripts passés, exécuter `verification-securite.sql`** —
-lecture seule, quatre requêtes, deux minutes. C'est la seule preuve que la
+**Une fois tous ces scripts passés, exécuter `verification-securite.sql`** —
+lecture seule, deux minutes, un seul tableau de résultat. C'est la seule preuve que la
 base est réellement fermée : le code peut être irréprochable et les données
 ouvertes si un script n'a pas été rejoué ici. Marche à suivre en **11.5**.
 
@@ -70,6 +93,8 @@ ouvertes si un script n'a pas été rejoué ici. Marche à suivre en **11.5**.
 | `partage-formation.sql`, `nettoyage-doublons-formation.sql` | Cours de formation : partage du catalogue BestaSolar, purge des anciennes copies. |
 | `pompe-kits.sql` | Table des kits de pompage absente (installation antérieure à cette fonctionnalité). |
 | `organisation-interne.sql` | Le bouton « Commander en ligne » n'apparaît pas dans le panier : vérifie quelle entreprise porte `kind = 'interne'` (la seule à pouvoir encaisser pour BestaSolar) et permet de la désigner. |
+| `partage-kits.sql` | Les kits BestaSolar ne sont pas visibles par les comptes techniciens. ⚠ Ce script REMPLACE la politique d'isolation de la table `kits` : à ne passer que si le partage est voulu. |
+| `etat-base.sql` | Lecture seule : dit quelles tables, colonnes et fonctions manquent, avant de lancer quoi que ce soit. |
 
 ## 3. Configuration Auth (dashboard Supabase)
 

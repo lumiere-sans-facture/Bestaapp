@@ -1248,31 +1248,14 @@ end $$;
 -- ============================================================
 
 -- ============================================================
--- Migration « code sans préfixe » (idempotente : rejouable sans effet).
--- Les codes déjà enregistrés perdent leur « BESTA- », DES DEUX CÔTÉS du lien
--- d'affiliation : celui du partenaire, celui de son parrain, et celui noté sur
--- l'organisation qu'il a parrainée. Ne migrer qu'un seul côté romprait le
--- rapprochement et ferait disparaître les commissions.
+-- Le RENOMMAGE des codes déjà enregistrés n'est PAS fait ici. Il appartient à
+-- `migrations/20260831_partner_code_format.sql`, qui le fait mieux : il gère
+-- le cas où deux codes deviennent identiques une fois raccourcis, et il
+-- couvre toutes les traces (devis, commissions, demandes de paiement, file
+-- Google). Le refaire ici violerait l'index unique posé par
+-- `20260830_partner_code_uniqueness.sql`.
+--
+-- `code_partenaire()` ci-dessus reste indispensable : elle sert à COMPARER un
+-- code reçu — un ancien lien « ?ref=BESTA-… » toujours en circulation — à
+-- celui enregistré, sans rien réécrire.
 -- ============================================================
-update public.partners
-   set data = jsonb_set(data, '{code}', to_jsonb(public.code_partenaire(data ->> 'code'))),
-       updated_at = now()
- where coalesce(data ->> 'code', '') <> ''
-   and data ->> 'code' is distinct from public.code_partenaire(data ->> 'code');
-
-update public.partners
-   set data = jsonb_set(data, '{sponsorCode}', to_jsonb(public.code_partenaire(data ->> 'sponsorCode'))),
-       updated_at = now()
- where coalesce(data ->> 'sponsorCode', '') <> ''
-   and data ->> 'sponsorCode' is distinct from public.code_partenaire(data ->> 'sponsorCode');
-
-update public.referrals
-   set data = jsonb_set(data, '{partnerCode}', to_jsonb(public.code_partenaire(data ->> 'partnerCode'))),
-       updated_at = now()
- where coalesce(data ->> 'partnerCode', '') <> ''
-   and data ->> 'partnerCode' is distinct from public.code_partenaire(data ->> 'partnerCode');
-
-update public.orgs
-   set referred_by = public.code_partenaire(referred_by)
- where referred_by is not null
-   and referred_by is distinct from public.code_partenaire(referred_by);
