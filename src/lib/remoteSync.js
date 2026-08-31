@@ -322,6 +322,17 @@ export async function setOrgReferral(code) {
   if (error) throw new Error(error.message);
 }
 
+/** Réunit un compte gérant existant à l'organisation indiquée par le code de
+ * réunion. La base vérifie le rôle, l'absence d'équipier dans la source et
+ * l'absence de conflit avant le moindre déplacement. */
+export async function reunirMonCompteGerant(codeReunion) {
+  const { data, error } = await supabase.rpc('reunir_mon_compte_gerant', {
+    p_code_reunion: codeReunion,
+  });
+  if (error) throw new Error(error.message);
+  return data || {};
+}
+
 /** Organisation de l'utilisateur courant (nom, type interne/pro, code
  *  d'invitation). select('*') : tolère les schémas avec ou sans colonne kind.
  *  Retourne null sur l'ancien schéma mono-équipe (table orgs absente). */
