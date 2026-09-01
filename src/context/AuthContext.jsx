@@ -192,7 +192,7 @@ export function AuthProvider({ children }) {
   // ID token à Supabase. On évite ainsi la redirection visible vers le domaine
   // technique du projet Supabase, tout en conservant Supabase Auth pour la
   // session, les règles RLS et les comptes existants.
-  const signInWithGoogle = async ({ credential, nonce, inviteCode, refCode } = {}) => {
+  const signInWithGoogle = async ({ credential, inviteCode, refCode } = {}) => {
     if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
     if (!credential) return { ok: false, error: 'Jeton Google absent. Réessayez.' };
     localStorage.setItem(OAUTH_CONTEXT_KEY, JSON.stringify({
@@ -203,7 +203,6 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'google',
       token: credential,
-      ...(nonce ? { nonce } : {}),
     });
     if (error) localStorage.removeItem(OAUTH_CONTEXT_KEY);
     if (error) return { ok: false, error: error.message };
