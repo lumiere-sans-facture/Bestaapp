@@ -28,13 +28,6 @@ const loadGoogleIdentity = () => {
   return googleIdentityPromise;
 };
 
-const createNonce = () => {
-  if (!window.crypto?.getRandomValues) return null;
-  const bytes = new Uint8Array(16);
-  window.crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-};
-
 /**
  * Bouton officiel Google Identity Services. Google affiche alors le nom et
  * l'origine de Besta, avant que le jeton ne soit remis à Supabase pour créer
@@ -50,7 +43,6 @@ export default function GoogleSignInButton({ clientId, disabled = false, onCrede
 
   useEffect(() => {
     let cancelled = false;
-    const nonce = createNonce();
     const container = containerRef.current;
 
     loadGoogleIdentity()
@@ -63,13 +55,12 @@ export default function GoogleSignInButton({ clientId, disabled = false, onCrede
               onErrorRef.current?.('Google n’a pas renvoyé de jeton de connexion.');
               return;
             }
-            Promise.resolve(onCredentialRef.current?.({ credential: response.credential, nonce }))
+            Promise.resolve(onCredentialRef.current?.({ credential: response.credential }))
               .catch(() => onErrorRef.current?.('Connexion avec Google impossible.'));
           },
           auto_select: false,
           cancel_on_tap_outside: true,
           context: 'signin',
-          ...(nonce ? { nonce } : {}),
         });
 
         // Le bouton fourni par Google est préférable à une imitation : il est
