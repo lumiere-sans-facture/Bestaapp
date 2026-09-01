@@ -427,6 +427,9 @@ textarea.input { resize: vertical; }
 }
 .btn-google:hover { border-color: var(--text-muted); background: var(--bg); }
 .btn-google .google-icon { flex-shrink: 0; }
+.google-signin-button { width: 100%; min-height: 44px; }
+.google-signin-button > div { display: block !important; }
+.google-signin-button iframe { display: block; max-width: 100%; }
 /* Volet de marque : masqué sur mobile — une deuxième colonne n'a pas la
    place d'exister sous 900px, mieux vaut l'omettre que la tasser. */
 .login-right {

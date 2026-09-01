@@ -188,18 +188,59 @@ export function AuthProvider({ children }) {
     setIsLoading(false);
   }, []);
 
-  const signInWithGoogle = async ({ inviteCode, refCode } = {}) => {
+  // Google Identity Services s'exécute sur app.bestasolar.com et transmet un
+  // ID token à Supabase. On évite ainsi la redirection visible vers le domaine
+  // technique du projet Supabase, tout en conservant Supabase Auth pour la
+  // session, les règles RLS et les comptes existants.
+  const signInWithGoogle = async ({ credential, inviteCode, refCode } = {}) => {
     if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
+    if (!credential) return { ok: false, error: 'Jeton Google absent. Réessayez.' };
     localStorage.setItem(OAUTH_CONTEXT_KEY, JSON.stringify({
       inviteCode: inviteCode || null,
       refCode: refCode || null,
     }));
-    const { error } = await supabase.auth.signInWithOAuth({
+
+    const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      token: credential,
     });
     if (error) localStorage.removeItem(OAUTH_CONTEXT_KEY);
-    return { ok: !error, error: error?.message };
+    if (error) return { ok: false, error: error.message };
+
+    const googleUser = data.user || data.session?.user;
+    const email = googleUser?.email;
+    if (!email) {
+      localStorage.removeItem(OAUTH_CONTEXT_KEY);
+      await supabase.auth.signOut();
+      return { ok: false, error: 'Le compte Google ne contient pas d’adresse email utilisable.' };
+    }
+
+    touchSession();
+    const { profile, injoignable } = await fetchProfile(email);
+    if (profile) {
+      await adoptProfile(profile);
+      return { ok: true };
+    }
+
+    if (injoignable) {
+      return { ok: false, error: 'Google a accepté la connexion, mais Besta ne peut pas joindre le serveur. Réessayez dans un instant.' };
+    }
+
+    // Premier compte Google : l'utilisateur termine son profil métier sur
+    // l'écran déjà prévu pour ce cas (téléphone, entreprise ou équipe).
+    const cree = await provisionProfile(email);
+    if (cree) {
+      await adoptProfile(cree);
+      return { ok: true };
+    }
+    const oauthContext = readOAuthContext();
+    setPendingAuthUser({
+      email,
+      name: googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || '',
+      inviteCode: oauthContext.inviteCode || null,
+      refCode: oauthContext.refCode || null,
+    });
+    return { ok: true };
   };
 
   const login = async (email, password) => {
