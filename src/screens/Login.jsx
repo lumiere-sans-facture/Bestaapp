@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sun, Mail, Lock, Eye, EyeOff, KeyRound, UserPlus, ChevronLeft, ChevronDown, Handshake, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { getActiveRef, normaliseCode } from '../utils/referral';
 import { lireFormuleChoisie } from '../utils/formuleChoisie';
@@ -50,17 +51,6 @@ function CountryFlag({ country }) {
       alt=""
       aria-hidden="true"
     />
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg className="google-icon" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
-      <path fill="#4285f4" d="M21.6 12.23c0-.72-.06-1.26-.2-1.82H12v3.42h5.52a4.7 4.7 0 0 1-2.05 3.09v2.22h3.32c1.94-1.79 2.81-4.42 2.81-6.91Z" />
-      <path fill="#34a853" d="M12 22c2.7 0 4.96-.89 6.61-2.42l-3.32-2.22c-.9.61-2.06.98-3.29.98-2.6 0-4.8-1.76-5.59-4.12H2.98v2.29A10 10 0 0 0 12 22Z" />
-      <path fill="#fbbc05" d="M6.41 14.22A6.01 6.01 0 0 1 6.1 12c0-.77.13-1.52.31-2.22V7.49H2.98A10 10 0 0 0 2 12c0 1.61.39 3.13.98 4.51l3.43-2.29Z" />
-      <path fill="#ea4335" d="M12 5.66c1.47 0 2.79.51 3.82 1.5l2.87-2.87A9.64 9.64 0 0 0 12 2a10 10 0 0 0-9.02 5.49l3.43 2.29C7.2 7.42 9.4 5.66 12 5.66Z" />
-    </svg>
   );
 }
 
@@ -145,15 +135,17 @@ export default function Login({ vueInitiale = 'login' }) {
 
   const switchView = (v) => { setView(v); setError(''); setNotice(''); };
 
-  const handleGoogle = async () => {
+  const handleGoogle = async ({ credential, nonce }) => {
     setError('');
     setLoading(true);
     const res = await signInWithGoogle({
+      credential,
+      nonce,
       inviteCode: teamCode || null,
       refCode: teamCode ? null : refCode.trim() || null,
     });
+    setLoading(false);
     if (!res.ok) {
-      setLoading(false);
       setError(res.error || 'Connexion avec Google impossible.');
     }
   };
@@ -308,11 +300,20 @@ export default function Login({ vueInitiale = 'login' }) {
     </div>
   );
 
-  const googleAccess = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true' && isSupabaseConfigured && (
+  const googleEnabled = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true' && isSupabaseConfigured;
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+  const googleAccess = googleEnabled && (
     <>
-      <button type="button" className="btn btn-google btn-block btn-lg" onClick={handleGoogle} disabled={loading}>
-        <GoogleIcon /> {loading ? 'Ouverture de Google…' : 'Continuer avec Google'}
-      </button>
+      {googleClientId ? (
+        <GoogleSignInButton
+          clientId={googleClientId}
+          disabled={loading}
+          onCredential={handleGoogle}
+          onError={(message) => { setLoading(false); setError(message); }}
+        />
+      ) : (
+        <div className="login-error">Connexion Google indisponible : configuration de l’application incomplète.</div>
+      )}
       <div className="login-divider"><span>ou avec votre email</span></div>
     </>
   );
