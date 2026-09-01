@@ -280,6 +280,31 @@ create or replace function public.code_partenaire(p_code text)
   select nullif(regexp_replace(upper(trim(coalesce(p_code, ''))), '^BESTA-', ''), '')
 $$;
 
+-- Un partenaire inscrit SANS code n'était rattaché à personne — et il coupait
+-- du même coup toute la branche née sous lui, puisque l'arbre d'affiliation se
+-- parcourt de proche en proche. Il rejoint donc BestaSolar par défaut, ce qui
+-- vaut mieux qu'orphelin : personne ne disparaît du réseau.
+--
+-- Ce rattachement est marqué comme « par défaut », et c'est essentiel : il
+-- reste corrigeable UNE FOIS par le partenaire (set_org_referral), alors qu'un
+-- code réellement choisi est définitif. Sans ce drapeau, l'attribution
+-- automatique aurait verrouillé un parrain que personne n'a désigné.
+alter table public.orgs add column if not exists referral_par_defaut boolean not null default false;
+
+-- Code de rattachement par défaut : celui du plus ancien partenaire de
+-- l'organisation INTERNE (celle marquée kind = 'interne', voir
+-- organisation-interne.sql). Null si elle n'existe pas ou n'a aucun code :
+-- mieux vaut alors ne rattacher à rien que d'inventer un parrain.
+create or replace function public.code_partenaire_defaut()
+  returns text language sql stable security definer set search_path = public as $$
+  select public.code_partenaire(pt.data ->> 'code')
+  from public.partners pt
+  join public.orgs o on o.id = pt.org_id and o.kind = 'interne'
+  where coalesce(pt.data ->> 'code', '') <> ''
+  order by pt.updated_at asc, pt.id asc
+  limit 1
+$$;
+
 -- Les anciennes signatures sont supprimées AVANT de recréer la fonction
 -- (sinon PostgREST verrait plusieurs fonctions homonymes et rejetterait
 -- les appels pour ambiguïté).
@@ -287,7 +312,7 @@ drop function if exists public.signup_create_org(text, text);
 drop function if exists public.signup_create_org(text, text, text);
 create or replace function public.signup_create_org(p_org_name text, p_user_name text, p_ref_code text default null, p_phone text default '')
   returns text language plpgsql security definer set search_path = public as $$
-declare v_org text; v_email text; v_ref text; v_rid text;
+declare v_org text; v_email text; v_ref text; v_rid text; v_par_defaut boolean;
 begin
   v_email := auth.jwt() ->> 'email';
   if v_email is null then raise exception 'non authentifié'; end if;
@@ -296,10 +321,14 @@ begin
   end if;
   v_org := 'org-' || replace(gen_random_uuid()::text, '-', '');
   v_ref := public.code_partenaire(p_ref_code);
-  insert into public.orgs (id, name, plan, invite_code, referred_by)
+  -- Aucun code saisi : rattachement par défaut à BestaSolar, marqué comme tel
+  -- pour rester corrigeable une fois par le partenaire.
+  v_par_defaut := v_ref is null;
+  if v_par_defaut then v_ref := public.code_partenaire_defaut(); end if;
+  insert into public.orgs (id, name, plan, invite_code, referred_by, referral_par_defaut)
     values (v_org, p_org_name, 'trial',
             upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
-            v_ref);
+            v_ref, v_par_defaut and v_ref is not null);
   -- Utilisateur CLASSIQUE (pas gérant) : l'inscription self-service ne donne
   -- aucun menu de gestion — l'app simple (tableau de bord, clients, boutique,
   -- formations, espace partenaire) + l'option Pro payante.
@@ -346,7 +375,7 @@ end $$;
 -- ============================================================
 create or replace function public.set_org_referral(p_code text)
   returns void language plpgsql security definer set search_path = public as $$
-declare v_org text; v_role text; v_existing text; v_code text;
+declare v_org text; v_role text; v_existing text; v_code text; v_defaut boolean;
 begin
   select org_id, role into v_org, v_role
     from public.profiles where lower(email) = lower(auth.jwt() ->> 'email');
@@ -360,11 +389,36 @@ begin
   end if;
   v_code := public.code_partenaire(p_code);
   if v_code is null then raise exception 'code de parrainage vide'; end if;
-  select referred_by into v_existing from public.orgs where id = v_org;
-  if v_existing is not null then
+
+  -- Le code doit EXISTER. Sans ce contrôle, une faute de frappe rattachait
+  -- l'entreprise à un parrain fantôme : elle sortait du réseau sans que
+  -- personne ne s'en aperçoive, et le choix était définitif.
+  if not exists (
+    select 1 from public.partners pt
+    where public.code_partenaire(pt.data ->> 'code') = v_code
+  ) then
+    raise exception 'code de parrainage inconnu (%) — vérifiez auprès de votre partenaire', v_code;
+  end if;
+
+  -- Et il doit désigner quelqu'un d'AUTRE : se parrainer soi-même fermerait
+  -- une boucle dans l'arbre d'affiliation.
+  if exists (
+    select 1 from public.partners pt
+    where pt.org_id = v_org and public.code_partenaire(pt.data ->> 'code') = v_code
+  ) then
+    raise exception 'ce code est l''un des vôtres — indiquez celui du partenaire qui vous a recommandé';
+  end if;
+
+  select referred_by, referral_par_defaut into v_existing, v_defaut
+    from public.orgs where id = v_org;
+  -- Un rattachement PAR DÉFAUT (BestaSolar, faute de code à l'inscription)
+  -- se corrige une fois. Un code réellement choisi, jamais.
+  if v_existing is not null and not coalesce(v_defaut, false) then
     raise exception 'code de parrainage déjà attribué (%) — contactez BestaSolar pour le modifier', v_existing;
   end if;
-  update public.orgs set referred_by = v_code where id = v_org;
+  update public.orgs
+     set referred_by = v_code, referral_par_defaut = false
+   where id = v_org;
 end $$;
 
 -- Modification / correction : admin plateforme uniquement (p_code null = retirer).

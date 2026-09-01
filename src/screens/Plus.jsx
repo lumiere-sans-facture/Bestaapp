@@ -10,6 +10,7 @@ import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchP
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
 import { estProprietaireEspace } from '../utils/roles';
 import { normaliseCode } from '../utils/referral';
+import { etatParrainage, PARRAINAGE_PAR_DEFAUT, PARRAINAGE_VERROUILLE } from '../utils/parrainage';
 import { configActive, providerById, MODE_LABEL } from '../utils/paiementProviders';
 import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft, formule, FORMULE_DEFAUT } from '../utils/subscription';
 import { lireFormuleChoisie, oublierFormuleChoisie } from '../utils/formuleChoisie';
@@ -700,13 +701,16 @@ export default function Plus() {
         </button>
       <div className="sync-inline"><SyncStatusRow /></div>
 
-      {/* Parrainage de l'entreprise : attribution unique, ensuite verrouillée
-          (seul BestaSolar peut la modifier, sur demande du partenaire).
+      {/* Parrainage de l'entreprise. Trois états, et c'est le drapeau
+          `referral_par_defaut` qui les sépare : un code CHOISI est définitif,
+          un rattachement PAR DÉFAUT (BestaSolar, faute de code à l'inscription)
+          se corrige une fois — sans quoi l'app aurait verrouillé un parrain que
+          le partenaire n'a jamais désigné.
           Visible pour le gérant — ou l'utilisateur seul dans son espace. */}
       {isSupabaseConfigured && user.org && estProprietaireEspace(user, team, teamChargee) && (
         <div className="card">
           <div className="sheet-section-title"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Parrainage</div>
-          {user.org.referred_by ? (
+          {etatParrainage(user.org) === PARRAINAGE_VERROUILLE ? (
             <>
               <div className="sheet-row">
                 <span className="sheet-label">Parrainé par</span>
@@ -723,7 +727,7 @@ export default function Plus() {
                 try {
                   await setOrgReferral(refInput);
                   await refreshOrg();
-                  toast('Code de parrainage enregistré.');
+                  toast('Parrain enregistré. Ce choix est maintenant définitif.');
                 } catch (err) {
                   toast(err.message || 'Attribution impossible.', { type: 'error' });
                 } finally {
@@ -731,9 +735,19 @@ export default function Plus() {
                 }
               }}
             >
+              {etatParrainage(user.org) === PARRAINAGE_PAR_DEFAUT && (
+                <div className="sheet-row">
+                  <span className="sheet-label">Rattaché par défaut</span>
+                  <span className="sheet-value"><span className="flat-badge">{user.org.referred_by}</span></span>
+                </div>
+              )}
               <p className="text-sm text-secondary" style={{ marginBottom: 10 }}>
-                Un partenaire BestaSolar vous a recommandé ? Saisissez son code — attention,
-                ce choix est <strong>définitif</strong>.
+                {etatParrainage(user.org) === PARRAINAGE_PAR_DEFAUT
+                  ? <>Vous vous êtes inscrit sans code : votre compte est rattaché à BestaSolar.
+                      Si un partenaire vous a recommandé, saisissez son code — vous ne pourrez
+                      le faire <strong>qu'une seule fois</strong>.</>
+                  : <>Un partenaire BestaSolar vous a recommandé ? Saisissez son code — attention,
+                      ce choix est <strong>définitif</strong>.</>}
               </p>
               <div className="momo-input-row">
                 <input className="input" value={refInput} onChange={(e) => setRefInput(normaliseCode(e.target.value))} placeholder="NOM-XXXXXX" aria-label="Code partenaire" />

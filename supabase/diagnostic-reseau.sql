@@ -33,6 +33,7 @@ mes_codes as (
 inscrites as (
   select o.id, o.name,
          public.code_partenaire(o.referred_by) as code_utilise,
+         coalesce(o.referral_par_defaut, false) as par_defaut,
          exists (select 1 from mes_codes mc where mc.code = public.code_partenaire(o.referred_by)) as est_a_moi,
          (select count(*) from public.leads l where l.org_id = o.id) as nb_clients
   from public.orgs o, moi
@@ -67,7 +68,9 @@ select '3. Entreprises inscrites',
        i.name,
        case
          when i.code_utilise is null then '⚪ inscrite SANS code — rien ne la rattache à vous'
-         when i.est_a_moi then '✅ code ' || i.code_utilise || ' — ' || i.nb_clients || ' client(s) qui doivent remonter'
+         when i.est_a_moi then '✅ code ' || i.code_utilise
+              || case when i.par_defaut then ' (rattachement par défaut, encore corrigeable une fois)' else '' end
+              || ' — ' || i.nb_clients || ' client(s) qui doivent remonter'
          else '⚪ code ' || i.code_utilise || ' — appartient à un autre réseau'
        end
 from inscrites i
