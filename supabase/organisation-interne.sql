@@ -9,8 +9,13 @@
 -- « Commander en ligne » depuis la boutique — puisque cet encaissement
 -- alimente les commandes BestaSolar.
 --
--- SYMPTÔME QUI AMÈNE ICI : le bouton « Commander en ligne » n'apparaît pas
--- dans le panier, alors qu'on est bien gérant.
+-- SYMPTÔMES QUI AMÈNENT ICI :
+--  - le bouton « Commander en ligne » n'apparaît pas dans le panier, alors
+--    qu'on est bien gérant ;
+--  - les partenaires inscrits SANS code de parrainage ne sont rattachés à
+--    personne. Le rattachement par défaut vise l'organisation interne : sans
+--    elle, `code_partenaire_defaut()` ne renvoie rien et personne n'est
+--    rattaché (voir la section 5).
 
 -- 1. ÉTAT DES LIEUX — à lancer d'abord, seul.
 --    Repérez la ligne de VOTRE entreprise et regardez sa colonne `kind`.
@@ -49,3 +54,22 @@ order by (o.kind = 'interne') desc, membres desc;
 --
 -- update public.profiles set org_id = 'org-bestasolar'
 -- where lower(email) = lower('vous@exemple.com');
+
+-- 5. LE RATTACHEMENT PAR DÉFAUT EST-IL OPÉRATIONNEL ?
+--    Lecture seule. Depuis que les partenaires inscrits sans code rejoignent
+--    BestaSolar automatiquement, deux conditions doivent tenir : une
+--    organisation interne existe, ET elle porte au moins un code partenaire.
+--    Un code, pas seulement une entreprise : c'est un CODE qui se pose dans
+--    `orgs.referred_by`.
+select
+  case
+    when not exists (select 1 from public.orgs where kind = 'interne')
+      then '❌ Aucune organisation interne — voir la section 3 ci-dessus.'
+    when (select count(*) from public.orgs where kind = 'interne') > 1
+      then '❌ Plusieurs organisations internes : catalogue en double garanti. Section 3.'
+    when public.code_partenaire_defaut() is null
+      then '❌ L''organisation interne n''a aucun partenaire avec un code. '
+           || 'Ouvrez Plus → Partenaires dans l''app et créez-en un : c''est son code '
+           || 'qui sert de rattachement par défaut.'
+    else '✅ Rattachement par défaut opérationnel : ' || public.code_partenaire_defaut()
+  end as etat_du_rattachement_par_defaut;
