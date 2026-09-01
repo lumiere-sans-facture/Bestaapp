@@ -135,12 +135,11 @@ export default function Login({ vueInitiale = 'login' }) {
 
   const switchView = (v) => { setView(v); setError(''); setNotice(''); };
 
-  const handleGoogle = async ({ credential, nonce }) => {
+  const handleGoogle = async ({ credential }) => {
     setError('');
     setLoading(true);
     const res = await signInWithGoogle({
       credential,
-      nonce,
       inviteCode: teamCode || null,
       refCode: teamCode ? null : refCode.trim() || null,
     });
