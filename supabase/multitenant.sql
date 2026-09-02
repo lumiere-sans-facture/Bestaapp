@@ -26,6 +26,9 @@ create table if not exists public.orgs (
   created_at timestamptz not null default now()
 );
 alter table public.orgs enable row level security;
+-- Conservation de la trace lors d'une fusion vers l'organisation Besta unique.
+alter table public.orgs add column if not exists merged_into text references public.orgs(id);
+alter table public.orgs add column if not exists merged_at timestamptz;
 
 -- Type d'organisation :
 --   'interne' = BestaSolar (CRM complet : boutique, partenaires, commissions, équipe)
@@ -308,9 +311,17 @@ $$;
 -- Les anciennes signatures sont supprimées AVANT de recréer la fonction
 -- (sinon PostgREST verrait plusieurs fonctions homonymes et rejetterait
 -- les appels pour ambiguïté).
+-- Inscription centralisée : chaque nouveau compte rejoint Besta, sans créer
+-- une organisation distincte. Le parrainage reste enregistré dans referrals.
 drop function if exists public.signup_create_org(text, text);
 drop function if exists public.signup_create_org(text, text, text);
-create or replace function public.signup_create_org(p_org_name text, p_user_name text, p_ref_code text default null, p_phone text default '')
+drop function if exists public.signup_create_org(text, text, text, text);
+create or replace function public.signup_create_org(
+  p_org_name text,
+  p_user_name text,
+  p_ref_code text default null,
+  p_phone text default ''
+)
   returns text language plpgsql security definer set search_path = public as $$
 declare v_org text; v_email text; v_ref text; v_rid text; v_par_defaut boolean;
 begin
@@ -319,29 +330,19 @@ begin
   if exists (select 1 from public.profiles where lower(email) = lower(v_email)) then
     raise exception 'profil déjà existant pour cet email';
   end if;
-  v_org := 'org-' || replace(gen_random_uuid()::text, '-', '');
+  select id into v_org from public.orgs
+   where kind = 'interne' and merged_into is null and plan <> 'suspended'
+   order by created_at asc limit 1;
+  if v_org is null then raise exception 'organisation Besta introuvable'; end if;
   v_ref := public.code_partenaire(p_ref_code);
-  -- Aucun code saisi : rattachement par défaut à BestaSolar, marqué comme tel
-  -- pour rester corrigeable une fois par le partenaire.
   v_par_defaut := v_ref is null;
   if v_par_defaut then v_ref := public.code_partenaire_defaut(); end if;
-  insert into public.orgs (id, name, plan, invite_code, referred_by, referral_par_defaut)
-    values (v_org, p_org_name, 'trial',
-            upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
-            v_ref, v_par_defaut and v_ref is not null);
-  -- Utilisateur CLASSIQUE (pas gérant) : l'inscription self-service ne donne
-  -- aucun menu de gestion — l'app simple (tableau de bord, clients, boutique,
-  -- formations, espace partenaire) + l'option Pro payante.
   insert into public.profiles (id, email, name, role, org_id, phone)
     values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org, coalesce(trim(p_phone), ''));
-  -- ATTRIBUTION du parrainage : trace l'inscription CHEZ LE PARRAIN — une
-  -- ligne au registre d'affiliation de SON organisation. C'est ce qui alimente
-  -- « Historique de mes parrainages » et le suivi des filleuls du partenaire.
-  -- En cas de code présent dans plusieurs orgs (homonymes), le plus ancien gagne.
   if v_ref is not null then
     v_rid := gen_random_uuid()::text;
     insert into public.referrals (org_id, id, data, updated_at)
-    select pt.org_id, v_rid, jsonb_build_object(
+    select v_org, v_rid, jsonb_build_object(
         'id', v_rid,
         'partnerCode', pt.data->>'code',
         'type', 'inscription',
@@ -353,7 +354,8 @@ begin
         'createdAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
       ), now()
     from public.partners pt
-    where public.code_partenaire(pt.data->>'code') = v_ref
+    where pt.org_id = v_org
+      and public.code_partenaire(pt.data->>'code') = v_ref
     order by pt.updated_at asc
     limit 1;
   end if;
@@ -439,7 +441,9 @@ end $$;
 -- Le gérant partage le code (visible dans l'écran Équipe) ; le technicien
 -- s'inscrit avec ce code et rejoint l'org — aucun accès admin requis.
 -- ============================================================
+-- Les liens d'équipe historiques rejoignent maintenant la même organisation Besta.
 drop function if exists public.signup_join_org(text, text);
+drop function if exists public.signup_join_org(text, text, text);
 create or replace function public.signup_join_org(p_invite_code text, p_user_name text, p_phone text default '')
   returns text language plpgsql security definer set search_path = public as $$
 declare v_org text; v_email text;
@@ -449,8 +453,10 @@ begin
   if exists (select 1 from public.profiles where lower(email) = lower(v_email)) then
     raise exception 'profil déjà existant pour cet email';
   end if;
-  select id into v_org from public.orgs where invite_code = upper(trim(p_invite_code));
-  if v_org is null then raise exception 'code d''invitation invalide'; end if;
+  select id into v_org from public.orgs
+   where kind = 'interne' and merged_into is null and plan <> 'suspended'
+   order by created_at asc limit 1;
+  if v_org is null then raise exception 'organisation Besta introuvable'; end if;
   insert into public.profiles (id, email, name, role, org_id, phone)
     values (auth.uid()::text, v_email, p_user_name, 'technicien', v_org, coalesce(trim(p_phone), ''));
   return v_org;
