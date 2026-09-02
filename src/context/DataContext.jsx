@@ -213,6 +213,12 @@ export function DataProvider({ children }) {
   // (email, téléphone, Google ou parrainage) et l'écran utilisé pour créer le
   // client. Le partenaire correspondant n'est qu'un complément de traçabilité.
   const clientActions = useMemo(() => ({
+    // L'auteur doit être présent avant la persistance distante : les règles RLS
+    // n'autorisent un partenaire qu'à créer les clients qui lui appartiennent.
+    addLead: (lead) => actions.addLead({
+      ...lead,
+      assignedTo: lead.assignedTo || user.id,
+    }),
     addProClient: (client) => {
       const partner = (state.partners || []).find((item) => item.userId === user.id);
       return actions.addProClient({
