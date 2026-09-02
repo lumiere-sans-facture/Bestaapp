@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { nomContactGoogle } from '../utils/contactGoogle';
 
 // Synchronisation des collections métier avec Supabase.
 // Chaque entité est une ligne { id, data } ; la logique métier reste
@@ -542,7 +541,7 @@ export const disconnectGoogleContacts = () =>
 
 /** Envoie un contact BestaSolar vers la file serveur. Le résultat ne bloque
  *  jamais l'enregistrement local : l'appelant conserve pending/failed pour la
- *  reprise. Les clients sont stockés dans la collection "leads". */
+ *  reprise. Les clients viennent du carnet CRM (leads) ou Devis Pro. */
 export const syncGoogleContact = (contact, contactType = 'partner') =>
   invokeGoogleContacts('google-contacts-sync', {
     contactId: contact.id,
@@ -551,21 +550,19 @@ export const syncGoogleContact = (contact, contactType = 'partner') =>
       id: contact.id,
       // Pour une entreprise, le nom de la personne à joindre est plus utile
       // dans Google Contacts ; le nom de l'entreprise reste dans l'organisation.
-      // Le nom porte le code de l'apporteur — « FATOU-KN8ERZ Soumana » — pour
-      // que le carnet Google se LISE par partenaire, et pas seulement se
-      // fouille : le champ personnalisé « Enregistré par » n'apparaît pas dans
-      // la liste des contacts (voir utils/contactGoogle.js).
-      name: nomContactGoogle(
-        contactType === 'lead' ? (contact.contact || contact.name) : contact.name,
-        contactType === 'lead' ? (contact.registeredByPartnerCode || '') : (contact.code || ''),
-      ),
+      name: contactType === 'lead' || contactType === 'pro_client'
+        ? (contact.contact || contact.name)
+        : contact.name,
       phone: contact.phone,
       email: contact.email || '',
       company: contactType === 'lead' && contact.clientType === 'entreprise'
         ? contact.name
         : (contact.company || contact.entreprise || ''),
-      registeredByName: contactType === 'lead' ? (contact.registeredByPartnerName || '') : '',
-      registeredByCode: contactType === 'lead' ? (contact.registeredByPartnerCode || '') : '',
+      registeredByUserId: contact.registeredByUserId || contact.assignedTo || contact.userId || null,
+      registeredByName: contact.registeredByName || contact.registeredByPartnerName || '',
+      registeredByCode: contact.registeredByCode || contact.registeredByPartnerCode || '',
+      createdAt: contact.createdAt || null,
+      registrationHistory: Array.isArray(contact.registrationHistory) ? contact.registrationHistory : [],
     },
   });
 
@@ -591,4 +588,3 @@ export async function fetchPartenairesReseau() {
 
 // Compatibilité pour les éventuels appels existants hors du DataContext.
 export const syncPartnerGoogleContact = (partner) => syncGoogleContact(partner, 'partner');
-
