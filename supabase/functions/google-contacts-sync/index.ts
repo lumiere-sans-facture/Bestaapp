@@ -78,14 +78,17 @@ async function currentOrg(req: Request) {
   const client = db();
   const { data: auth } = await client.auth.getUser(token);
   if (!auth.user) throw new Error('Session invalide.');
-  // profiles.id est une clé texte de l'application, indépendante de
-  // auth.users.id : l'e-mail est le point de jonction fiable.
-  const email = (auth.user.email || '').toLowerCase();
-  if (!email) throw new Error('Compte sans adresse e-mail.');
-  // Chaque membre de la même organisation doit synchroniser vers le compte
-  // Google du gérant. La recherche insensible à la casse couvre les profils
-  // dont l'adresse a été saisie avec des majuscules à l'inscription.
-  const { data: profile, error } = await client.from('profiles').select('org_id').ilike('email', email).maybeSingle();
+  // Le profil est normalement lié à auth.users.id. Cette voie couvre aussi
+  // un compte Supabase créé avec téléphone, même lorsqu'il n'a pas d'e-mail.
+  let { data: profile, error } = await client.from('profiles')
+    .select('org_id').eq('id', auth.user.id).maybeSingle();
+  // Compatibilité avec les anciens profils, historiquement reliés par e-mail.
+  if (!profile?.org_id && auth.user.email) {
+    const fallback = await client.from('profiles').select('org_id')
+      .ilike('email', auth.user.email.toLowerCase()).maybeSingle();
+    profile = fallback.data;
+    error = error || fallback.error;
+  }
   if (error || !profile?.org_id) throw new Error('Organisation introuvable.');
   return { client, orgId: profile.org_id as string };
 }
@@ -166,7 +169,16 @@ const traceNote = (contact: Contact) => {
     partnerCode: contact.registeredByCode || null,
     firstAddedAt: contact.createdAt || null,
   };
-  const sources = history.length ? history : [primary];
+  const sources = (history.length ? history : [primary]).map((source) =>
+    source.userId && source.userId === primary.userId
+      ? {
+          ...primary,
+          ...source,
+          partnerName: source.partnerName || primary.partnerName,
+          partnerCode: source.partnerCode || primary.partnerCode,
+        }
+      : source
+  );
   const entries = sources.map((source) => {
     const person = [source.partnerName || '', source.partnerCode || ''].filter(Boolean).join(' — ') || 'Utilisateur Besta';
     const id = source.userId ? ` — ID : ${source.userId}` : '';
