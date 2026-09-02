@@ -299,7 +299,7 @@ Deno.serve(async (req) => {
     const client = db();
     if (body.action === 'retry-pending') {
       if (!Deno.env.get('GOOGLE_CONTACTS_CRON_SECRET') || req.headers.get('x-google-contacts-cron-secret') !== Deno.env.get('GOOGLE_CONTACTS_CRON_SECRET')) return json({ error: 'Non autorisé.' }, 401);
-      const { data: jobs } = await client.from('google_contact_sync_jobs').select('*').in('status', ['pending', 'failed']).lte('next_attempt_at', new Date().toISOString()).limit(50);
+      const { data: jobs } = await client.from('google_contact_sync_jobs').select('*').in('status', ['pending', 'failed']).lte('next_attempt_at', new Date().toISOString()).limit(4);
       const results = [];
       for (const job of (jobs || [])) results.push(await processJob(client, job as Job));
       return json({ processed: results.length, results });
