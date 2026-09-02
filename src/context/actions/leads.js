@@ -6,6 +6,7 @@
 // directement.
 import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForLead } from '../../utils/commissionSync';
+import { appendClientSource, buildClientSource, canSyncClientContact, isSameClient, sourceHistoryFor } from '../../utils/clientContact';
 
 export function createLeadActions(setState) {
   // Application effective d'un changement d'étape (commissions comprises).
@@ -54,16 +55,12 @@ export function createLeadActions(setState) {
     // 30 jours, last-click) rattache automatiquement la piste au partenaire.
     addLead: (lead) =>
       setState((s) => {
-        const leadId = crypto.randomUUID();
         let parrainL1 = lead.parrainL1 || null;
-        let referrals = s.referrals || [];
         if (!parrainL1) {
           const refPartner = partnerFromActiveRef(s.partners);
-          if (refPartner) {
-            parrainL1 = refPartner.id;
-            referrals = [newReferral(refPartner.code, 'piste', { leadId }), ...referrals];
-          }
+          if (refPartner) parrainL1 = refPartner.id;
         }
+        const parrain = parrainL1 ? s.partners.find((p) => p.id === parrainL1) : null;
         const sponsor = parrainL1
           ? s.partners.find((p) => p.id === parrainL1)?.sponsorId || null
           : null;
@@ -71,6 +68,45 @@ export function createLeadActions(setState) {
         // commerciale : elle constitue la trace de la personne qui a créé la
         // fiche client et sera reprise dans Google Contacts.
         const enregistrant = s.partners.find((p) => p.userId === lead.assignedTo);
+        const now = new Date().toISOString();
+        const source = buildClientSource({ userId: lead.assignedTo, partner: enregistrant, referrer: parrain, at: now });
+        const existing = s.leads.find((item) => isSameClient(item, lead));
+
+        // Téléphone ou e-mail déjà connu : la fiche existante est enrichie au
+        // lieu de créer un doublon. L'auteur d'origine reste figé, tandis que
+        // l'historique garde aussi le nouvel apporteur / parrain.
+        if (existing) {
+          const fields = ['name', 'contact', 'phone', 'email', 'address', 'notes', 'clientType'];
+          const patch = Object.fromEntries(fields
+            .filter((field) => lead[field] !== undefined && lead[field] !== null && String(lead[field]).trim() !== '')
+            .map((field) => [field, lead[field]]));
+          const history = appendClientSource(sourceHistoryFor(existing), source);
+          const referrals = parrain && !(s.referrals || []).some((ref) => ref.leadId === existing.id && ref.partnerCode === parrain.code)
+            ? [newReferral(parrain.code, 'piste', { leadId: existing.id }), ...(s.referrals || [])]
+            : (s.referrals || []);
+          return {
+            ...s,
+            referrals,
+            leads: s.leads.map((item) => item.id !== existing.id ? item : {
+              ...item,
+              ...patch,
+              parrainL1: item.parrainL1 || parrainL1,
+              parrainL2: item.parrainL2 || sponsor,
+              registrationHistory: history,
+              lastActivity: now.slice(0, 10),
+              ...(canSyncClientContact({ ...item, ...patch }) ? {
+                google_contact_sync_status: 'pending',
+                google_contact_sync_error: null,
+                google_contact_sync_next_retry_at: null,
+              } : {}),
+            }),
+          };
+        }
+
+        const leadId = crypto.randomUUID();
+        const referrals = parrain
+          ? [newReferral(parrain.code, 'piste', { leadId }), ...(s.referrals || [])]
+          : (s.referrals || []);
         return {
           ...s,
           referrals,
@@ -81,13 +117,14 @@ export function createLeadActions(setState) {
               parrainL2: sponsor,
               id: leadId,
               stage: 'nouveau',
-              createdAt: new Date().toISOString().slice(0, 10),
-              lastActivity: new Date().toISOString().slice(0, 10),
+              createdAt: now.slice(0, 10),
+              lastActivity: now.slice(0, 10),
               registeredByUserId: lead.assignedTo || null,
               registeredByPartnerId: enregistrant?.id || null,
               registeredByPartnerName: enregistrant?.name || null,
               registeredByPartnerCode: enregistrant?.code || null,
-              ...(lead.phone?.trim() ? { google_contact_sync_status: 'pending' } : {}),
+              registrationHistory: appendClientSource([], source),
+              ...(canSyncClientContact(lead) ? { google_contact_sync_status: 'pending' } : {}),
             },
             ...s.leads,
           ],
@@ -101,12 +138,11 @@ export function createLeadActions(setState) {
         ...s,
         leads: s.leads.map((l) =>
           l.id !== leadId ? l : (() => {
-            // Une fiche créée avant l'activation de Google Contacts, ou dont
-            // le numéro a été modifié, est remise dans la file à sa prochaine
-            // sauvegarde. Une simple modification d'un autre champ ne crée
-            // jamais un doublon pour un contact déjà synchronisé.
-            const phone = typeof patch.phone === 'string' ? patch.phone.trim() : '';
-            const needsSync = Boolean(phone) && (phone !== (l.phone || '').trim() || !l.google_contact_sync_status);
+            // Toute coordonnée ou identité modifiée repart dans la file : un
+            // doublon Google existant est alors mis à jour, pas recréé.
+            const next = { ...l, ...patch };
+            const changedContact = ['name', 'contact', 'phone', 'email', 'clientType'].some((field) => field in patch && patch[field] !== l[field]);
+            const needsSync = canSyncClientContact(next) && (changedContact || !l.google_contact_sync_status);
             return {
               ...l,
               ...patch,
@@ -228,4 +264,3 @@ export function createLeadActions(setState) {
       })),
   };
 }
-
