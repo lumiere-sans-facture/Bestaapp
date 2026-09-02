@@ -30,6 +30,37 @@ export const setSyncOrg = (orgId, kind = null) => {
 const withOrg = (row) => (currentOrgId ? { ...row, org_id: currentOrgId } : row);
 
 /**
+ * Les quatre valeurs qui décident d'un refus de sécurité, relevées à la
+ * source. La politique compare `org_id = auth_org_id()` : il suffit de voir
+ * l'e-mail de la session, ce que la base en déduit, et ce que l'app estampille.
+ * Sans ça, on ne peut que supposer.
+ */
+export async function diagnosticReplication() {
+  if (!supabase) return { local: true, orgEcriture: currentOrgId };
+  let email = null;
+  try {
+    const { data: { user } = {} } = await supabase.auth.getUser();
+    email = user?.email || null;
+  } catch { /* session illisible : traité comme absente */ }
+  let orgBase = null;
+  try {
+    const { data } = await supabase.rpc('auth_org_id');
+    orgBase = data || null;
+  } catch { /* fonction absente : orgBase reste vide */ }
+  let profilTrouve = false;
+  let orgProfil = null;
+  if (email) {
+    try {
+      const { data } = await supabase.from('profiles').select('org_id')
+        .eq('email', email.toLowerCase()).maybeSingle();
+      profilTrouve = Boolean(data);
+      orgProfil = data?.org_id || null;
+    } catch { /* lecture refusée : le profil reste « introuvable » */ }
+  }
+  return { email, profilTrouve, orgProfil, orgBase, orgEcriture: currentOrgId };
+}
+
+/**
  * Relit l'organisation que la BASE attribue au compte connecté, et réaligne
  * l'estampille de réplication dessus.
  *

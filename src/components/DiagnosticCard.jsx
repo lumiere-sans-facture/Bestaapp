@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { Stethoscope, CheckCircle2, AlertTriangle, Send } from 'lucide-react';
+import { Stethoscope, CheckCircle2, AlertTriangle, Send, ShieldCheck } from 'lucide-react';
 import { signalerErreur } from '../lib/rapportErreur';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { diagnosticReplication } from '../lib/remoteSync';
+import { verdictReplication } from '../utils/diagnosticReplication';
 import { sentryConfigure } from '../lib/sentry';
 import { analytiqueConfiguree, hoteAnalytique, problemeAnalytique, testerAnalytique } from '../lib/analytique';
 import { useToast } from './Toast';
+
+const verdictReplicationEtat = (etat) => ({ etat, verdict: verdictReplication(etat) });
 
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
 const ENVIRONNEMENT = typeof __APP_ENV__ === 'string' ? __APP_ENV__ : 'test';
@@ -25,6 +30,8 @@ const ENVIRONNEMENT = typeof __APP_ENV__ === 'string' ? __APP_ENV__ : 'test';
 export default function DiagnosticCard() {
   const [dernier, setDernier] = useState(null);
   const [verdictAnalytique, setVerdictAnalytique] = useState(null);
+  const [identite, setIdentite] = useState(null);
+  const [identiteEnCours, setIdentiteEnCours] = useState(false);
   const toast = useToast();
   const sentryActif = sentryConfigure();
   const analytiqueActive = analytiqueConfiguree();
@@ -38,6 +45,20 @@ export default function DiagnosticCard() {
     setVerdictAnalytique(r);
     toast(r.ok ? 'Événement de test accepté par PostHog.' : `PostHog a répondu : ${r.statut}`,
       { type: r.ok ? 'success' : 'error' });
+  };
+
+  // Refus « row-level security » : les quatre valeurs qui le décident, relevées
+  // à la source. Le gérant peut les lire et les transmettre — supposer coûtait
+  // jusqu'ici plusieurs allers-retours.
+  const testerIdentite = async () => {
+    setIdentiteEnCours(true);
+    try {
+      setIdentite(verdictReplicationEtat(await diagnosticReplication()));
+    } catch (e) {
+      setIdentite({ erreur: e.message || 'Diagnostic impossible.' });
+    } finally {
+      setIdentiteEnCours(false);
+    }
   };
 
   const tester = () => {
@@ -102,6 +123,43 @@ export default function DiagnosticCard() {
             ? 'Les plantages partent vers Sentry et vers le journal serveur. Le test ci-dessous vérifie toute la chaîne.'
             : 'Sentry n’est pas configuré (VITE_SENTRY_DSN dans Vercel). Les plantages sont tout de même enregistrés dans le journal serveur.'}
         </p>
+
+        {isSupabaseConfigured && (
+          <button className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={testerIdentite} disabled={identiteEnCours}>
+            <ShieldCheck size={16} /> {identiteEnCours ? 'Vérification…' : 'Vérifier l’identité de réplication'}
+          </button>
+        )}
+
+        {identite && (
+          <div className={`callout ${identite.verdict?.ok ? '' : 'callout-danger'}`} role="status" style={{ marginTop: 12 }}>
+            <div className="callout-title">
+              <ShieldCheck size={13} /> {identite.erreur ? 'Diagnostic impossible' : identite.verdict.titre}
+            </div>
+            {identite.erreur ? (
+              <div className="text-sm">{identite.erreur}</div>
+            ) : (
+              <>
+                <div className="text-sm">{identite.verdict.detail}</div>
+                <div className="sheet-row">
+                  <span className="sheet-label">Session</span>
+                  <span className="sheet-value paiement-mono">{identite.etat.email || '—'}</span>
+                </div>
+                <div className="sheet-row">
+                  <span className="sheet-label">Profil en base</span>
+                  <span className="sheet-value paiement-mono">{identite.etat.profilTrouve ? (identite.etat.orgProfil || '—') : 'introuvable'}</span>
+                </div>
+                <div className="sheet-row">
+                  <span className="sheet-label">Entreprise attendue</span>
+                  <span className="sheet-value paiement-mono">{identite.etat.orgBase || '—'}</span>
+                </div>
+                <div className="sheet-row">
+                  <span className="sheet-label">Entreprise écrite</span>
+                  <span className="sheet-value paiement-mono">{identite.etat.orgEcriture || '—'}</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <button className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={tester}>
           <Send size={16} /> Envoyer une erreur de test
