@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as seed from '../data/seed';
-import { consumeRefClick, memeCode } from '../utils/referral';
+import { consumeRefClick } from '../utils/referral';
 import { useAuth } from './AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchTeamProfiles, syncGoogleContact } from '../lib/remoteSync';
 import { loadState, persist, STORAGE_KEY } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
-import { useReseau } from './useReseau';
+import { canSyncClientContact } from '../utils/clientContact';
 
 // Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
 // (le contexte est lisible depuis tous les écrans).
@@ -51,7 +51,7 @@ export function DataProvider({ children }) {
     const code = consumeRefClick();
     if (!code) return;
     setState((s) =>
-      s.partners.some((p) => memeCode(p.code, code) && p.status === 'actif')
+      s.partners.some((p) => p.code === code && p.status === 'actif')
         ? { ...s, referrals: [newReferral(code, 'clic'), ...(s.referrals || [])] }
         : s
     );
@@ -133,11 +133,12 @@ export function DataProvider({ children }) {
     const due = [
       ...(state.partners || []).map((contact) => ({ contact, contactType: 'partner' })),
       ...(state.leads || []).map((contact) => ({ contact, contactType: 'lead' })),
+      ...(state.proClients || []).map((contact) => ({ contact, contactType: 'pro_client' })),
     ].filter(({ contact, contactType }) => {
       const status = contact.google_contact_sync_status;
       const retry = contact.google_contact_sync_next_retry_at;
       const key = `${contactType}:${contact.id}`;
-      return contact.phone && (status === 'pending' || status === 'failed')
+      return canSyncClientContact(contact) && (status === 'pending' || status === 'failed')
         && (!retry || Number.isNaN(Date.parse(retry)) || Date.parse(retry) <= now)
         && !googleSyncInFlight.current.has(key);
     }).slice(0, 3);
@@ -147,21 +148,25 @@ export function DataProvider({ children }) {
       const key = `${contactType}:${contact.id}`;
       const setSyncStatus = contactType === 'lead'
         ? actions.setLeadGoogleContactSync
-        : actions.setPartnerGoogleContactSync;
+        : contactType === 'pro_client'
+          ? actions.setProClientGoogleContactSync
+          : actions.setPartnerGoogleContactSync;
       // L'auteur de la fiche est figé à la création. Ce repli couvre les
       // anciens clients créés avant l'ajout du champ de traçabilité.
-      const enregistrant = contactType === 'lead'
+      const estClient = contactType === 'lead' || contactType === 'pro_client';
+      const enregistrant = estClient
         ? (state.partners || []).find((partner) => partner.id === contact.registeredByPartnerId
           || partner.userId === contact.registeredByUserId
-          || partner.userId === contact.assignedTo)
+          || partner.userId === contact.assignedTo || partner.userId === contact.userId)
         : null;
-      const membre = contactType === 'lead'
-        ? team.find((member) => member.id === contact.registeredByUserId || member.id === contact.assignedTo)
+      const membre = estClient
+        ? team.find((member) => member.id === contact.registeredByUserId || member.id === contact.assignedTo || member.id === contact.userId)
         : null;
-      const contactToSync = contactType === 'lead' ? {
+      const contactToSync = estClient ? {
         ...contact,
-        registeredByPartnerName: contact.registeredByPartnerName || enregistrant?.name || membre?.name || '',
-        registeredByPartnerCode: contact.registeredByPartnerCode || enregistrant?.code || '',
+        registeredByName: contact.registeredByName || contact.registeredByPartnerName || enregistrant?.name || membre?.name || '',
+        registeredByCode: contact.registeredByCode || contact.registeredByPartnerCode || enregistrant?.code || '',
+        registeredByUserId: contact.registeredByUserId || contact.assignedTo || contact.userId || null,
       } : contact;
       googleSyncInFlight.current.add(key);
       syncGoogleContact(contactToSync, contactType)
@@ -175,7 +180,7 @@ export function DataProvider({ children }) {
         .finally(() => googleSyncInFlight.current.delete(key));
     });
     return () => { active = false; };
-  }, [state.partners, state.leads, actions, googleRetryTick]);
+  }, [state.partners, state.leads, state.proClients, actions, team, googleRetryTick]);
 
   // Profil partenaire de l'utilisateur garanti dès l'ouverture de l'app.
   // C'est lui qui porte les commissions : sans profil, une affaire gagnée
@@ -184,11 +189,6 @@ export function DataProvider({ children }) {
   useEffect(() => {
     if (user?.id) actions.ensurePartnerForUser(user);
   }, [user?.id, actions]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Le réseau (partenaires filleuls et leurs clients) : lecture serveur seule,
-  // hors état local — ces données ne nous appartiennent pas et l'app doit
-  // rester utilisable sans backend. Voir le hook.
-  const reseau = useReseau();
 
   // Sélecteurs dérivés de l'état courant
   const helpers = useMemo(() => ({
@@ -204,8 +204,27 @@ export function DataProvider({ children }) {
       user.role === 'gerant' ? state.leads : state.leads.filter((l) => l.assignedTo === user.id),
   }), [state, team]);
 
+  // Chaque point d'entrée de l'espace Devis Pro passe par cette action. Elle
+  // fige donc l'auteur immédiatement, quels que soient son mode d'inscription
+  // (email, téléphone, Google ou parrainage) et l'écran utilisé pour créer le
+  // client. Le partenaire correspondant n'est qu'un complément de traçabilité.
+  const clientActions = useMemo(() => ({
+    addProClient: (client) => {
+      const partner = (state.partners || []).find((item) => item.userId === user.id);
+      return actions.addProClient({
+        ...client,
+        registeredByUserId: client.registeredByUserId || user.id,
+        registeredByName: client.registeredByName || user.name || '',
+        registeredByPartnerId: client.registeredByPartnerId || partner?.id || null,
+        registeredByPartnerName: client.registeredByPartnerName || partner?.name || null,
+        registeredByPartnerCode: client.registeredByPartnerCode || partner?.code || null,
+        registeredByPartner: partner || null,
+      });
+    },
+  }), [actions, state.partners, user.id, user.name]);
+
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, ...reseau, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, ...clientActions, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
       {children}
     </DataContext.Provider>
   );
@@ -216,4 +235,3 @@ export function useData() {
   if (!ctx) throw new Error('useData doit être utilisé dans <DataProvider>');
   return ctx;
 }
-
