@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Phone, Mail, MapPin, Building2, User, Pencil, MessageCircle, FileText, FolderKanban, UserCheck, FolderOpen, Clock, Wallet, CalendarDays, Plus, Compass } from 'lucide-react';
+import { Phone, Mail, MapPin, Building2, User, Pencil, MessageCircle, FileText, FolderKanban, UserCheck, FolderOpen, Clock, Wallet, CalendarDays, Plus } from 'lucide-react';
 import { formatCFA, formatDate, initials } from '../../utils/format';
-import { libelleSource } from '../../utils/contactSource';
 import { computeMonthlyDevis } from '../../utils/stats';
 import { etatDevis, ETAT_DEVIS_LABEL } from '../../utils/affaires';
 import StageBadge from '../../components/StageBadge';
@@ -13,6 +12,13 @@ const ONGLETS = [
   ['contact', 'Contact'],
   ['notes', 'Notes'],
 ];
+
+const GOOGLE_SYNC_LABELS = {
+  pending: 'En attente',
+  synced: 'Synchronisé',
+  already_exists: 'Synchronisé (contact existant)',
+  failed: 'Échec — nouvelle tentative prévue',
+};
 
 /**
  * Fiche client plein écran : en-tête d'identité, onglets et synthèse de
@@ -188,18 +194,6 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
               <a className="sheet-value sheet-link" href={`tel:${client.phone.replace(/\s/g, '')}`}>{client.phone}</a>
             </div>
           )}
-          {client.phone2 && (
-            <div className="sheet-row">
-              <span className="sheet-label"><Phone size={14} /> 2ᵉ téléphone</span>
-              <a className="sheet-value sheet-link" href={`tel:${client.phone2.replace(/\s/g, '')}`}>{client.phone2}</a>
-            </div>
-          )}
-          {libelleSource(client.source) && (
-            <div className="sheet-row">
-              <span className="sheet-label"><Compass size={14} /> Origine</span>
-              <span className="sheet-value">{libelleSource(client.source)}</span>
-            </div>
-          )}
           {client.email && (
             <div className="sheet-row">
               <span className="sheet-label"><Mail size={14} /> Email</span>
@@ -219,6 +213,12 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
             <div className="sheet-row">
               <span className="sheet-label"><UserCheck size={14} /> Enregistré par</span>
               <span className="sheet-value">{enregistrant}{codeEnregistrant && <> <span className="partner-code-chip">{codeEnregistrant}</span></>}</span>
+            </div>
+          )}
+          {client.google_contact_sync_status && (
+            <div className="sheet-row">
+              <span className="sheet-label">Google Contacts</span>
+              <span className="sheet-value">{GOOGLE_SYNC_LABELS[client.google_contact_sync_status] || client.google_contact_sync_status}</span>
             </div>
           )}
           <div className="client-sheet-actions">
@@ -245,4 +245,3 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
     </>
   );
 }
-
