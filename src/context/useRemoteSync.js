@@ -3,7 +3,8 @@
 // et la réplication non-destructive (tombstones). Retourne le statut de sync.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { pullAll, pushCollections, pushTombstone, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
+import { pullAll, pushCollections, pushTombstone, resynchroniserOrg, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
+import { estRefusRls, MESSAGE_REFUS_RLS } from '../utils/erreurSync';
 import { loadFileSync, persistFileSync } from './dataState';
 import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection } from '../utils/fileSync';
 
@@ -272,6 +273,30 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
         return;
       }
       console.error('Réplication Supabase échouée :', erreurs.join(' · '));
+      // Refus de la sécurité au niveau ligne : la ligne porte une organisation
+      // qui n'est plus celle du compte — l'organisation est lue à la CONNEXION
+      // et un rattachement corrigé entre-temps la périme. On la relit auprès de
+      // la base ; si elle a bougé, l'envoi repart tout de suite avec la bonne,
+      // sans attendre la déconnexion. C'est le seul cas où réessayer plus vite
+      // a un sens : rien d'autre n'aura changé entre deux tentatives.
+      if (erreurs.some(estRefusRls)) {
+        const { change } = await resynchroniserOrg();
+        if (annule) return;
+        if (change) {
+          setSyncError(null);
+          setRetryTick((t) => t + 1);
+          return;
+        }
+        // L'estampille était déjà la bonne : la cause est ailleurs, et le
+        // message brut de PostgreSQL n'aide personne.
+        echecs.current += 1;
+        const bloquees = Object.keys(changed).filter((t) => !acquises.includes(t));
+        setSyncError(`${MESSAGE_REFUS_RLS}${bloquees.length ? ` (en attente : ${bloquees.join(', ')})` : ''}`);
+        setSyncStatus('error');
+        clearTimeout(retryTimer.current);
+        retryTimer.current = setTimeout(() => setRetryTick((t) => t + 1), delaiReprise(echecs.current));
+        return;
+      }
       // Le voyant passe au rouge et l'envoi est REJOUÉ : les données locales
       // restent marquées « à pousser » tant qu'elles ne sont pas arrivées.
       echecs.current += 1;

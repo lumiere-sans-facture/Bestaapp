@@ -30,6 +30,43 @@ export const setSyncOrg = (orgId, kind = null) => {
 };
 const withOrg = (row) => (currentOrgId ? { ...row, org_id: currentOrgId } : row);
 
+/**
+ * Relit l'organisation que la BASE attribue au compte connecté, et réaligne
+ * l'estampille de réplication dessus.
+ *
+ * Pourquoi c'est nécessaire : l'organisation est lue à la CONNEXION, puis
+ * gardée en mémoire pour estampiller chaque ligne poussée. Si elle change
+ * pendant la session — un rattachement corrigé en SQL, une réunion de comptes
+ * gérants — l'app continue d'écrire sous l'ancienne, la RLS refuse
+ * (`new row violates row-level security policy`), et la file se bloque
+ * jusqu'à la prochaine connexion. C'est `auth_org_id()` qui fait foi : c'est
+ * exactement la valeur à laquelle la politique compare.
+ *
+ * @returns {Promise<{change: boolean, orgId: string|null}>}
+ */
+export async function resynchroniserOrg() {
+  if (!supabase) return { change: false, orgId: currentOrgId };
+  let orgId = null;
+  try {
+    const { data, error } = await supabase.rpc('auth_org_id');
+    if (!error && data) orgId = data;
+  } catch { /* fonction absente : on tente la lecture directe ci-dessous */ }
+  if (!orgId) {
+    try {
+      const { data: { user } = {} } = await supabase.auth.getUser();
+      const email = (user?.email || '').toLowerCase();
+      if (!email) return { change: false, orgId: currentOrgId };
+      const { data } = await supabase.from('profiles').select('org_id').eq('email', email).maybeSingle();
+      orgId = data?.org_id || null;
+    } catch { /* serveur injoignable : on garde l'estampille actuelle */ }
+  }
+  if (!orgId) return { change: false, orgId: currentOrgId };
+  const change = orgId !== currentOrgId;
+  // Le type d'organisation ne change pas avec le rattachement : on le garde.
+  if (change) setSyncOrg(orgId, currentOrgKind);
+  return { change, orgId };
+}
+
 // Tables absentes du schéma distant : une collection ajoutée par une mise à
 // jour de l'application existe côté client AVANT que le SQL ne soit rejoué.
 // Sans ce filet, sa lecture faisait échouer TOUTE la synchronisation — plus
