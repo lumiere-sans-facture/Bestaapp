@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, User, Phone, MapPin, Check, Pencil, Send, FileText, Receipt, UserPlus } from 'lucide-react';
+import { Plus, User, Phone, Mail, MapPin, Check, Pencil, Send, FileText, Receipt, UserPlus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
@@ -13,7 +13,7 @@ import ClientIdentityFields, { contactEffectif } from '../../../components/Clien
 import DangerZone from '../../../components/DangerZone';
 import { useToast } from '../../../components/Toast';
 
-const EMPTY = { name: '', contact: '', phone: '', ville: '', type: 'particulier' };
+const EMPTY = { name: '', contact: '', phone: '', email: '', ville: '', type: 'particulier' };
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
@@ -69,7 +69,7 @@ export default function ClientsTab({ company }) {
 
   const openNew = () => { setForm(EMPTY); setEditingId('new'); };
   const openEdit = (c) => {
-    setForm({ name: c.name, contact: c.contact || '', phone: c.phone || '', ville: c.ville || '', type: c.type || 'particulier' });
+    setForm({ name: c.name, contact: c.contact || '', phone: c.phone || '', email: c.email || '', ville: c.ville || '', type: c.type || 'particulier' });
     setViewId(null);
     setEditingId(c.id);
   };
@@ -77,7 +77,7 @@ export default function ClientsTab({ company }) {
 
   const submit = (e) => {
     e.preventDefault();
-    const data = { name: form.name.trim(), contact: contactEffectif(form).trim(), phone: form.phone.trim(), ville: form.ville.trim(), type: form.type };
+    const data = { name: form.name.trim(), contact: contactEffectif(form).trim(), phone: form.phone.trim(), email: form.email.trim(), ville: form.ville.trim(), type: form.type };
     if (!data.name) return;
     if (editingId === 'new') addProClient({ userId: user.id, ...data });
     else updateProClient(editingId, data);
@@ -104,6 +104,7 @@ export default function ClientsTab({ company }) {
       name: l.name,
       contact: l.contact || '',
       phone: l.phone || '',
+      email: l.email || '',
       ville: l.address || '',
       type: l.clientType === 'entreprise' ? 'entreprise' : 'particulier',
     });
@@ -178,8 +179,17 @@ export default function ClientsTab({ company }) {
                   <a className="sheet-value sheet-link" href={`tel:${viewed.phone.replace(/\s/g, '')}`}>{viewed.phone}</a>
                 </div>
               )}
+              {viewed.email && (
+                <div className="sheet-row">
+                  <span className="sheet-label"><Mail size={14} /> Email</span>
+                  <a className="sheet-value sheet-link" href={`mailto:${viewed.email}`}>{viewed.email}</a>
+                </div>
+              )}
               {viewed.ville && <div className="sheet-row"><span className="sheet-label"><MapPin size={14} /> Ville</span><span className="sheet-value">{viewed.ville}</span></div>}
               <div className="sheet-row"><span className="sheet-label">Client depuis</span><span className="sheet-value">{formatDate(viewed.createdAt)}</span></div>
+              {viewed.google_contact_sync_status && (
+                <div className="sheet-row"><span className="sheet-label">Google Contacts</span><span className="sheet-value">{{ pending: 'En attente', synced: 'Synchronisé', already_exists: 'Synchronisé (contact existant)', failed: 'Échec — nouvelle tentative prévue' }[viewed.google_contact_sync_status] || viewed.google_contact_sync_status}</span></div>
+              )}
             </div>
 
             <div className="client-bilan">
@@ -270,6 +280,9 @@ export default function ClientsTab({ company }) {
               <input className="input" value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })} />
             </Field>
           </div>
+          <Field label={<><Mail size={13} /> Email</>}>
+            <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="client@exemple.com" />
+          </Field>
           <button type="submit" className="btn btn-primary btn-block"><Check size={17} /> {editingId === 'new' ? 'Ajouter le client' : 'Enregistrer'}</button>
           {editingId !== 'new' && (
             <DangerZone

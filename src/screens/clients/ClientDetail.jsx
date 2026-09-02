@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Phone, Mail, MapPin, Building2, User, Pencil, MessageCircle, FileText, FolderKanban, UserCheck, FolderOpen, Clock, Wallet, CalendarDays, Plus, Compass } from 'lucide-react';
 import { formatCFA, formatDate, initials } from '../../utils/format';
-import { libelleSource } from '../../utils/contactSource';
 import { computeMonthlyDevis } from '../../utils/stats';
+import { libelleSource } from '../../utils/contactSource';
 import { etatDevis, ETAT_DEVIS_LABEL } from '../../utils/affaires';
 import StageBadge from '../../components/StageBadge';
 import EmptyState from '../../components/EmptyState';
@@ -13,6 +13,13 @@ const ONGLETS = [
   ['contact', 'Contact'],
   ['notes', 'Notes'],
 ];
+
+const GOOGLE_SYNC_LABELS = {
+  pending: 'En attente',
+  synced: 'Synchronisé',
+  already_exists: 'Synchronisé (contact existant)',
+  failed: 'Échec — nouvelle tentative prévue',
+};
 
 /**
  * Fiche client plein écran : en-tête d'identité, onglets et synthèse de
@@ -221,6 +228,12 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
               <span className="sheet-value">{enregistrant}{codeEnregistrant && <> <span className="partner-code-chip">{codeEnregistrant}</span></>}</span>
             </div>
           )}
+          {client.google_contact_sync_status && (
+            <div className="sheet-row">
+              <span className="sheet-label">Google Contacts</span>
+              <span className="sheet-value">{GOOGLE_SYNC_LABELS[client.google_contact_sync_status] || client.google_contact_sync_status}</span>
+            </div>
+          )}
           <div className="client-sheet-actions">
             <button className="btn btn-primary" onClick={onNouveauDevis}><FileText size={16} /> Créer un devis</button>
             {telNettoye && (
@@ -245,4 +258,3 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
     </>
   );
 }
-
