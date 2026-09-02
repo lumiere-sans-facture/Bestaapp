@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { nomContactGoogle } from '../utils/contactGoogle';
 
 // Synchronisation des collections métier avec Supabase.
 // Chaque entité est une ligne { id, data } ; la logique métier reste
@@ -322,17 +321,6 @@ export async function setOrgReferral(code) {
   if (error) throw new Error(error.message);
 }
 
-/** Réunit un compte gérant existant à l'organisation indiquée par le code de
- * réunion. La base vérifie le rôle, l'absence d'équipier dans la source et
- * l'absence de conflit avant le moindre déplacement. */
-export async function reunirMonCompteGerant(codeReunion) {
-  const { data, error } = await supabase.rpc('reunir_mon_compte_gerant', {
-    p_code_reunion: codeReunion,
-  });
-  if (error) throw new Error(error.message);
-  return data || {};
-}
-
 /** Organisation de l'utilisateur courant (nom, type interne/pro, code
  *  d'invitation). select('*') : tolère les schémas avec ou sans colonne kind.
  *  Retourne null sur l'ancien schéma mono-équipe (table orgs absente). */
@@ -505,7 +493,7 @@ export const disconnectGoogleContacts = () =>
 
 /** Envoie un contact BestaSolar vers la file serveur. Le résultat ne bloque
  *  jamais l'enregistrement local : l'appelant conserve pending/failed pour la
- *  reprise. Les clients sont stockés dans la collection "leads". */
+ *  reprise. Les clients viennent du carnet CRM (leads) ou Devis Pro. */
 export const syncGoogleContact = (contact, contactType = 'partner') =>
   invokeGoogleContacts('google-contacts-sync', {
     contactId: contact.id,
@@ -514,44 +502,21 @@ export const syncGoogleContact = (contact, contactType = 'partner') =>
       id: contact.id,
       // Pour une entreprise, le nom de la personne à joindre est plus utile
       // dans Google Contacts ; le nom de l'entreprise reste dans l'organisation.
-      // Le nom porte le code de l'apporteur — « FATOU-KN8ERZ Soumana » — pour
-      // que le carnet Google se LISE par partenaire, et pas seulement se
-      // fouille : le champ personnalisé « Enregistré par » n'apparaît pas dans
-      // la liste des contacts (voir utils/contactGoogle.js).
-      name: nomContactGoogle(
-        contactType === 'lead' ? (contact.contact || contact.name) : contact.name,
-        contactType === 'lead' ? (contact.registeredByPartnerCode || '') : (contact.code || ''),
-      ),
+      name: contactType === 'lead' || contactType === 'pro_client'
+        ? (contact.contact || contact.name)
+        : contact.name,
       phone: contact.phone,
       email: contact.email || '',
       company: contactType === 'lead' && contact.clientType === 'entreprise'
         ? contact.name
         : (contact.company || contact.entreprise || ''),
-      registeredByName: contactType === 'lead' ? (contact.registeredByPartnerName || '') : '',
-      registeredByCode: contactType === 'lead' ? (contact.registeredByPartnerCode || '') : '',
+      registeredByUserId: contact.registeredByUserId || contact.assignedTo || contact.userId || null,
+      registeredByName: contact.registeredByName || contact.registeredByPartnerName || '',
+      registeredByCode: contact.registeredByCode || contact.registeredByPartnerCode || '',
+      createdAt: contact.createdAt || null,
+      registrationHistory: Array.isArray(contact.registrationHistory) ? contact.registrationHistory : [],
     },
   });
 
-/**
- * Le RÉSEAU, en lecture seule : les partenaires nés de nos codes d'affiliation
- * et les clients qu'ils enregistrent. Chacun a ouvert sa PROPRE organisation ;
- * l'isolation les rendait invisibles à la tête de réseau. Ces deux lectures
- * les montrent sans jamais lever le cloisonnement.
- */
-export async function fetchClientsReseau() {
-  if (!supabase) return [];
-  const { data, error } = await supabase.rpc('mes_clients_reseau');
-  if (error) throw new Error(error.message);
-  return data || [];
-}
-
-export async function fetchPartenairesReseau() {
-  if (!supabase) return [];
-  const { data, error } = await supabase.rpc('mes_partenaires_reseau');
-  if (error) throw new Error(error.message);
-  return data || [];
-}
-
 // Compatibilité pour les éventuels appels existants hors du DataContext.
 export const syncPartnerGoogleContact = (partner) => syncGoogleContact(partner, 'partner');
-
