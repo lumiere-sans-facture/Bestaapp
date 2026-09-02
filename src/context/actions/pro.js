@@ -270,7 +270,7 @@ export function createProActions(setState) {
             proClients: (s.proClients || []).map((item) => item.id === existing.id ? created : item),
           };
         }
-        const { registeredByPartner, referredByPartner, ...stored } = client;
+        const { registeredByPartner: _registeredByPartner, referredByPartner: _referredByPartner, ...stored } = client;
         created = {
           id: crypto.randomUUID(),
           name: '', phone: '', ville: '', type: 'particulier',
