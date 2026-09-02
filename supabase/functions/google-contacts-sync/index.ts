@@ -195,6 +195,12 @@ const withoutBestaTrace = (biographies: any[]) => (biographies || [])
 
 const personPayload = (contact: Contact, existing: any = null) => {
   const words = String(contact.name || 'Client BestaSolar').trim().split(/\s+/);
+  const sourceHistory = Array.isArray(contact.registrationHistory) ? contact.registrationHistory : [];
+  // Le code permet d'identifier immédiatement le partenaire dans Google Contacts,
+  // sans modifier le numéro réel du client.
+  const partnerCode = String(contact.registeredByCode || sourceHistory[0]?.partnerCode || '')
+    .trim()
+    .replace(/^BESTA-/i, '');
   const phone = String(contact.phone || '').trim();
   const email = normalizeEmail(contact.email);
   const existingPhones = existing?.phoneNumbers || [];
@@ -202,7 +208,10 @@ const personPayload = (contact: Contact, existing: any = null) => {
   const existingOrganizations = existing?.organizations || [];
   const existingDefined = existing?.userDefined || [];
   const payload: Record<string, any> = {
-    names: [{ givenName: words[0] || 'Client', familyName: words.slice(1).join(' ') || undefined }],
+    names: [{
+      givenName: words[0] || 'Client',
+      familyName: [words.slice(1).join(' '), partnerCode].filter(Boolean).join(' — ') || undefined,
+    }],
     phoneNumbers: uniqueBy([...existingPhones, ...(phone ? [{ value: phone, type: 'mobile' }] : [])], (entry) => normalizePhoneNumber(entry?.value, PAYS_PAR_DEFAUT)),
     emailAddresses: uniqueBy([...existingEmails, ...(email ? [{ value: email, type: 'work' }] : [])], (entry) => normalizeEmail(entry?.value)),
     organizations: uniqueBy([...existingOrganizations, ...(contact.company ? [{ name: String(contact.company), type: 'work' }] : [])], (entry) => String(entry?.name || '').trim().toLowerCase()),
