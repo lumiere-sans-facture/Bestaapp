@@ -3,7 +3,8 @@ import { Stethoscope, CheckCircle2, AlertTriangle, Send, ShieldCheck } from 'luc
 import { signalerErreur } from '../lib/rapportErreur';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { diagnosticReplication } from '../lib/remoteSync';
-import { verdictReplication } from '../utils/diagnosticReplication';
+import { clientsNonDetenus, verdictReplication } from '../utils/diagnosticReplication';
+import { useData } from '../context/DataContext';
 import { sentryConfigure } from '../lib/sentry';
 import { analytiqueConfiguree, hoteAnalytique, problemeAnalytique, testerAnalytique } from '../lib/analytique';
 import { useToast } from './Toast';
@@ -33,6 +34,7 @@ export default function DiagnosticCard() {
   const [identite, setIdentite] = useState(null);
   const [identiteEnCours, setIdentiteEnCours] = useState(false);
   const toast = useToast();
+  const { leads } = useData();
   const sentryActif = sentryConfigure();
   const analytiqueActive = analytiqueConfiguree();
   const problemeConfig = problemeAnalytique();
@@ -53,7 +55,10 @@ export default function DiagnosticCard() {
   const testerIdentite = async () => {
     setIdentiteEnCours(true);
     try {
-      setIdentite(verdictReplicationEtat(await diagnosticReplication()));
+      const brut = await diagnosticReplication();
+      // Ce que la base refusera, calculé localement : inutile de le lui demander.
+      const refuses = clientsNonDetenus(leads, brut.profilId);
+      setIdentite(verdictReplicationEtat({ ...brut, clientsNonDetenus: refuses.length }));
     } catch (e) {
       setIdentite({ erreur: e.message || 'Diagnostic impossible.' });
     } finally {
@@ -151,6 +156,14 @@ export default function DiagnosticCard() {
                 <div className="sheet-row">
                   <span className="sheet-label">Entreprise attendue</span>
                   <span className="sheet-value paiement-mono">{identite.etat.orgBase || '—'}</span>
+                </div>
+                <div className="sheet-row">
+                  <span className="sheet-label">Gérant plateforme</span>
+                  <span className="sheet-value paiement-mono">{identite.etat.adminPlateforme ? 'oui' : 'non'}</span>
+                </div>
+                <div className="sheet-row">
+                  <span className="sheet-label">Clients d’un autre membre</span>
+                  <span className="sheet-value paiement-mono">{identite.etat.clientsNonDetenus ?? 0}</span>
                 </div>
                 <div className="sheet-row">
                   <span className="sheet-label">Entreprise écrite</span>

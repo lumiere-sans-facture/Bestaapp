@@ -35,11 +35,37 @@ export const VERDICTS = {
     detail: 'L’application écrit sous une entreprise, la base en attend une autre. '
       + 'Déconnectez-vous puis reconnectez-vous.',
   },
+  'clients-non-detenus': {
+    titre: 'Clients d’un autre membre en attente',
+    detail: 'Depuis la fusion des organisations, la base n’autorise chacun à écrire '
+      + 'QUE les clients dont il est l’auteur (`auth_owns_client`), sauf le gérant '
+      + 'plateforme. Votre file contient des clients enregistrés par quelqu’un '
+      + 'd’autre : ils seront refusés indéfiniment. Deux issues — donner le drapeau '
+      + '`is_platform_admin` à ce compte, ou faire reconnaître le rôle gérant par la '
+      + 'politique.',
+  },
   coherent: {
     titre: 'Identité cohérente',
     detail: 'L’entreprise utilisée pour écrire est bien celle que la base attribue '
-      + 'à votre compte. Un refus de sécurité ne peut plus venir de là.',
+      + 'à votre compte, et tous les clients en attente vous appartiennent. Un refus '
+      + 'de sécurité ne peut plus venir de là.',
   },
+};
+
+/**
+ * Clients de la file que la base refusera : depuis la fusion, un client
+ * n'est écrivable que par son auteur. Le calcul est LOCAL — inutile
+ * d'interroger le serveur pour savoir ce qu'il va refuser.
+ *
+ * @param {Array<object>} leads
+ * @param {string|null} profilId identifiant du profil connecté (profiles.id)
+ */
+export const clientsNonDetenus = (leads = [], profilId = null) => {
+  if (!profilId) return [];
+  return (leads || []).filter((lead) => {
+    const auteur = lead?.registeredByUserId || lead?.assignedTo || lead?.userId || null;
+    return auteur && auteur !== profilId;
+  });
 };
 
 /**
@@ -55,6 +81,8 @@ export const verdictReplication = (etat = {}) => {
     if (!etat.orgBase) return 'org-introuvable';
     if (!etat.orgEcriture) return 'estampille-vide';
     if (etat.orgBase !== etat.orgEcriture) return 'org-differente';
+    // Le gérant plateforme écrit partout : pour lui, l'appartenance ne joue pas.
+    if (!etat.adminPlateforme && etat.clientsNonDetenus > 0) return 'clients-non-detenus';
     return 'coherent';
   })();
   return { code, ok: code === 'coherent' || code === 'local', ...VERDICTS[code] };

@@ -47,6 +47,19 @@ export async function diagnosticReplication() {
     const { data } = await supabase.rpc('auth_org_id');
     orgBase = data || null;
   } catch { /* fonction absente : orgBase reste vide */ }
+  // Depuis la fusion des organisations, la politique des clients compare aussi
+  // l'AUTEUR (`auth_owns_client`) — sauf pour le gérant plateforme, qui écrit
+  // partout. Ces deux valeurs décident donc autant que l'entreprise.
+  let profilId = null;
+  try {
+    const { data } = await supabase.rpc('auth_profile_id');
+    profilId = data || null;
+  } catch { /* migration de fusion non passée : la règle ne s'applique pas */ }
+  let adminPlateforme = false;
+  try {
+    const { data } = await supabase.rpc('auth_is_platform_admin');
+    adminPlateforme = Boolean(data);
+  } catch { /* fonction absente : traité comme non-admin */ }
   let profilTrouve = false;
   let orgProfil = null;
   if (email) {
@@ -57,7 +70,7 @@ export async function diagnosticReplication() {
       orgProfil = data?.org_id || null;
     } catch { /* lecture refusée : le profil reste « introuvable » */ }
   }
-  return { email, profilTrouve, orgProfil, orgBase, orgEcriture: currentOrgId };
+  return { email, profilTrouve, orgProfil, orgBase, profilId, adminPlateforme, orgEcriture: currentOrgId };
 }
 
 /**
