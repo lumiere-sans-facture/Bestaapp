@@ -84,6 +84,30 @@ export function DataProvider({ children }) {
     };
   }, [scope]);
 
+  // Répare les brouillons créés avec une version antérieure : leur auteur
+  // manquait, donc la politique RLS refusait leur première synchronisation.
+  // Le brouillon appartient nécessairement à la session qui le reprend.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !user?.id) return;
+    setState((current) => {
+      const partner = (current.partners || []).find((item) => item.userId === user.id);
+      let repaired = false;
+      const leads = (current.leads || []).map((lead) => {
+        if (lead.assignedTo || lead.registeredByUserId) return lead;
+        repaired = true;
+        return {
+          ...lead,
+          assignedTo: user.id,
+          registeredByUserId: user.id,
+          registeredByPartnerId: partner?.id || null,
+          registeredByPartnerName: partner?.name || null,
+          registeredByPartnerCode: partner?.code || null,
+        };
+      });
+      return repaired ? { ...current, leads } : current;
+    });
+  }, [user.id]);
+
   // Réplication Supabase (optionnelle, auto-détectée)
   const { syncStatus, syncError, enAttente, synchroniserMaintenant } = useRemoteSync(state, setState, stateRef, scope);
 
