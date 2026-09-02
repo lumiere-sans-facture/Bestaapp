@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as seed from '../data/seed';
-import { consumeRefClick } from '../utils/referral';
+import { consumeRefClick, memeCode } from '../utils/referral';
 import { useAuth } from './AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchTeamProfiles, syncGoogleContact } from '../lib/remoteSync';
@@ -8,6 +8,7 @@ import { loadState, persist, STORAGE_KEY } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
 import { canSyncClientContact } from '../utils/clientContact';
+import { useReseau } from './useReseau';
 
 // Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
 // (le contexte est lisible depuis tous les écrans).
@@ -51,7 +52,7 @@ export function DataProvider({ children }) {
     const code = consumeRefClick();
     if (!code) return;
     setState((s) =>
-      s.partners.some((p) => p.code === code && p.status === 'actif')
+      s.partners.some((p) => memeCode(p.code, code) && p.status === 'actif')
         ? { ...s, referrals: [newReferral(code, 'clic'), ...(s.referrals || [])] }
         : s
     );
@@ -224,7 +225,7 @@ export function DataProvider({ children }) {
   }), [actions, state.partners, user.id, user.name]);
 
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, ...clientActions, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
+    <DataContext.Provider value={{ ...state, ...actions, ...helpers, ...reseau, ...clientActions, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
       {children}
     </DataContext.Provider>
   );
