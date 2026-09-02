@@ -191,6 +191,9 @@ export function DataProvider({ children }) {
     if (user?.id) actions.ensurePartnerForUser(user);
   }, [user?.id, actions]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Le réseau reste une lecture serveur distincte de l'état local.
+  const reseau = useReseau();
+
   // Sélecteurs dérivés de l'état courant
   const helpers = useMemo(() => ({
     getPartnerById: (id) => state.partners.find((p) => p.id === id),
