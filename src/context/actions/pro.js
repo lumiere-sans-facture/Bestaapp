@@ -4,6 +4,7 @@ import { defaultEcheance } from '../../utils/paiement';
 import { abonnementApresPaiement } from '../../utils/verificationPaiement';
 import { formule, FORMULE_DEFAUT } from '../../utils/subscription';
 import { prochainNumeroFacture } from '../../utils/facture';
+import { appendClientSource, buildClientSource, canSyncClientContact, isSameClient, sourceHistoryFor } from '../../utils/clientContact';
 
 export function createProActions(setState) {
   return {
@@ -241,11 +242,42 @@ export function createProActions(setState) {
     addProClient: (client) => {
       let created = null;
       setState((s) => {
+        const now = new Date().toISOString();
+        const source = buildClientSource({
+          userId: client.registeredByUserId || client.userId,
+          partner: client.registeredByPartner,
+          referrer: client.referredByPartner,
+          at: now,
+        });
+        const existing = (s.proClients || []).find((item) => isSameClient(item, client));
+        if (existing) {
+          const fields = ['name', 'contact', 'phone', 'email', 'ville', 'type'];
+          const patch = Object.fromEntries(fields
+            .filter((field) => client[field] !== undefined && client[field] !== null && String(client[field]).trim() !== '')
+            .map((field) => [field, client[field]]));
+          created = {
+            ...existing,
+            ...patch,
+            registrationHistory: appendClientSource(sourceHistoryFor(existing), source),
+            ...(canSyncClientContact({ ...existing, ...patch }) ? {
+              google_contact_sync_status: 'pending',
+              google_contact_sync_error: null,
+              google_contact_sync_next_retry_at: null,
+            } : {}),
+          };
+          return {
+            ...s,
+            proClients: (s.proClients || []).map((item) => item.id === existing.id ? created : item),
+          };
+        }
+        const { registeredByPartner, referredByPartner, ...stored } = client;
         created = {
           id: crypto.randomUUID(),
           name: '', phone: '', ville: '', type: 'particulier',
-          ...client,
-          createdAt: new Date().toISOString(),
+          ...stored,
+          createdAt: now,
+          registrationHistory: appendClientSource([], source),
+          ...(canSyncClientContact(stored) ? { google_contact_sync_status: 'pending' } : {}),
         };
         return { ...s, proClients: [created, ...(s.proClients || [])] };
       });
@@ -255,7 +287,34 @@ export function createProActions(setState) {
     updateProClient: (clientId, patch) =>
       setState((s) => ({
         ...s,
-        proClients: (s.proClients || []).map((c) => (c.id === clientId ? { ...c, ...patch } : c)),
+        proClients: (s.proClients || []).map((c) => {
+          if (c.id !== clientId) return c;
+          const next = { ...c, ...patch };
+          const changedContact = ['name', 'contact', 'phone', 'email'].some((field) => field in patch && patch[field] !== c[field]);
+          return {
+            ...next,
+            ...(canSyncClientContact(next) && (changedContact || !c.google_contact_sync_status) ? {
+              google_contact_sync_status: 'pending',
+              google_contact_sync_error: null,
+              google_contact_sync_next_retry_at: null,
+            } : {}),
+          };
+        }),
+      })),
+
+    setProClientGoogleContactSync: (clientId, result = {}) =>
+      setState((s) => ({
+        ...s,
+        proClients: (s.proClients || []).map((client) => (client.id === clientId ? {
+          ...client,
+          google_contact_sync_status: result.status || 'pending',
+          ...(result.resourceName ? { google_contact_resource_name: result.resourceName } : {}),
+          ...(result.status === 'synced' || result.status === 'already_exists'
+            ? { google_contact_synced_at: new Date().toISOString(), google_contact_sync_error: null, google_contact_sync_next_retry_at: null }
+            : {}),
+          ...(result.error ? { google_contact_sync_error: result.error } : {}),
+          ...(result.nextRetryAt ? { google_contact_sync_next_retry_at: result.nextRetryAt } : {}),
+        } : client)),
       })),
 
     deleteProClient: (clientId) =>
