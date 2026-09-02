@@ -518,5 +518,25 @@ export const syncGoogleContact = (contact, contactType = 'partner') =>
     },
   });
 
+/**
+ * Le RÉSEAU, en lecture seule : les partenaires nés de nos codes d'affiliation
+ * et les clients qu'ils enregistrent. Chacun a ouvert sa PROPRE organisation ;
+ * l'isolation les rendait invisibles à la tête de réseau. Ces deux lectures
+ * les montrent sans jamais lever le cloisonnement.
+ */
+export async function fetchClientsReseau() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('mes_clients_reseau');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function fetchPartenairesReseau() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('mes_partenaires_reseau');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 // Compatibilité pour les éventuels appels existants hors du DataContext.
 export const syncPartnerGoogleContact = (partner) => syncGoogleContact(partner, 'partner');
