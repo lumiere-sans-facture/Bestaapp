@@ -78,6 +78,48 @@ begin
     nullif(data ->> 'userId', '')
   ) is null;
 
+  -- Les catalogues partagés et les jobs peuvent exister dans plusieurs
+  -- organisations avec le même identifiant. Une seule version est conservée :
+  -- celle de l'organisation principale à égalité, sinon la plus récente.
+  delete from public.inverters
+  where ctid in (
+    select ctid from (
+      select ctid, row_number() over (
+        partition by id
+        order by (org_id = v_primary_org) desc, updated_at desc nulls last, ctid
+      ) as rn
+      from public.inverters
+    ) ranked where rn > 1
+  );
+
+  delete from public."pompeKits"
+  where ctid in (
+    select ctid from (
+      select ctid, row_number() over (
+        partition by id
+        order by (org_id = v_primary_org) desc, updated_at desc nulls last, ctid
+      ) as rn
+      from public."pompeKits"
+    ) ranked where rn > 1
+  );
+
+  -- Pour un même contact, un job en attente/échec est prioritaire afin que
+  -- sa dernière modification soit bien envoyée après la fusion.
+  delete from public.google_contact_sync_jobs
+  where ctid in (
+    select ctid from (
+      select ctid, row_number() over (
+        partition by contact_type, partner_id
+        order by
+          case status when 'pending' then 0 when 'failed' then 1 when 'synced' then 2 else 3 end,
+          (org_id = v_primary_org) desc,
+          updated_at desc nulls last,
+          ctid
+      ) as rn
+      from public.google_contact_sync_jobs
+    ) ranked where rn > 1
+  );
+
   foreach v_table in array array[
     'commissions', 'companies', 'devis', 'erreurs', 'factures',
     'formationProgress', 'formations', 'google_contact_sync_jobs',
