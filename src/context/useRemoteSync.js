@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { pullAll, pushCollections, pushTombstone, resynchroniserOrg, subscribeToChanges, lignesRefuseesParTable, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 import { estRefusRls, MESSAGE_REFUS_RLS, messageLignesRefusees } from '../utils/erreurSync';
+import { peutEnvoyer } from '../utils/etatSync';
 import { loadFileSync, persistFileSync } from './dataState';
 import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection } from '../utils/fileSync';
 
@@ -210,7 +211,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
     // le travail fait hors-ligne, et elle alimente le compte affiché.
     majFile(state);
     if (!syncedRef.current) return undefined;
-    if (syncStatus !== 'online' && syncStatus !== 'error') return undefined;
+    if (!peutEnvoyer(syncStatus)) return undefined;
     const changed = {};
     const deletedByTable = {};
     for (const table of SYNCED_COLLECTIONS) {
@@ -302,7 +303,10 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
         // saura exactement combien restent à quai.
         if (!isolerRefus.current) {
           isolerRefus.current = true;
-          setSyncStatus('connecting');
+          // Le statut n'est PAS touché : seuls `online` et `error` autorisent
+          // un envoi (STATUTS_QUI_ENVOIENT). Le passer à « connecting » ici
+          // bloquait la relance qu'on vient de demander — voyant orange figé,
+          // et plus rien qui part jusqu'au rechargement de la page.
           setRetryTick((t) => t + 1);
           return;
         }
