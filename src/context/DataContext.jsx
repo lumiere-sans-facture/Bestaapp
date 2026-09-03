@@ -7,7 +7,7 @@ import { fetchTeamProfiles, syncGoogleContact } from '../lib/remoteSync';
 import { loadState, persist, STORAGE_KEY } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
-import { canSyncClientContact } from '../utils/clientContact';
+import { contactsGoogleAEnvoyer } from '../utils/contactsGoogle';
 import { useReseau } from './useReseau';
 
 // Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
@@ -148,37 +148,29 @@ export function DataProvider({ children }) {
   }, []);
 
   // Reprise asynchrone de Google Contacts. La mutation locale ne dépend jamais
-  // de ce réseau : les partenaires et les fiches Clients (collection leads)
-  // avec un statut arrivé à échéance sont tentés. Un seul essai par contact est
-  // exécuté simultanément.
+  // de ce réseau : partenaires et clients PUBLICS arrivés à échéance sont
+  // tentés, un seul essai par contact à la fois.
   const googleSyncInFlight = useRef(new Set());
   useEffect(() => {
     if (!isSupabaseConfigured) return undefined;
-    const now = Date.now();
-    const due = [
-      ...(state.partners || []).map((contact) => ({ contact, contactType: 'partner' })),
-      ...(state.leads || []).map((contact) => ({ contact, contactType: 'lead' })),
-      ...(state.proClients || []).map((contact) => ({ contact, contactType: 'pro_client' })),
-    ].filter(({ contact, contactType }) => {
-      const status = contact.google_contact_sync_status;
-      const retry = contact.google_contact_sync_next_retry_at;
-      const key = `${contactType}:${contact.id}`;
-      return canSyncClientContact(contact) && (status === 'pending' || status === 'failed')
-        && (!retry || Number.isNaN(Date.parse(retry)) || Date.parse(retry) <= now)
-        && !googleSyncInFlight.current.has(key);
-    }).slice(0, 3);
+    // La règle vit dans utils/contactsGoogle.js : partenaires et clients du
+    // côté PUBLIC seulement. Les clients de l'espace Devis Pro n'y vont pas —
+    // c'est l'entreprise personnelle de l'abonné.
+    const due = contactsGoogleAEnvoyer({
+      partners: state.partners,
+      leads: state.leads,
+      enCours: googleSyncInFlight.current,
+    });
     if (!due.length) return undefined;
     let active = true;
     due.forEach(({ contact, contactType }) => {
       const key = `${contactType}:${contact.id}`;
       const setSyncStatus = contactType === 'lead'
         ? actions.setLeadGoogleContactSync
-        : contactType === 'pro_client'
-          ? actions.setProClientGoogleContactSync
-          : actions.setPartnerGoogleContactSync;
+        : actions.setPartnerGoogleContactSync;
       // L'auteur de la fiche est figé à la création. Ce repli couvre les
       // anciens clients créés avant l'ajout du champ de traçabilité.
-      const estClient = contactType === 'lead' || contactType === 'pro_client';
+      const estClient = contactType === 'lead';
       const enregistrant = estClient
         ? (state.partners || []).find((partner) => partner.id === contact.registeredByPartnerId
           || partner.userId === contact.registeredByUserId
