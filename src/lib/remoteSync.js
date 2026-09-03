@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { estRefusRls } from '../utils/erreurSync';
 
 // Synchronisation des collections métier avec Supabase.
 // Chaque entité est une ligne { id, data } ; la logique métier reste
@@ -26,6 +27,28 @@ export const setSyncOrg = (orgId, kind = null) => {
   currentOrgId = orgId || null;
   currentOrgKind = kind || null;
   tablesAbsentes.clear(); // nouvelle session : on re-teste le schéma distant
+  lignesRefusees.clear(); // ... et on retente les lignes que le serveur refusait
+};
+
+// Lignes que le serveur REFUSE d'enregistrer (sécurité au niveau ligne), par
+// table. Sans ce registre, UNE ligne refusée bloquait l'envoi de TOUTE sa
+// collection, indéfiniment : le lot entier est rejeté par Postgres, donc les
+// lignes parfaitement légitimes qui l'accompagnent ne partaient jamais non
+// plus. On les met de côté pour que le reste passe, et on les compte — il
+// n'est pas question de faire croire qu'elles sont enregistrées.
+//
+// Le registre est vidé à chaque connexion : une règle de sécurité corrigée
+// côté base suffit à les faire repartir, sans rien à réparer dans l'app.
+const lignesRefusees = new Map(); // table -> Set(id)
+const marquerRefusee = (table, id) => {
+  if (!lignesRefusees.has(table)) lignesRefusees.set(table, new Set());
+  lignesRefusees.get(table).add(id);
+};
+/** Combien de lignes le serveur refuse, par table. {} si tout passe. */
+export const lignesRefuseesParTable = () => {
+  const parTable = {};
+  for (const [table, ids] of lignesRefusees) if (ids.size) parTable[table] = ids.size;
+  return parTable;
 };
 const withOrg = (row) => (currentOrgId ? { ...row, org_id: currentOrgId } : row);
 
@@ -261,9 +284,43 @@ async function envoyerLot(table, lot) {
     } catch (e) {
       derniere = e; // requête avortée : le client lève au lieu de retourner error
     }
+    // Un refus de la sécurité est DÉTERMINISTE : le rejouer n'ajoute que de
+    // l'attente et de la charge serveur pour obtenir le même refus.
+    if (estRefusRls(derniere)) throw derniere;
     if (essai < 2) await attendre(500 * (essai + 1));
   }
   throw derniere;
+}
+
+// Nombre maximal d'envois consacrés à isoler les lignes refusées, par lot.
+// La dichotomie trouve k lignes fautives parmi n en ~k·log(n) envois ; le
+// plafond couvre le cas dégénéré où le serveur les refuse TOUTES — mieux vaut
+// alors mettre le reste du lot de côté que d'inonder le serveur.
+const BUDGET_ISOLATION = 48;
+
+/**
+ * Envoie un lot en écartant les lignes que la sécurité refuse.
+ *
+ * Postgres rejette le lot ENTIER dès qu'une ligne viole la politique : sans
+ * dichotomie, une seule ligne « pas à nous » condamne toute la collection.
+ * On coupe donc en deux jusqu'à isoler la (ou les) fautive(s), qui rejoignent
+ * le registre des refus ; tout le reste part normalement.
+ */
+export async function envoyerEnIsolant(table, rows, budget = { restant: BUDGET_ISOLATION }) {
+  if (!rows.length) return;
+  try {
+    budget.restant -= 1;
+    await envoyerLot(table, rows);
+  } catch (e) {
+    if (!estRefusRls(e)) throw e; // panne réseau ou table absente : à l'appelant
+    if (rows.length === 1 || budget.restant <= 0) {
+      for (const row of rows) marquerRefusee(table, row.id);
+      return;
+    }
+    const milieu = Math.ceil(rows.length / 2);
+    await envoyerEnIsolant(table, rows.slice(0, milieu), budget);
+    await envoyerEnIsolant(table, rows.slice(milieu), budget);
+  }
 }
 
 /**
@@ -274,9 +331,13 @@ async function envoyerLot(table, lot) {
  * simultanés — dont le catalogue et ses photos — saturaient la connexion et
  * échouaient en bloc. Chaque table qui passe est acquise : elle ne sera pas
  * renvoyée si une autre échoue.
+ * @param {{isolerRefus?: boolean}} options `isolerRefus` : écarter une à une
+ *   les lignes que la sécurité refuse au lieu de perdre toute la collection.
+ *   Activé seulement en SECOND passage — le premier laisse sa chance au
+ *   réalignement de l'organisation, qui, lui, débloque tout d'un coup.
  * @returns {Promise<string[]>} tables effectivement répliquées
  */
-export async function pushCollections(collections) {
+export async function pushCollections(collections, { isolerRefus = false } = {}) {
   const reussies = [];
   const erreurs = [];
   const manquantes = [];
@@ -303,11 +364,18 @@ export async function pushCollections(collections) {
     // lot par Postgres (« ON CONFLICT DO UPDATE command cannot affect row a
     // second time »), donc toute la synchronisation. Un doublon local — quelle
     // qu'en soit l'origine — ne doit jamais avoir ce pouvoir.
+    // Lignes déjà refusées par le serveur : les renvoyer ferait rejeter le lot
+    // entier à chaque cycle, et la collection resterait bloquée pour de bon.
+    const refusees = lignesRefusees.get(table);
     const rows = dedupePar(items, (i) => i.id)
+      .filter((i) => !refusees?.has(i.id))
       .map((item) => withOrg({ id: item.id, data: item, updated_at: new Date().toISOString() }));
     if (!rows.length) { reussies.push(table); continue; }
     try {
-      for (const lot of decouperEnLots(rows)) await envoyerLot(table, lot);
+      for (const lot of decouperEnLots(rows)) {
+        if (isolerRefus) await envoyerEnIsolant(table, lot);
+        else await envoyerLot(table, lot);
+      }
       reussies.push(table);
     } catch (e) {
       if (tableManquante(e)) { noterAbsente(table); manquantes.push(table); continue; }

@@ -3,8 +3,8 @@
 // et la réplication non-destructive (tombstones). Retourne le statut de sync.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { pullAll, pushCollections, pushTombstone, resynchroniserOrg, subscribeToChanges, SYNCED_COLLECTIONS } from '../lib/remoteSync';
-import { estRefusRls, MESSAGE_REFUS_RLS } from '../utils/erreurSync';
+import { pullAll, pushCollections, pushTombstone, resynchroniserOrg, subscribeToChanges, lignesRefuseesParTable, SYNCED_COLLECTIONS } from '../lib/remoteSync';
+import { estRefusRls, MESSAGE_REFUS_RLS, messageLignesRefusees } from '../utils/erreurSync';
 import { loadFileSync, persistFileSync } from './dataState';
 import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection } from '../utils/fileSync';
 
@@ -30,6 +30,10 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
   const syncedRef = useRef(null); // dernier état RÉELLEMENT répliqué, par collection
   const lastPushAt = useRef(0);
   const echecs = useRef(0);       // échecs consécutifs de push (délai croissant)
+  // Second passage : écarter les lignes refusées une à une. Armé seulement
+  // après un réalignement d'organisation resté sans effet — sinon on se
+  // priverait de la réparation qui, elle, débloque TOUT d'un coup.
+  const isolerRefus = useRef(false);
   const retryTimer = useRef(null);
   const [retryTick, setRetryTick] = useState(0); // relance un envoi échoué
   const [syncStatus, setSyncStatus] = useState(isSupabaseConfigured ? 'connecting' : 'local');
@@ -229,7 +233,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
       const erreurs = [];
       let reussies = [];
       try {
-        reussies = await pushCollections(changed);
+        reussies = await pushCollections(changed, { isolerRefus: isolerRefus.current });
       } catch (e) {
         reussies = e.reussies || [];
         erreurs.push(e.message);
@@ -268,7 +272,11 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
       if (!erreurs.length) {
         // Réellement répliqué : on peut enfin considérer ces données à jour.
         echecs.current = 0;
-        setSyncError(null);
+        // ... à une exception près : les lignes que le serveur REFUSE, mises de
+        // côté pour ne pas bloquer les autres. Elles ne sont pas parties, et
+        // l'app doit le dire — le voyant reste vert parce que tout le reste
+        // circule, le détail nomme ce qui est resté à quai.
+        setSyncError(messageLignesRefusees(lignesRefuseesParTable()));
         setSyncStatus('online');
         return;
       }
@@ -287,8 +295,19 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
           setRetryTick((t) => t + 1);
           return;
         }
-        // L'estampille était déjà la bonne : la cause est ailleurs, et le
-        // message brut de PostgreSQL n'aide personne.
+        // L'estampille était déjà la bonne : ce ne sont donc pas TOUTES les
+        // lignes qui sont refusées, mais certaines — celles saisies par un
+        // autre membre, que la politique des clients réserve à leur auteur.
+        // On repart aussitôt en les isolant : le reste passe enfin, et on
+        // saura exactement combien restent à quai.
+        if (!isolerRefus.current) {
+          isolerRefus.current = true;
+          setSyncStatus('connecting');
+          setRetryTick((t) => t + 1);
+          return;
+        }
+        // Isolation déjà tentée et refus toujours global : la cause est
+        // ailleurs, et le message brut de PostgreSQL n'aide personne.
         echecs.current += 1;
         const bloquees = Object.keys(changed).filter((t) => !acquises.includes(t));
         setSyncError(`${MESSAGE_REFUS_RLS}${bloquees.length ? ` (en attente : ${bloquees.join(', ')})` : ''}`);
