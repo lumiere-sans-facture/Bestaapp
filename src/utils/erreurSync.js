@@ -4,21 +4,27 @@
  * Une écriture refusée par la sécurité au niveau ligne (RLS).
  *
  * Message PostgreSQL : « new row violates row-level security policy for
- * table "leads" ». Sur cette app il n'a qu'une cause : la ligne est estampillée
- * d'une organisation qui n'est plus celle du compte. La politique ne compare
- * QUE `org_id = auth_org_id()` — ni l'auteur, ni le partenaire, ni le rôle
- * n'entrent en jeu.
+ * table "leads" ». Deux causes possibles, dans cet ordre :
+ *
+ *   1. la ligne est estampillée d'une organisation qui n'est plus celle du
+ *      compte — `resynchroniserOrg()` la relit et l'envoi repart seul ;
+ *   2. la ligne appartient à un AUTRE membre. Depuis la fusion des
+ *      organisations, la politique des clients compare aussi l'auteur
+ *      (`auth_owns_client`) : le gérant ne peut réécrire les clients de ses
+ *      partenaires que si la règle « manager client access » est posée sur
+ *      `leads`. C'est le cas traité par le message ci-dessous.
  */
 export const estRefusRls = (message = '') =>
   /row-level security|row level security|violates row-level/i.test(String(message || ''));
 
 /**
  * Message affiché quand le réalignement de l'organisation n'a rien changé :
- * l'estampille était déjà la bonne, la cause est ailleurs. Dire quoi faire
- * vaut mieux que répéter le message brut de PostgreSQL, que personne ne sait
- * interpréter.
+ * l'estampille était DÉJÀ la bonne. Se reconnecter ne sert donc à rien — la
+ * cause est côté base. Dire quoi faire vaut mieux que répéter le message brut
+ * de PostgreSQL, que personne ne sait interpréter.
  */
 export const MESSAGE_REFUS_RLS =
-  'Écriture refusée par la sécurité : votre session n’est plus rattachée à la '
-  + 'même entreprise que votre compte. Déconnectez-vous puis reconnectez-vous — '
-  + 'vos données en attente repartiront ensuite.';
+  'Le serveur refuse d’enregistrer certains clients : ils ont été saisis par un '
+  + 'autre membre, et ce compte n’a pas encore le droit de les réécrire. Rien '
+  + 'n’est perdu, tout reste sur cet appareil. Prévenez le gérant : la règle de '
+  + 'sécurité de la base doit être mise à jour.';
