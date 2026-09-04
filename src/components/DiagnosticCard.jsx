@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Stethoscope, CheckCircle2, AlertTriangle, Send, ShieldCheck } from 'lucide-react';
+import { Stethoscope, CheckCircle2, AlertTriangle, Send, ShieldCheck, ClipboardCopy } from 'lucide-react';
 import { signalerErreur } from '../lib/rapportErreur';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { diagnosticReplication } from '../lib/remoteSync';
 import { clientsNonDetenus, verdictReplication } from '../utils/diagnosticReplication';
+import { sqlReparationPour } from '../data/sqlReparationClients';
 import { useData } from '../context/DataContext';
 import { sentryConfigure } from '../lib/sentry';
 import { analytiqueConfiguree, hoteAnalytique, problemeAnalytique, testerAnalytique } from '../lib/analytique';
@@ -33,6 +34,7 @@ export default function DiagnosticCard() {
   const [verdictAnalytique, setVerdictAnalytique] = useState(null);
   const [identite, setIdentite] = useState(null);
   const [identiteEnCours, setIdentiteEnCours] = useState(false);
+  const [sqlCopie, setSqlCopie] = useState(false);
   const toast = useToast();
   const { leads } = useData();
   const sentryActif = sentryConfigure();
@@ -63,6 +65,22 @@ export default function DiagnosticCard() {
       setIdentite({ erreur: e.message || 'Diagnostic impossible.' });
     } finally {
       setIdentiteEnCours(false);
+    }
+  };
+
+  // Le gérant lit le refus sur son téléphone : lui demander d'aller chercher un
+  // fichier dans le dépôt, c'est lui demander un ordinateur. Le script part
+  // dans le presse-papiers, son adresse déjà remplie — il n'a plus qu'à ouvrir
+  // le SQL Editor de Supabase et coller.
+  const copierSqlReparation = async () => {
+    const sql = sqlReparationPour(identite?.etat?.email);
+    try {
+      await navigator.clipboard.writeText(sql);
+      setSqlCopie(true);
+      setTimeout(() => setSqlCopie(false), 2500);
+      toast('Script copié. Collez-le dans Supabase › SQL Editor, puis exécutez.');
+    } catch {
+      toast('Copie refusée par le navigateur.', { type: 'error' });
     }
   };
 
@@ -169,6 +187,24 @@ export default function DiagnosticCard() {
                   <span className="sheet-label">Entreprise écrite</span>
                   <span className="sheet-value paiement-mono">{identite.etat.orgEcriture || '—'}</span>
                 </div>
+                {identite.verdict.code === 'clients-non-detenus' && (
+                  <>
+                    <p className="text-sm" style={{ margin: '10px 0 0' }}>
+                      Ces clients ne partent pas d’ici et ne sont pas lisibles par ce
+                      compte : le serveur les réserve à celui qui les a enregistrés.
+                      Le script ci-dessous rend les clients du côté public visibles au
+                      gérant. Les clients du Devis Pro, eux, restent privés.
+                    </p>
+                    <button className="btn btn-outline btn-block" style={{ marginTop: 10 }} onClick={copierSqlReparation}>
+                      <ClipboardCopy size={16} /> {sqlCopie ? 'Script copié' : 'Copier le SQL de réparation'}
+                    </button>
+                    <p className="text-sm text-secondary" style={{ margin: '8px 0 0' }}>
+                      À coller dans Supabase › SQL Editor, puis Exécuter. Votre adresse y
+                      est déjà remplie. Le script affiche un tableau de contrôle qui dit
+                      s’il a réussi. Ensuite, déconnectez-vous et reconnectez-vous.
+                    </p>
+                  </>
+                )}
               </>
             )}
           </div>

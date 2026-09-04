@@ -55,20 +55,27 @@ const nommer = (table, n) => {
 /**
  * Ce que le serveur refuse d'enregistrer, dit en clair.
  *
- * Le reste de la synchronisation, lui, est passé : l'app écarte les lignes
- * refusées pour ne plus bloquer les autres. Le message doit donc annoncer
- * DEUX choses — ce qui est resté à quai, et que rien n'est perdu.
+ * Une précision qui décide de la formulation : ces lignes sont exactement
+ * celles que le compte ne peut pas LIRE sur le serveur — la politique réserve
+ * chaque client à son auteur, en lecture comme en écriture. L'app ne peut donc
+ * pas savoir si elles y sont déjà (posées par leur auteur depuis son appareil)
+ * ou nulle part. Le message ne l'affirme ni dans un sens ni dans l'autre : il
+ * dit ce qui est vérifié — elles ne partent pas d'ici, elles restent lisibles
+ * ici — et où aller pour trancher.
  *
- * @param {Record<string, number>} parTable ex. { leads: 3 }
+ * Il ne cite AUCUN chemin de fichier : il est lu sur un téléphone, par le
+ * gérant, qui n'a pas le dépôt sous la main. La marche à suivre vit dans
+ * Plus › Diagnostic, avec le bouton qui met le script dans le presse-papiers.
+ *
+ * @param {Record<string, number>} parTable ex. { leads: 32 }
  */
 export const messageLignesRefusees = (parTable = {}) => {
   const parts = Object.entries(parTable)
     .filter(([, n]) => n > 0)
     .map(([table, n]) => nommer(table, n));
   if (!parts.length) return null;
-  return `${parts.join(', ')} ne peuvent pas être envoyés au serveur : ils ont `
-    + 'été saisis par un autre membre, et ce compte n’a pas le droit de les '
-    + 'réécrire. Ils restent sur cet appareil et tout le reste est bien '
-    + 'synchronisé. Pour les débloquer, le gérant doit exécuter '
-    + 'supabase/reparer-clients-publics.sql.';
+  return `${parts.join(', ')} appartiennent à d’autres membres : le serveur `
+    + 'réserve chaque client à celui qui l’a enregistré, et ne les accepte donc '
+    + 'pas depuis ce compte. Ils restent consultables ici, et le reste est bien '
+    + 'synchronisé. Pour les rattacher à votre compte : Plus › Diagnostic.';
 };

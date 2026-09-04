@@ -56,14 +56,23 @@ describe('messageLignesRefusees', () => {
     expect(messageLignesRefusees({ leads: 1 })).toMatch(/^1 client /);
   });
 
-  it('dit que rien n’est perdu et que le reste est passé', () => {
-    const m = messageLignesRefusees({ leads: 2, partners: 1 });
-    expect(m).toMatch(/2 clients, 1 partenaire/);
-    expect(m).toMatch(/restent sur cet appareil/);
-    expect(m).toMatch(/tout le reste est bien/i);
+  it('n’envoie pas le gérant chercher un fichier : il lit ça sur son '
+    + 'téléphone', () => {
+    const m = messageLignesRefusees({ leads: 32 });
+    expect(m).not.toMatch(/\.sql/);
+    expect(m).not.toMatch(/supabase\//);
+    expect(m).toMatch(/Plus › Diagnostic/);
   });
 
-  it('nomme la réparation, pour que le gérant sache quoi faire', () => {
-    expect(messageLignesRefusees({ leads: 1 })).toMatch(/reparer-clients-publics\.sql/);
+  it('n’affirme pas ce que l’app ne peut pas vérifier : ces clients étant '
+    + 'illisibles pour ce compte, on ignore s’ils sont déjà sur le serveur', () => {
+    const m = messageLignesRefusees({ leads: 32 });
+    expect(m).not.toMatch(/rien n.est perdu/i);
+    expect(m).not.toMatch(/déjà (sur le|au) serveur/i);
+    expect(m).toMatch(/restent consultables ici/);
+  });
+
+  it('cumule les collections', () => {
+    expect(messageLignesRefusees({ leads: 2, partners: 1 })).toMatch(/2 clients, 1 partenaire/);
   });
 });

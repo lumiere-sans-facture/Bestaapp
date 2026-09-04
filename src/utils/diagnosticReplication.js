@@ -36,13 +36,11 @@ export const VERDICTS = {
       + 'Déconnectez-vous puis reconnectez-vous.',
   },
   'clients-non-detenus': {
-    titre: 'Clients d’un autre membre en attente',
-    detail: 'Depuis la fusion des organisations, la base n’autorise chacun à écrire '
-      + 'QUE les clients dont il est l’auteur (`auth_owns_client`), sauf le gérant '
-      + 'plateforme. Votre file contient des clients enregistrés par quelqu’un '
-      + 'd’autre : ils seront refusés indéfiniment. Deux issues — donner le drapeau '
-      + '`is_platform_admin` à ce compte, ou faire reconnaître le rôle gérant par la '
-      + 'politique.',
+    titre: 'Clients d’un autre membre, illisibles par ce compte',
+    detail: 'Le serveur réserve chaque client à celui qui l’a enregistré : ceux de '
+      + 'vos partenaires ne sont donc ni lisibles ni renvoyables depuis ce compte. '
+      + 'Rien ne se débloquera de soi-même — c’est une règle de la base, à changer '
+      + 'une fois, avec le script ci-dessous.',
   },
   coherent: {
     titre: 'Identité cohérente',
