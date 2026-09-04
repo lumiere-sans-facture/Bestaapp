@@ -92,4 +92,40 @@ export const catalogueProducts = [
   { id: 'cat-p19r3', name: 'Disjoncteur DC 63A CHNT', description: 'Modèle 63A · Accessoire de protection · Tension 1000 DC', basePrice: 4000, category: 'accessoires', stock: 10, image: '/products/cat-p19r3.jpg' },
   { id: 'cat-p19r4', name: 'Disjoncteur DC 100A', description: 'Modèle 100A · Accessoire de protection · Tension 1000 DC', basePrice: 4500, category: 'accessoires', stock: 10, image: '/products/cat-p19r4.jpg' },
   { id: 'cat-p19r5', name: 'Regulateur de voltage AC', description: 'Modèle Numerique · Accessoire de protection · Tension 1000 DC · Amperage 63A', basePrice: 8000, category: 'controleurs', stock: 10, image: '/products/cat-p19r5.jpg' },
+
+  // ---------------------------------------------------------------------
+  //  Complément 2026 — catalogue Deye / SUNTREE / câblerie (8 pages).
+  //  Repris tel quel du PDF fournisseur : `basePrice` est la colonne
+  //  « Prix HT », c'est-à-dire le prix PARTENAIRE, comme au-dessus.
+  //  Les identifiants portent le préfixe `cat26-` : les `cat-pNrM` du
+  //  premier catalogue occupent déjà les mêmes numéros de page.
+  //  Les références déjà présentes plus haut (cosses, wattmètre Elejoy,
+  //  panneau Jinko 580W, fiche MC4, disjoncteurs 125A et 250A, inverseur
+  //  automatique, parafoudres) ne sont PAS redoublées ici.
+  // ---------------------------------------------------------------------
+  { id: 'cat26-p2r1', name: 'Onduleur Hybride 20kW Triphasé Deye', description: 'Modèle SUN-20K-SG05LP3-EU-SM2 · Triphasé · Efficacité de charge 99% · Prend en charge en parallèle 10 · Garantie 5 ans · Communication WIFI / RS485/CAN', basePrice: 1850000, category: 'onduleurs', stock: 10, image: '/products/cat26-p2r1.jpg' },
+  { id: 'cat26-p2r2', name: 'Onduleur Hybride 16kW Triphasé Deye', description: 'Modèle SUN-16K-SG05LP3-EU-SM2 · Triphasé · Efficacité de charge 99% · Prend en charge en parallèle 10 · Garantie 5 ans · Communication WIFI / RS485/CAN', basePrice: 1500000, category: 'onduleurs', stock: 10, image: '/products/cat26-p2r2.jpg' },
+  { id: 'cat26-p2r3', name: 'Solution ESS commerciale et industrielle Deye', description: 'Efficacité de charge 95% · Prend en charge en parallèle 6 · Garantie 2 ans · Capacités jusqu’à 2 MW / 4,3 MWh', basePrice: 24000000, category: 'generateurs', stock: 10, image: '/products/cat26-p2r3.jpg' },
+  { id: 'cat26-p2r4', name: 'Batterie lithium 10kwh Deye', description: 'Modèle E-G10.2 10.24KWH 51.2V · Tension nominale 51,2 V · Énergie nominale 10,24 kWh · Parallèle max. 64 unités (655 kWh)', basePrice: 940000, category: 'batteries', stock: 10, image: '/products/cat26-p2r4.jpg' },
+  { id: 'cat26-p2r5', name: 'Support rack 9 niveaux pour batteries haute tension Deye', description: 'Modèle Rack 9 layers · Pour 8 batteries lithium · Type de batterie BOS-G Pro 5 kWh', basePrice: 330000, category: 'accessoires', stock: 10, image: '/products/cat26-p2r5.jpg' },
+  { id: 'cat26-p3r1', name: 'Batterie lithium 5kwh haute tension Deye', description: 'Modèle BOS-G RPO 5KWH · Montage rack · Prend en charge en parallèle 17 · Cycle de vie ≥6000 fois · Garantie 5 ans', basePrice: 650000, category: 'batteries', stock: 10, image: '/products/cat26-p3r1.jpg' },
+  { id: 'cat26-p3r2', name: 'Boîtier de commande haute tension Deye', description: 'Modèle BOS-G-PDU-2 · Voltage de fonctionnement 120-750V · Garantie 5 ans', basePrice: 650000, category: 'accessoires', stock: 10, image: '/products/cat26-p3r2.jpg' },
+  { id: 'cat26-p4r1', name: 'Panneaux Photovoltaïque 555W Jinko', description: 'Efficacité de charge 85% · Capacite 555Wc · Garantie 12 ans', basePrice: 55000, category: 'panneaux', stock: 10, image: '/products/cat26-p4r1.jpg' },
+  { id: 'cat26-p5r3', name: 'Disjoncteur AC 100A 4P SUNTREE', description: 'Modèle SUNBRKAC100AMPS-4P · 100A 4P · Tension 400 DC', basePrice: 6000, category: 'accessoires', stock: 10, image: '/products/cat26-p5r3.jpg' },
+  { id: 'cat26-p5r4', name: 'Boîte électrique étanche 20×25×15 SUNTREE', description: 'Modèle SUNENCLOSURE20X25X15 · Niveau d’étanchéité IP65 · Standard EN60529 · Taille 20×25×15', basePrice: 18000, category: 'accessoires', stock: 10, image: '/products/cat26-p5r4.jpg' },
+  { id: 'cat26-p5r5', name: 'Boîte électrique étanche 25×35×15 SUNTREE', description: 'Modèle SUNENCLOSURE25X35X15 · Niveau d’étanchéité IP65 · Standard EN60529 · Taille 25×35×15', basePrice: 21000, category: 'accessoires', stock: 10, image: '/products/cat26-p5r5.jpg' },
+  { id: 'cat26-p6r1', name: 'Fusible DC 20A 1000V SUNTREE', description: 'Modèle SUNFUSEDC20A-1000V · Fusible 20A-1000V · Tension 1000 DC', basePrice: 4000, category: 'accessoires', stock: 10, image: '/products/cat26-p6r1.jpg' },
+  { id: 'cat26-p6r2', name: 'Connecteur MC4 45A SUNTREE', description: 'Modèle SUNMC4-45A · 6mm² 45A · Tension 1500 DC', basePrice: 800, category: 'accessoires', stock: 10, image: '/products/cat26-p6r2.jpg' },
+  { id: 'cat26-p6r3', name: 'Isolateur DC 25A 1500V SUNTREE', description: 'Modèle SUNDCISO25A-1500V · Tension DC 750-1500V / 25A · Certificat CE et TUV · Durée de vie mécanique 8000 fois', basePrice: 15000, category: 'accessoires', stock: 10, image: '/products/cat26-p6r3.jpg' },
+  { id: 'cat26-p6r4', name: 'Isolateur DC 32A 1000V 4P SUNTREE', description: 'Modèle SUNDCISO32A-1000V-4P · Tension DC 750-1000V / 32A · Certificat CE et TUV · Durée de vie mécanique 8000 fois', basePrice: 16000, category: 'accessoires', stock: 10, image: '/products/cat26-p6r4.jpg' },
+  { id: 'cat26-p6r5', name: 'Disjoncteur DC 63A 2P SUNTREE', description: 'Modèle SUNBRKDC63A-2P · Tension 2P 550VDC · Ampérage BRK 63A', basePrice: 8000, category: 'accessoires', stock: 10, image: '/products/cat26-p6r5.jpg' },
+  { id: 'cat26-p7r1', name: 'Câble souple H07V-K 35mm² — couronne 100 m', description: 'Âme cuivre pur (CU/PVC) · Modèle H07V-K souple · Section 35mm² · Tension 450/750V · Liaison principale batterie · Prix pour 100 m', basePrice: 390000, category: 'accessoires', stock: 10, image: '/products/cat26-p7r1.jpg' },
+  { id: 'cat26-p7r2', name: 'Câble souple H07V-K 25mm² — couronne 100 m', description: 'Âme cuivre pur (CU/PVC) · Modèle H07V-K souple · Section 25mm² · Tension 450/750V · Liaison inter-batteries / alimentation · Prix pour 100 m', basePrice: 280000, category: 'accessoires', stock: 10, image: '/products/cat26-p7r2.jpg' },
+  { id: 'cat26-p7r3', name: 'Câble souple H07V-K 16mm² — couronne 100 m', description: 'Âme cuivre pur (CU/PVC) · Modèle H07V-K souple · Section 16mm² · Tension 450/750V · Mise à la terre principale · Prix pour 100 m', basePrice: 185000, category: 'accessoires', stock: 10, image: '/products/cat26-p7r3.jpg' },
+  { id: 'cat26-p7r4', name: 'Câble souple H07V-K 10mm² — couronne 100 m', description: 'Âme cuivre pur (CU/PVC) · Modèle H07V-K souple · Section 10mm² · Tension 450/750V · Liaison entre le régulateur et la batterie · Prix pour 100 m', basePrice: 125500, category: 'accessoires', stock: 10, image: '/products/cat26-p7r4.jpg' },
+  { id: 'cat26-p7r5', name: 'Câble souple H07V-K 6mm² — couronne 100 m', description: 'Âme cuivre pur (CU/PVC) · Modèle H07V-K souple · Section 6mm² · Tension 450/750V · Prix pour 100 m', basePrice: 80000, category: 'accessoires', stock: 10, image: '/products/cat26-p7r5.jpg' },
+  { id: 'cat26-p8r1', name: 'Embouts de câble 16mm² — boîte de 100', description: 'Quantité 100 pièces · Section 16mm²', basePrice: 8500, category: 'accessoires', stock: 10, image: '/products/cat26-p8r1.jpg' },
+  { id: 'cat26-p8r2', name: 'Embouts de câble 10mm² — boîte de 100', description: 'Quantité 100 pièces · Section 10mm²', basePrice: 7500, category: 'accessoires', stock: 10, image: '/products/cat26-p8r2.jpg' },
+  { id: 'cat26-p8r3', name: 'Embouts de câble 6mm² — boîte de 100', description: 'Quantité 100 pièces · Section 6mm²', basePrice: 6000, category: 'accessoires', stock: 10, image: '/products/cat26-p8r3.jpg' },
+  { id: 'cat26-p8r4', name: 'Cosse batterie 35mm²', description: 'Modèle 35mm² souple · Section 35mm²', basePrice: 1300, category: 'accessoires', stock: 10, image: '/products/cat26-p8r4.jpg' },
 ];
