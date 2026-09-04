@@ -261,6 +261,7 @@ export const productCategories = [
   { id: 'onduleurs', label: 'Onduleurs' },
   { id: 'batteries', label: 'Batteries' },
   { id: 'panneaux', label: 'Panneaux' },
+  { id: 'pompes', label: 'Pompes' },
   { id: 'controleurs', label: 'Contrôleurs' },
   { id: 'accessoires', label: 'Accessoires' },
 ];
