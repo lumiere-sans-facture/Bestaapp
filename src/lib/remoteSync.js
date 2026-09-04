@@ -93,7 +93,12 @@ export async function diagnosticReplication() {
       orgProfil = data?.org_id || null;
     } catch { /* lecture refusée : le profil reste « introuvable » */ }
   }
-  return { email, profilTrouve, orgProfil, orgBase, profilId, adminPlateforme, orgEcriture: currentOrgId };
+  // Ce que le serveur a RÉELLEMENT refusé pendant cette session : le seul
+  // élément du diagnostic qui ne soit pas une déduction.
+  const refusees = lignesRefuseesParTable();
+  const refusConstates = Object.values(refusees).reduce((n, v) => n + v, 0);
+  return { email, profilTrouve, orgProfil, orgBase, profilId, adminPlateforme,
+    refusees, refusConstates, orgEcriture: currentOrgId };
 }
 
 /**

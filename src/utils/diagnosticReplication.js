@@ -35,6 +35,13 @@ export const VERDICTS = {
     detail: 'L’application écrit sous une entreprise, la base en attend une autre. '
       + 'Déconnectez-vous puis reconnectez-vous.',
   },
+  'refus-constates': {
+    titre: 'Le serveur a refusé des clients',
+    detail: 'Ce n’est pas une déduction : pendant cette session, la base a REFUSÉ '
+      + 'd’enregistrer des clients de ce compte. Peu importe ce que dit le drapeau '
+      + 'gérant plateforme — la règle posée sur la table des clients ne les laisse '
+      + 'pas passer. Le script ci-dessous la corrige.',
+  },
   'clients-non-detenus': {
     titre: 'Clients d’un autre membre, illisibles par ce compte',
     detail: 'Le serveur réserve chaque client à celui qui l’a enregistré : ceux de '
@@ -67,8 +74,17 @@ export const clientsNonDetenus = (leads = [], profilId = null) => {
 };
 
 /**
+ * Faut-il proposer la réparation ? Dès qu'un client n'est pas à ce compte —
+ * refusé pour de bon, ou seulement en attente de l'être. Le drapeau « gérant
+ * plateforme » n'entre pas dans ce calcul : il a déjà fait croire une fois que
+ * tout allait bien, et masqué le bouton à celui qui en avait besoin.
+ */
+export const reparationUtile = (etat = {}) =>
+  (etat.refusConstates || 0) > 0 || (etat.clientsNonDetenus || 0) > 0;
+
+/**
  * @param {{email?: string|null, profilTrouve?: boolean, orgBase?: string|null,
- *          orgEcriture?: string|null, local?: boolean}} etat
+ *          orgEcriture?: string|null, refusConstates?: number, local?: boolean}} etat
  * @returns {{code: keyof VERDICTS, ok: boolean, titre: string, detail: string}}
  */
 export const verdictReplication = (etat = {}) => {
@@ -79,6 +95,12 @@ export const verdictReplication = (etat = {}) => {
     if (!etat.orgBase) return 'org-introuvable';
     if (!etat.orgEcriture) return 'estampille-vide';
     if (etat.orgBase !== etat.orgEcriture) return 'org-differente';
+    // CE QUI S'EST RÉELLEMENT PASSÉ passe avant ce qu'on déduit. Le drapeau
+    // « gérant plateforme » laissait conclure que ce compte écrit partout, donc
+    // que tout allait bien — verdict vert, réparation masquée — alors que le
+    // serveur refusait des clients pour de bon. Un refus constaté ne se discute
+    // pas : c'est la politique en place qui tranche, pas le drapeau.
+    if (etat.refusConstates > 0) return 'refus-constates';
     // Le gérant plateforme écrit partout : pour lui, l'appartenance ne joue pas.
     if (!etat.adminPlateforme && etat.clientsNonDetenus > 0) return 'clients-non-detenus';
     return 'coherent';

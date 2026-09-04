@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clientsNonDetenus, verdictReplication } from '../diagnosticReplication';
+import { clientsNonDetenus, reparationUtile, verdictReplication } from '../diagnosticReplication';
 
 const complet = {
   email: 'boss@besta.tg', profilTrouve: true,
@@ -66,5 +66,49 @@ describe('clientsNonDetenus', () => {
 
   it('ne conclut rien sans identifiant de profil', () => {
     expect(clientsNonDetenus([{ id: 'a', assignedTo: 'u2' }], null)).toEqual([]);
+  });
+});
+
+describe('un refus CONSTATÉ prime sur toute déduction', () => {
+  const complet = {
+    email: 'boss@bestasolar.tg', profilTrouve: true, orgBase: 'org-1', orgEcriture: 'org-1',
+  };
+
+  it('le drapeau gérant plateforme ne blanchit plus un refus réel', () => {
+    // Le cas vécu : le drapeau valait « oui », l'app concluait que tout allait
+    // bien, et le serveur refusait 32 clients malgré tout.
+    const v = verdictReplication({ ...complet, adminPlateforme: true, clientsNonDetenus: 35, refusConstates: 32 });
+    expect(v.code).toBe('refus-constates');
+    expect(v.ok).toBe(false);
+  });
+
+  it('sans refus constaté, le gérant plateforme reste au vert', () => {
+    const v = verdictReplication({ ...complet, adminPlateforme: true, clientsNonDetenus: 35, refusConstates: 0 });
+    expect(v.code).toBe('coherent');
+  });
+
+  it('un refus constaté passe avant l’appartenance des clients', () => {
+    const v = verdictReplication({ ...complet, adminPlateforme: false, clientsNonDetenus: 4, refusConstates: 4 });
+    expect(v.code).toBe('refus-constates');
+  });
+
+  it('mais après un problème d’identité, qui, lui, se répare autrement', () => {
+    const v = verdictReplication({ ...complet, orgEcriture: 'org-2', refusConstates: 9 });
+    expect(v.code).toBe('org-differente');
+  });
+});
+
+describe('reparationUtile — le bouton doit être atteignable', () => {
+  it('s’affiche sur un refus constaté, drapeau plateforme ou non', () => {
+    expect(reparationUtile({ adminPlateforme: true, refusConstates: 32 })).toBe(true);
+  });
+
+  it('s’affiche aussi sur de simples clients d’un autre membre', () => {
+    expect(reparationUtile({ adminPlateforme: true, clientsNonDetenus: 35 })).toBe(true);
+  });
+
+  it('reste caché quand il n’y a rien à réparer', () => {
+    expect(reparationUtile({ clientsNonDetenus: 0, refusConstates: 0 })).toBe(false);
+    expect(reparationUtile({})).toBe(false);
   });
 });

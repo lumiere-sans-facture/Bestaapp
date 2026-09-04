@@ -3,7 +3,7 @@ import { Stethoscope, CheckCircle2, AlertTriangle, Send, ShieldCheck, ClipboardC
 import { signalerErreur } from '../lib/rapportErreur';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { diagnosticReplication } from '../lib/remoteSync';
-import { clientsNonDetenus, verdictReplication } from '../utils/diagnosticReplication';
+import { clientsNonDetenus, reparationUtile, verdictReplication } from '../utils/diagnosticReplication';
 import { sqlReparationPour } from '../data/sqlReparationClients';
 import { useData } from '../context/DataContext';
 import { sentryConfigure } from '../lib/sentry';
@@ -187,7 +187,11 @@ export default function DiagnosticCard() {
                   <span className="sheet-label">Entreprise écrite</span>
                   <span className="sheet-value paiement-mono">{identite.etat.orgEcriture || '—'}</span>
                 </div>
-                {identite.verdict.code === 'clients-non-detenus' && (
+                <div className="sheet-row">
+                  <span className="sheet-label">Refusés par le serveur</span>
+                  <span className="sheet-value paiement-mono">{identite.etat.refusConstates ?? 0}</span>
+                </div>
+                {reparationUtile(identite.etat) && (
                   <>
                     <p className="text-sm" style={{ margin: '10px 0 0' }}>
                       Ces clients ne partent pas d’ici et ne sont pas lisibles par ce
