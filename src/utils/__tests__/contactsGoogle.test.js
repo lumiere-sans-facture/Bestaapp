@@ -43,3 +43,46 @@ describe('contacts à envoyer vers Google', () => {
     expect(contactsGoogleAEnvoyer({ leads })).toHaveLength(3);
   });
 });
+
+describe('ordre de passage — ce qu’on regarde apparaître passe en premier', () => {
+  const tel = (id, statut) => ({
+    id, name: `Client ${id}`, phone: '+22890000001',
+    ...(statut ? { google_contact_sync_status: statut } : {}),
+  });
+
+  it('le contact qu’on vient d’enregistrer passe devant tout l’historique', () => {
+    // 30 anciens clients sans statut (repris après coup) et un seul nouveau.
+    const anciens = Array.from({ length: 30 }, (_, i) => tel(`vieux-${i}`, null));
+    const file = contactsGoogleAEnvoyer({ leads: [...anciens, tel('neuf', 'pending')] });
+    expect(file[0].contact.id).toBe('neuf');
+  });
+
+  it('un nouveau partenaire aussi', () => {
+    const file = contactsGoogleAEnvoyer({
+      partners: [tel('p-vieux', null), tel('p-neuf', 'pending')],
+      leads: [tel('l-vieux', null)],
+    });
+    expect(file[0].contact.id).toBe('p-neuf');
+  });
+
+  it('une reprise après échec passe avant le rattrapage, après les nouveaux', () => {
+    const file = contactsGoogleAEnvoyer({
+      leads: [tel('sans-statut', null), tel('echoue', 'failed'), tel('neuf', 'pending')],
+    });
+    expect(file.map((f) => f.contact.id)).toEqual(['neuf', 'echoue', 'sans-statut']);
+  });
+
+  it('à rang égal, l’ordre des listes est conservé (tri stable)', () => {
+    const file = contactsGoogleAEnvoyer({
+      leads: [tel('a', 'pending'), tel('b', 'pending'), tel('c', 'pending')],
+    });
+    expect(file.map((f) => f.contact.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('le classement ne fait entrer personne qui n’aurait pas été envoyé', () => {
+    const sansTelephone = { id: 'x', name: 'Sans numéro' };
+    const dejaFait = { ...tel('y', 'synced') };
+    expect(contactsGoogleAEnvoyer({ leads: [sansTelephone, dejaFait] })).toEqual([]);
+  });
+});
+

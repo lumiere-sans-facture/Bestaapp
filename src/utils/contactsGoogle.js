@@ -24,6 +24,27 @@ const aEnvoyer = (contact, maintenant) => {
 };
 
 /**
+ * Ordre de passage. Le carnet n'accepte que quelques contacts à la fois : ce
+ * qui part en premier décide de ce que l'utilisateur voit arriver tout de
+ * suite. Trois rangs, du plus urgent au moins urgent :
+ *
+ *   0. `pending` — le contact vient d'être enregistré et attend son tour.
+ *      C'est CELUI-LÀ que quelqu'un regarde apparaître dans son téléphone.
+ *   1. `failed`  — déjà tenté, en reprise. Son échéance le retient déjà.
+ *   2. sans statut — le rattrapage des contacts d'avant la file d'attente.
+ *
+ * Sans ce classement, un nouveau numéro passait DERRIÈRE tout l'historique :
+ * l'enregistrement était instantané avant qu'on ne reprenne les anciens
+ * contacts, il ne l'était plus après.
+ */
+const rang = (contact) => {
+  const statut = contact.google_contact_sync_status;
+  if (statut === 'pending') return 0;
+  if (statut === 'failed') return 1;
+  return 2;
+};
+
+/**
  * @param {{partners?: Array, leads?: Array, maintenant?: number,
  *          enCours?: Set<string>, limite?: number}} etat
  * @returns {Array<{contact: object, contactType: string, cle: string}>}
@@ -38,4 +59,7 @@ export const contactsGoogleAEnvoyer = ({
   .filter(({ contact, cle }) => canSyncClientContact(contact)
     && aEnvoyer(contact, maintenant)
     && !enCours.has(cle))
+  // `sort` est stable : à rang égal, l'ordre des listes est conservé — les
+  // créations récentes sont en tête (les actions les ajoutent par le début).
+  .sort((a, b) => rang(a.contact) - rang(b.contact))
   .slice(0, limite);
