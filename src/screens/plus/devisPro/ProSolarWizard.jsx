@@ -11,6 +11,7 @@ import {
 } from '../../../utils/solarSizing';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
+import { tarifElectriciteParDefaut } from '../../../utils/sizingSheet/compute';
 import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
 import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
@@ -223,9 +224,13 @@ export default function ProSolarWizard({ onDone }) {
 
   const totals = useMemo(() => computeFactureTotals(lignes, tvaActive), [lignes, tvaActive]);
 
-  // Paramètres de rentabilité de la fiche (page 3) — vides = défauts
-  // (tarif 145 F/kWh, taux 0,85, maintenance 50 000 F/an, provision 320 000 F,
-  // investissement = total du devis).
+  // Paramètres de rentabilité de la fiche (page 3) — vides = défauts.
+  // Le tarif est automatique : 114 F/kWh au Togo, 145 F/kWh au Bénin.
+  const clientSelectionne = clientMode === 'new'
+    ? newClient
+    : (myClients.find((c) => c.id === clientId) || {});
+  const villeDimensionnement = location?.name || clientSelectionne.ville || '';
+  const tarifElecDefaut = tarifElectriciteParDefaut(villeDimensionnement, location?.country || '');
   const [renta, setRenta] = useState({ tarifElec: '', tauxUtilisation: '', maintenanceAnnuelle: '', provisionOnduleur: '', investissement: '' });
   // Production de la fiche PDF : quelques secondes sur un téléphone d'entrée
   // de gamme. Sans cet état, on appuie deux fois et deux onglets s'ouvrent.
@@ -243,6 +248,7 @@ export default function ProSolarWizard({ onDone }) {
     setFicheEnCours(true);
     const { ouvrirFichePdf } = await import('../../../utils/sizingSheet');
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
+    const villeFiche = location?.name || client.ville || null;
     await ouvrirFichePdf({
       // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
       // coordonnées), comme ses devis et ses factures.
@@ -253,7 +259,8 @@ export default function ProSolarWizard({ onDone }) {
       consumption,
       systemType,
       sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
-      cityName: location?.name || client.ville || null,
+      cityName: villeFiche,
+      cityCountry: location?.country || '',
       solarSource: solar?.source || null,
       sizing,
       inverter,
@@ -624,9 +631,9 @@ export default function ProSolarWizard({ onDone }) {
                 <details className="geo-manual" style={{ marginTop: 12 }}>
                   <summary>Paramètres de rentabilité de la fiche (facultatif)</summary>
                   <div className="form-row-2">
-                    <Field label="Tarif électricité (F CFA/kWh)">
+                    <Field label={`Tarif électricité (F CFA/kWh) — défaut : ${tarifElecDefaut} F`}>
                       <input className="input" type="number" min="1" value={renta.tarifElec}
-                        onChange={(e) => setRenta({ ...renta, tarifElec: e.target.value })} placeholder="145" />
+                        onChange={(e) => setRenta({ ...renta, tarifElec: e.target.value })} placeholder={String(tarifElecDefaut)} />
                     </Field>
                     <Field label="Taux d'utilisation (0–1)">
                       <input className="input" type="number" min="0.1" max="1" step="0.05" value={renta.tauxUtilisation}

@@ -71,11 +71,38 @@ export const productionAnnuelle = (kwc, hspPireMois, ville) =>
   Math.round(couvertureMensuelle({ kwc, hspRetenu: hspPireMois, ville, consoJour: 0 }).production);
 
 // ---- Rentabilité ----
+// Le tarif dépend du lieu choisi pour le dimensionnement. Le Bénin reste
+// la référence par défaut, tandis qu'une ville géocodée au Togo utilise 114 F/kWh.
+export const TARIF_ELECTRICITE_BENIN = 145;
+export const TARIF_ELECTRICITE_TOGO = 114;
+
+const normaliserLieu = (valeur = '') => String(valeur)
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .trim()
+  .toLowerCase();
+
+// Repli lorsque seule la ville a été saisie sans la recherche de localisation.
+const VILLES_TOGO = new Set([
+  'lome', 'aneho', 'tsevie', 'kara', 'sokode', 'atakpame', 'kpalime',
+  'dapaong', 'mango', 'bafilo', 'niamtougou', 'notse', 'badou',
+]);
+
+export const estVilleDuTogo = (ville = '', pays = '') => {
+  const paysNormalise = normaliserLieu(pays);
+  const villeNormalisee = normaliserLieu(ville);
+  if (paysNormalise === 'tg' || paysNormalise.includes('togo') || villeNormalisee.includes('togo')) return true;
+  return VILLES_TOGO.has(villeNormalisee.split(',')[0].trim());
+};
+
+export const tarifElectriciteParDefaut = (ville = '', pays = '') =>
+  (estVilleDuTogo(ville, pays) ? TARIF_ELECTRICITE_TOGO : TARIF_ELECTRICITE_BENIN);
+
 // Tous les paramètres sont surchargeables ; les montants affichés sont
 // RECALCULÉS depuis les valeurs arrondies affichées (jamais des flottants),
 // pour que le lecteur puisse refaire chaque calcul à la main.
 export const RENTA_DEFAUTS = {
-  tarifElec: 145,            // F CFA / kWh
+  tarifElec: TARIF_ELECTRICITE_BENIN, // F CFA / kWh
   tauxUtilisation: 0.85,     // part de la production réellement consommée
   horizon: 10,               // ans
   maintenanceAnnuelle: 50000, // F CFA / an, À PARTIR de la 2e année
@@ -155,7 +182,13 @@ export const computeSheet = (d) => {
   const energieJour = conso.day + nightEnergyForPanels;
   const panelWc = Number((String(d.panelName || '').match(/(\d{3,4})\s*W/i) || [])[1]) || 550;
   const kwc = (d.sizing.numberOfPanels * panelWc) / 1000;
-  const renta = calculerRentabilite(consoJour, d.investissement ?? null, d.rentabilite || {});
+  // Un tarif saisi à la main reste prioritaire. Sans surcharge, le tarif est
+  // déterminé par la ville/pays sélectionnés pendant le dimensionnement.
+  const rentabilite = { ...(d.rentabilite || {}) };
+  if (!(Number(rentabilite.tarifElec) > 0)) {
+    rentabilite.tarifElec = tarifElectriciteParDefaut(d.cityName, d.cityCountry);
+  }
+  const renta = calculerRentabilite(consoJour, d.investissement ?? null, rentabilite);
   const couverture = couvertureMensuelle({
     kwc, hspRetenu: Number(d.sunHours) || 0, ville: d.cityName, consoJour,
   });

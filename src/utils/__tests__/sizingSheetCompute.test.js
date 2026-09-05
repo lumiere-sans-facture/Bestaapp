@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   couvertureMensuelle, calerProfilSurPireMois, profilPourVille, productionJour,
-  productionAnnuelle, calculerRentabilite, libelleRoi, JOURS_MOIS,
+  productionAnnuelle, calculerRentabilite, computeSheet, tarifElectriciteParDefaut, libelleRoi, JOURS_MOIS,
 } from '../sizingSheet/compute';
 import { calculateSystemSize, SIZING_PARAMS, PANEL_REFERENCE_WC } from '../solarSizing';
 
@@ -72,6 +72,21 @@ describe('production mensuelle', () => {
 });
 
 describe('rentabilité — montants recalculés depuis les valeurs affichées', () => {
+  it('applique 114 F/kWh aux villes du Togo et conserve 145 F/kWh au Bénin', () => {
+    expect(tarifElectriciteParDefaut('Lomé', 'Togo')).toBe(114);
+    expect(tarifElectriciteParDefaut('Kara', '')).toBe(114);
+    expect(tarifElectriciteParDefaut('Cotonou', 'Bénin')).toBe(145);
+
+    const dossierTogo = {
+      consumption: { day: 12, night: 3 },
+      sizing: { autonomyNights: 1, numberOfPanels: 10, batteryCapacity: 0 },
+      systemType: 'off-grid', panelName: 'Panneau 550W', sunHours: 4.3,
+      batteries: [], cityName: 'Lomé', cityCountry: 'Togo',
+    };
+    expect(computeSheet(dossierTogo).renta.tarifElec).toBe(114);
+    expect(computeSheet({ ...dossierTogo, rentabilite: { tarifElec: 130 } }).renta.tarifElec).toBe(130);
+  });
+
   // Cas de référence (climatiseur 3 CV) : 17,6 kWh/j, investissement 2 300 000 F.
   const r = calculerRentabilite(17.6, 2300000);
 
