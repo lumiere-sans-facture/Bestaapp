@@ -233,6 +233,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
       systemType,
       sunHours: psh,
       cityName: location?.name || lead?.address || null,
+      cityCountry: location?.country || '',
       solarSource: solar?.source || null,
       sizing,
       // Seules les grandeurs techniques sont transmises : les marques du
