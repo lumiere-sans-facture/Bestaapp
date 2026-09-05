@@ -14,7 +14,10 @@ import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
 import { TVA_PCT } from '../../config/company';
 import { signalerErreur } from '../../lib/rapportErreur';
-import { capturerDimensionnement, restaurerDimensionnement, prochainRowId } from '../../utils/dimensionnement';
+import {
+  capturerDimensionnement, restaurerDimensionnement, prochainRowId,
+  localisationAvecCoordonnees, donneesSolairesCompletes,
+} from '../../utils/dimensionnement';
 
 let rowSeq = 0;
 
@@ -95,6 +98,10 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   const [solar, setSolar] = useState(reprise.solarSource ? { source: reprise.solarSource } : null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
+  // Un devis rouvert peut venir d'une ancienne version : il garde alors le
+  // nom de la ville et la source solaire, mais pas leurs statistiques.
+  const locationAvecCoords = localisationAvecCoordonnees(location);
+  const solaireComplet = donneesSolairesCompletes(solar);
 
   const loadSolar = async (loc) => {
     setLocation(loc);
@@ -530,11 +537,13 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                 <div className="geo-result">
                   <MapPin size={15} />
                   <strong>{location.name}</strong>
-                  <span className="geo-coords">({location.lat.toFixed(2)}°, {location.lon.toFixed(2)}°)</span>
+                  {locationAvecCoords && (
+                    <span className="geo-coords">({Number(location.lat).toFixed(2)}°, {Number(location.lon).toFixed(2)}°)</span>
+                  )}
                 </div>
               )}
 
-              {solar && (
+              {solaireComplet && (
                 <div className="solar-card">
                   <div className="solar-card-head">
                     <span className="solar-card-title"><Sun size={15} /> Ensoleillement — {location?.name}</span>
@@ -542,18 +551,24 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                   </div>
                   <div className="solar-stats">
                     <div className="solar-stat">
-                      <div className="solar-stat-value">{solar.peakSunHours}h</div>
+                      <div className="solar-stat-value">{Number(solar.peakSunHours)}h</div>
                       <div className="solar-stat-label">Heures pic / jour (pire mois)</div>
                     </div>
                     <div className="solar-stat">
-                      <div className="solar-stat-value">{solar.yearlyYield.toLocaleString('fr-FR')}</div>
+                      <div className="solar-stat-value">{Number(solar.yearlyYield).toLocaleString('fr-FR')}</div>
                       <div className="solar-stat-label">kWh/kWc/an</div>
                     </div>
                     <div className="solar-stat">
-                      <div className="solar-stat-value">{solar.optimalAngle}°</div>
+                      <div className="solar-stat-value">{Number(solar.optimalAngle)}°</div>
                       <div className="solar-stat-label">Angle optimal</div>
                     </div>
                   </div>
+                </div>
+              )}
+              {solar && !solaireComplet && (
+                <div className="field-hint" role="status">
+                  <Sun size={13} style={{ verticalAlign: -2 }} /> Ensoleillement enregistré
+                  {solar.source ? ' — source ' + solar.source : ''}. Les données détaillées seront mises à jour lors d'une nouvelle recherche de ville.
                 </div>
               )}
 

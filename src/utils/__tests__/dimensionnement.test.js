@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   capturerDimensionnement, restaurerDimensionnement, dimensionnementRejouable,
   resumeDimensionnement, prochainRowId, VERSION_DIMENSIONNEMENT,
+  localisationAvecCoordonnees, donneesSolairesCompletes,
 } from '../dimensionnement';
 import { DEFAULT_PEAK_SUN_HOURS, DEFAULT_AUTONOMY_NIGHTS, DEFAULT_MOUNTING_TYPE } from '../solarSizing';
 import { PRIX_KWH_RESEAU, DEFAULT_REPARTITION } from '../factureConso';
@@ -85,6 +86,23 @@ describe('restaurerDimensionnement', () => {
       expect(Array.isArray(rendu.appareils)).toBe(true);
       expect(rendu.sunHours).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('réouverture d’une localisation', () => {
+  it('n’affiche pas de statistiques absentes dans un ancien devis', () => {
+    const ancien = restaurerDimensionnement({
+      dimensionnement: {
+        ...capturerDimensionnement(ETAT),
+        location: { name: 'Lomé', lat: null, lon: null },
+        solarSource: 'NASA/PVGIS',
+      },
+    });
+    expect(localisationAvecCoordonnees(ancien.location)).toBe(false);
+    expect(donneesSolairesCompletes(ancien.solar)).toBe(false);
+    expect(donneesSolairesCompletes({
+      source: 'NASA/PVGIS', peakSunHours: 4.3, yearlyYield: 1500, optimalAngle: 12,
+    })).toBe(true);
   });
 });
 
