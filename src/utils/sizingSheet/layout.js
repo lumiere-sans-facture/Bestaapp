@@ -10,7 +10,7 @@ import { SIZING_PARAMS, SYSTEM_VOLTAGE, SYSTEM_TYPES } from '../solarSizing';
 import { CUSTOM_APPLIANCE_LABEL } from '../../data/appliances';
 import { emetteurDe, policeDocument } from '../docTemplates/shared';
 import { couleursLisibles } from '../couleurDocument';
-import { getDureesVie, libelleRoi } from './compute';
+import { DUREES_VIE, libelleRoi } from './compute';
 import { renderCoverageChart } from './chart';
 
 // Milliers à espaces (« 5 400 »). L'unité, elle, est TOUJOURS accrochée à sa
@@ -149,30 +149,22 @@ export function renderSheet(d, c) {
   ];
 
   // --- Matériel (page 2, deux tableaux côte à côte) ---
-  // Si un devis a fourni la liste exacte des matériels (d.materielDevis),
-  // on l'utilise telle quelle — c'est la source de vérité commerciale.
-  // Sinon, on reconstruit la liste depuis le résultat du dimensionnement.
   const panelWc = c.panelWc;
-  let materiel;
-  if (Array.isArray(d.materielDevis) && d.materielDevis.length > 0) {
-    materiel = d.materielDevis;
-  } else {
-    const batParCapacite = new Map();
-    d.batteries.forEach((b) => batParCapacite.set(b.capacity, (batParCapacite.get(b.capacity) || 0) + b.qty));
-    materiel = [
-      { ref: `Panneau photovoltaïque ${u(nf(panelWc), 'Wc')}`, qty: d.sizing.numberOfPanels },
-      // Même calibre que le § 4 : le récapitulatif ne peut pas lister un
-      // onduleur plus petit que celui que l'étude vient de prescrire.
-      ...(d.inverter ? [{ ref: `Onduleur hybride ${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`, qty: nbOnduleurs }] : []),
-      ...[...batParCapacite.entries()].map(([capacite, qty]) => ({
-        ref: `Batterie lithium ${u(SYSTEM_VOLTAGE, 'V')} ${u(nf(Math.round((capacite * 1000) / SYSTEM_VOLTAGE)), 'Ah')} (${u(nf(capacite, capacite % 1 ? 1 : 0), 'kWh')})`,
-        qty,
-      })),
-      { ref: 'Structure de montage', qty: Math.max(1, Math.round(d.sizing.numberOfPanels / 10)) },
-      { ref: 'Kit de câblage solaire', qty: 1 },
-      { ref: 'Coffret de protection DC/AC', qty: 1 },
-    ];
-  }
+  const batParCapacite = new Map();
+  d.batteries.forEach((b) => batParCapacite.set(b.capacity, (batParCapacite.get(b.capacity) || 0) + b.qty));
+  const materiel = [
+    { ref: `Panneau photovoltaïque ${u(nf(panelWc), 'Wc')}`, qty: d.sizing.numberOfPanels },
+    // Même calibre que le § 4 : le récapitulatif ne peut pas lister un
+    // onduleur plus petit que celui que l'étude vient de prescrire.
+    ...(d.inverter ? [{ ref: `Onduleur hybride ${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`, qty: nbOnduleurs }] : []),
+    ...[...batParCapacite.entries()].map(([capacite, qty]) => ({
+      ref: `Batterie lithium ${u(SYSTEM_VOLTAGE, 'V')} ${u(nf(Math.round((capacite * 1000) / SYSTEM_VOLTAGE)), 'Ah')} (${u(nf(capacite, capacite % 1 ? 1 : 0), 'kWh')})`,
+      qty,
+    })),
+    { ref: 'Structure de montage', qty: Math.max(1, Math.round(d.sizing.numberOfPanels / 10)) },
+    { ref: 'Kit de câblage solaire', qty: 1 },
+    { ref: 'Coffret de protection DC/AC', qty: 1 },
+  ];
   const moitie = Math.ceil(materiel.length / 2);
   const tableMateriel = (items) => `
     <table>
@@ -249,12 +241,7 @@ export function renderSheet(d, c) {
   const rentaRows = [
     ['Consommation couverte', `${u(nf(renta.kwhAnnuels), 'kWh/an')} <span class="muted">(${u(nf(totalKwh, 2), 'kWh/j')} × ${nf(renta.tauxUtilisation, 2)} × 365)</span>`],
     ['Investissement estimé', renta.investissement != null ? cfa(renta.investissement) : 'À renseigner'],
-    // Quand aucun remplacement d'onduleur n'est prévu (garantie longue durée
-    // ou équipement PCS), la ligne reste présente pour rassurer le lecteur
-    // mais n'alourdit pas le calcul de rentabilité.
-    renta.provisionOnduleur > 0
-      ? [`Remplacement onduleur (1 × sur ${nf(renta.horizon)} ans)`, cfa(renta.provisionOnduleur)]
-      : ['Remplacement onduleur', '<span class="muted">Sans remplacement prévu</span>'],
+    [`Remplacement onduleur (1 × sur ${nf(renta.horizon)} ans)`, cfa(renta.provisionOnduleur)],
     [`Maintenance (${cfa(renta.maintenanceAnnuelle)}/an dès la 2ᵉ année)`, cfa(renta.maintenanceTotale)],
     [`Économies cumulées sur ${nf(renta.horizon)} ans`, cfa(renta.economiesCumulees)],
   ];
@@ -523,7 +510,7 @@ ${policeDocument()}
         <div class="stat-mois">soit ${cfa(renta.economieMensuelle)} par mois</div>
         <div class="stat-note">${u(nf(renta.kwhAnnuels), 'kWh')} × ${u(nf(renta.tarifElec), 'F CFA/kWh')}</div>
       </div>`}
-      ${stat('Retour sur investissement', libelleRoi(renta.roiMois), renta.roiMois != null ? (renta.provisionOnduleur > 0 ? 'investissement + provision onduleur couverts' : 'investissement couvert') : 'investissement à renseigner')}
+      ${stat('Retour sur investissement', libelleRoi(renta.roiMois), renta.roiMois != null ? 'investissement + provision onduleur couverts' : 'investissement à renseigner')}
       ${stat('Gain net sur la période', renta.gainNet != null ? cfa(renta.gainNet) : '—', 'économies − investissement − coûts d’exploitation')}
     </div>
     <table>
@@ -533,7 +520,7 @@ ${policeDocument()}
     </table>
     <div class="micro" style="margin-top:24px">Durée de vie des équipements</div>
     <div class="vies">
-      ${getDureesVie(renta.provisionOnduleur).map((v) => `
+      ${DUREES_VIE.map((v) => `
         <div class="stat-label">${v.equipement}</div>
         <div class="stat-value">${v.duree}</div>
         <div class="stat-note">${v.note || ''}</div>`).join('')}

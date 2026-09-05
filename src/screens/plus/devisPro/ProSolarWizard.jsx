@@ -249,14 +249,6 @@ export default function ProSolarWizard({ onDone }) {
     const { ouvrirFichePdf } = await import('../../../utils/sizingSheet');
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
     const villeFiche = location?.name || client.ville || null;
-    // Matériels du devis (section 5 de la fiche) : on exclut les lignes de
-    // service (main-d'œuvre, maçonnerie, installation) qui n'ont pas de
-    // réalité physique à lister. Les matériaux du devis réel priment sur
-    // la liste auto-générée depuis le dimensionnement.
-    const EXCLUSIONS_SERVICE = /main[- ]d[''']?\s*?œuvre|installation|maçonnerie|macon/i;
-    const materielDevis = lignes
-      .filter((l) => l.qty > 0 && !EXCLUSIONS_SERVICE.test(l.designation || ''))
-      .map((l) => ({ ref: l.designation, qty: l.qty }));
     await ouvrirFichePdf({
       // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
       // coordonnées), comme ses devis et ses factures.
@@ -274,8 +266,6 @@ export default function ProSolarWizard({ onDone }) {
       inverter,
       batteries: batteryList,
       panelName,
-      // Récapitulatif matériel : liste exacte du devis (sans services).
-      materielDevis: materielDevis.length > 0 ? materielDevis : undefined,
       // Rentabilité (page 3) : total du devis par défaut, surchargeable
       // champ par champ dans « Paramètres de rentabilité » ci-dessous.
       investissement: Number(renta.investissement) > 0 ? Number(renta.investissement) : (totals.totalTTC || null),

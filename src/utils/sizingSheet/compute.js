@@ -121,22 +121,6 @@ export const DUREES_VIE = [
 ];
 
 /**
- * Durées de vie adaptées : quand aucun remplacement d'onduleur n'est prévu
- * (provisionOnduleur === 0), on l'indique pour que le lecteur comprenne que
- * le coût est déjà inclus ou que la garantie couvre la période.
- */
-export const getDureesVie = (provisionOnduleur) => {
-  if (!provisionOnduleur) {
-    return DUREES_VIE.map((v) =>
-      v.equipement === 'Onduleur'
-        ? { ...v, duree: '10 ans+', note: 'Pas de remplacement prévu' }
-        : v,
-    );
-  }
-  return DUREES_VIE;
-};
-
-/**
  * Estimation de rentabilité sur l'horizon.
  * @param {number} consoJour       kWh/jour du dossier
  * @param {number|null} investissement  F CFA (devis) — null si inconnu
