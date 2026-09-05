@@ -26,6 +26,21 @@ const MODES_CONSO = ['appareils', 'manuel', 'facture'];
 
 const nombre = (v, defaut) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : defaut);
 const parmi = (v, valeurs, defaut) => (valeurs.includes(v) ? v : defaut);
+const estNombreFini = (v) => Number.isFinite(Number(v));
+
+/** Une localisation est assez complète pour afficher ses coordonnées. */
+export const localisationAvecCoordonnees = (location) =>
+  estNombreFini(location?.lat) && estNombreFini(location?.lon);
+
+/**
+ * Les anciens devis ne conservent que la source solaire, pas toutes les
+ * statistiques. L'écran ne doit afficher la carte détaillée que si elles sont
+ * réellement disponibles.
+ */
+export const donneesSolairesCompletes = (solar) =>
+  estNombreFini(solar?.peakSunHours)
+  && estNombreFini(solar?.yearlyYield)
+  && estNombreFini(solar?.optimalAngle);
 
 /**
  * Un appareil, nettoyé : jamais de champ inattendu recopié dans le devis.
