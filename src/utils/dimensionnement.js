@@ -26,7 +26,7 @@ const MODES_CONSO = ['appareils', 'manuel', 'facture'];
 
 const nombre = (v, defaut) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : defaut);
 const parmi = (v, valeurs, defaut) => (valeurs.includes(v) ? v : defaut);
-const estNombreFini = (v) => Number.isFinite(Number(v));
+const estNombreFini = (v) => v !== null && v !== '' && Number.isFinite(Number(v));
 
 /** Une localisation est assez complète pour afficher ses coordonnées. */
 export const localisationAvecCoordonnees = (location) =>
