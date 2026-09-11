@@ -649,8 +649,11 @@ const ONDULEUR_LINE_RE = /onduleur/i;
  *   produit (productId, réglé depuis « Mes kits ») suit son prix public
  *   ACTUEL plutôt que le prix figé à la composition du kit — modifier le prix
  *   en Boutique se répercute alors automatiquement, ici et sur les devis.
+ * @param {number} coefMainOeuvre  multiplicateur des seules lignes de main
+ *   d'œuvre : 2 pour un chantier togolais (voir utils/mainOeuvre.js), 1 sinon.
+ *   Le matériel n'est jamais touché — même fournisseur des deux côtés.
  */
-export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = []) => {
+export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = [], coefMainOeuvre = 1) => {
   const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
   // Nombre de panneaux réellement nécessaires, à la puissance crête DU KIT —
   // le kit est choisi sur sa batterie, pas sur son nombre de panneaux, donc
@@ -712,13 +715,16 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   }
   // Prix résolu ligne par ligne : celui du produit boutique lié s'il existe
   // encore (suit ses changements de prix), sinon le prix figé de la ligne.
+  // La main d'œuvre porte en plus le coefficient du pays du chantier.
+  const coef = Number(coefMainOeuvre) > 0 ? Number(coefMainOeuvre) : 1;
+  const prixUnitaire = (l) => resolveLignePrice(l, products) * (l.labor ? coef : 1);
   const toItem = (l, type) => {
-    const unitPrice = resolveLignePrice(l, products);
+    const unitPrice = prixUnitaire(l);
     return { type, name: l.designation, quantity: l.qty, unit: l.unit, unitPrice, totalPrice: l.qty * unitPrice };
   };
   const components = lines.filter((l) => !l.labor).map((l) => toItem(l, 'kit'));
   const prestations = lines.filter((l) => l.labor).map((l) => toItem(l, 'prestation'));
-  const total = lines.reduce((s, l) => s + l.qty * resolveLignePrice(l, products), 0);
+  const total = lines.reduce((s, l) => s + l.qty * prixUnitaire(l), 0);
   return {
     components, prestations,
     equipmentCost: components.reduce((s, c) => s + c.totalPrice, 0),

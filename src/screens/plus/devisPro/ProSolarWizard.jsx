@@ -12,6 +12,7 @@ import {
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import { tarifElectriciteParDefaut } from '../../../utils/sizingSheet/compute';
+import { coefficientMainOeuvre } from '../../../utils/mainOeuvre';
 import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
 import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
@@ -211,6 +212,20 @@ export default function ProSolarWizard({ onDone }) {
   const totalBatteryCapacity = batteryList.reduce((s, b) => s + b.capacity * b.qty, 0);
   const setBattery = (id, qty) => setBatteryQty((m) => ({ ...(m || {}), [id]: Math.max(0, qty) }));
 
+  // Client et lieu du chantier : ils décident du tarif du kWh de la fiche de
+  // rentabilité ET du coefficient de main d'œuvre. Déclarés ici, avant les
+  // lignes du devis, qui en dépendent maintenant.
+  const clientSelectionne = clientMode === 'new'
+    ? newClient
+    : (myClients.find((c) => c.id === clientId) || {});
+  const villeDimensionnement = location?.name || clientSelectionne.ville || '';
+  const tarifElecDefaut = tarifElectriciteParDefaut(villeDimensionnement, location?.country || '');
+  const coefMainOeuvre = coefficientMainOeuvre({
+    ville: villeDimensionnement,
+    pays: location?.country || '',
+    telephone: clientSelectionne.phone || '',
+  });
+
   const lignes = useMemo(() => {
     if (!sizing || !inverter) return [];
     return [
@@ -218,19 +233,16 @@ export default function ProSolarWizard({ onDone }) {
       { designation: inverter.model, qty: 1, pu: inverter.price },
       ...batteryList.map((b) => ({ designation: b.model, qty: b.qty, pu: b.price })),
       ...accessoryLines(sizing.numberOfPanels),
-      { designation: "Main d'œuvre et installation", qty: 1, pu: sizing.numberOfPanels * INSTALLATION_COST_PER_PANEL },
+      // Main d'œuvre doublée au Togo (utils/mainOeuvre.js) : seule cette
+      // ligne bouge, le matériel garde son prix des deux côtés.
+      { designation: "Main d'œuvre et installation", qty: 1, pu: sizing.numberOfPanels * INSTALLATION_COST_PER_PANEL * coefMainOeuvre },
     ];
-  }, [sizing, inverter, batteryList, panelName, panelPrice]);
+  }, [sizing, inverter, batteryList, panelName, panelPrice, coefMainOeuvre]);
 
   const totals = useMemo(() => computeFactureTotals(lignes, tvaActive), [lignes, tvaActive]);
 
   // Paramètres de rentabilité de la fiche (page 3) — vides = défauts.
   // Le tarif est automatique : 114 F/kWh au Togo, 145 F/kWh au Bénin.
-  const clientSelectionne = clientMode === 'new'
-    ? newClient
-    : (myClients.find((c) => c.id === clientId) || {});
-  const villeDimensionnement = location?.name || clientSelectionne.ville || '';
-  const tarifElecDefaut = tarifElectriciteParDefaut(villeDimensionnement, location?.country || '');
   const [renta, setRenta] = useState({ tarifElec: '', tauxUtilisation: '', maintenanceAnnuelle: '', provisionOnduleur: '', investissement: '' });
   // Production de la fiche PDF : quelques secondes sur un téléphone d'entrée
   // de gamme. Sans cet état, on appuie deux fois et deux onglets s'ouvrent.

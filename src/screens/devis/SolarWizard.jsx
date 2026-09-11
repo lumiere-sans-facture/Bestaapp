@@ -6,6 +6,7 @@ import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
 import { factureVersConsommation, REPARTITIONS } from '../../utils/factureConso';
 import { calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
+import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -207,9 +208,17 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   // exige plus (le kit est choisi sur sa batterie, pas sur ses panneaux).
   // La ligne « Structure de montage » varie aussi selon le support choisi —
   // ou disparaît si le client a le sien (includeMounting).
+  // Main d'œuvre doublée au Togo. Les deux signaux sont ceux qui servent déjà
+  // au tarif du kWh : la ville retenue pour le dimensionnement, et — à défaut
+  // de ville reconnue — le numéro du client.
+  const coefMainOeuvre = coefficientMainOeuvre({
+    ville: location?.name || selectedLead?.address || '',
+    pays: location?.country || '',
+    telephone: selectedLead?.phone || '',
+  });
   const displayQuotation = useMemo(
-    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS, products) : null),
-    [selectedKit, mountingType, includeMounting, sizing, INVERTERS, products]
+    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre) : null),
+    [selectedKit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre]
   );
   // Panneaux réellement inclus au devis : ceux du kit, complétés si le besoin
   // calculé en exige plus (kit choisi sur sa batterie, pas ses panneaux).
@@ -637,7 +646,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                   const isSelected = kit.id === selectedKit.id;
                   const quotation = isSelected
                     ? displayQuotation
-                    : buildKitQuotation(kit, mountingType, includeMounting, sizing, INVERTERS, products);
+                    : buildKitQuotation(kit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre);
                   return (
                     <button
                       key={kit.id}
