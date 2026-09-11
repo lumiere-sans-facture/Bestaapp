@@ -5,6 +5,9 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-09-11
+- Kit **48 kWh** (3 × 16, 24 panneaux, onduleur 12 kVA) ajouté au catalogue officiel — 7 198 700 F CFA
+
 ## 2026-08-29
 - **Connexion Google Contacts** : les deux fonctions serveur ne pouvaient pas fonctionner — quatre expressions régulières portaient un antislash de trop. L'une d'elles rendait le fichier impossible à compiler, donc à déployer ; une autre empêchait la lecture du jeton de session, d'où le `400` renvoyé à chaque tentative. Corrigées, avec le guide d'installation pas à pas qui va avec (`supabase/INSTALLATION_GOOGLE_CONTACTS.md`)
 - **« Se connecter » ouvre la connexion**, même sur un appareil ayant suivi un lien de parrainage. L'attribution vit trente jours et détournait la route vers l'inscription pendant tout ce temps — invisible sur un navigateur neuf, systématique sur celui d'un visiteur réel

@@ -249,6 +249,36 @@ export const SOLAR_KITS = [
       ["Main d'œuvre", 1, 'pcs', 150000],
     ]),
   },
+  {
+    // Composition relevée sur le devis BS-20260911-0001 (7 198 700 F CFA).
+    // Le haut de gamme : trois modules de 16 kWh et un onduleur 12 kVA.
+    id: 'kit-48kwh',
+    name: 'Kit 48 kWh (3 × 16)',
+    battery: 48,
+    batteryModules: [{ capacity: 16, qty: 3 }], // détail réel pour la fiche technique
+    panels: 24,
+    panelW: 620,
+    inverter: 12,
+    lines: toLines([
+      ['Batterie lithium 16kwh Taico', 3, 'pcs', 1155000],
+      ['Panneaux Photovoltaïque 620W Jinko', 24, 'pcs', 74800],
+      ['Onduleur hybride Deye 12kva', 1, 'pcs', 1100000],
+      ['Coffret de protection DC 2 entrée/sortie', 1, 'pcs', 65000],
+      ['Disjoncteur DC 400A', 1, 'pcs', 45000],
+      ['Câble PV 1x6mm² Rouge/Noire', 100, 'm', 700],
+      ['Câble batterie 1x35mm²', 6, 'm', 4000],
+      ['Cosse batterie cuivre de 35mm²', 4, 'pcs', 1500],
+      ['Moulure 40x40', 3, 'pcs', 5500],
+      ['Kit terre', 1, 'pcs', 25000],
+      ['Câble terre 1x16mm²', 25, 'pcs', 2000],
+      ['Coffret AC', 1, 'pcs', 45000],
+      ['Câble TH AC 1x6mm²', 12, 'pcs', 1000],
+      ['Structure de montage PV rails galvanisé (Tôle)', 24, 'pcs', 10000],
+      // Prix de BASE (Bénin) : utils/mainOeuvre.js le double pour un chantier
+      // togolais. L'inscrire déjà doublé le porterait à 480 000 au Togo.
+      ["Main d'œuvre", 1, 'pcs', 240000],
+    ]),
+  },
 ];
 
 // Kits officiels déjà dotés AVANT l'introduction du registre `kitsDotes`

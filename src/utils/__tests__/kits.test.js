@@ -5,7 +5,7 @@ import { buildKitQuotation, suggestKitForBattery, suggestKitsForBattery, MOUNTIN
 const byId = (id) => SOLAR_KITS.find((k) => k.id === id);
 
 describe('buildKitQuotation', () => {
-  // Totaux exacts des 10 devis kits officiels (prix tout compris, sans TVA),
+  // Totaux exacts des 11 devis kits officiels (prix tout compris, sans TVA),
   // sur le support par défaut (tôle) : la ligne « Structure de montage » du
   // kit est recalculée au panneau, pas au prix fixe de data/kits.js.
   //
@@ -31,9 +31,13 @@ describe('buildKitQuotation', () => {
     'kit-20kwh': 3344000,
     'kit-25kwh-felicity': 4315000,
     'kit-32kwh': 4518000,
+    // 48 kWh : seul kit dont le bordereau porte DÉJÀ sa structure au bon
+    // compte (24 panneaux × 10 000 sur tôle) — devis et bordereau coïncident
+    // donc au franc près, contrairement aux trois précédents.
+    'kit-48kwh': 7198700,
   };
 
-  it('propose les 10 kits officiels', () => {
+  it('propose les 11 kits officiels', () => {
     expect(SOLAR_KITS.map((k) => k.id)).toEqual(Object.keys(TOTALS));
   });
 
@@ -45,6 +49,24 @@ describe('buildKitQuotation', () => {
       expect(q.tva).toBe(0);
     });
   }
+
+  // Relevé sur le devis BS-20260911-0001, le document qui a servi de source.
+  // Ce test est la garantie que le kit saisi dans le code chiffre EXACTEMENT
+  // comme le devis d'origine — une erreur de saisie sur une quantité ou un
+  // prix unitaire se verrait ici, pas six mois plus tard devant un client.
+  it('kit 48 kWh : composition et total conformes au devis d’origine', () => {
+    const k = byId('kit-48kwh');
+    expect(k.battery).toBe(48);
+    expect(k.batteryModules).toEqual([{ capacity: 16, qty: 3 }]);
+    expect(k.panels).toBe(24);
+    expect(k.panelW).toBe(620);
+    expect(k.inverter).toBe(12);
+    expect(k.lines.reduce((t, l) => t + l.pu * l.qty, 0)).toBe(7198700);
+    // La main d'œuvre est le prix de BASE : utils/mainOeuvre.js la double pour
+    // un chantier togolais. L'inscrire déjà doublée la porterait à 480 000.
+    const mo = k.lines.find((l) => l.labor);
+    expect(mo.pu).toBe(240000);
+  });
 
   it('chaque kit porte panneaux, puissance panneau, batterie et onduleur', () => {
     for (const k of SOLAR_KITS) {
