@@ -1396,6 +1396,11 @@ form .login-link { width: 100%; margin-top: 4px; }
 /* Une colonne partout ; les paires courtes et jumelles utilisent .form-pair. */
 .form-row-2 { display: block; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Dans une feuille, chaque pixel vertical compte : au-delà, le formulaire
+   passe sous le bord de l'écran et se remplit en aveugle, au défilement.
+   16 px entre deux champs est le confort d'une page ; 12 suffit ici, et
+   c'est ce qui fait tenir le formulaire client entier sur un téléphone. */
+.sheet-body form .input-group { margin-bottom: 12px; }
 .sheet-body form, .pro-company-form { max-width: var(--form-max); }
 .delete-product-btn { margin-top: 10px; }
 .product-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }

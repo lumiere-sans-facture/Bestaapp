@@ -12,11 +12,13 @@ import EmptyState from '../components/EmptyState';
 import ClientIdentityFields, { contactEffectif } from '../components/ClientIdentityFields';
 import ClientDetail from './clients/ClientDetail';
 import ClientsReseau from './clients/ClientsReseau';
-import { SOURCES_CONTACT } from '../utils/contactSource';
 
 // Pas de « valeur estimée » à saisir : la valeur de l'affaire se déduit
 // automatiquement des devis créés pour le client.
-const EMPTY_FORM = { name: '', contact: '', phone: '', phone2: '', email: '', address: '', notes: '', source: '', clientType: 'particulier' };
+// `phone2` et `source` n'y figurent plus : le formulaire ne les saisit plus.
+// Les fiches qui en portent déjà les CONSERVENT — `updateLead` fusionne le
+// correctif avec l'existant, il n'efface pas ce qu'il ignore.
+const EMPTY_FORM = { name: '', contact: '', phone: '', email: '', address: '', notes: '', clientType: 'particulier' };
 
 // Formulaire client partagé entre l'ajout et la modification.
 function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIcon }) {
@@ -34,17 +36,6 @@ function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIc
       <Field label="Téléphone">
         <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
       </Field>
-      <Field label="2ᵉ téléphone">
-        {/* Beaucoup de clients donnent deux numéros — un pour les appels, un
-            pour WhatsApp. Le second se perdait jusqu'ici dans les notes. */}
-        <input className="input" type="tel" value={form.phone2} onChange={(e) => setForm({ ...form, phone2: e.target.value })} placeholder="Autre numéro (facultatif)" />
-      </Field>
-      <Field label="Origine du contact">
-        <select className="input" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
-          <option value="">Non précisée</option>
-          {SOURCES_CONTACT.map((s) => <option key={s.id} value={s.id}>{s.libelle}</option>)}
-        </select>
-      </Field>
       <Field label="Email">
         <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="client@exemple.com" />
       </Field>
@@ -52,7 +43,7 @@ function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIc
         <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Quartier, ville" />
       </Field>
       <Field label="Notes">
-        <textarea className="input" rows="3" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Détails du besoin…" />
+        <textarea className="input" rows="2" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Détails du besoin…" />
       </Field>
       <button type="submit" className="btn btn-primary btn-block"><SubmitIcon size={18} /> {submitLabel}</button>
     </form>
@@ -111,11 +102,9 @@ export default function Clients() {
       name: client.name || '',
       contact: client.contact || '',
       phone: client.phone || '',
-      phone2: client.phone2 || '',
       email: client.email || '',
       address: client.address || '',
       notes: client.notes || '',
-      source: client.source || '',
       clientType: client.clientType || 'particulier',
     });
     setEditId(client.id);
