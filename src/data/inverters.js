@@ -21,4 +21,11 @@ export const INVERTER_MODELS = [
   { id: 'itel-3kva', brand: 'Itel', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 190000, efficiency: 95 },
   { id: 'hz-6kva', brand: 'HZ', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 250000, efficiency: 95 },
   { id: 'deye-6kva', brand: 'Deye', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 390000, efficiency: 96 },
+  // Onduleur du kit 48 kWh. SEUL modèle dont `maxPvPower` soit une vraie
+  // valeur constructeur (15 000 Wc) et non l'estimation kVA × 1,3, qui
+  // donnerait 15 600. Prix repris de la ligne « Onduleur » du kit.
+  // Rendement volontairement absent : il n'a pas été relevé sur la fiche
+  // technique, et l'inventer vaut moins que de le laisser vide — le résumé
+  // l'omet simplement, et « Plus › Onduleurs » permet de le renseigner.
+  { id: 'deye-12kva', brand: 'Deye', model: 'Onduleur hybride 12kVA', capacity: 12, maxPvPower: 15000, price: 1100000 },
 ];
