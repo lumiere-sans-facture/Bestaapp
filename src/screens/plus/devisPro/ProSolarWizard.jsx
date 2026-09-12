@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, FileText, Package } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
-  calculateSystemSize, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
+  calculateSystemSize, buildKitQuotation, suggestKitsForBattery, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, suggestInverterFor, limitePv, puissanceSortie, suggestBatteryCombo,
-  AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS,
+  AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE,
 } from '../../../utils/solarSizing';
+import { factureVersConsommation, PRIX_KWH_RESEAU, DEFAULT_REPARTITION } from '../../../utils/factureConso';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import { tarifElectriciteParDefaut } from '../../../utils/sizingSheet/compute';
@@ -17,6 +18,8 @@ import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
 import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
 import TvaToggle from '../../../components/TvaToggle';
+import EditableQuotation, { lignesDepuisDevisKit, lignesModifiables } from '../../../components/EditableQuotation';
+import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../components/SolarConsumptionControls';
 import { signalerErreur } from '../../../lib/rapportErreur';
 
 let rowSeq = 0;
@@ -43,7 +46,7 @@ const accessoryLines = (numberOfPanels) => [
  */
 export default function ProSolarWizard({ onDone }) {
   const { user } = useAuth();
-  const { products, proClientsForUser, addProClient, addDevis, getCompanyForUser, inverters: onduleursConfigures } = useData();
+  const { products, kits, proClientsForUser, addProClient, addDevis, getCompanyForUser, inverters: onduleursConfigures } = useData();
 
   const myClients = proClientsForUser(user.id);
   const company = getCompanyForUser(user.id);
@@ -62,14 +65,18 @@ export default function ProSolarWizard({ onDone }) {
   // --- Consommation ---
   const [rows, setRows] = useState([]);
   const [pickerId, setPickerId] = useState('');
-  const [manualMode, setManualMode] = useState(false);
+  const [consoMode, setConsoMode] = useState('appareils');
+  const manualMode = consoMode !== 'appareils';
   const [manual, setManual] = useState({ day: '', night: '' });
+  const [facture, setFacture] = useState({ montant: '', prixKwh: PRIX_KWH_RESEAU, repartition: DEFAULT_REPARTITION });
 
   // --- Système --- (off-grid par défaut : cas majoritaire sur le terrain)
   const [systemType, setSystemType] = useState('off-grid');
   const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
   // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
   const [autonomyNights, setAutonomyNights] = useState(DEFAULT_AUTONOMY_NIGHTS);
+  const [mountingType, setMountingType] = useState(DEFAULT_MOUNTING_TYPE);
+  const [includeMounting, setIncludeMounting] = useState(true);
 
   // --- Localisation / ensoleillement (PVGIS / NASA) ---
   const [query, setQuery] = useState('');
@@ -119,6 +126,9 @@ export default function ProSolarWizard({ onDone }) {
   const [showAllInverters, setShowAllInverters] = useState(false);
   const [batteryBrand, setBatteryBrand] = useState('');
   const [batteryQty, setBatteryQty] = useState(null); // null = combinaison suggérée à venir
+  const [proposalMode, setProposalMode] = useState((kits || []).length ? 'kit' : 'custom');
+  const [selectedKitId, setSelectedKitId] = useState(null);
+  const [proposalLines, setProposalLines] = useState([]);
 
   // --- Client / devis ---
   const [clientMode, setClientMode] = useState(myClients.length ? 'existing' : 'new');
@@ -138,12 +148,17 @@ export default function ProSolarWizard({ onDone }) {
   const updateRow = (rowId, field, value) => setRows((p) => p.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r)));
   const removeRow = (rowId) => setRows((p) => p.filter((r) => r.rowId !== rowId));
 
+  const factureConso = useMemo(
+    () => factureVersConsommation(facture.montant, facture.prixKwh, facture.repartition),
+    [facture]
+  );
   const consumption = useMemo(() => {
-    if (manualMode) return { day: Number(manual.day) || 0, night: Number(manual.night) || 0 };
+    if (consoMode === 'direct') return { day: Number(manual.day) || 0, night: Number(manual.night) || 0 };
+    if (consoMode === 'facture') return { day: factureConso.day, night: factureConso.night };
     const day = rows.reduce((s, r) => s + r.power * r.quantity * r.day, 0) / 1000;
     const night = rows.reduce((s, r) => s + r.power * r.quantity * r.night, 0) / 1000;
     return { day: Number(day.toFixed(2)), night: Number(night.toFixed(2)) };
-  }, [rows, manualMode, manual]);
+  }, [rows, consoMode, manual, factureConso]);
   const totalConsumption = consumption.day + consumption.night;
   // Pic de charge : toutes les charges branchées en même temps (dimensionne l'onduleur).
   const peakLoad = useMemo(() => rows.reduce((s, r) => s + r.power * r.quantity, 0), [rows]);
@@ -226,7 +241,7 @@ export default function ProSolarWizard({ onDone }) {
     telephone: clientSelectionne.phone || '',
   });
 
-  const lignes = useMemo(() => {
+  const customLines = useMemo(() => {
     if (!sizing || !inverter) return [];
     return [
       { designation: panelName, qty: sizing.numberOfPanels, pu: panelPrice },
@@ -239,7 +254,42 @@ export default function ProSolarWizard({ onDone }) {
     ];
   }, [sizing, inverter, batteryList, panelName, panelPrice, coefMainOeuvre]);
 
-  const totals = useMemo(() => computeFactureTotals(lignes, tvaActive), [lignes, tvaActive]);
+  // Même catalogue de kits et même critère de recommandation que le parcours
+  // public : la plus petite capacité batterie suffisante, variantes incluses.
+  const suggestedKits = useMemo(
+    () => (sizing ? suggestKitsForBattery(kits || [], sizing.batteryCapacity) : []),
+    [kits, sizing]
+  );
+  const effectiveKitId = suggestedKits.some((kit) => kit.id === selectedKitId)
+    ? selectedKitId
+    : (kits || []).some((kit) => kit.id === selectedKitId)
+      ? selectedKitId
+      : suggestedKits[0]?.id || kits?.[0]?.id || null;
+  const selectedKit = (kits || []).find((kit) => kit.id === effectiveKitId) || null;
+  const kitQuotation = useMemo(
+    () => (selectedKit
+      ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, onduleursConfigures || [], products)
+      : null),
+    [selectedKit, mountingType, includeMounting, sizing, onduleursConfigures, products]
+  );
+
+  const proposalKey = proposalMode === 'kit'
+    ? `kit:${effectiveKitId}:${mountingType}:${includeMounting}:${sizing?.requiredPanelPower || 0}`
+    : `custom:${inverter?.id || ''}:${JSON.stringify(batteryQty)}:${sizing?.numberOfPanels || 0}`;
+  useEffect(() => {
+    if (step !== 4) return;
+    setProposalLines(proposalMode === 'kit'
+      ? lignesDepuisDevisKit(kitQuotation)
+      : lignesModifiables(customLines));
+    // `proposalKey` décrit les choix structurants. Une modification manuelle
+    // des lignes ne le change pas et n'est donc jamais écrasée par cet effet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, proposalMode, proposalKey]);
+
+  const totals = useMemo(() => computeFactureTotals(proposalLines, tvaActive), [proposalLines, tvaActive]);
+  const proposalReady = proposalLines.length > 0 && proposalLines.every((line) => (
+    line.designation.trim() && Number(line.qty) > 0 && Number(line.pu) >= 0
+  ));
 
   // Paramètres de rentabilité de la fiche (page 3) — vides = défauts.
   // Le tarif est automatique : 114 F/kWh au Togo, 145 F/kWh au Bénin.
@@ -261,6 +311,12 @@ export default function ProSolarWizard({ onDone }) {
     const { ouvrirFichePdf } = await import('../../../utils/sizingSheet');
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
     const villeFiche = location?.name || client.ville || null;
+    const ficheInverter = proposalMode === 'kit'
+      ? (kitQuotation?.inverterSuggested || (selectedKit ? { model: `Onduleur du kit ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter } : null))
+      : inverter;
+    const ficheBatteries = proposalMode === 'kit' && selectedKit
+      ? [{ model: `Batterie du kit ${selectedKit.name}`, capacity: selectedKit.battery, qty: 1 }]
+      : batteryList;
     await ouvrirFichePdf({
       // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
       // coordonnées), comme ses devis et ses factures.
@@ -275,9 +331,9 @@ export default function ProSolarWizard({ onDone }) {
       cityCountry: location?.country || '',
       solarSource: solar?.source || null,
       sizing,
-      inverter,
-      batteries: batteryList,
-      panelName,
+      inverter: ficheInverter,
+      batteries: ficheBatteries,
+      panelName: proposalMode === 'kit' && selectedKit ? `Panneau ${selectedKit.panelW} Wc` : panelName,
       // Rentabilité (page 3) : total du devis par défaut, surchargeable
       // champ par champ dans « Paramètres de rentabilité » ci-dessous.
       investissement: Number(renta.investissement) > 0 ? Number(renta.investissement) : (totals.totalTTC || null),
@@ -294,7 +350,7 @@ export default function ProSolarWizard({ onDone }) {
   };
 
   const submit = (statut = 'finalise') => {
-    if (!sizing || !inverter || !lignes.length) return;
+    if (!sizing || !proposalReady) return;
     let client;
     if (clientMode === 'new') {
       if (!newClient.name.trim()) return;
@@ -303,7 +359,11 @@ export default function ProSolarWizard({ onDone }) {
       client = myClients.find((c) => c.id === clientId);
       if (!client) return;
     }
-    const t = computeFactureTotals(lignes, tvaActive);
+    const lignesFinales = proposalLines.map(({ id: _id, ...line }) => line);
+    const t = computeFactureTotals(lignesFinales, tvaActive);
+    const inverterInfo = proposalMode === 'kit'
+      ? (kitQuotation?.inverterSuggested || (selectedKit ? { brand: '', model: `Onduleur du kit ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter } : null))
+      : inverter;
     addDevis({
       type: 'pro',
       leadId: null,
@@ -311,7 +371,7 @@ export default function ProSolarWizard({ onDone }) {
       clientName: client.name,
       clientPhone: client.phone || '',
       clientVille: client.ville || '',
-      lignes,
+      lignes: lignesFinales,
       subtotal: t.totalHT,
       tvaActive,
       tva: t.tva,
@@ -319,16 +379,21 @@ export default function ProSolarWizard({ onDone }) {
       statut,
       createdBy: user.id,
       pro: true,
+      kitId: proposalMode === 'kit' ? selectedKit?.id || null : null,
+      kitName: proposalMode === 'kit' ? selectedKit?.name || null : null,
       sizing: {
-        numberOfPanels: sizing.numberOfPanels,
+        numberOfPanels: proposalMode === 'kit' ? kitQuotation?.panelsIncluded || sizing.numberOfPanels : sizing.numberOfPanels,
         panelCapacity: sizing.panelCapacity,
-        inverter: { brand: inverter.brand, model: inverter.model, capacity: inverter.capacity },
-        batteryCapacity: totalBatteryCapacity,
+        inverter: inverterInfo ? { brand: inverterInfo.brand || '', model: inverterInfo.model, capacity: inverterInfo.capacity } : null,
+        batteryCapacity: proposalMode === 'kit' ? selectedKit?.battery || sizing.batteryCapacity : totalBatteryCapacity,
         systemType,
         autonomyNights,
         peakSunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
         estimatedProduction: sizing.estimatedProduction,
         city: location?.name || null,
+        consoMode,
+        consumption,
+        facture: consoMode === 'facture' ? facture : null,
       },
     });
     onDone();
@@ -390,13 +455,14 @@ export default function ProSolarWizard({ onDone }) {
         {/* Étape 2 : consommation */}
         {step === 2 && (
           <div>
-            <div className="wizard-step-header">
-              <div className="wizard-step-title">Estimez la consommation</div>
-              <button className="btn btn-sm btn-outline" onClick={() => setManualMode((m) => !m)}>
-                {manualMode ? 'Calculateur' : 'Saisie directe'}
-              </button>
-            </div>
-            {manualMode ? (
+            <div className="wizard-step-title">Estimez la consommation</div>
+            <ConsumptionModePicker value={consoMode} onChange={setConsoMode} />
+
+            {consoMode === 'facture' && (
+              <InvoiceConsumptionFields facture={facture} onChange={setFacture} result={factureConso} />
+            )}
+
+            {consoMode === 'direct' && (
               <div className="manual-consumption-grid">
                 <Field label={<><Sun size={14} /> Jour (kWh)</>}>
                   <input className="input" type="number" min="0" step="0.1" value={manual.day} onChange={(e) => setManual({ ...manual, day: e.target.value })} placeholder="0" />
@@ -405,7 +471,9 @@ export default function ProSolarWizard({ onDone }) {
                   <input className="input" type="number" min="0" step="0.1" value={manual.night} onChange={(e) => setManual({ ...manual, night: e.target.value })} placeholder="0" />
                 </Field>
               </div>
-            ) : (
+            )}
+
+            {consoMode === 'appareils' && (
               <>
                 <div className="appliance-picker">
                   <select className="input" value={pickerId} onChange={(e) => setPickerId(e.target.value)}>
@@ -452,7 +520,7 @@ export default function ProSolarWizard({ onDone }) {
             <div className="consumption-summary">
               <div className="consumption-stat day"><Sun size={16} /><div><div className="consumption-value">{nbFr(consumption.day)}</div><div className="consumption-label">Jour (kWh)</div></div></div>
               <div className="consumption-stat night"><Moon size={16} /><div><div className="consumption-value">{nbFr(consumption.night)}</div><div className="consumption-label">Nuit (kWh)</div></div></div>
-              {!manualMode && (
+              {consoMode === 'appareils' && (
                 <div className="consumption-stat peak"><Gauge size={16} /><div><div className="consumption-value">{peakLoad.toLocaleString('fr-FR')}</div><div className="consumption-label">Pic de charge (W)</div></div></div>
               )}
               <div className="consumption-stat total"><Zap size={16} /><div><div className="consumption-value">{nbFr(totalConsumption)}</div><div className="consumption-label">Total / jour (kWh)</div></div></div>
@@ -548,6 +616,70 @@ export default function ProSolarWizard({ onDone }) {
           <div>
             <div className="wizard-step-title">Matériel & devis</div>
 
+            <div className="client-type-toggle" role="group" aria-label="Source de la proposition" style={{ marginBottom: 16 }}>
+              <button type="button" className={`client-type-btn ${proposalMode === 'kit' ? 'active' : ''}`}
+                onClick={() => setProposalMode('kit')} disabled={!(kits || []).length}>
+                <Package size={15} /> Kits Besta
+              </button>
+              <button type="button" className={`client-type-btn ${proposalMode === 'custom' ? 'active' : ''}`}
+                onClick={() => setProposalMode('custom')}>
+                <Cpu size={15} /> Composition pro
+              </button>
+            </div>
+
+            {proposalMode === 'kit' && (
+              <>
+                <div className="kit-selector">
+                  <div className="kit-selector-title">Kits disponibles — les recommandations sont signalées</div>
+                  <div className="kit-options">
+                    {(kits || []).map((kit) => {
+                      const quotation = kit.id === selectedKit?.id
+                        ? kitQuotation
+                        : buildKitQuotation(kit, mountingType, includeMounting, sizing, onduleursConfigures || [], products);
+                      const recommended = suggestedKits.some((item) => item.id === kit.id);
+                      return (
+                        <button key={kit.id} type="button" className={`kit-option ${kit.id === selectedKit?.id ? 'selected' : ''}`}
+                          onClick={() => setSelectedKitId(kit.id)} aria-pressed={kit.id === selectedKit?.id}>
+                          <span className="kit-option-name">
+                            {kit.name}{recommended && <span className="kit-badge">Conseillé</span>}
+                          </span>
+                          <span className="kit-option-meta">
+                            {kit.panels} × {kit.panelW} Wc · {kit.battery} kWh · {kit.inverter} kVA · {formatCFA(quotation?.total || 0)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {selectedKit && (
+                  <div className="kit-summary">
+                    <Package size={16} />
+                    <span>{selectedKit.name} — {kitQuotation?.panelsIncluded || selectedKit.panels} panneaux · batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA</span>
+                  </div>
+                )}
+
+                <div className="chip-selector">
+                  <span className="chip-selector-label"><PanelTop size={13} /> Type de support</span>
+                  <div className="categories-scroll" style={{ marginBottom: 0, opacity: includeMounting ? 1 : 0.5 }}>
+                    {MOUNTING_TYPES.map((mounting) => (
+                      <button key={mounting.id} type="button" className={`category-chip ${mountingType === mounting.id ? 'active' : ''}`}
+                        onClick={() => setMountingType(mounting.id)} disabled={!includeMounting}>
+                        {mounting.label}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="checkbox-row" style={{ paddingTop: 2 }}>
+                    <input type="checkbox" checked={!includeMounting} onChange={(event) => setIncludeMounting(!event.target.checked)} />
+                    Ne pas inclure la structure de montage
+                  </label>
+                </div>
+              </>
+            )}
+
+            {proposalMode === 'custom' && (
+              <>
+
             {/* --- Onduleur --- */}
             <div className="mat-section-head">
               <span className="mat-section-title"><Cpu size={15} /> Onduleur</span>
@@ -625,19 +757,13 @@ export default function ProSolarWizard({ onDone }) {
                 </button>
               </>
             ) : <div className="empty-state">Aucune batterie dans la boutique.</div>}
+              </>
+            )}
 
             {/* Récapitulatif du devis, dès que l'onduleur est arrêté. */}
-            {inverter && (
+            {(proposalMode === 'kit' ? !!selectedKit : !!inverter) && (
               <>
-                <div className="bom" style={{ marginTop: 18 }}>
-                  <div className="bom-title">Équipements & prestations</div>
-                  {lignes.map((l, i) => (
-                    <div key={i} className="bom-row">
-                      <div className="bom-name">{l.designation}{l.qty > 1 ? <span className="bom-qty"> × {l.qty}</span> : ''}</div>
-                      <div className="bom-price">{formatCFA(l.qty * l.pu)}</div>
-                    </div>
-                  ))}
-                </div>
+                <EditableQuotation lines={proposalLines} onChange={setProposalLines} products={products} />
 
                 {/* Rentabilité de la fiche : chaque champ vide garde son défaut. */}
                 <details className="geo-manual" style={{ marginTop: 12 }}>
@@ -695,8 +821,8 @@ export default function ProSolarWizard({ onDone }) {
             </button>
           ) : (
             <>
-              <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!clientReady || !inverter || !lignes.length}><Check size={18} /> Créer le devis</button>
-              <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => submit('brouillon')} disabled={!clientReady || !inverter || !lignes.length}>Brouillon</button>
+              <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!clientReady || !proposalReady}><Check size={18} /> Créer le devis</button>
+              <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => submit('brouillon')} disabled={!clientReady || !proposalReady}>Brouillon</button>
             </>
           )}
         </div>
