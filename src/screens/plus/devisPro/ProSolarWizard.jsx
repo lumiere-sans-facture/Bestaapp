@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, Calculator, Banknote, PanelTop, Cpu, Battery, MapPin, Search, FileText, Package } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, FileText, Package } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
@@ -9,7 +9,7 @@ import {
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, suggestInverterFor, limitePv, puissanceSortie, suggestBatteryCombo,
   AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE,
 } from '../../../utils/solarSizing';
-import { factureVersConsommation, REPARTITIONS, PRIX_KWH_RESEAU, DEFAULT_REPARTITION } from '../../../utils/factureConso';
+import { factureVersConsommation, PRIX_KWH_RESEAU, DEFAULT_REPARTITION } from '../../../utils/factureConso';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import { tarifElectriciteParDefaut } from '../../../utils/sizingSheet/compute';
@@ -19,6 +19,7 @@ import Field from '../../../components/Field';
 import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
 import TvaToggle from '../../../components/TvaToggle';
 import EditableQuotation, { lignesDepuisDevisKit, lignesModifiables } from '../../../components/EditableQuotation';
+import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../components/SolarConsumptionControls';
 import { signalerErreur } from '../../../lib/rapportErreur';
 
 let rowSeq = 0;
@@ -455,50 +456,10 @@ export default function ProSolarWizard({ onDone }) {
         {step === 2 && (
           <div>
             <div className="wizard-step-title">Estimez la consommation</div>
-            <div className="categories-scroll" style={{ marginBottom: 12 }}>
-              {[
-                ['appareils', 'Liste des appareils'],
-                ['facture', 'Facture CEET/SBEE (F CFA)'],
-                ['direct', 'Saisie directe (kWh)'],
-              ].map(([id, label]) => (
-                <button key={id} type="button" className={`category-chip ${consoMode === id ? 'active' : ''}`}
-                  aria-pressed={consoMode === id} onClick={() => setConsoMode(id)}>
-                  {id === 'facture' ? <Banknote size={13} style={{ verticalAlign: -2, marginRight: 4 }} /> : id === 'direct' ? <Calculator size={13} style={{ verticalAlign: -2, marginRight: 4 }} /> : null}
-                  {label}
-                </button>
-              ))}
-            </div>
+            <ConsumptionModePicker value={consoMode} onChange={setConsoMode} />
 
             {consoMode === 'facture' && (
-              <>
-                <div className="manual-consumption-grid">
-                  <Field label={<><Banknote size={14} /> Facture mensuelle moyenne (F CFA)</>}>
-                    <input className="input" type="number" min="0" step="500" value={facture.montant}
-                      onChange={(e) => setFacture({ ...facture, montant: e.target.value })} placeholder="Ex : 25 000" />
-                  </Field>
-                  <Field label="Prix du kWh (F CFA)">
-                    <input className="input" type="number" min="1" value={facture.prixKwh}
-                      onChange={(e) => setFacture({ ...facture, prixKwh: e.target.value })} />
-                  </Field>
-                </div>
-                <div className="chip-selector">
-                  <span className="chip-selector-label"><Sun size={13} /> Quand consomme-t-il le plus ?</span>
-                  <div className="categories-scroll" style={{ marginBottom: 0 }}>
-                    {REPARTITIONS.map((repartition) => (
-                      <button key={repartition.id} type="button" className={`category-chip ${facture.repartition === repartition.id ? 'active' : ''}`}
-                        onClick={() => setFacture({ ...facture, repartition: repartition.id })}>
-                        {repartition.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {factureConso.kwhMois > 0 && (
-                  <div className="field-hint" role="status">
-                    ≈ {factureConso.kwhMois.toLocaleString('fr-FR')} kWh par mois,
-                    soit {nbFr(factureConso.day + factureConso.night)} kWh par jour.
-                  </div>
-                )}
-              </>
+              <InvoiceConsumptionFields facture={facture} onChange={setFacture} result={factureConso} />
             )}
 
             {consoMode === 'direct' && (
