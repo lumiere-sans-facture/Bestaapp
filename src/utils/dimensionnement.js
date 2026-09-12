@@ -22,11 +22,12 @@ import { PRIX_KWH_RESEAU, DEFAULT_REPARTITION, REPARTITIONS } from './factureCon
  */
 export const VERSION_DIMENSIONNEMENT = 1;
 
-const MODES_CONSO = ['appareils', 'manuel', 'facture'];
+const MODES_CONSO = ['appareils', 'direct', 'facture'];
 
 const nombre = (v, defaut) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : defaut);
 const parmi = (v, valeurs, defaut) => (valeurs.includes(v) ? v : defaut);
 const estNombreFini = (v) => v !== null && v !== '' && Number.isFinite(Number(v));
+const modeConso = (v) => (v === 'manuel' ? 'direct' : parmi(v, MODES_CONSO, 'appareils'));
 
 /** Une localisation est assez complète pour afficher ses coordonnées. */
 export const localisationAvecCoordonnees = (location) =>
@@ -75,7 +76,7 @@ export const prochainRowId = (appareils = []) =>
 export function capturerDimensionnement(etat = {}) {
   return {
     version: VERSION_DIMENSIONNEMENT,
-    consoMode: parmi(etat.consoMode, MODES_CONSO, 'appareils'),
+    consoMode: modeConso(etat.consoMode),
     appareils: Array.isArray(etat.rows) ? etat.rows.map((a, i) => appareilPropre(a, i)) : [],
     manuel: {
       day: String(etat.manual?.day ?? ''),
@@ -109,6 +110,28 @@ export function capturerDimensionnement(etat = {}) {
 export function restaurerDimensionnement(devis) {
   const d = devis?.dimensionnement;
   const base = capturerDimensionnement({});
+  // Les premiers devis Pro harmonisés avec le parcours public conservaient le
+  // résultat dans `sizing`, mais pas encore la photographie complète de
+  // l'étude. Ils restent réouvrables en repartant de leur consommation : les
+  // appareils détaillés ne peuvent pas être inventés, la saisie directe est
+  // donc le repli fidèle et modifiable.
+  if ((!d || typeof d !== 'object') && devis?.type === 'pro' && devis?.sizing) {
+    const ancien = devis.sizing;
+    const consommation = ancien.consumption || devis.consumption || {};
+    return {
+      ...capturerDimensionnement({
+        consoMode: ancien.consoMode === 'facture' ? 'facture' : 'direct',
+        manual: { day: consommation.day ?? '', night: consommation.night ?? '' },
+        facture: ancien.facture || {},
+        systemType: ancien.systemType,
+        autonomyNights: ancien.autonomyNights,
+        sunHours: ancien.peakSunHours,
+        location: ancien.city ? { name: ancien.city, lat: null, lon: null } : null,
+      }),
+      restaure: true,
+      ancienFormat: true,
+    };
+  }
   if (!d || typeof d !== 'object') return { ...base, restaure: false };
   return {
     ...capturerDimensionnement({
@@ -132,14 +155,24 @@ export function restaurerDimensionnement(devis) {
 export const dimensionnementRejouable = (devis) =>
   devis?.type === 'solar' && !!devis?.dimensionnement && typeof devis.dimensionnement === 'object';
 
+/** Un devis Pro peut être rouvert dès qu'il porte l'étude complète ou, pour
+ *  l'ancien format, une consommation calculée exploitable. */
+export const dimensionnementProRejouable = (devis) =>
+  devis?.type === 'pro'
+  && ((!!devis?.dimensionnement && typeof devis.dimensionnement === 'object')
+    || (!!devis?.sizing && typeof devis.sizing === 'object'
+      && !!(devis.sizing.consumption || devis.consumption)));
+
 /**
  * Résumé d'une étude en une ligne, pour l'écran des devis.
  * @returns {string} ex. « 4 appareils · 17,6 kWh/j · autonome »
  */
 export function resumeDimensionnement(devis) {
-  if (!dimensionnementRejouable(devis)) return '';
-  const d = devis.dimensionnement;
-  const conso = Number(devis.consumption?.day || 0) + Number(devis.consumption?.night || 0);
+  if (!dimensionnementRejouable(devis) && !dimensionnementProRejouable(devis)) return '';
+  const restaure = restaurerDimensionnement(devis);
+  const d = devis.dimensionnement || restaure;
+  const consommation = devis.consumption || devis.sizing?.consumption || {};
+  const conso = Number(consommation.day || 0) + Number(consommation.night || 0);
   const parties = [];
   if (d.consoMode === 'appareils') {
     const n = d.appareils?.length || 0;
