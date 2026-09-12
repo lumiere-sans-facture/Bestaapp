@@ -13,7 +13,7 @@ const FOCUSABLE =
  * fermeture au clavier (Échap), focus piégé à l'intérieur et restauré à
  * l'élément déclencheur à la fermeture.
  */
-export default function Sheet({ open, onClose, title, subtitle, children, footer }) {
+export default function Sheet({ open, onClose, title, subtitle, children, footer, className = '', headerActions = null, closePosition = 'right' }) {
   const [visible, setVisible] = useState(false);
   const sheetRef = useRef(null);
   const previouslyFocused = useRef(null);
@@ -84,7 +84,7 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
       <div className={`sheet-overlay ${visible ? 'active' : ''}`} onClick={onClose} />
       <div
         ref={sheetRef}
-        className={`sheet ${visible ? 'active' : ''}`}
+        className={`sheet ${className} ${visible ? 'active' : ''}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
@@ -92,13 +92,17 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
       >
         <div className="sheet-handle" />
         <div className="sheet-header">
-          <div>
+          {closePosition === 'left' && (
+            <button className="sheet-close" onClick={onClose} aria-label="Fermer"><X size={24} /></button>
+          )}
+          <div className="sheet-heading">
             {title && <div className="sheet-title" id={titleId}>{title}</div>}
             {subtitle && <div className="sheet-subtitle">{subtitle}</div>}
           </div>
-          <button className="sheet-close" onClick={onClose} aria-label="Fermer">
-            <X size={20} />
-          </button>
+          {headerActions && <div className="sheet-header-actions">{headerActions}</div>}
+          {closePosition !== 'left' && (
+            <button className="sheet-close" onClick={onClose} aria-label="Fermer"><X size={20} /></button>
+          )}
         </div>
         <div className="sheet-body">{children}</div>
         {footer && <div className="sheet-footer">{footer}</div>}

@@ -16,6 +16,14 @@ describe('computeFactureTotals', () => {
     expect(computeFactureTotals(lignes, true)).toEqual({ totalHT: 2500, tva: 450, totalTTC: 2950 });
   });
 
+  it('additionne les taux de TVA propres à chaque ligne', () => {
+    const mixed = [
+      { qty: 2, pu: 1000, taxRate: 0.18 },
+      { qty: 1, pu: 500, taxRate: 0 },
+    ];
+    expect(computeFactureTotals(mixed, true)).toEqual({ totalHT: 2500, tva: 360, totalTTC: 2860 });
+  });
+
   it('arrondit la TVA à l’entier', () => {
     // 333 * 0.18 = 59.94 -> 60
     expect(computeFactureTotals([{ pu: 333, qty: 1 }], true).tva).toBe(60);

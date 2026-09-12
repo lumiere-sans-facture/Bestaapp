@@ -11,7 +11,14 @@ export const FACTURE_STATUT_BADGE = {
 /** Totaux d'une facture : HT, TVA arrondie (si assujettie) au taux officiel, TTC. */
 export const computeFactureTotals = (lignes, tvaActive) => {
   const totalHT = lignes.reduce((s, l) => s + (Number(l.pu) || 0) * (Number(l.qty) || 0), 0);
-  const tva = tvaActive ? Math.round(totalHT * TVA_RATE) : 0;
+  // Les nouvelles lignes peuvent porter leur propre taux. Les documents plus
+  // anciens n'en ont pas : ils conservent alors la TVA globale historique.
+  const taxesParLigne = lignes.some((l) => l.taxRate != null);
+  const tva = tvaActive
+    ? Math.round(taxesParLigne
+      ? lignes.reduce((s, l) => s + (Number(l.pu) || 0) * (Number(l.qty) || 0) * (Number(l.taxRate) || 0), 0)
+      : totalHT * TVA_RATE)
+    : 0;
   return { totalHT, tva, totalTTC: totalHT + tva };
 };
 

@@ -265,13 +265,15 @@ export function generateProPdf({ kind, company = {}, modele = 'couleur', doc: d,
 export function devisToLignes(devisDoc, products = []) {
   // Lignes déjà stockées (devis Pro ou devis édité) : on les prend telles quelles.
   if (Array.isArray(devisDoc.lignes) && devisDoc.lignes.length) {
-    return devisDoc.lignes.map((l) => ({ designation: l.designation, qty: l.qty, pu: l.pu }));
+    return devisDoc.lignes.map((l) => ({ ...l, designation: l.designation, qty: l.qty, pu: l.pu }));
   }
   if (devisDoc.type === 'solar' && devisDoc.quotation) {
     return [...devisDoc.quotation.components, ...(devisDoc.quotation.prestations || [])].map((c) => ({
       designation: c.name,
       qty: c.quantity,
       pu: c.unitPrice,
+      itemType: (devisDoc.quotation.prestations || []).includes(c) ? 'service' : 'bien',
+      unit: (devisDoc.quotation.prestations || []).includes(c) ? 'forfait' : 'pcs',
     }));
   }
   return (devisDoc.items || []).map(({ productId, qty }) => {
