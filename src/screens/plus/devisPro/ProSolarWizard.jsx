@@ -5,7 +5,7 @@ import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
-  calculateSystemSize, buildKitQuotation, suggestKitsForBattery, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
+  calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, suggestInverterFor, limitePv, puissanceSortie, suggestBatteryCombo,
   AUTONOMY_OPTIONS, MOUNTING_TYPES,
 } from '../../../utils/solarSizing';
@@ -273,17 +273,18 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     () => (sizing ? suggestKitsForBattery(kits || [], sizing.batteryCapacity) : []),
     [kits, sizing]
   );
+  // Comme dans le parcours public, la sélection est strictement limitée aux
+  // variantes de la capacité compatible retenue. Un ancien choix devenu trop
+  // petit après modification du besoin ne doit jamais rester sélectionné.
   const effectiveKitId = suggestedKits.some((kit) => kit.id === selectedKitId)
     ? selectedKitId
-    : (kits || []).some((kit) => kit.id === selectedKitId)
-      ? selectedKitId
-      : suggestedKits[0]?.id || kits?.[0]?.id || null;
+    : suggestedKits[0]?.id || null;
   const selectedKit = (kits || []).find((kit) => kit.id === effectiveKitId) || null;
   const kitQuotation = useMemo(
     () => (selectedKit
-      ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, onduleursConfigures || [], products)
+      ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, onduleursConfigures || [], products, coefMainOeuvre)
       : null),
-    [selectedKit, mountingType, includeMounting, sizing, onduleursConfigures, products]
+    [selectedKit, mountingType, includeMounting, sizing, onduleursConfigures, products, coefMainOeuvre]
   );
 
   const proposalKey = proposalMode === 'kit'
@@ -651,33 +652,52 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
 
             {proposalMode === 'kit' && (
               <>
-                <div className="kit-selector">
-                  <div className="kit-selector-title">Kits disponibles — les recommandations sont signalées</div>
-                  <div className="kit-options">
-                    {(kits || []).map((kit) => {
-                      const quotation = kit.id === selectedKit?.id
-                        ? kitQuotation
-                        : buildKitQuotation(kit, mountingType, includeMounting, sizing, onduleursConfigures || [], products);
-                      const recommended = suggestedKits.some((item) => item.id === kit.id);
-                      return (
-                        <button key={kit.id} type="button" className={`kit-option ${kit.id === selectedKit?.id ? 'selected' : ''}`}
-                          onClick={() => setSelectedKitId(kit.id)} aria-pressed={kit.id === selectedKit?.id}>
-                          <span className="kit-option-name">
-                            {kit.name}{recommended && <span className="kit-badge">Conseillé</span>}
-                          </span>
-                          <span className="kit-option-meta">
-                            {kit.panels} × {kit.panelW} Wc · {kit.battery} kWh · {kit.inverter} kVA · {formatCFA(quotation?.total || 0)}
-                          </span>
-                        </button>
-                      );
-                    })}
+                {suggestedKits.length ? (
+                  <div className="kit-selector">
+                    <div className="kit-selector-title">{suggestedKits.length > 1 ? 'Kits suggérés' : 'Kit suggéré'}</div>
+                    <div className="kit-options">
+                      {suggestedKits.map((kit) => {
+                        const isSelected = kit.id === selectedKit?.id;
+                        const quotation = isSelected
+                          ? kitQuotation
+                          : buildKitQuotation(kit, mountingType, includeMounting, sizing, onduleursConfigures || [], products, coefMainOeuvre);
+                        return (
+                          <button key={kit.id} type="button" className={`kit-option ${isSelected ? 'selected' : ''}`}
+                            onClick={() => setSelectedKitId(kit.id)} aria-pressed={isSelected}>
+                            <span className="kit-option-name">
+                              {kit.name}<span className="kit-badge">Suggéré</span>
+                            </span>
+                            <span className="kit-option-meta">{formatCFA(quotation?.total || 0)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="empty-state">Aucun kit compatible n’est disponible. Utilisez la composition Pro ou ajoutez un kit adapté.</div>
+                )}
 
                 {selectedKit && (
                   <div className="kit-summary">
                     <Package size={16} />
-                    <span>{selectedKit.name} — {kitQuotation?.panelsIncluded || selectedKit.panels} panneaux · batterie {selectedKit.battery} kWh · onduleur {selectedKit.inverter} kVA</span>
+                    <span>
+                      {selectedKit.name} — {kitQuotation?.panelsIncluded || selectedKit.panels} panneaux {selectedKit.panelW}Wc
+                      {(kitQuotation?.panelsIncluded || selectedKit.panels) > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
+                      {' '}· batterie {selectedKit.battery} kWh · onduleur{' '}
+                      {kitQuotation?.inverterSuggested
+                        ? `${kitQuotation.inverterSuggested.quantite > 1 ? `${kitQuotation.inverterSuggested.quantite} × ` : ''}${kitQuotation.inverterSuggested.capacity} kVA ${kitQuotation.inverterSuggested.brand}`
+                        : `${selectedKit.inverter} kVA`}
+                    </span>
+                  </div>
+                )}
+
+                {kitQuotation?.inverterSuggested && (
+                  <div className="field-hint" role="status" style={{ marginTop: -6, marginBottom: 12 }}>
+                    <Cpu size={13} style={{ verticalAlign: -2 }} /> Onduleur adapté automatiquement : celui du kit
+                    ({selectedKit.inverter} kVA) ne suffit pas pour ce besoin —{' '}
+                    {kitQuotation.inverterSuggested.quantite > 1 && `${kitQuotation.inverterSuggested.quantite} × `}
+                    {designationOnduleur(kitQuotation.inverterSuggested)}
+                    {kitQuotation.inverterSuggested.quantite > 1 ? ' en parallèle' : ''} retenus à la place.
                   </div>
                 )}
 
