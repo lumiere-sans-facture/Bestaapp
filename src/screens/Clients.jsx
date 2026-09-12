@@ -36,9 +36,6 @@ function ClientForm({ form, setForm, onSubmit, submitLabel, submitIcon: SubmitIc
       <Field label="Téléphone">
         <input className="input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+228 ..." />
       </Field>
-      <Field label="Email">
-        <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="client@exemple.com" />
-      </Field>
       <Field label="Adresse">
         <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Quartier, ville" />
       </Field>
