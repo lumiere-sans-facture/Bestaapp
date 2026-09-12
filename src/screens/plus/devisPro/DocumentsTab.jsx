@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, ChevronRight, Search, CheckCircle, Pencil, Wallet, Send } from 'lucide-react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, ChevronRight, Search, CheckCircle, Pencil, Wallet, Send, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
@@ -19,6 +19,7 @@ import Sheet from '../../../components/Sheet';
 import ConfirmSheet from '../../../components/ConfirmSheet';
 import { useToast } from '../../../components/Toast';
 import DevisEditSheet from '../../devis/DevisEditSheet';
+import { dimensionnementProRejouable, resumeDimensionnement } from '../../../utils/dimensionnement';
 
 
 const nextStatut = (s) => (s === 'brouillon' ? 'emise' : 'payee');
@@ -46,6 +47,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const [modeleChoisi, setModeleChoisi] = useState(null);
   const modeleActif = modeleChoisi || modeleDefaut;
   const [editDevis, setEditDevis] = useState(null);
+  const [devisAModifier, setDevisAModifier] = useState(null);
   const [factureEdit, setFactureEdit] = useState(null);
   const [payFacture, setPayFacture] = useState(null); // facture en cours d'encaissement
   // Confirmation en cours : { title, message, confirmLabel, danger, action }.
@@ -85,7 +87,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
     </div>
   );
   const switchTab = (t) => { setTab(t); setStatusFilter('all'); setSearch(''); };
-  const closeCreate = () => { setView('list'); setCreateMode('choose'); };
+  const closeCreate = () => { setView('list'); setCreateMode('choose'); setDevisAModifier(null); };
 
   const submitFacture = (data) => {
     if (factureEdit) updateFacture(factureEdit.id, data);
@@ -180,11 +182,11 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   if (view === 'create') {
     return (
       <>
-        <button className="btn btn-outline btn-sm back-button" onClick={createMode === 'choose' ? closeCreate : () => setCreateMode('choose')}>
-          <ChevronLeft size={16} /> {createMode === 'choose' ? 'Retour aux documents' : 'Changer de type'}
+        <button className="btn btn-outline btn-sm back-button" onClick={devisAModifier || createMode === 'choose' ? closeCreate : () => setCreateMode('choose')}>
+          <ChevronLeft size={16} /> {devisAModifier || createMode === 'choose' ? 'Retour aux documents' : 'Changer de type'}
         </button>
-        <div className="section-title">Nouveau devis</div>
-        {createMode === 'choose' && (
+        <div className="section-title">{devisAModifier ? 'Modifier le dimensionnement' : 'Nouveau devis'}</div>
+        {!devisAModifier && createMode === 'choose' && (
           <div className="devis-mode-grid">
             <button className="devis-mode-card featured" onClick={() => setCreateMode('solar')}>
               <span className="devis-mode-badge">Recommandé</span>
@@ -199,8 +201,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             </button>
           </div>
         )}
-        {createMode === 'solar' && <ProSolarWizard onDone={closeCreate} />}
-        {createMode === 'manual' && <ProDevisBuilder onDone={closeCreate} />}
+        {(devisAModifier || createMode === 'solar') && <ProSolarWizard onDone={closeCreate} devisAModifier={devisAModifier} />}
+        {!devisAModifier && createMode === 'manual' && <ProDevisBuilder onDone={closeCreate} />}
       </>
     );
   }
@@ -427,6 +429,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
           <div className="doc-actions-list">
             <div className="sheet-row"><span className="sheet-label">Client</span><span className="sheet-value">{clientOf(actions.doc)}</span></div>
             <div className="sheet-row"><span className="sheet-label">Total TTC</span><span className="sheet-value amount">{formatCFA(actions.doc.total)}</span></div>
+            {dimensionnementProRejouable(actions.doc) && (
+              <div className="sheet-row"><span className="sheet-label">Dimensionnement</span><span className="sheet-value">{resumeDimensionnement(actions.doc)}</span></div>
+            )}
             {factureByDevis.get(actions.doc.id) && (
               <div className="sheet-row"><span className="sheet-label">Facturé</span><span className="sheet-value">{factureByDevis.get(actions.doc.id).numero}</span></div>
             )}
@@ -437,6 +442,16 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
             <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions.doc); setActions(null); }}>
               <Pencil size={16} /> Modifier le devis
             </button>
+            {dimensionnementProRejouable(actions.doc) && (
+              <button className="btn btn-outline btn-block" onClick={() => {
+                setDevisAModifier(actions.doc);
+                setCreateMode('solar');
+                setView('create');
+                setActions(null);
+              }}>
+                <SlidersHorizontal size={16} /> Revoir le dimensionnement
+              </button>
+            )}
             <button className="btn btn-outline btn-block" onClick={() => runAction(() => convertDevis(actions.doc))}>
               <Receipt size={16} /> Convertir en facture
             </button>

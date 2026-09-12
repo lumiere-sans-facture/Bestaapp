@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   capturerDimensionnement, restaurerDimensionnement, dimensionnementRejouable,
+  dimensionnementProRejouable,
   resumeDimensionnement, prochainRowId, VERSION_DIMENSIONNEMENT,
   localisationAvecCoordonnees, donneesSolairesCompletes,
 } from '../dimensionnement';
@@ -61,6 +62,11 @@ describe('capturerDimensionnement', () => {
     expect(c.sunHours).toBe(DEFAULT_PEAK_SUN_HOURS);
     expect(c.facture.prixKwh).toBe(PRIX_KWH_RESEAU);
     expect(c.facture.repartition).toBe(DEFAULT_REPARTITION);
+  });
+
+  it('conserve la saisie directe et convertit son ancien identifiant', () => {
+    expect(capturerDimensionnement({ consoMode: 'direct' }).consoMode).toBe('direct');
+    expect(capturerDimensionnement({ consoMode: 'manuel' }).consoMode).toBe('direct');
   });
 });
 
@@ -133,6 +139,29 @@ describe('dimensionnementRejouable', () => {
     expect(dimensionnementRejouable({ type: 'solar' })).toBe(false);
     expect(dimensionnementRejouable({ type: 'manual', dimensionnement: { version: 1 } })).toBe(false);
     expect(dimensionnementRejouable(null)).toBe(false);
+  });
+});
+
+describe('dimensionnement Pro rejouable', () => {
+  it('reconnaît une étude Pro enregistrée sans l’exposer comme devis public', () => {
+    const devis = { type: 'pro', dimensionnement: capturerDimensionnement(ETAT) };
+    expect(dimensionnementProRejouable(devis)).toBe(true);
+    expect(dimensionnementRejouable(devis)).toBe(false);
+  });
+
+  it('restaure un ancien devis Pro depuis sa consommation calculée', () => {
+    const devis = {
+      type: 'pro',
+      sizing: {
+        consoMode: 'direct', consumption: { day: 4.5, night: 7.5 },
+        systemType: 'hybrid', autonomyNights: 2, peakSunHours: 4.2, city: 'Lomé',
+      },
+    };
+    expect(dimensionnementProRejouable(devis)).toBe(true);
+    const rendu = restaurerDimensionnement(devis);
+    expect(rendu).toMatchObject({ restaure: true, ancienFormat: true, consoMode: 'direct', systemType: 'hybrid' });
+    expect(rendu.manuel).toEqual({ day: '4.5', night: '7.5' });
+    expect(rendu.location).toEqual({ name: 'Lomé', lat: null, lon: null });
   });
 });
 

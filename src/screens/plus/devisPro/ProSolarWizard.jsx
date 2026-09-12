@@ -7,9 +7,9 @@ import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAp
 import {
   calculateSystemSize, buildKitQuotation, suggestKitsForBattery, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
   inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, suggestInverterFor, limitePv, puissanceSortie, suggestBatteryCombo,
-  AUTONOMY_OPTIONS, DEFAULT_AUTONOMY_NIGHTS, MOUNTING_TYPES, DEFAULT_MOUNTING_TYPE,
+  AUTONOMY_OPTIONS, MOUNTING_TYPES,
 } from '../../../utils/solarSizing';
-import { factureVersConsommation, PRIX_KWH_RESEAU, DEFAULT_REPARTITION } from '../../../utils/factureConso';
+import { factureVersConsommation } from '../../../utils/factureConso';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import { tarifElectriciteParDefaut } from '../../../utils/sizingSheet/compute';
@@ -21,6 +21,10 @@ import TvaToggle from '../../../components/TvaToggle';
 import EditableQuotation, { lignesDepuisDevisKit, lignesModifiables } from '../../../components/EditableQuotation';
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../components/SolarConsumptionControls';
 import { signalerErreur } from '../../../lib/rapportErreur';
+import {
+  capturerDimensionnement, restaurerDimensionnement, prochainRowId,
+  localisationAvecCoordonnees, donneesSolairesCompletes,
+} from '../../../utils/dimensionnement';
 
 let rowSeq = 0;
 const EMPTY_CLIENT = { name: '', contact: '', phone: '', ville: '', type: 'particulier' };
@@ -44,9 +48,16 @@ const accessoryLines = (numberOfPanels) => [
  * marque) → choix des batteries → devis. Les onduleurs, batteries et panneaux
  * proviennent du CATALOGUE BOUTIQUE (marques + prix réels), pas de listes en dur.
  */
-export default function ProSolarWizard({ onDone }) {
+export default function ProSolarWizard({ onDone, devisAModifier = null }) {
+  // La reprise est calculée une seule fois afin que les valeurs restaurées ne
+  // viennent jamais écraser les modifications faites pendant cette session.
+  const [reprise] = useState(() => {
+    const r = restaurerDimensionnement(devisAModifier);
+    rowSeq = Math.max(rowSeq, prochainRowId(r.appareils) - 1);
+    return r;
+  });
   const { user } = useAuth();
-  const { products, kits, proClientsForUser, addProClient, addDevis, getCompanyForUser, inverters: onduleursConfigures } = useData();
+  const { products, kits, proClientsForUser, addProClient, addDevis, updateDevis, getCompanyForUser, inverters: onduleursConfigures } = useData();
 
   const myClients = proClientsForUser(user.id);
   const company = getCompanyForUser(user.id);
@@ -60,30 +71,32 @@ export default function ProSolarWizard({ onDone }) {
   // Prix PUBLIC, jamais le prix technicien sur un devis remis au client.
   const panelPrice = panelProduct ? prixPublic(panelProduct.basePrice) : PANEL_SPEC.price;
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(devisAModifier ? 2 : 1);
 
   // --- Consommation ---
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState(reprise.appareils);
   const [pickerId, setPickerId] = useState('');
-  const [consoMode, setConsoMode] = useState('appareils');
+  const [consoMode, setConsoMode] = useState(reprise.consoMode);
   const manualMode = consoMode !== 'appareils';
-  const [manual, setManual] = useState({ day: '', night: '' });
-  const [facture, setFacture] = useState({ montant: '', prixKwh: PRIX_KWH_RESEAU, repartition: DEFAULT_REPARTITION });
+  const [manual, setManual] = useState(reprise.manuel);
+  const [facture, setFacture] = useState(reprise.facture);
 
   // --- Système --- (off-grid par défaut : cas majoritaire sur le terrain)
-  const [systemType, setSystemType] = useState('off-grid');
-  const [sunHours, setSunHours] = useState(DEFAULT_PEAK_SUN_HOURS);
+  const [systemType, setSystemType] = useState(reprise.systemType);
+  const [sunHours, setSunHours] = useState(reprise.sunHours);
   // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
-  const [autonomyNights, setAutonomyNights] = useState(DEFAULT_AUTONOMY_NIGHTS);
-  const [mountingType, setMountingType] = useState(DEFAULT_MOUNTING_TYPE);
-  const [includeMounting, setIncludeMounting] = useState(true);
+  const [autonomyNights, setAutonomyNights] = useState(reprise.autonomyNights);
+  const [mountingType, setMountingType] = useState(reprise.mountingType);
+  const [includeMounting, setIncludeMounting] = useState(reprise.includeMounting);
 
   // --- Localisation / ensoleillement (PVGIS / NASA) ---
   const [query, setQuery] = useState('');
-  const [location, setLocation] = useState(null); // { name, lat, lon }
-  const [solar, setSolar] = useState(null);        // { peakSunHours, yearlyYield, optimalAngle, source }
+  const [location, setLocation] = useState(reprise.location); // { name, lat, lon }
+  const [solar, setSolar] = useState(reprise.solarSource ? { source: reprise.solarSource } : null); // { peakSunHours, yearlyYield, optimalAngle, source }
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const locationAvecCoords = localisationAvecCoordonnees(location);
+  const solaireComplet = donneesSolairesCompletes(solar);
 
   const loadSolar = async (loc) => {
     setLocation(loc);
@@ -126,15 +139,15 @@ export default function ProSolarWizard({ onDone }) {
   const [showAllInverters, setShowAllInverters] = useState(false);
   const [batteryBrand, setBatteryBrand] = useState('');
   const [batteryQty, setBatteryQty] = useState(null); // null = combinaison suggérée à venir
-  const [proposalMode, setProposalMode] = useState((kits || []).length ? 'kit' : 'custom');
-  const [selectedKitId, setSelectedKitId] = useState(null);
+  const [proposalMode, setProposalMode] = useState(devisAModifier?.kitId ? 'kit' : ((kits || []).length ? 'kit' : 'custom'));
+  const [selectedKitId, setSelectedKitId] = useState(devisAModifier?.kitId || null);
   const [proposalLines, setProposalLines] = useState([]);
 
   // --- Client / devis ---
-  const [clientMode, setClientMode] = useState(myClients.length ? 'existing' : 'new');
-  const [clientId, setClientId] = useState(myClients[0]?.id || '');
+  const [clientMode, setClientMode] = useState((devisAModifier?.clientId || myClients.length) ? 'existing' : 'new');
+  const [clientId, setClientId] = useState(devisAModifier?.clientId || myClients[0]?.id || '');
   const [newClient, setNewClient] = useState(EMPTY_CLIENT);
-  const [tvaActive, setTvaActive] = useState(company?.assujettieVAT || false);
+  const [tvaActive, setTvaActive] = useState(devisAModifier ? !!devisAModifier.tvaActive : (company?.assujettieVAT || false));
 
   // Appareil du catalogue, ou appareil personnalisé (tout est saisi à la main).
   const addAppliance = () => {
@@ -364,7 +377,12 @@ export default function ProSolarWizard({ onDone }) {
     const inverterInfo = proposalMode === 'kit'
       ? (kitQuotation?.inverterSuggested || (selectedKit ? { brand: '', model: `Onduleur du kit ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter } : null))
       : inverter;
-    addDevis({
+    const dimensionnement = capturerDimensionnement({
+      consoMode, rows, manual, facture, systemType, autonomyNights,
+      mountingType, includeMounting, sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+      location, solar,
+    });
+    const contenu = {
       type: 'pro',
       leadId: null,
       clientId: client.id,
@@ -381,6 +399,8 @@ export default function ProSolarWizard({ onDone }) {
       pro: true,
       kitId: proposalMode === 'kit' ? selectedKit?.id || null : null,
       kitName: proposalMode === 'kit' ? selectedKit?.name || null : null,
+      consumption,
+      dimensionnement,
       sizing: {
         numberOfPanels: proposalMode === 'kit' ? kitQuotation?.panelsIncluded || sizing.numberOfPanels : sizing.numberOfPanels,
         panelCapacity: sizing.panelCapacity,
@@ -395,7 +415,9 @@ export default function ProSolarWizard({ onDone }) {
         consumption,
         facture: consoMode === 'facture' ? facture : null,
       },
-    });
+    };
+    if (devisAModifier) updateDevis(devisAModifier.id, contenu);
+    else addDevis(contenu);
     onDone();
   };
 
@@ -576,10 +598,10 @@ export default function ProSolarWizard({ onDone }) {
                 <div className="geo-result">
                   <MapPin size={15} />
                   <strong>{location.name}</strong>
-                  <span className="geo-coords">({location.lat.toFixed(2)}°, {location.lon.toFixed(2)}°)</span>
+                  {locationAvecCoords && <span className="geo-coords">({Number(location.lat).toFixed(2)}°, {Number(location.lon).toFixed(2)}°)</span>}
                 </div>
               )}
-              {solar && (
+              {solaireComplet && (
                 <div className="solar-card">
                   <div className="solar-card-head">
                     <span className="solar-card-title"><Sun size={15} /> Ensoleillement — {location?.name}</span>
@@ -821,8 +843,8 @@ export default function ProSolarWizard({ onDone }) {
             </button>
           ) : (
             <>
-              <button className="btn btn-accent btn-block" onClick={() => submit('finalise')} disabled={!clientReady || !proposalReady}><Check size={18} /> Créer le devis</button>
-              <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => submit('brouillon')} disabled={!clientReady || !proposalReady}>Brouillon</button>
+              <button className="btn btn-accent btn-block" onClick={() => submit(devisAModifier?.statut || 'finalise')} disabled={!clientReady || !proposalReady}><Check size={18} /> {devisAModifier ? 'Mettre à jour le devis' : 'Créer le devis'}</button>
+              {!devisAModifier && <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => submit('brouillon')} disabled={!clientReady || !proposalReady}>Brouillon</button>}
             </>
           )}
         </div>
