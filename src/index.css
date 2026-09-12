@@ -384,6 +384,25 @@ textarea.input { resize: vertical; }
 
 .form-grid { display: flex; flex-direction: column; }
 
+.editable-quotation { margin-top: 18px; }
+.editable-quotation-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.editable-quotation-main { display: flex; align-items: center; gap: 8px; }
+.editable-quotation-main .input { padding-block: 8px; font-weight: 600; }
+.editable-quotation-fields { display: grid; grid-template-columns: 90px minmax(110px, 1fr); gap: 8px; align-items: end; margin-top: 8px; }
+.editable-quotation-fields label { min-width: 0; }
+.editable-quotation-fields label span { display: block; color: var(--text-muted); font-size: 0.7rem; margin-bottom: 3px; }
+.editable-quotation-fields input,
+.editable-quotation-fields select { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg-card); color: var(--text-primary); }
+.editable-quotation-fields label:nth-child(3) { grid-column: 1 / -1; }
+.editable-quotation-fields strong { grid-column: 1 / -1; text-align: right; color: var(--primary-ink); }
+.editable-quotation-add { display: flex; gap: 8px; margin-top: 12px; }
+
+@media (min-width: 640px) {
+  .editable-quotation-fields { grid-template-columns: 90px 130px minmax(180px, 1fr) auto; }
+  .editable-quotation-fields label:nth-child(3),
+  .editable-quotation-fields strong { grid-column: auto; }
+}
+
 /* ============ Connexion ============ */
 
 .login-screen {
