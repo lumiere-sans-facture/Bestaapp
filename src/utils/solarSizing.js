@@ -176,7 +176,7 @@ export const calibreRequis = (sortieW) => CALIBRES_KVA.find((k) => k * 1000 * FA
  * indulgent (voir onduleurTientLePic) : on ne reproche pas à un onduleur de
  * ne pas tenir un pic que personne n'a mesuré.
  */
-const critereDeChoix = (critere = {}) => (critere.peakLoad > 0
+export const critereDeChoix = (critere = {}) => (critere.peakLoad > 0
   ? critere
   : { ...critere, peakLoad: critere.pvPower || 0 });
 
@@ -215,21 +215,23 @@ export const onduleursEnParallele = (inv, n = 1, configures = []) => {
 /**
  * Onduleur(s) à retenir, par ESCALADE — jamais plus de deux appareils :
  *   1. le modèle préféré (celui du kit) en 1 exemplaire ;
- *   2. ce même modèle en 2 exemplaires ;
- *   3. les modèles de la liste en 1 exemplaire, du plus petit au plus grand ;
- *   4. ces mêmes modèles en 2 exemplaires.
- * Doubler le modèle du kit avant d'en changer garde la cohérence du kit ; à
- * l'inverse, un modèle supérieur seul est préféré à deux petits en parallèle.
+ *   2. les modèles de la liste en 1 exemplaire, du plus petit au plus grand ;
+ *   3. le modèle préféré en 2 exemplaires ;
+ *   4. les modèles de la liste en 2 exemplaires.
+ * UN SEUL appareil d'abord, toujours : tant qu'un modèle du catalogue suffit
+ * à lui seul, on ne met pas deux boîtiers en parallèle — c'est un câblage de
+ * plus, un point de panne de plus et une facture de plus. Le modèle du kit
+ * passe devant les autres à quantité égale, pour garder la cohérence du kit.
  * @returns {{modele:object, quantite:number, suffisant:boolean}|null}
  */
 export const resoudreOnduleur = (options = [], critere = {}, { prefere = null } = {}) => {
   const choix = critereDeChoix(critere);
   const liste = [...options].sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
-  const escalade = [
-    ...(prefere ? [{ modele: prefere, quantite: 1 }, { modele: prefere, quantite: MAX_ONDULEURS }] : []),
-    ...liste.map((o) => ({ modele: o, quantite: 1 })),
-    ...liste.map((o) => ({ modele: o, quantite: MAX_ONDULEURS })),
+  const pour = (quantite) => [
+    ...(prefere ? [{ modele: prefere, quantite }] : []),
+    ...liste.map((o) => ({ modele: o, quantite })),
   ];
+  const escalade = [...pour(1), ...pour(MAX_ONDULEURS)];
   if (!escalade.length) return null;
   const convient = ({ modele, quantite }) =>
     onduleurSuffisant(onduleursEnParallele(modele, quantite, choix.configures), choix);
@@ -607,12 +609,16 @@ export const buildQuotation = (sizing, { products = [], includeMaintenance = tru
 export const suggestKitsForBattery = (kits = [], batteryNeed = 0) => {
   if (!kits.length) return [];
   const need = Number(batteryNeed) || 0;
-  const suffisants = kits.filter((k) => k.battery >= need);
+  // La capacité saisie dans « Mes kits » peut revenir en texte (formulaire,
+  // réplication) : la comparer telle quelle laissait « 10 » ≠ 10 et vidait la
+  // liste des kits proposés. On la lit toujours en nombre.
+  const capaciteKit = (k) => Number(k?.battery) || 0;
+  const suffisants = kits.filter((k) => capaciteKit(k) >= need);
   const pool = suffisants.length ? suffisants : kits;
   const capacity = suffisants.length
-    ? Math.min(...pool.map((k) => k.battery))
-    : Math.max(...pool.map((k) => k.battery));
-  return pool.filter((k) => k.battery === capacity);
+    ? Math.min(...pool.map(capaciteKit))
+    : Math.max(...pool.map(capaciteKit));
+  return pool.filter((k) => capaciteKit(k) === capacity);
 };
 
 /** Compatibilité : le premier kit suggéré reste disponible pour les appels unitaires. */
@@ -673,8 +679,9 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const currentSpec = inverters.find((o) => o.capacity === kit.inverter);
   const pvPose = sizing?.installedPvPower || (neededPanels * (kit.panelW || 0));
   const critere = { peakLoad: sizing?.peakLoad || 0, pvPower: pvPose, configures: inverters };
-  // Escalade : l'onduleur du kit d'abord, doublé si besoin, puis un modèle
-  // supérieur, doublé à son tour — deux appareils au maximum.
+  // Escalade : l'onduleur du kit d'abord, puis un modèle supérieur SEUL —
+  // on ne double qu'une fois tous les modèles seuls épuisés (voir
+  // resoudreOnduleur), deux appareils au maximum.
   const retenu = currentSpec ? resoudreOnduleur(inverters, critere, { prefere: currentSpec }) : null;
   const change = retenu && (retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
   const inverterSuggested = change ? { ...retenu.modele, quantite: retenu.quantite } : null;

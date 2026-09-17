@@ -3,7 +3,7 @@ import { SOLAR_KITS } from '../../data/kits';
 import { INVERTER_MODELS } from '../../data/inverters';
 import { normaliserOnduleur, onduleurEstValide, resumeOnduleur, dupliquerOnduleur } from '../inverters';
 import {
-  buildKitQuotation, suggestInverterFor, puissanceSortie, limitePv,
+  buildKitQuotation, suggestInverterFor, puissanceSortie, limitePv, resoudreOnduleur,
   calibreRequis, sortieOnduleurRequise, onduleurSuffisant, onduleurTientLePic,
   onduleurAccepteLePv, designationOnduleur, calculateSystemSize, SIZING_PARAMS,
 } from '../solarSizing';
@@ -157,6 +157,52 @@ describe('aucun onduleur disponible ne convient : le dire, pas le taire', () => 
     });
     expect(sizing.inverter.capacity).toBe(8);
     expect(sizing.inverterQuantite).toBe(1);
+  });
+
+  it('un modèle supérieur SEUL passe avant le doublage de l’onduleur du kit', () => {
+    // Cas relevé sur les onduleurs configurés de l'entreprise : kit en 6 kVA
+    // (entrée PV 7 800 Wc), 11 780 Wc de panneaux posés, pic 5 000 W. Le
+    // 6 kVA tient le pic mais pas les panneaux : deux en parallèle y
+    // suffiraient — sauf qu'un seul 12 kVA (15 000 Wc) suffit aussi. Deux
+    // boîtiers là où un seul convient, c'est un câblage et une facture de trop.
+    const configures = [
+      { id: 'o3', capacity: 3, maxPvPower: 3900, price: 300000 },
+      { id: 'o6', capacity: 6, maxPvPower: 7800, price: 600000 },
+      { id: 'o12', capacity: 12, maxPvPower: 15000, price: 1100000 },
+    ];
+    const critere = { peakLoad: 5000, pvPower: 11780, configures };
+    const kitSix = configures.find((o) => o.capacity === 6);
+    const retenu = resoudreOnduleur(configures, critere, { prefere: kitSix });
+    expect(retenu.modele.capacity).toBe(12);
+    expect(retenu.quantite).toBe(1);
+    expect(retenu.suffisant).toBe(true);
+  });
+
+  it('l’onduleur du kit reste préféré tant qu’il suffit SEUL', () => {
+    const configures = [
+      { id: 'o6', capacity: 6, maxPvPower: 7800, price: 600000 },
+      { id: 'o12', capacity: 12, maxPvPower: 15000, price: 1100000 },
+    ];
+    const retenu = resoudreOnduleur(configures, { peakLoad: 4000, pvPower: 7000, configures }, {
+      prefere: configures[0],
+    });
+    expect(retenu.modele.capacity).toBe(6);
+    expect(retenu.quantite).toBe(1);
+  });
+
+  it('on ne double qu’une fois tous les modèles seuls épuisés', () => {
+    // Pic 13 000 W → 15 600 W exigés : aucun modèle seul ne tient. Deux
+    // 12 kVA (24 000 W) sont alors légitimes.
+    const configures = [
+      { id: 'o6', capacity: 6, maxPvPower: 7800, price: 600000 },
+      { id: 'o12', capacity: 12, maxPvPower: 15000, price: 1100000 },
+    ];
+    const retenu = resoudreOnduleur(configures, { peakLoad: 13000, pvPower: 11780, configures }, {
+      prefere: configures[0],
+    });
+    expect(retenu.modele.capacity).toBe(12);
+    expect(retenu.quantite).toBe(2);
+    expect(retenu.suffisant).toBe(true);
   });
 
   it('deux appareils au maximum : au-delà, l’insuffisance est signalée', () => {

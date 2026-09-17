@@ -6,7 +6,7 @@ import { formatCFA } from '../../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
   calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
-  inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, suggestInverterFor, limitePv, puissanceSortie, suggestBatteryCombo,
+  inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, suggestInverterFor, onduleurSuffisant, critereDeChoix, suggestBatteryCombo,
   AUTONOMY_OPTIONS, MOUNTING_TYPES,
 } from '../../../utils/solarSizing';
 import { factureVersConsommation } from '../../../utils/factureConso';
@@ -214,10 +214,11 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     () => (sizing ? suggestInverterFor(brandInverters, critereOnduleur) : null),
     [sizing, brandInverters, critereOnduleur]
   );
-  // Convient = tient le pic ET accepte les panneaux posés (limite PV configurée).
+  // Convient = tient le pic ET accepte les panneaux posés (limite PV
+  // configurée). Même juge que le dimensionnement (onduleurSuffisant) : la
+  // liste proposée ne peut plus diverger de l'onduleur retenu automatiquement.
   const suitableInverters = useMemo(
-    () => brandInverters.filter((i) => puissanceSortie(i) >= (critereOnduleur.peakLoad || critereOnduleur.pvPower) * 1.2
-      && (!limitePv(i, critereOnduleur.configures) || limitePv(i, critereOnduleur.configures) >= critereOnduleur.pvPower)),
+    () => brandInverters.filter((i) => onduleurSuffisant(i, critereDeChoix(critereOnduleur))),
     [brandInverters, critereOnduleur]
   );
   const shownInverters = (showAllInverters || suitableInverters.length === 0) ? brandInverters : suitableInverters;
@@ -705,7 +706,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                     ({selectedKit.inverter} kVA) ne suffit pas pour ce besoin —{' '}
                     {kitQuotation.inverterSuggested.quantite > 1 && `${kitQuotation.inverterSuggested.quantite} × `}
                     {designationOnduleur(kitQuotation.inverterSuggested)}
-                    {kitQuotation.inverterSuggested.quantite > 1 ? ' en parallèle' : ''} retenus à la place.
+                    {kitQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
                   </div>
                 )}
 

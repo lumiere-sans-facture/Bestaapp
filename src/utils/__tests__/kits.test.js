@@ -259,6 +259,20 @@ describe('suggestKitForBattery', () => {
     expect(suggestKitForBattery(kits, 0).id).toBe('k5');
   });
 
+  it('lit une capacité saisie en texte comme un nombre', () => {
+    // La capacité vient d'un champ de formulaire (« Mes kits ») et peut
+    // revenir en texte d'une sauvegarde ancienne : '10' doit se comparer
+    // comme 10, sous peine de ne suggérer plus AUCUN kit.
+    const texte = [
+      { id: 'k5', name: 'Kit 5', battery: '5' },
+      { id: 'k10', name: 'Kit 10', battery: '10' },
+      { id: 'k20', name: 'Kit 20', battery: '20' },
+    ];
+    expect(suggestKitsForBattery(texte, 6).map((k) => k.id)).toEqual(['k10']);
+    expect(suggestKitForBattery(texte, 6).id).toBe('k10');
+    expect(suggestKitForBattery(texte, 30).id).toBe('k20');
+  });
+
   it('sur les kits officiels : suggère toujours une batterie ≥ besoin quand c\'est possible', () => {
     for (const need of [1, 2.5, 4, 5, 10, 19, 20, 25, 32]) {
       const suggestion = suggestKitForBattery(SOLAR_KITS, need);

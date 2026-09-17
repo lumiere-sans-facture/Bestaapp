@@ -653,7 +653,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                 ({selectedKit.inverter} kVA) ne suffit pas pour ce besoin —{' '}
                 {displayQuotation.inverterSuggested.quantite > 1 && `${displayQuotation.inverterSuggested.quantite} × `}
                 {designationOnduleur(displayQuotation.inverterSuggested)}
-                {displayQuotation.inverterSuggested.quantite > 1 ? ' en parallèle' : ''} retenus à la place.
+                {displayQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
               </div>
             )}
             {/* Aucun onduleur configuré ne convient : le dire AVANT le devis,
