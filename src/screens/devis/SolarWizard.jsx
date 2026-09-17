@@ -7,6 +7,7 @@ import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAp
 import { factureVersConsommation } from '../../utils/factureConso';
 import { calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
 import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
+import { provisionOnduleurDuDevis } from '../../utils/sizingSheet/compute';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import PartnerField from './PartnerField';
@@ -241,6 +242,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     const lead = myLeads.find((l) => l.id === selectedLeadId);
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const apporteur = partnerId ? partners.find((p) => p.id === partnerId) : null;
+    const provisionOnduleur = provisionOnduleurDuDevis(displayQuotation?.components);
     await ouvrirFichePdf({
       client: { name: lead?.contact || lead?.name || '', phone: lead?.phone || '', ville: lead?.address || '' },
       apporteur: apporteur ? { name: apporteur.name, code: apporteur.code } : null,
@@ -260,6 +262,10 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
       panelName: `Panneau photovoltaïque ${sizing.panelWc}W`,
       // Rentabilité (page 3) : l'investissement estimé = total du devis kit.
       investissement: displayQuotation?.total || null,
+      // ... et la provision de remplacement = le prix de L'ONDULEUR DE CE
+      // DEVIS. Sans elle, toutes les fiches provisionnaient les mêmes
+      // 320 000 F, qu'on ait posé un 3 kVA ou un 12 kVA.
+      rentabilite: provisionOnduleur != null ? { provisionOnduleur } : {},
     }, { onglet }).catch((e) => {
       // L'onglet affiche déjà l'échec ; le journal en garde la trace.
       signalerErreur(e, { origine: 'fiche-dimensionnement', ecran: '/devis' });

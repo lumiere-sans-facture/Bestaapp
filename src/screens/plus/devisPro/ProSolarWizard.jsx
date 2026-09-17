@@ -12,7 +12,7 @@ import {
 import { factureVersConsommation } from '../../../utils/factureConso';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
-import { tarifElectriciteParDefaut } from '../../../utils/sizingSheet/compute';
+import { provisionOnduleurDuDevis, tarifElectriciteParDefaut } from '../../../utils/sizingSheet/compute';
 import { coefficientMainOeuvre } from '../../../utils/mainOeuvre';
 import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
@@ -301,6 +301,12 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   }, [step, proposalMode, proposalKey]);
 
   const totals = useMemo(() => computeFactureTotals(proposalLines, tvaActive), [proposalLines, tvaActive]);
+  // Provision de remplacement : le prix de l'onduleur RÉELLEMENT au devis,
+  // lignes modifiées comprises. Le champ « Provision onduleur » reste
+  // prioritaire quand le technicien y saisit un montant.
+  const provisionOnduleurDefaut = useMemo(
+    () => provisionOnduleurDuDevis(proposalLines), [proposalLines]
+  );
   const proposalReady = proposalLines.length > 0 && proposalLines.every((line) => (
     line.designation.trim() && Number(line.qty) > 0 && Number(line.pu) >= 0
   ));
@@ -355,7 +361,9 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
         ...(Number(renta.tarifElec) > 0 ? { tarifElec: Number(renta.tarifElec) } : {}),
         ...(Number(renta.tauxUtilisation) > 0 ? { tauxUtilisation: Number(renta.tauxUtilisation) } : {}),
         ...(Number(renta.maintenanceAnnuelle) >= 0 && renta.maintenanceAnnuelle !== '' ? { maintenanceAnnuelle: Number(renta.maintenanceAnnuelle) } : {}),
-        ...(Number(renta.provisionOnduleur) >= 0 && renta.provisionOnduleur !== '' ? { provisionOnduleur: Number(renta.provisionOnduleur) } : {}),
+        ...(Number(renta.provisionOnduleur) >= 0 && renta.provisionOnduleur !== ''
+          ? { provisionOnduleur: Number(renta.provisionOnduleur) }
+          : (provisionOnduleurDefaut != null ? { provisionOnduleur: provisionOnduleurDefaut } : {})),
       },
     }, { onglet }).catch((e) => {
       // L'onglet affiche déjà l'échec ; le journal en garde la trace.
@@ -825,7 +833,8 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                     </Field>
                     <Field label="Provision onduleur (F CFA)">
                       <input className="input" type="number" min="0" value={renta.provisionOnduleur}
-                        onChange={(e) => setRenta({ ...renta, provisionOnduleur: e.target.value })} placeholder="320 000" />
+                        onChange={(e) => setRenta({ ...renta, provisionOnduleur: e.target.value })}
+                        placeholder={provisionOnduleurDefaut != null ? String(provisionOnduleurDefaut) : '320 000'} />
                     </Field>
                   </div>
                   <Field label="Investissement estimé (F CFA)">

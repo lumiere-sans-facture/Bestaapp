@@ -106,7 +106,42 @@ export const RENTA_DEFAUTS = {
   tauxUtilisation: 0.85,     // part de la production réellement consommée
   horizon: 10,               // ans
   maintenanceAnnuelle: 50000, // F CFA / an, À PARTIR de la 2e année
-  provisionOnduleur: 320000, // F CFA — 1 remplacement (durée de vie 5 ans)
+  // F CFA — 1 remplacement (durée de vie 5 ans). REPLI seulement : quand le
+  // devis est connu, c'est le prix de SON onduleur qui fait la provision
+  // (provisionOnduleurDuDevis ci-dessous). Un montant fixe faisait provisionner
+  // 320 000 pour un onduleur à 1 100 000 comme pour un autre à 160 000.
+  provisionOnduleur: 320000,
+};
+
+// Une ligne de devis d'onduleur COMMENCE par le mot — « Onduleur hybride Deye
+// 12kva », « Onduleur Hybride 6kva Itel Energy ». Le chercher n'importe où
+// dans la désignation ramasserait les accessoires qui le mentionnent, comme
+// le « Module dongle Wi-Fi pour onduleur », et gonflerait la provision.
+const DESIGNATION_ONDULEUR = /^\s*onduleur/i;
+
+// Les lignes ont deux formes selon leur origine : { designation, qty, pu }
+// côté Pro, { name, quantity, unitPrice, totalPrice } pour un devis de kit.
+const designationLigne = (l) => String(l?.designation ?? l?.name ?? '');
+const montantLigne = (l) => {
+  const total = Number(l?.totalPrice);
+  if (Number.isFinite(total) && total > 0) return total;
+  return (Number(l?.qty ?? l?.quantity) || 0) * (Number(l?.pu ?? l?.unitPrice) || 0);
+};
+
+/**
+ * Provision de remplacement, prise sur le devis lui-même : l'onduleur qu'on
+ * remplacera est celui qu'on installe. Deux onduleurs en parallèle comptent
+ * pour deux — la ligne porte sa quantité.
+ *
+ * @param {Array} lignes  lignes du devis, dans l'une ou l'autre forme
+ * @returns {number|null} montant, ou null si aucune ligne d'onduleur — au
+ *   destinataire de retomber alors sur RENTA_DEFAUTS.
+ */
+export const provisionOnduleurDuDevis = (lignes = []) => {
+  const total = (lignes || [])
+    .filter((l) => DESIGNATION_ONDULEUR.test(designationLigne(l)))
+    .reduce((somme, l) => somme + montantLigne(l), 0);
+  return total > 0 ? Math.round(total) : null;
 };
 
 // Durées de vie annoncées, de la plus longue à la plus courte : le lecteur
