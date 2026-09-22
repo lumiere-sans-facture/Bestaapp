@@ -3,6 +3,7 @@ import { Crown, Check, X, TrendingUp, Users, Clock, Handshake } from 'lucide-rea
 import { useData } from '../../context/DataContext';
 import { formatCFA, formatDate } from '../../utils/format';
 import { effectiveStatus, daysLeft, prixMensuelEquivalent } from '../../utils/subscription';
+import { estEssai } from '../../utils/codePromo';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import {
   adminSubscriptionsOverview,
@@ -10,6 +11,7 @@ import {
   adminRejectSubscriptionPayment,
 } from '../../lib/remoteSync';
 import ConfirmSheet from '../../components/ConfirmSheet';
+import CodesPromoAdmin from './CodesPromoAdmin';
 import { useToast } from '../../components/Toast';
 
 const STATUS_LABEL = {
@@ -48,7 +50,8 @@ export default function SubscriptionsAdmin() {
   // PAR MOIS, pas pour le tarif mensuel. Un abonné annuel à 45 000 F pèse
   // 3 750 F par mois ; les compter tous à 5 000 F gonflait le chiffre d'un
   // tiers sur la formule la plus vendue.
-  const mrr = activeSubs.reduce((t, s) => t + prixMensuelEquivalent(s.formule), 0);
+  // Un essai (code d'essai) ne rapporte rien : il n'entre pas dans le MRR.
+  const mrr = activeSubs.filter((s) => !estEssai(s)).reduce((t, s) => t + prixMensuelEquivalent(s.formule), 0);
   const pendingPayments = payments.filter((p) => p.statut === 'initie');
   // Libellé d'une ligne : en mode serveur, le nom du membre / de l'entreprise
   // arrive avec la ligne ; en mode local, on résout l'id utilisateur.
@@ -134,7 +137,9 @@ export default function SubscriptionsAdmin() {
         <div className="card-title"><Crown size={15} /> Abonnés ({subs.length})</div>
         {subs.length ? subs.map((s) => {
           const st = effectiveStatus(s);
-          const [label, cls] = STATUS_LABEL[st] || [st, 'badge-muted'];
+          const [label, cls] = st === 'actif' && estEssai(s)
+            ? ['Essai', 'badge-success']
+            : STATUS_LABEL[st] || [st, 'badge-muted'];
           return (
             <div key={`${s.orgId || ''}-${s.id}`} className="sheet-row">
               <span className="sheet-label">
@@ -151,6 +156,8 @@ export default function SubscriptionsAdmin() {
           );
         }) : <div className="text-sm text-secondary">Aucun abonnement pour le moment.</div>}
       </div>
+
+      <CodesPromoAdmin />
 
       <div className="card my-partner-section">
         <div className="card-title">Historique des paiements</div>

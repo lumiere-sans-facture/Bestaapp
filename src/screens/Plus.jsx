@@ -13,8 +13,10 @@ import { normaliseCode } from '../utils/referral';
 import { etatParrainage, PARRAINAGE_PAR_DEFAUT, PARRAINAGE_VERROUILLE } from '../utils/parrainage';
 import { configActive, providerById, MODE_LABEL } from '../utils/paiementProviders';
 import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft, formule, FORMULE_DEFAUT } from '../utils/subscription';
+import { estEssai } from '../utils/codePromo';
 import { lireFormuleChoisie, oublierFormuleChoisie } from '../utils/formuleChoisie';
 import ChoixFormule from '../components/ChoixFormule';
+import CodeEssai from '../components/CodeEssai';
 import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
@@ -627,7 +629,8 @@ export default function Plus() {
   const resumeAbonnement = () => {
     if (proActive) {
       const jours = daysLeft(sub);
-      return jours ? `Actif · ${jours} j restants` : 'Actif';
+      const libelle = estEssai(sub) ? 'Essai' : 'Actif';
+      return jours ? `${libelle} · ${jours} j restants` : libelle;
     }
     if (subStatus === 'en_attente_paiement') return 'Paiement en attente de validation';
     if (subStatus === 'expire') return 'Expiré — à renouveler';
@@ -1026,6 +1029,10 @@ export default function Plus() {
           <li><Check size={15} /> <strong>3 modèles</strong> de mise en page professionnels</li>
           <li><Check size={15} /> Conversion devis → facture en un clic</li>
         </ul>
+
+        {/* Essai par code : proposé en premier, y compris à qui attend la
+            validation d'un paiement — il n'a pas à patienter pour essayer. */}
+        <CodeEssai onOuvrirPro={closeSubSheet} />
 
         {subSent || subStatus === 'en_attente_paiement' ? (
           <div className="pro-pending">

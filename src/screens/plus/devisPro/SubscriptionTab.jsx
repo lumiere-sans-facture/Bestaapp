@@ -6,7 +6,8 @@ import { useToast } from '../../../components/Toast';
 import Field from '../../../components/Field';
 import KkiapayButton from '../../../components/KkiapayButton';
 import { formatCFA, formatDate } from '../../../utils/format';
-import { effectiveStatus, daysLeft, formule, FORMULE_DEFAUT } from '../../../utils/subscription';
+import { effectiveStatus, daysLeft, formule, formuleValide, FORMULE_DEFAUT } from '../../../utils/subscription';
+import { estEssai } from '../../../utils/codePromo';
 import { lireFormuleChoisie, oublierFormuleChoisie } from '../../../utils/formuleChoisie';
 import ChoixFormule from '../../../components/ChoixFormule';
 import { PAY_NUMBER } from '../../../config/company';
@@ -28,7 +29,8 @@ export default function SubscriptionTab({ sub }) {
   // celle de l'abonnement en cours — on renouvelle par défaut ce qu'on a pris.
   const [form, setForm] = useState(() => ({
     methode: 'momo', phone: user.phone || '', reference: '',
-    formule: lireFormuleChoisie() || sub?.formule || FORMULE_DEFAUT,
+    // Un essai n'est pas une formule payante : on propose alors la mensuelle.
+    formule: lireFormuleChoisie() || (formuleValide(sub?.formule) ? sub.formule : FORMULE_DEFAUT),
   }));
   const f = formule(form.formule);
   const status = effectiveStatus(sub);
@@ -150,9 +152,15 @@ export default function SubscriptionTab({ sub }) {
       {sub.dateFin && (
         <div className="sheet-row"><span className="sheet-label">Expire le</span><span className="sheet-value">{formatDate(sub.dateFin)} ({daysLeft(sub)} jour(s) restants)</span></div>
       )}
-      <div className="sheet-row"><span className="sheet-label">Formule</span><span className="sheet-value">{formule(sub.formule).libelle} — {formatCFA(sub.montant)} / {formule(sub.formule).periode}</span></div>
+      <div className="sheet-row"><span className="sheet-label">Formule</span><span className="sheet-value">{
+        estEssai(sub)
+          ? <>Essai gratuit{sub.codePromo ? ` · code ${sub.codePromo}` : ''}</>
+          : <>{formule(sub.formule).libelle} — {formatCFA(sub.montant)} / {formule(sub.formule).periode}</>
+      }</span></div>
       <ChoixFormule value={form.formule} onChange={(id) => setForm({ ...form, formule: id })} />
-      <p className="text-sm" style={{ margin: '10px 0 4px' }}>Pour renouveler : envoyez {formatCFA(f.prix)} au numéro ci-dessous, puis validez.</p>
+      <p className="text-sm" style={{ margin: '10px 0 4px' }}>
+        {estEssai(sub) ? 'Pour continuer après l’essai' : 'Pour renouveler'} : envoyez {formatCFA(f.prix)} au numéro ci-dessous, puis validez.
+      </p>
       <div className="copy-block">
         <span className="copy-block-value">{PAY_NUMBER}</span>
         <button type="button" className="btn btn-sm btn-outline" onClick={copyPayNumber}>Copier</button>

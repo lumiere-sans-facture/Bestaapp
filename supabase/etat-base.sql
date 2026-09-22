@@ -41,7 +41,8 @@ with attendues(table_name, script) as (
     ('factures',           '3 · multitenant.sql'),
     ('paiementConfigs',    '4 · paiements.sql'),
     ('paiements_verifies', '4 · paiements.sql — verrou anti-rejeu des paiements'),
-    ('erreurs',            '5 · erreurs.sql — journal des plantages')
+    ('erreurs',            '5 · erreurs.sql — journal des plantages'),
+    ('codes_promo',        '11 · codes-promo.sql — codes d''essai Devis Pro')
 )
 select
   a.table_name                                as "table",

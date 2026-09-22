@@ -3,6 +3,7 @@
 import { defaultEcheance } from '../../utils/paiement';
 import { abonnementApresPaiement } from '../../utils/verificationPaiement';
 import { formule, FORMULE_DEFAUT } from '../../utils/subscription';
+import { abonnementApresCode, normaliserCode, joursDuCode } from '../../utils/codePromo';
 import { prochainNumeroFacture } from '../../utils/facture';
 import { appendClientSource, buildClientSource, canSyncClientContact, isSameClient, sourceHistoryFor } from '../../utils/clientContact';
 
@@ -70,6 +71,50 @@ export function createProActions(setState) {
           ...s,
           subscriptions: [sub, ...(s.subscriptions || []).filter((x) => x.id !== subId)],
           subscriptionPayments: [paiement, ...(s.subscriptionPayments || []).filter((p) => p.id !== payId)],
+        };
+      }),
+
+    // ---- Codes d'essai ----
+    // Mode local : le gérant crée ses codes sur l'appareil. Avec un backend,
+    // ces trois actions ne servent pas — le serveur juge (codes-promo.sql).
+    creerCodePromo: ({ code, jours, maxUtilisations = null, expireLe = null, note = '' }) =>
+      setState((s) => {
+        const canon = normaliserCode(code);
+        if ((s.codesPromo || []).some((c) => c.code === canon)) return s;
+        const nouveau = {
+          code: canon, jours: joursDuCode({ jours }), actif: true,
+          maxUtilisations: Number(maxUtilisations) > 0 ? Math.round(Number(maxUtilisations)) : null,
+          expireLe: expireLe || null, note: note || '', creeLe: new Date().toISOString(), utilisations: [],
+        };
+        return { ...s, codesPromo: [nouveau, ...(s.codesPromo || [])] };
+      }),
+
+    basculerCodePromo: (code, actif) =>
+      setState((s) => ({
+        ...s,
+        codesPromo: (s.codesPromo || []).map((c) => (c.code === code ? { ...c, actif } : c)),
+      })),
+
+    // Utilisation d'un code. En mode local, `enregistrerUtilisation` trace
+    // l'usage sur le code (validé en amont par verifierCode). Avec un
+    // backend, le serveur a déjà tout écrit : on applique ici le MÊME
+    // résultat localement, avec la date de fin qu'il a décidée — la ligne
+    // « actif » n'est jamais repoussée (remoteSync la filtre).
+    activerEssai: (userId, { code, jours, dateFin = null, enregistrerUtilisation = false }) =>
+      setState((s) => {
+        const subId = `sub-${userId}`;
+        const existant = (s.subscriptions || []).find((x) => x.id === subId);
+        const calcule = abonnementApresCode(existant, { userId, code, jours });
+        const sub = dateFin ? { ...calcule, dateFin } : calcule;
+        const canon = normaliserCode(code);
+        return {
+          ...s,
+          subscriptions: [sub, ...(s.subscriptions || []).filter((x) => x.id !== subId)],
+          codesPromo: enregistrerUtilisation
+            ? (s.codesPromo || []).map((c) => (c.code === canon
+              ? { ...c, utilisations: [...(c.utilisations || []), { userId, le: new Date().toISOString() }] }
+              : c))
+            : s.codesPromo,
         };
       }),
 

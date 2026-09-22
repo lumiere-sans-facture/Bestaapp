@@ -5,6 +5,10 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-09-22
+- **Essai gratuit de l'espace Pro par code** : dans « Passer en mode Pro », un code ouvre 30 jours d'espace Pro sans paiement. Le gérant crée ses codes (durée, plafond d'utilisations, date limite) et les désactive depuis « Abonnements Devis Pro ». Le serveur juge chaque code — impossible de s'offrir le Pro depuis le navigateur — et un compte n'utilise un même code qu'une fois. Nécessite `supabase/codes-promo.sql` dans les deux projets Supabase
+- Onduleur : un seul appareil tant qu'un modèle suffit — le kit 32 kWh recevait deux 6 kVA là où un seul 12 kVA convient
+
 ## 2026-09-11
 - Kit **48 kWh** (3 × 16, 24 panneaux, onduleur 12 kVA) ajouté au catalogue officiel — 7 198 700 F CFA
 

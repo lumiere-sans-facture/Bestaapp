@@ -65,6 +65,10 @@ export const buildInitialState = () => ({
   // Demandes de paiement des commissions : vide au départ, alimentée par
   // les partenaires eux-mêmes.
   payoutRequests: [],
+  // Codes d'essai Devis Pro du MODE LOCAL uniquement. Jamais répliqués (hors
+  // SYNCED_COLLECTIONS) : avec un backend, les codes vivent côté serveur
+  // (supabase/codes-promo.sql), illisibles depuis l'app.
+  codesPromo: [],
   devisCounter: 0,
   orderCounter: 0,
 });
@@ -113,6 +117,7 @@ export const loadState = (scope = null) => {
       // Migration « Kits pompage » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.pompeKits)) saved.pompeKits = POMPE_KITS;
       if (!saved.payoutRequests) saved.payoutRequests = [];
+      if (!Array.isArray(saved.codesPromo)) saved.codesPromo = [];
       if (!saved.formations) saved.formations = isSupabaseConfigured ? [] : seed.formations;
       if (!saved.formationProgress) saved.formationProgress = [];
       // Migration formation : structure « école » (cours → modules → leçons).

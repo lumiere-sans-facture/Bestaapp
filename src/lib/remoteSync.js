@@ -526,6 +526,41 @@ export async function adminConfirmSubscriptionPayment(orgId, paymentId) {
   if (error) throw new Error(error.message);
 }
 
+// ---- Codes d'essai Devis Pro (supabase/codes-promo.sql) ----
+
+/**
+ * Utilise un code d'essai. Le SERVEUR juge le code et écrit l'abonnement :
+ * la RLS interdit à un membre d'écrire un abonnement « actif » lui-même.
+ * @returns {Promise<{ok: true, dateFin: string, jours: number, formule: string}
+ *   | {ok: false, raison: string}>}
+ */
+export async function utiliserCodePromo(code) {
+  const { data, error } = await supabase.rpc('utiliser_code_promo', { p_code: code });
+  if (error) throw new Error(error.message);
+  return data || { ok: false, raison: 'inconnu' };
+}
+
+/** Admin plateforme : tous les codes, avec leur nombre d'utilisations. */
+export async function adminCodesPromo() {
+  const { data, error } = await supabase.rpc('admin_codes_promo');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/** Admin plateforme : crée un code (durée en jours, plafond et échéance optionnels). */
+export async function adminCreerCodePromo({ code, jours, maxUtilisations = null, expireLe = null, note = '' }) {
+  const { error } = await supabase.rpc('admin_creer_code_promo', {
+    p_code: code, p_jours: jours, p_max: maxUtilisations, p_expire_le: expireLe, p_note: note,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Admin plateforme : active ou désactive un code. */
+export async function adminBasculerCodePromo(code, actif) {
+  const { error } = await supabase.rpc('admin_basculer_code_promo', { p_code: code, p_actif: actif });
+  if (error) throw new Error(error.message);
+}
+
 /**
  * Vue gérant : tous les devis PUBLICS de la plateforme (toutes organisations,
  * hors espace Pro payant), enrichis du client (clientName…), de l'auteur et
