@@ -17,11 +17,14 @@ export const SQL_REPARATION_CLIENTS = `-- ======================================
 --   remplit déjà avec l'adresse de votre session.)
 -- ============================================================
 --
--- Ce script fait deux choses d'affilée :
+-- Ce script fait trois choses d'affilée :
 --   1. il (re)pose la règle qui rend les clients PUBLICS visibles au gérant —
 --      si elle n'était jamais passée, elle passe maintenant ;
---   2. il affiche un tableau de contrôle qui dit, ligne par ligne, où en est
---      la base. Si le refus persiste après ça, ce tableau contient la cause.
+--   2. il REJOUE les écritures de l'app sous votre compte, dans une
+--      transaction annulée (rien n'est modifié), pour voir si la base les
+--      accepte VRAIMENT — et sinon, quelle règle les bloque ;
+--   3. il affiche un tableau de contrôle qui dit, ligne par ligne, où en est
+--      la base. Si le refus persiste, ce tableau en contient la cause.
 --
 -- Le Devis Pro n'est pas touché : les clients Pro restent privés à leur auteur.
 
@@ -55,13 +58,108 @@ create policy "manager client access" on public.leads
     or (org_id = public.auth_org_id() and public.auth_est_proprietaire_espace())
   );
 
--- 3. TABLEAU DE CONTRÔLE.
---    \`auth.jwt()\` est vide dans le SQL Editor : on refait donc le calcul à la
---    main, à partir de l'e-mail ci-dessous. C'est le seul endroit à modifier.
+-- 3. L'ADRESSE DU COMPTE À CONTRÔLER — le seul endroit à modifier.
+select set_config('diag.email', lower(trim('mon.email@exemple.com')), false);   -- MON EMAIL
+
+-- 4. TEST RÉEL D'ÉCRITURE, SOUS CE COMPTE.
+--    Déduire « ça doit passer » du rôle du compte ne suffit pas : un admin
+--    plateforme était déclaré « réparé » alors que la base refusait encore ses
+--    envois. On rejoue donc EXACTEMENT ce que fait l'app — un upsert par
+--    client, puis la création d'un client — avec l'identité du compte et
+--    toutes les règles de sécurité actives, dans une transaction ANNULÉE à la
+--    fin : rien n'est modifié. Le premier refus est rapporté tel quel : il
+--    nomme la règle ou la table qui bloque.
+create temp table if not exists _diag_ecriture (n int, controle text, resultat text, ok boolean);
+truncate _diag_ecriture;
+do $diag$
+declare
+  v_email   text := current_setting('diag.email');
+  v_profil  record;
+  v_uid     text;
+  v_pk      text;
+  v_lead    jsonb;
+  v_lignes  jsonb;
+  v_total   int := 0;
+  v_refus   int := 0;
+  v_invis   int := 0;
+  v_n       int;
+  v_premier text;
+  v_ids     text := '';
+  v_insert  text;
+  v_ok_ins  boolean := false;
+begin
+  select id, org_id into v_profil from public.profiles where lower(email) = v_email;
+  if v_profil.id is null then return; end if;
+  select id::text into v_uid from auth.users where lower(email) = v_email limit 1;
+  select conname into v_pk from pg_constraint
+    where conrelid = 'public.leads'::regclass and contype = 'p';
+  -- Relevés AVANT de prendre l'identité du compte : un client que ce compte ne
+  -- « voit » pas doit être testé aussi — c'est justement lui qui coince.
+  select coalesce(jsonb_agg(jsonb_build_object('org_id', org_id, 'id', id, 'data', data) order by id), '[]'::jsonb)
+    into v_lignes from (select org_id, id, data from public.leads where org_id = v_profil.org_id order by id limit 500) l;
+
+  begin
+    -- Identité du compte, comme dans une requête de l'app.
+    perform set_config('request.jwt.claims',
+      json_build_object('email', v_email, 'sub', coalesce(v_uid, ''), 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+
+    -- a) Chaque client de l'entreprise, réécrit à l'identique (upsert).
+    for v_lead in select * from jsonb_array_elements(v_lignes) loop
+      v_total := v_total + 1;
+      begin
+        execute format(
+          'insert into public.leads (org_id, id, data, updated_at) values ($1, $2, $3, now())
+             on conflict on constraint %I do update set data = excluded.data, updated_at = excluded.updated_at', v_pk)
+          using v_lead ->> 'org_id', v_lead ->> 'id', v_lead -> 'data';
+        get diagnostics v_n = row_count;
+        if v_n = 0 then v_invis := v_invis + 1; end if;
+      exception when others then
+        v_refus := v_refus + 1;
+        v_premier := coalesce(v_premier, sqlstate || ' — ' || sqlerrm);
+        if v_refus <= 5 then v_ids := v_ids || case when v_ids = '' then '' else ', ' end || (v_lead ->> 'id'); end if;
+      end;
+    end loop;
+
+    -- b) Un nouveau client, comme en crée l'app.
+    begin
+      execute 'insert into public.leads (org_id, id, data, updated_at) values ($1, $2, $3, now())'
+        using v_profil.org_id, 'diag-' || md5(random()::text),
+              jsonb_build_object('name', 'Test diagnostic', 'registeredByUserId', v_profil.id, 'assignedTo', v_profil.id);
+      v_ok_ins := true;
+      v_insert := 'accepté';
+    exception when others then
+      v_insert := 'REFUSÉ : ' || sqlstate || ' — ' || sqlerrm;
+    end;
+
+    -- Tout annuler : rien de ce test ne doit rester dans la base.
+    raise exception using errcode = 'P0099', message = 'annulation du test';
+  exception when sqlstate 'P0099' then
+    null;
+  end;
+
+  -- Le rôle et l'identité simulés sont défaits avec la sous-transaction.
+  insert into _diag_ecriture values
+    (5, 'Test réel : réécrire les ' || v_total || ' clients',
+     case when v_refus = 0 and v_invis = 0 then 'tous acceptés'
+          else v_refus || ' refusé(s)' || case when v_invis > 0 then ', ' || v_invis || ' invisible(s)' else '' end
+               || coalesce(' — premier refus : ' || v_premier, '')
+               || case when v_ids <> '' then ' — clients : ' || v_ids else '' end end,
+     v_refus = 0 and v_invis = 0),
+    (5, 'Test réel : créer un client', v_insert, v_ok_ins),
+    (5, 'Clé primaire de leads', coalesce(v_pk, 'AUCUNE') || ' ('
+      || (select string_agg(a.attname, ', ' order by a.attnum) from pg_constraint c
+          join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
+          where c.conrelid = 'public.leads'::regclass and c.contype = 'p') || ')',
+     true);
+end
+$diag$;
+
+-- 5. TABLEAU DE CONTRÔLE.
 with moi as (
   select p.id, p.email, p.org_id, p.role, coalesce(p.is_platform_admin, false) as admin
   from public.profiles p
-  where lower(p.email) = lower('mon.email@exemple.com')   -- MON EMAIL
+  where lower(p.email) = current_setting('diag.email')
 ),
 autres_gerants as (
   select count(*)::int as n from public.profiles g
@@ -73,7 +171,7 @@ verdict as (
   ), false) as ok
 ),
 regles as (
-  select policyname, coalesce(with_check, qual, '') as expr
+  select policyname, permissive, cmd, coalesce(with_check, qual, '') as expr
   from pg_policies where schemaname = 'public' and tablename = 'leads'
 ),
 clients as (
@@ -85,6 +183,11 @@ clients as (
                  is distinct from (select id from moi)
          )::int as autrui
   from public.leads l where l.org_id = (select org_id from moi)
+),
+test as (
+  select bool_and(ok) as ok,
+         string_agg(resultat, ' / ') filter (where not ok) as refus
+  from _diag_ecriture where controle like 'Test réel%'
 )
 select * from (
   select 1 as n, 'Profil' as controle,
@@ -96,14 +199,18 @@ select * from (
   union all
   select 2, 'Gérants dans l''entreprise', (select n from autres_gerants)::text
   union all
-  select 3, 'Verdict : propriétaire de l''espace',
+  select 3, 'Règles : propriétaire de l''espace',
          case when not exists (select 1 from moi)
                    then 'INDÉTERMINÉ — aucun profil pour cet e-mail (voir la ligne 1)'
-              when (select ok from verdict) then 'OUI — le gérant a bien accès aux clients publics'
-              else 'NON — c''est la cause du refus : ce compte n''est ni gérant ni admin plateforme, '
+              when (select ok from verdict) then 'OUI — les règles donnent accès aux clients publics'
+              else 'NON — ce compte n''est ni gérant ni admin plateforme, '
                    || 'et un autre gérant existe dans l''entreprise' end
   union all
-  select 4, 'Règle « ' || r.policyname || ' » sur leads', r.expr from regles r
+  select 4, 'Règle « ' || r.policyname || ' » sur leads'
+            || case when r.permissive = 'RESTRICTIVE' then ' (RESTRICTIVE : s''ajoute aux autres)' else '' end
+            || ' [' || r.cmd || ']', r.expr from regles r
+  union all
+  select d.n, d.controle, d.resultat from _diag_ecriture d
   union all
   select 6, 'Clients publics de l''entreprise',
          (select total from clients)::text || ' au total, dont '
@@ -112,11 +219,14 @@ select * from (
   select 7, 'Conclusion',
          case when not exists (select 1 from moi)
                    then 'E-mail inconnu. Cherchez le bon avec : select email, role from public.profiles order by email;'
-              when (select ok from verdict)
-              then 'Réparé. Déconnectez-vous puis reconnectez-vous : la file en attente repartira.'
-              else 'Encore refusé. Passez ce compte en gérant : '
+              when coalesce((select ok from test), false)
+              then 'Réparé : la base accepte réellement les écritures de ce compte. Déconnectez-vous puis reconnectez-vous : la file en attente repartira.'
+              when not (select ok from verdict)
+              then 'Encore refusé. Passez ce compte en gérant : '
                    || 'update public.profiles set role = ''gerant'' where lower(email) = lower('''
-                   || (select email from moi) || ''');' end
+                   || (select email from moi) || ''');'
+              else 'ENCORE REFUSÉ par la base, alors que les règles devraient l''autoriser. La cause est dans les lignes « Test réel » '
+                   || 'ci-dessus (règle ou table nommée dans le message) : envoyez ce tableau au support.' end
 ) t order by n, controle;
 `;
 

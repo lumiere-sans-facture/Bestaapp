@@ -21,12 +21,19 @@ describe('SQL de réparation embarqué', () => {
 describe('sqlReparationPour', () => {
   it('remplit l’adresse de la session : rien à éditer avant de coller', () => {
     const sql = sqlReparationPour('Boss@BestaSolar.TG');
-    expect(sql).toContain("lower('boss@bestasolar.tg')");
+    // Une seule ligne porte l'adresse : le test réel ET le tableau la relisent.
+    expect(sql).toContain("set_config('diag.email', lower(trim('boss@bestasolar.tg'))");
     expect(sql).not.toContain(EMAIL_MODELE);
   });
 
   it('ne laisse pas une apostrophe casser le script', () => {
-    expect(sqlReparationPour("o'brien@exemple.com")).toContain("lower('obrien@exemple.com')");
+    expect(sqlReparationPour("o'brien@exemple.com")).toContain("lower(trim('obrien@exemple.com'))");
+  });
+
+  it('rejoue réellement les écritures, et annule tout', () => {
+    expect(SQL_REPARATION_CLIENTS).toContain("set local role authenticated");
+    expect(SQL_REPARATION_CLIENTS).toContain("errcode = 'P0099'");
+    expect(SQL_REPARATION_CLIENTS.match(/mon\.email@exemple\.com/g)).toHaveLength(1);
   });
 
   it('garde le modèle quand la session n’a pas d’adresse', () => {
