@@ -69,8 +69,12 @@ select set_config('diag.email', lower(trim('mon.email@exemple.com')), false);   
 --    toutes les règles de sécurité actives, dans une transaction ANNULÉE à la
 --    fin : rien n'est modifié. Le premier refus est rapporté tel quel : il
 --    nomme la règle ou la table qui bloque.
+-- Table TEMPORAIRE : elle n'existe que dans cette fenêtre du SQL Editor.
+-- La RLS y est activée pour que Supabase ne s'en alarme pas ; son
+-- propriétaire (vous) y écrit quand même.
 create temp table if not exists _diag_ecriture (n int, controle text, resultat text, ok boolean);
-truncate _diag_ecriture;
+alter table _diag_ecriture enable row level security;
+delete from _diag_ecriture;
 do $diag$
 declare
   v_email   text := current_setting('diag.email');
