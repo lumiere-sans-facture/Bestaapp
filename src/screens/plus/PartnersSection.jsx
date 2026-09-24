@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick, Search, Star } from 'lucide-react';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, initials, formatTaux } from '../../utils/format';
+import { dateEmissionDevis } from '../../utils/dateEmission';
 import { partnerLink, REF_TTL_DAYS, getActiveRef, memeCode } from '../../utils/referral';
 import PartenairesReseau from './PartenairesReseau';
 import Sheet from '../../components/Sheet';
@@ -304,7 +305,7 @@ export default function PartnersSection({ onBack }) {
                     <div key={d.id} className="sheet-row">
                       <span className="sheet-label">
                         {d.devisNumber} — {getLeadById(d.leadId)?.name || 'Client'}
-                        <span className="text-secondary"> · {formatDate(d.createdAt)}</span>
+                        <span className="text-secondary"> · {formatDate(dateEmissionDevis(d))}</span>
                       </span>
                       <span className="sheet-value amount">{formatCFA(d.total)}</span>
                     </div>

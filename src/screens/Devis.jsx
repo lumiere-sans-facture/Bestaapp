@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { FileText, Plus, Download, Search, Check, Trash2, Pencil, BadgeCheck, SlidersHorizontal, Send } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { dateEmissionDevis } from '../utils/dateEmission';
 import { useCart } from '../context/CartContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchAdminPublicDevis } from '../lib/remoteSync';
@@ -134,7 +135,7 @@ export default function Devis() {
     .sort((a, b) => {
       if (sortBy === 'montant-desc') return b.total - a.total;
       if (sortBy === 'montant-asc') return a.total - b.total;
-      const diff = new Date(b.createdAt) - new Date(a.createdAt);
+      const diff = new Date(dateEmissionDevis(b)) - new Date(dateEmissionDevis(a));
       return sortBy === 'ancien' ? -diff : diff;
     });
 
@@ -214,7 +215,7 @@ export default function Devis() {
                           <span className="flat-badge warning">Sans suite</span>
                         )}
                         <span className="flat-row-date">
-                          {formatDate(d.createdAt)} · {d.type === 'solar' ? (d.sousType === 'pompage' ? 'Pompage solaire' : 'Solaire') : 'Comptant'}
+                          {formatDate(dateEmissionDevis(d))} · {d.type === 'solar' ? (d.sousType === 'pompage' ? 'Pompage solaire' : 'Solaire') : 'Comptant'}
                           {d._externe && ` · par ${d.authorName || d.orgName}`}
                         </span>
                       </div>

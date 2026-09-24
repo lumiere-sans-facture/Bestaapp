@@ -3,6 +3,7 @@
 // Aucun modèle ne réimplémente ces briques : elles garantissent que les trois
 // rendus partagent la même grille, la même typographie et les mêmes nombres.
 import { COMPANY } from '../../config/company';
+import { dateEmissionDevis } from '../dateEmission';
 import { LOGO_BESTASOLAR } from '../../assets/logoBestaSolar';
 import { prixPublic } from '../price';
 
@@ -154,8 +155,9 @@ export function donneesDeDevis({ devis, company, lead, partner, products = [] })
       };
   return {
     numero: devis.devisNumber || '',
-    date: devis.createdAt,
-    dateSecondaire: dateplusJours(devis.createdAt, 30),
+    // Date d'émission (modifiable), pas la date de saisie ; la validité en part.
+    date: dateEmissionDevis(devis),
+    dateSecondaire: dateplusJours(dateEmissionDevis(devis), Number(devis.validiteJours) > 0 ? Number(devis.validiteJours) : 30),
     emetteur: emetteurDe(company || {}),
     client,
     lignes,

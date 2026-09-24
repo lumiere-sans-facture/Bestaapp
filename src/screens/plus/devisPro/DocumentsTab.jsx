@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, ChevronRight, Search, CheckCircle, Pencil, Wallet, Send, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
+import { dateEmissionDevis } from '../../../utils/dateEmission';
 import { formatCFA, formatDate } from '../../../utils/format';
 import { computeFactureTotals } from '../../../utils/facture';
 import {
@@ -149,9 +150,10 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
 
   // --- Filtre + tri ---
   const q = search.trim().toLowerCase();
-  const sortDocs = (arr, amountKey) => [...arr].sort((a, b) => {
+  // Devis : date d'émission (modifiable) ; factures : date de création.
+  const sortDocs = (arr, amountKey, dateDe = (x) => x.createdAt) => [...arr].sort((a, b) => {
     if (sortBy === 'montant') return (b[amountKey] || 0) - (a[amountKey] || 0);
-    const diff = new Date(b.createdAt) - new Date(a.createdAt);
+    const diff = new Date(dateDe(b)) - new Date(dateDe(a));
     return sortBy === 'ancien' ? -diff : diff;
   });
   const visibleFactures = sortDocs(
@@ -169,7 +171,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         return d.statut !== 'brouillon' && !factureByDevis.has(d.id); // à facturer
       })
       .filter((d) => !q || [d.devisNumber, clientOf(d)].some((v) => v && v.toLowerCase().includes(q))),
-    'total'
+    'total',
+    dateEmissionDevis,
   );
 
   const cardKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
@@ -340,7 +343,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                     <div className="flat-row-title">{d.devisNumber} - {clientOf(d)}</div>
                     <div className="flat-row-sub">
                       <span className={`flat-badge ${bcls}`}>{blabel}</span>
-                      <span className="flat-row-date">{formatDate(d.createdAt)}</span>
+                      <span className="flat-row-date">{formatDate(dateEmissionDevis(d))}</span>
                     </div>
                   </div>
                   <div className="flat-row-amount">{formatCFA(d.total)}</div>

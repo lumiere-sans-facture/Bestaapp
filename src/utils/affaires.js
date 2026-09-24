@@ -6,6 +6,7 @@
 // La numérotation des documents est déduite de l'existant : un compteur local
 // n'est pas répliqué et produirait des numéros en double entre appareils.
 import { DAY_MS, ageInDays } from './date';
+import { dateEmissionDevis } from './dateEmission';
 import { formatCFA } from './format';
 import { COMPANY } from '../config/company';
 
@@ -46,8 +47,8 @@ export function buildAffaires(leads = [], devisList = []) {
       });
       continue;
     }
-    // Devis les plus récents en tête : le dernier créé se voit en premier.
-    const tries = [...ds].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    // Devis les plus récents en tête : le dernier émis se voit en premier.
+    const tries = [...ds].sort((a, b) => new Date(dateEmissionDevis(b) || 0) - new Date(dateEmissionDevis(a) || 0));
     for (const d of tries) {
       cartes.push({
         key: `devis-${d.id}`,
@@ -148,7 +149,7 @@ const jourISO = (d) => new Date(d).toISOString().slice(0, 10);
 
 /** Dernier jour de validité d'un devis (AAAA-MM-JJ), ou null si indatable. */
 export function dateExpiration(devis) {
-  const depart = devis?.date || devis?.createdAt;
+  const depart = dateEmissionDevis(devis);
   if (!depart) return null;
   const t = new Date(depart).getTime();
   if (!Number.isFinite(t)) return null;
@@ -229,7 +230,7 @@ export const SEUIL_SANS_SUITE_JOURS = 7;
 export function estDevisSansSuite(devis, lead = null, seuil = SEUIL_SANS_SUITE_JOURS, maintenant = new Date()) {
   if (!devis || devis.type === 'pro') return false;
   if (etatDevis(devis, lead, maintenant) !== 'en-cours') return false;
-  const envoye = devis.date || devis.createdAt;
+  const envoye = dateEmissionDevis(devis);
   if (!envoye || ageInDays(envoye, maintenant) <= seuil) return false;
   const { derniereRelance } = devis;
   return !derniereRelance || new Date(derniereRelance) <= new Date(envoye);
@@ -259,7 +260,7 @@ export function devisSansSuite(devisList = [], leads = [], seuil = SEUIL_SANS_SU
     .map((d) => ({
       devis: d,
       lead: clientDe.get(d.leadId) || null,
-      jours: Math.round(ageInDays(d.date || d.createdAt, maintenant)),
+      jours: Math.round(ageInDays(dateEmissionDevis(d), maintenant)),
     }))
     .sort((a, b) => b.jours - a.jours);
 }

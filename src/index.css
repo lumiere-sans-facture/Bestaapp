@@ -2817,6 +2817,10 @@ form .login-link { width: 100%; margin-top: 4px; }
 .quote-note-card > button span:last-child { font-size: 2rem; line-height: 1; }
 .quote-note-editor { padding: 0 16px 16px; }
 .quote-note-editor .btn { margin-top: 10px; width: 100%; }
+/* Date d'émission : en tête de l'éditeur, plus basse que la note. */
+.quote-date-card { margin: 0 0 12px; }
+.quote-date-card > button { min-height: 56px; }
+.quote-date-card > button strong { color: var(--text-primary); }
 .quote-client-form { margin-bottom: 12px; padding: 16px; }
 .quote-save-state { display: flex; justify-content: center; align-items: center; gap: 5px; color: var(--success-ink); font-size: 0.8rem; margin-top: 10px; }
 .quote-totals { padding: 24px 14px 10px; }

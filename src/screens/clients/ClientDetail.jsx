@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Phone, Mail, MapPin, Building2, User, Pencil, MessageCircle, FileText, FolderKanban, UserCheck, FolderOpen, Clock, Wallet, CalendarDays, Plus, Compass } from 'lucide-react';
 import { formatCFA, formatDate, initials } from '../../utils/format';
+import { dateEmissionDevis } from '../../utils/dateEmission';
 import { computeMonthlyDevis } from '../../utils/stats';
 import { libelleSource } from '../../utils/contactSource';
 import { etatDevis, ETAT_DEVIS_LABEL } from '../../utils/affaires';
@@ -139,7 +140,7 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
                     <div key={d.id} className="alert-feed-row">
                       <div className="alert-feed-text">
                         <div className="alert-feed-title">{d.devisNumber || 'Devis'}</div>
-                        <div className="alert-feed-entity">{formatDate(d.createdAt)}</div>
+                        <div className="alert-feed-entity">{formatDate(dateEmissionDevis(d))}</div>
                       </div>
                       <span className="sheet-value amount">{formatCFA(d.total)}</span>
                     </div>
@@ -167,7 +168,7 @@ export default function ClientDetail({ client, devisClient, stage, apporteur, on
                       <div className="flat-row-title">{d.devisNumber || 'Devis'}</div>
                       <div className="flat-row-sub">
                         <span className={`flat-badge ${bcls}`}>{ETAT_DEVIS_LABEL[etat]}</span>
-                        <span className="flat-row-date">{formatDate(d.createdAt)}</span>
+                        <span className="flat-row-date">{formatDate(dateEmissionDevis(d))}</span>
                       </div>
                     </div>
                     <div className="flat-row-amount">{formatCFA(d.total)}</div>

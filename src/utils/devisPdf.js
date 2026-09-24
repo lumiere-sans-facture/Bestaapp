@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { COMPANY } from '../config/company';
 import { prixPublic } from './price';
+import { dateEmissionDevis } from './dateEmission';
 
 // Format de devis officiel BestaSolar (modèle « Énergie lumineuse sans facture »).
 // Reproduit la mise en page du devis de référence : en-tête logo + contacts,
@@ -96,10 +97,11 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  const validUntil = new Date(devis.createdAt);
+  const emission = dateEmissionDevis(devis);
+  const validUntil = new Date(emission);
   validUntil.setDate(validUntil.getDate() + 30);
   const metaRows = [
-    ['Date', fmtDate(devis.createdAt)],
+    ['Date', fmtDate(emission)],
     ["Valide jusqu'au", fmtDate(validUntil)],
     ['Numéro', devis.devisNumber || devis.id],
   ];

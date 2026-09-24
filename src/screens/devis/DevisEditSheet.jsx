@@ -4,6 +4,8 @@ import { useData } from '../../context/DataContext';
 import { TVA_RATE } from '../../config/company';
 import { computeFactureTotals } from '../../utils/facture';
 import { cleanQuoteLines, moveQuoteLine, normalizeQuoteLine, quoteLineId } from '../../utils/quoteLines';
+import { dateEmissionDevis, depuisChampDate, problemeDateEmission, versChampDate } from '../../utils/dateEmission';
+import { formatDate } from '../../utils/format';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
 import ConfirmSheet from '../../components/ConfirmSheet';
@@ -34,6 +36,11 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
   const [menuOpen, setMenuOpen] = useState(false);
   const [client, setClient] = useState({ clientName: '', clientPhone: '', clientVille: '' });
   const [clientOpen, setClientOpen] = useState(false);
+  // Date d'émission : celle imprimée sur le devis et dont part sa validité.
+  const [dateOpen, setDateOpen] = useState(false);
+  const [dateSaisie, setDateSaisie] = useState('');
+  const [dateEnregistree, setDateEnregistree] = useState(null);
+  const [dateErreur, setDateErreur] = useState('');
   const dragRef = useRef({ index: null, changed: false, original: null });
 
   const currency = devis?.currency || 'XOF';
@@ -46,6 +53,10 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
     if (!open || !devis) return;
     setClient({ clientName: devis.clientName || '', clientPhone: devis.clientPhone || '', clientVille: devis.clientVille || '' });
     setNote(devis.noteBasPage || '');
+    setDateEnregistree(dateEmissionDevis(devis));
+    setDateSaisie(versChampDate(dateEmissionDevis(devis)));
+    setDateOpen(false);
+    setDateErreur('');
     setSaveError('');
     setSaveState('');
     setLineForm(null);
@@ -152,6 +163,15 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
   const saveNote = async () => {
     if (await persist(lignes, { noteBasPage: note.trim() })) setNoteOpen(false);
   };
+  const saveDate = async () => {
+    const probleme = problemeDateEmission(dateSaisie);
+    if (probleme) { setDateErreur(probleme); return; }
+    const dateEmission = depuisChampDate(dateSaisie);
+    if (await persist(lignes, { dateEmission })) {
+      setDateEnregistree(dateEmission);
+      setDateOpen(false);
+    }
+  };
   const saveClient = async () => {
     if (await persist(lignes, {
       clientName: client.clientName.trim(), clientPhone: client.clientPhone.trim(), clientVille: client.clientVille.trim(),
@@ -200,6 +220,22 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
                     <button type="button" className="btn btn-primary btn-block" onClick={saveClient} disabled={saving}><Save size={16} /> Enregistrer le client</button>
                   </div>
                 )}
+
+                <div className="quote-note-card quote-date-card">
+                  <button type="button" onClick={() => setDateOpen((value) => !value)} aria-expanded={dateOpen}>
+                    <span>Date d'émission : <strong>{formatDate(dateEnregistree)}</strong></span><span>›</span>
+                  </button>
+                  {dateOpen && (
+                    <div className="quote-note-editor">
+                      <input className="input" type="date" aria-label="Date d'émission du devis" value={dateSaisie}
+                        max={versChampDate(new Date())}
+                        onChange={(event) => { setDateSaisie(event.target.value); setDateErreur(''); }} />
+                      <div className="field-hint">Imprimée sur le devis ; sa validité de 30 jours part de cette date.</div>
+                      {dateErreur && <div className="field-error" role="alert">{dateErreur}</div>}
+                      <button type="button" className="btn btn-primary" onClick={saveDate} disabled={saving || !dateSaisie}><Save size={16} /> Enregistrer la date</button>
+                    </div>
+                  )}
+                </div>
 
                 <div className="quote-lines-card">
                   {lignes.map((line, index) => (
