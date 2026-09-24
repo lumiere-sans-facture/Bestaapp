@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { estRefusRls } from '../utils/erreurSync';
+import { estRefusRls, estFonctionServeurAbsente, messageFonctionAbsente } from '../utils/erreurSync';
 
 // Synchronisation des collections métier avec Supabase.
 // Chaque entité est une ligne { id, data } ; la logique métier reste
@@ -527,13 +527,31 @@ export async function adminConfirmSubscriptionPayment(orgId, paymentId) {
 }
 
 /**
+ * Appel d'une fonction serveur livrée par un script SQL. Si la base n'a pas
+ * reçu ce script, l'erreur de PostgREST (« Could not find the function … in
+ * the schema cache ») est remplacée par ce qu'il faut faire, et marquée
+ * `code = 'fonction-absente'` pour que l'écran puisse adapter son message.
+ */
+async function appelerFonctionScript(fonction, params, script) {
+  const { data, error } = await supabase.rpc(fonction, params);
+  if (!error) return data;
+  if (estFonctionServeurAbsente(error)) {
+    const e = new Error(messageFonctionAbsente(fonction, script));
+    e.code = 'fonction-absente';
+    throw e;
+  }
+  throw new Error(error.message);
+}
+
+const SCRIPT_2026_09 = 'supabase/a-executer-2026-09.sql';
+
+/**
  * Supprime le compte connecté, et son entreprise s'il y travaille seul
  * (supabase/suppression-compte.sql — le serveur décide de la portée).
  * @returns {Promise<{ok: true, portee: 'compte'|'entreprise'} | {ok: false, raison: string}>}
  */
 export async function supprimerMonCompte() {
-  const { data, error } = await supabase.rpc('supprimer_mon_compte');
-  if (error) throw new Error(error.message);
+  const data = await appelerFonctionScript('supprimer_mon_compte', {}, SCRIPT_2026_09);
   return data || { ok: false, raison: 'reseau' };
 }
 
@@ -546,30 +564,26 @@ export async function supprimerMonCompte() {
  *   | {ok: false, raison: string}>}
  */
 export async function utiliserCodePromo(code) {
-  const { data, error } = await supabase.rpc('utiliser_code_promo', { p_code: code });
-  if (error) throw new Error(error.message);
+  const data = await appelerFonctionScript('utiliser_code_promo', { p_code: code }, SCRIPT_2026_09);
   return data || { ok: false, raison: 'inconnu' };
 }
 
 /** Admin plateforme : tous les codes, avec leur nombre d'utilisations. */
 export async function adminCodesPromo() {
-  const { data, error } = await supabase.rpc('admin_codes_promo');
-  if (error) throw new Error(error.message);
+  const data = await appelerFonctionScript('admin_codes_promo', {}, SCRIPT_2026_09);
   return data || [];
 }
 
 /** Admin plateforme : crée un code (durée en jours, plafond et échéance optionnels). */
 export async function adminCreerCodePromo({ code, jours, maxUtilisations = null, expireLe = null, note = '' }) {
-  const { error } = await supabase.rpc('admin_creer_code_promo', {
+  await appelerFonctionScript('admin_creer_code_promo', {
     p_code: code, p_jours: jours, p_max: maxUtilisations, p_expire_le: expireLe, p_note: note,
-  });
-  if (error) throw new Error(error.message);
+  }, SCRIPT_2026_09);
 }
 
 /** Admin plateforme : active ou désactive un code. */
 export async function adminBasculerCodePromo(code, actif) {
-  const { error } = await supabase.rpc('admin_basculer_code_promo', { p_code: code, p_actif: actif });
-  if (error) throw new Error(error.message);
+  await appelerFonctionScript('admin_basculer_code_promo', { p_code: code, p_actif: actif }, SCRIPT_2026_09);
 }
 
 /**

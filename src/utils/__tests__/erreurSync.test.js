@@ -76,3 +76,16 @@ describe('messageLignesRefusees', () => {
     expect(messageLignesRefusees({ leads: 2, partners: 1 })).toMatch(/2 clients, 1 partenaire/);
   });
 });
+
+describe('estFonctionServeurAbsente', () => {
+  it('reconnaît la réponse PostgREST d’une fonction absente', async () => {
+    const { estFonctionServeurAbsente, messageFonctionAbsente } = await import('../erreurSync');
+    expect(estFonctionServeurAbsente({ code: 'PGRST202', message: 'x' })).toBe(true);
+    expect(estFonctionServeurAbsente({ message: 'Could not find the function public.admin_creer_code_promo(p_code) in the schema cache' })).toBe(true);
+    expect(estFonctionServeurAbsente({ code: '42501', message: 'new row violates row-level security policy' })).toBe(false);
+    expect(estFonctionServeurAbsente(null)).toBe(false);
+    const m = messageFonctionAbsente('admin_creer_code_promo', 'supabase/a-executer-2026-09.sql');
+    expect(m).toContain('supabase/a-executer-2026-09.sql');
+    expect(m).not.toMatch(/schema cache/);
+  });
+});

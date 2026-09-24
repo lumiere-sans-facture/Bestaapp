@@ -76,6 +76,7 @@ export const MESSAGES_CODE = {
   trop: 'Trop d’essais infructueux. Réessayez dans une heure.',
   reseau: 'Vérification impossible : connexion au serveur indisponible. Réessayez.',
   profil: 'Compte introuvable sur le serveur. Déconnectez-vous puis reconnectez-vous.',
+  indisponible: 'L’essai par code n’est pas encore ouvert sur ce serveur. Contactez BestaSolar.',
 };
 
 export const messageCode = (raison) => MESSAGES_CODE[raison] || MESSAGES_CODE.inconnu;

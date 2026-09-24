@@ -97,3 +97,7 @@ end $$;
 
 revoke all on function public.supprimer_mon_compte() from public, anon;
 grant execute on function public.supprimer_mon_compte() to authenticated;
+
+-- L'API (PostgREST) relit la liste des fonctions : sinon l'app peut ne pas
+-- les trouver pendant quelques minutes (« … in the schema cache »).
+notify pgrst, 'reload schema';

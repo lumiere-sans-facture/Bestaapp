@@ -53,8 +53,8 @@ export default function CodeEssai({ onOuvrirPro }) {
       activerEssai(user.id, { code, jours: r.jours, dateFin: r.dateFin });
       setActive({ jours: r.jours, dateFin: r.dateFin });
       toast(`Code accepté — espace Pro ouvert jusqu'au ${formatDate(r.dateFin)}.`);
-    } catch {
-      setErreur(messageCode('reseau'));
+    } catch (err) {
+      setErreur(messageCode(err?.code === 'fonction-absente' ? 'indisponible' : 'reseau'));
     } finally {
       setEnCours(false);
     }

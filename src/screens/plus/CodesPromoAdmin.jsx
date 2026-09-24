@@ -30,7 +30,7 @@ export default function CodesPromoAdmin() {
       .then(setDistants)
       .catch((e) => {
         setDistants([]);
-        toast(`Codes d'essai indisponibles : ${e.message}. Le script supabase/codes-promo.sql a-t-il été exécuté ?`, { type: 'error' });
+        toast(e.code === 'fonction-absente' ? e.message : `Codes d'essai indisponibles : ${e.message}`, { type: 'error' });
       });
   }, [toast]);
   useEffect(() => { if (serveur) charger(); }, [serveur, charger]);

@@ -79,3 +79,22 @@ export const messageLignesRefusees = (parTable = {}) => {
     + 'pas depuis ce compte. Ils restent consultables ici, et le reste est bien '
     + 'synchronisé. Pour les rattacher à votre compte : Plus › Diagnostic.';
 };
+
+/**
+ * La fonction serveur appelée n'existe pas dans la base : le script SQL qui
+ * la crée n'a pas été exécuté dans CE projet Supabase (ou PostgREST ne l'a
+ * pas encore vue). PostgREST répond PGRST202 « Could not find the function
+ * … in the schema cache ».
+ */
+export const estFonctionServeurAbsente = (erreur) => {
+  if (!erreur) return false;
+  if (typeof erreur === 'object' && erreur.code === 'PGRST202') return true;
+  const texte = typeof erreur === 'string' ? erreur : String(erreur.message || '');
+  return /could not find the function/i.test(texte);
+};
+
+/** Message pour l'administrateur : QUOI exécuter, et OÙ. */
+export const messageFonctionAbsente = (fonction, script) =>
+  `La fonction serveur « ${fonction} » n'existe pas encore dans cette base Supabase. `
+  + `Exécutez ${script} dans le SQL Editor du projet utilisé par cette app `
+  + '(le projet de test pour l’app de test, celui de production pour la production), puis réessayez.';

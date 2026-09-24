@@ -345,6 +345,11 @@ end $$;
 revoke all on function public.supprimer_mon_compte() from public, anon;
 grant execute on function public.supprimer_mon_compte() to authenticated;
 
+-- L'API de Supabase (PostgREST) garde une liste des fonctions en cache : on
+-- lui demande de la relire, sinon l'app peut répondre « Could not find the
+-- function … in the schema cache » quelques minutes encore.
+notify pgrst, 'reload schema';
+
 -- #####################################################################
 -- Contrôle : tout doit être « ✅ ».
 -- #####################################################################

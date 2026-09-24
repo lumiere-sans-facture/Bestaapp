@@ -195,3 +195,7 @@ revoke all on function public.admin_basculer_code_promo(text, boolean) from publ
 grant execute on function public.admin_codes_promo() to authenticated;
 grant execute on function public.admin_creer_code_promo(text, integer, integer, timestamptz, text) to authenticated;
 grant execute on function public.admin_basculer_code_promo(text, boolean) to authenticated;
+
+-- L'API (PostgREST) relit la liste des fonctions : sinon l'app peut ne pas
+-- les trouver pendant quelques minutes (« … in the schema cache »).
+notify pgrst, 'reload schema';

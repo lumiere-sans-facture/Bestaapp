@@ -52,8 +52,8 @@ export default function SuppressionCompte() {
       poserConsignePurge({ scope: user.org?.id || user.org_id || user.id, userId: user.id });
       await logout();
       window.location.replace('/');
-    } catch {
-      setErreur(messageRefusSuppression('reseau'));
+    } catch (err) {
+      setErreur(messageRefusSuppression(err?.code === 'fonction-absente' ? 'indisponible' : 'reseau'));
       setEnCours(false);
     }
   };

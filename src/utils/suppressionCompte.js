@@ -71,6 +71,7 @@ export const MESSAGES_REFUS_SUPPRESSION = {
   interne: 'Ce compte porte le catalogue partagé de BestaSolar : il ne peut pas être supprimé depuis l’app.',
   session: 'Session expirée : reconnectez-vous, puis recommencez.',
   reseau: 'Suppression impossible : serveur injoignable. Vérifiez votre connexion et réessayez.',
+  indisponible: 'La suppression depuis l’app n’est pas encore ouverte sur ce serveur. Écrivez-nous pour supprimer votre compte :',
 };
 
 export const messageRefusSuppression = (raison) =>
