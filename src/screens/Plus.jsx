@@ -18,6 +18,7 @@ import { lireFormuleChoisie, oublierFormuleChoisie } from '../utils/formuleChois
 import ChoixFormule from '../components/ChoixFormule';
 import CodeEssai from '../components/CodeEssai';
 import SuppressionCompte from '../components/SuppressionCompte';
+import LiensLegaux from '../components/LiensLegaux';
 import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
@@ -692,6 +693,9 @@ export default function Plus() {
       {/* Réservé au gérant : lui seul peut agir sur la configuration du
           suivi, et lui seul a besoin de savoir s'il est actif. */}
       {user.role === 'gerant' && <DiagnosticCard />}
+
+      {/* Pages légales : exigées DANS l'app par les stores. */}
+      <LiensLegaux className="settings-legal" />
     </div>
   );
 

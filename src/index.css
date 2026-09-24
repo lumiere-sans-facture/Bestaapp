@@ -520,6 +520,13 @@ textarea.input { resize: vertical; }
 .login-link:hover { text-decoration: underline; }
 form .login-link { width: 100%; margin-top: 4px; }
 .login-links .login-link { width: auto; margin-top: 0; }
+/* Liens légaux (components/LiensLegaux.jsx) */
+.liens-legaux { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 16px; font-size: 0.75rem; }
+.liens-legaux a { color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; }
+.liens-legaux a:hover { color: var(--primary); }
+.liens-legaux-consentement { font-size: 0.75rem; color: var(--text-secondary); margin: 4px 0 12px; line-height: 1.5; }
+.liens-legaux-consentement a { color: var(--primary); text-decoration: underline; }
+.settings-legal { justify-content: center; margin: 8px 0 4px; }
 .login-version { text-align: left; font-size: 0.6875rem; color: var(--text-muted); margin-top: 14px; letter-spacing: 0.03em; }
 .login-notice {
   background: var(--success-light); color: var(--success-text);

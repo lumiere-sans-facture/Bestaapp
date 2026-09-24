@@ -45,7 +45,9 @@ export default function LandingPied() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px clamp(20px, 5vw, 48px) 36px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexWrap: 'wrap', gap: '8px 20px', fontSize: '0.8125rem', color: 'rgba(255,255,255,0.55)' }}>
           <span>© 2026 Besta Solar Pro</span>
           <span>Énergie lumineuse sans facture</span>
-          <a className="lp-h6" href="/privacy.html" style={{ color: 'rgba(255,255,255,0.55)', marginLeft: 'auto' }}>Mentions légales et confidentialité</a>
+          <span style={{ marginLeft: 'auto' }}>BESTA SOLAR TOGO · RCCM TG-LFW-01-2025-A10-01086</span>
+          <a className="lp-h6" href="/conditions.html" style={{ color: 'rgba(255,255,255,0.55)' }}>Conditions d'utilisation</a>
+          <a className="lp-h6" href="/privacy.html" style={{ color: 'rgba(255,255,255,0.55)' }}>Confidentialité</a>
         </div>
       </footer>
     </>

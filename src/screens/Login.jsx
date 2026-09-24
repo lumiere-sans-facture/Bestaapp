@@ -10,6 +10,7 @@ import { formatCFA } from '../utils/format';
 import { users } from '../data/seed';
 import { getLockState, registerFailedAttempt, clearAttempts, formatLockRemaining } from '../utils/loginThrottle';
 import { AsYouType, getCountries, getCountryCallingCode, isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js/min';
+import LiensLegaux from '../components/LiensLegaux';
 
 // Tous les pays sont disponibles. Togo et Bénin restent en tête : ce sont
 // les marchés de départ, sans enfermer un installateur étranger.
@@ -414,6 +415,7 @@ export default function Login({ vueInitiale = 'login' }) {
                     onChange={(e) => setRefCode(normaliseCode(e.target.value))} placeholder="NOM-XXXXXX" />
                 </div>
               )}
+              <LiensLegaux variante="consentement" />
               <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
                 {loading ? 'Finalisation…' : "Terminer et entrer dans l'app"}
               </button>
@@ -456,6 +458,7 @@ export default function Login({ vueInitiale = 'login' }) {
                   </div>
                 </div>
               )}
+              <LiensLegaux variante="consentement" />
               <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
                 {loading ? 'Création…' : 'Créer mon compte'}
               </button>
@@ -511,6 +514,7 @@ export default function Login({ vueInitiale = 'login' }) {
           )}
           {/* Version du build : diagnostic des appareils restés sur une vieille
               version en cache (doit correspondre au dernier déploiement). */}
+          <LiensLegaux />
           <div className="login-version">version {__APP_VERSION__} · {__APP_ENV__}</div>
         </div>
       </div>
