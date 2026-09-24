@@ -11,6 +11,36 @@
 --  Le tableau affiché à la fin doit montrer 4 lignes « ✅ ».
 -- =====================================================================
 
+-- Le reste de multitenant.sql ne se recopie pas ici (organisations,
+-- entreprise interne…) : s'il manque, on s'arrête AVANT de toucher à quoi
+-- que ce soit, avec la liste de ce qui manque.
+do $$
+declare v_manque text := '';
+begin
+  if to_regprocedure('public.auth_org_id()') is null then v_manque := v_manque || ' fonction auth_org_id ;'; end if;
+  if to_regclass('public.orgs') is null then v_manque := v_manque || ' table orgs ;';
+  elsif not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orgs' and column_name = 'kind')
+    then v_manque := v_manque || ' colonne orgs.kind ;'; end if;
+  if to_regprocedure('public.org_est_interne(text)') is null then v_manque := v_manque || ' fonction org_est_interne ;'; end if;
+  if v_manque <> '' then
+    raise exception 'Base en retard sur multitenant.sql — il manque :% Exécutez d''abord la version actuelle de supabase/multitenant.sql, puis relancez ce fichier. Rien n''a été modifié.', v_manque;
+  end if;
+end $$;
+
+-- 0. PRÉREQUIS — repris À L'IDENTIQUE de multitenant.sql, pour les bases
+--    qui en ont reçu une version antérieure (« column is_platform_admin does
+--    not exist »). La colonne vaut FALSE par défaut : personne ne devient
+--    admin plateforme par ce biais.
+alter table public.profiles add column if not exists is_platform_admin boolean not null default false;
+
+create or replace function public.auth_is_platform_admin()
+  returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select is_platform_admin from public.profiles where lower(email) = lower(auth.jwt() ->> 'email')),
+    false
+  )
+$$;
+
 -- #####################################################################
 -- 1/2 — supabase/codes-promo.sql
 -- #####################################################################

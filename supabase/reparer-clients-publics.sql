@@ -17,6 +17,20 @@
 --
 -- Le Devis Pro n'est pas touché : les clients Pro restent privés à leur auteur.
 
+-- 0. PRÉREQUIS — repris À L'IDENTIQUE de multitenant.sql, pour les bases
+--    qui en ont reçu une version antérieure (« column is_platform_admin does
+--    not exist »). La colonne vaut FALSE par défaut : personne ne devient
+--    admin plateforme par ce biais.
+alter table public.profiles add column if not exists is_platform_admin boolean not null default false;
+
+create or replace function public.auth_is_platform_admin()
+  returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select is_platform_admin from public.profiles where lower(email) = lower(auth.jwt() ->> 'email')),
+    false
+  )
+$$;
+
 -- 1. La règle du propriétaire d'espace (même définition que utils/roles.js) :
 --    gérant, admin plateforme, ou inscrit seul dans une org sans gérant.
 create or replace function public.auth_est_proprietaire_espace()
