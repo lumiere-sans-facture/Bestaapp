@@ -111,9 +111,8 @@ export default function SubscriptionTab({ sub }) {
             phone={form.phone}
             amount={f.prix}
             objet={{ type: 'abonnement', formule: f.id }}
-            label={`Payer ${formatCFA(f.prix)} avec KKiaPay (test)`}
+            label={`Payer ${formatCFA(f.prix)} par Mobile Money`}
             disabled={!form.phone}
-            onNumero={(numero) => setForm({ ...form, phone: numero })}
             onPaid={paiementKkiapay}
           />
           <button type="submit" className="btn btn-accent btn-block btn-lg">
@@ -169,9 +168,8 @@ export default function SubscriptionTab({ sub }) {
         phone={form.phone}
         amount={f.prix}
         objet={{ type: 'abonnement', formule: f.id }}
-        label={`Renouveler ${formatCFA(f.prix)} avec KKiaPay (test)`}
+        label={`Renouveler ${formatCFA(f.prix)} par Mobile Money`}
         disabled={!form.phone}
-        onNumero={(numero) => setForm({ ...form, phone: numero })}
         onPaid={paiementKkiapay}
       />
       <button className="btn btn-accent btn-block" onClick={() => { requestSubscription(user.id, { methode: 'momo', phone: user.phone || '', reference: '', formule: f.id }); setSubSent(true); }}>

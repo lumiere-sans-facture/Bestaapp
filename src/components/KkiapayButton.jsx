@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { CreditCard, FlaskConical } from 'lucide-react';
+import { CreditCard } from 'lucide-react';
 import { SUBSCRIPTION_PRICE } from '../utils/subscription';
-import { NUMEROS_TEST_SANDBOX, formatMomo, normaliserMomo, problemeNumero } from '../utils/kkiapay';
+import { normaliserMomo, problemeNumero } from '../utils/kkiapay';
 import { champConfig, configActive } from '../utils/paiementProviders';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { confirmerPaiement } from '../lib/paiementServeur';
 import { useToast } from './Toast';
 
@@ -15,6 +16,31 @@ import { useToast } from './Toast';
 // qu'un vrai paiement déclenché par une variable oubliée.
 const CLE_BUILD = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
 const SANDBOX_BUILD = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
+
+/**
+ * Réglages effectifs de KKiaPay. L'écran « Moyens de paiement » du gérant
+ * prime sur les variables de build : changer d'agrégateur ou passer en réel
+ * ne doit plus demander un redéploiement. Une configuration active pour un
+ * AUTRE agrégateur vide la clé — KkiaPay n'encaisse pas ce que CinetPay doit
+ * encaisser.
+ */
+const reglagesKkiapay = (paiementConfigs) => {
+  const config = configActive(paiementConfigs);
+  const configKkiapay = config?.provider === 'kkiapay' ? config : null;
+  const kkiapayKey = config
+    ? (configKkiapay ? champConfig(configKkiapay, 'publicKey') : '')
+    : CLE_BUILD;
+  const sandbox = config ? config.mode !== 'live' : SANDBOX_BUILD;
+  return { config, kkiapayKey, sandbox };
+};
+
+/** Le paiement en ligne est-il réellement proposé aux clients ? Il ne l'est
+ *  ni sans clé, ni en mode test. Sert aux écrans qui l'annoncent. */
+export const usePaiementEnLigne = () => {
+  const { paiementConfigs } = useData();
+  const { kkiapayKey, sandbox } = reglagesKkiapay(paiementConfigs);
+  return !!kkiapayKey && !sandbox;
+};
 
 /**
  * Bouton de paiement KKiaPay.
@@ -29,28 +55,21 @@ const SANDBOX_BUILD = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
  * build — le bouton ne s'affiche pas du tout : le paiement Mobile Money manuel
  * reste alors le seul parcours.
  *
+ * En MODE TEST (bac à sable), le bouton est caché aux clients : un paiement
+ * qui ne débite personne n'a rien à faire dans l'app publiée. Seul celui qui
+ * configure l'encaissement est prévenu, pour savoir quoi basculer.
+ *
  * @param {number} [amount]  montant à encaisser (défaut : l'abonnement Pro).
  * @param {{type: string, commandeId?: string}} [objet]  ce qui est payé — le
  *        serveur en déduit le montant ATTENDU et ce qu'il doit débloquer.
- * @param {(numero: string) => void} [onNumero] permet de proposer les numéros
- *        de test en mode bac à sable (le parent remplit son champ téléphone).
  */
 export default function KkiapayButton({
-  phone, label, onPaid, onNumero, disabled = false,
+  phone, label, onPaid, disabled = false,
   amount = SUBSCRIPTION_PRICE, objet = { type: 'abonnement' },
 }) {
   const { paiementConfigs } = useData();
   const { user } = useAuth();
-  // L'écran « Moyens de paiement » du gérant prime sur les variables de
-  // build : changer d'agrégateur ou passer en réel ne doit plus demander un
-  // redéploiement. Une configuration active pour un AUTRE agrégateur cache ce
-  // bouton — KkiaPay n'encaisse pas ce que CinetPay doit encaisser.
-  const config = configActive(paiementConfigs);
-  const configKkiapay = config?.provider === 'kkiapay' ? config : null;
-  const kkiapayKey = config
-    ? (configKkiapay ? champConfig(configKkiapay, 'publicKey') : '')
-    : CLE_BUILD;
-  const SANDBOX = config ? config.mode !== 'live' : SANDBOX_BUILD;
+  const { config, kkiapayKey, sandbox: SANDBOX } = reglagesKkiapay(paiementConfigs);
   const [ouvert, setOuvert] = useState(false);
   const toast = useToast();
   // Les gestionnaires sont enregistrés UNE fois auprès du widget ; cette
@@ -102,12 +121,17 @@ export default function KkiapayButton({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kkiapayKey]);
 
+  // Qui règle l'encaissement : l'admin plateforme avec un backend (c'est la
+  // configuration de BestaSolar qui encaisse), le gérant en mode local. Le
+  // gérant d'une entreprise cliente n'y peut rien : inutile de l'alerter.
+  const configureLEncaissement = isSupabaseConfigured ? !!user?.is_platform_admin : user?.role === 'gerant';
+
   // Aucune clé — ni configurée dans l'app, ni héritée du build : le bouton
   // n'a rien pour fonctionner. Disparaître sans un mot laissait chercher une
-  // panne là où il n'y a qu'une configuration à faire ; le gérant, lui, peut
-  // agir, on lui dit donc où.
+  // panne là où il n'y a qu'une configuration à faire ; celui qui peut agir
+  // est donc prévenu, et lui seul.
   if (!kkiapayKey) {
-    if (user?.role !== 'gerant') return null;
+    if (!configureLEncaissement) return null;
     return (
       <div className="field-hint" style={{ textAlign: 'center' }}>
         Paiement en ligne indisponible : {config
@@ -118,10 +142,22 @@ export default function KkiapayButton({
     );
   }
 
+  // Mode test : aucun bouton, aucun numéro de test — rien que les clients
+  // puissent voir. Le paiement Mobile Money manuel reste disponible.
+  if (SANDBOX) {
+    if (!configureLEncaissement) return null;
+    return (
+      <div className="field-hint" style={{ textAlign: 'center' }}>
+        Paiement en ligne masqué à vos clients : KKiaPay est en <strong>mode test</strong>.
+        {' '}Passez-le en mode réel dans <strong>Plus › Moyens de paiement</strong> pour l'ouvrir.
+      </div>
+    );
+  }
+
   const ouvrir = () => {
     // Le widget se contente de « numéro n'est pas valide » : on explique
     // d'abord ce qui cloche, sinon l'échec reste incompréhensible.
-    const probleme = problemeNumero(phone, { sandbox: SANDBOX });
+    const probleme = problemeNumero(phone);
     if (probleme) {
       toast(probleme, { type: 'error' });
       return;
@@ -149,40 +185,14 @@ export default function KkiapayButton({
   };
 
   return (
-    <>
-      <button
-        type="button"
-        className="btn btn-primary btn-block"
-        onClick={ouvrir}
-        disabled={disabled || ouvert}
-      >
-        <CreditCard size={17} />
-        {ouvert ? 'Paiement KKiaPay ouvert…' : label}
-      </button>
-
-      {/* Le bac à sable KKiaPay ne connaît que ses propres numéros, tous
-          béninois : sans cette liste, tout essai avec un vrai numéro togolais
-          se solde par « numéro n'est pas valide », sans explication. */}
-      {SANDBOX && (
-        <div className="kkiapay-sandbox">
-          <div className="kkiapay-sandbox-titre">
-            <FlaskConical size={13} /> Mode test — numéros acceptés
-          </div>
-          <div className="kkiapay-sandbox-liste">
-            {NUMEROS_TEST_SANDBOX.map((t) => (
-              <button key={t.numero} type="button" className="kkiapay-sandbox-num"
-                disabled={!onNumero}
-                onClick={() => onNumero?.(formatMomo(t.numero))}>
-                <span className="kkiapay-sandbox-numero">{formatMomo(t.numero)}</span>
-                <span className="kkiapay-sandbox-scenario">{t.operateur} · {t.scenario}</span>
-              </button>
-            ))}
-          </div>
-          <div className="field-hint">
-            Aucun argent n’est débité. Un vrai numéro sera refusé tant que le mode test est actif.
-          </div>
-        </div>
-      )}
-    </>
+    <button
+      type="button"
+      className="btn btn-primary btn-block"
+      onClick={ouvrir}
+      disabled={disabled || ouvert}
+    >
+      <CreditCard size={17} />
+      {ouvert ? 'Paiement KKiaPay ouvert…' : label}
+    </button>
   );
 }

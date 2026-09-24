@@ -1074,9 +1074,8 @@ export default function Plus() {
               phone={subForm.phone}
               amount={formuleChoisie.prix}
               objet={{ type: 'abonnement', formule: formuleChoisie.id }}
-              label={`Payer ${formatCFA(formuleChoisie.prix)} avec KKiaPay (test)`}
+              label={`Payer ${formatCFA(formuleChoisie.prix)} par Mobile Money`}
               disabled={!subForm.phone}
-              onNumero={(numero) => setSubForm({ ...subForm, phone: numero })}
               onPaid={(reference, verdict) => paiementKkiapay(reference, verdict)}
             />
             <button type="submit" className="btn btn-accent btn-block btn-lg">

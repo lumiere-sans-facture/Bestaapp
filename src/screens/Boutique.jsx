@@ -4,7 +4,7 @@ import { Search, Plus, Pencil, Trash2, Camera, Check, ShoppingCart, FileText, Sm
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
-import KkiapayButton from '../components/KkiapayButton';
+import KkiapayButton, { usePaiementEnLigne } from '../components/KkiapayButton';
 import { formatCFA } from '../utils/format';
 import { fileToResizedDataUrl } from '../utils/image';
 import { extractPowerWatts, POWER_RANGES, PRICE_RANGES } from '../utils/power';
@@ -41,6 +41,9 @@ export default function Boutique() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const fileInputRef = useRef(null);
   const toast = useToast();
+  // Paiement en ligne réellement ouvert (clé renseignée, mode réel) : sinon on
+  // n'en parle pas au client.
+  const enLigne = usePaiementEnLigne();
 
   const detailProduct = products.find((p) => p.id === detailId);
 
@@ -426,8 +429,9 @@ export default function Boutique() {
             </div>
             <div className="field-hint payment-stub-note">
               Rien n'est prélevé à cette étape : la commande est d'abord enregistrée.
-              Vous pourrez ensuite la régler en ligne, ou attendre l'appel de BestaSolar
-              sur ce numéro.
+              {enLigne
+                ? ' Vous pourrez ensuite la régler en ligne, ou attendre l’appel de BestaSolar sur ce numéro.'
+                : ' BestaSolar vous appelle ensuite sur ce numéro pour le règlement et la livraison.'}
             </div>
             <button type="submit" className="btn btn-primary btn-block">
               <Smartphone size={17} /> Continuer vers le paiement · {formatCFA(cartTotal)}
@@ -445,8 +449,10 @@ export default function Boutique() {
             ) : (
               <>
                 <p className="text-sm text-secondary">
-                  Commande de {formatCFA(payment.total)} enregistrée. Réglez-la maintenant en ligne,
-                  ou attendez l'appel de BestaSolar au {payment.phone} ({payment.operator}).
+                  Commande de {formatCFA(payment.total)} enregistrée.
+                  {enLigne
+                    ? <> Réglez-la maintenant en ligne, ou attendez l'appel de BestaSolar au {payment.phone} ({payment.operator}).</>
+                    : <> BestaSolar vous appelle au {payment.phone} ({payment.operator}) pour le règlement et la livraison.</>}
                 </p>
                 {/* Le montant vient de la commande, pas du panier : celui-ci
                     est déjà vidé, et c'est la commande qui fait foi. */}
@@ -456,7 +462,6 @@ export default function Boutique() {
                   objet={{ type: 'commande', commandeId: payment.id }}
                   label={`Payer maintenant · ${formatCFA(payment.total)}`}
                   onPaid={paiementCommande}
-                  onNumero={(numero) => setPayment((o) => (o && o !== 'form' ? { ...o, phone: numero } : o))}
                 />
               </>
             )}
