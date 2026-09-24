@@ -49,7 +49,7 @@ ok(/Envoyez 5 000 F par Mobile Money/.test(clientTest) && /S'abonner/.test(clien
    'le paiement Mobile Money manuel reste proposé');
 
 const gerantTest = await fiche(GERANT, 'sandbox');
-ok(/masqué à vos clients/.test(gerantTest) && /mode test/.test(gerantTest), 'le gérant est prévenu que le paiement en ligne est en mode test');
+ok(!/KKiaPay|mode test|\(test\)|masqué/i.test(gerantTest), 'le gérant non plus ne voit aucune mention de test');
 ok(!/numéros acceptés|Payer 5 000/.test(gerantTest), 'aucun bouton ni numéro de test, même pour le gérant');
 
 const clientReel = await fiche(TECH, 'live');

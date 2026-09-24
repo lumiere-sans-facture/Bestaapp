@@ -157,17 +157,12 @@ export default function KkiapayButton({
     );
   }
 
-  // Mode test : aucun bouton, aucun numéro de test — rien que les clients
-  // puissent voir. Le paiement Mobile Money manuel reste disponible.
-  if (SANDBOX) {
-    if (!configureLEncaissement) return null;
-    return (
-      <div className="field-hint" style={{ textAlign: 'center' }}>
-        Paiement en ligne masqué à vos clients : KKiaPay est en <strong>mode test</strong>.
-        {' '}Passez-le en mode réel dans <strong>Plus › Moyens de paiement</strong> pour l'ouvrir.
-      </div>
-    );
-  }
+  // Mode test : RIEN n'est affiché, à personne — ni bouton, ni numéro de
+  // test, ni mention du mode test (demande explicite : l'app publiée ne doit
+  // rien montrer de ses essais). Le mode reste lisible par l'administrateur
+  // dans Plus › Paramètres › Moyens de paiement. Le paiement Mobile Money
+  // manuel reste proposé à côté.
+  if (SANDBOX) return null;
 
   const ouvrir = () => {
     // Le widget se contente de « numéro n'est pas valide » : on explique
