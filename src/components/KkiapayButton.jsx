@@ -17,6 +17,19 @@ import { useToast } from './Toast';
 const CLE_BUILD = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
 const SANDBOX_BUILD = import.meta.env.VITE_KKIAPAY_SANDBOX !== 'false';
 
+// Script du widget, chargé UNE fois et seulement quand un bouton de paiement
+// s'affiche vraiment. Placé dans index.html, il retardait l'ouverture de
+// l'app entière le temps que le serveur de KKiaPay réponde.
+const SCRIPT_WIDGET = 'https://cdn.kkiapay.me/k.js';
+const chargerWidgetKkiapay = () => {
+  if (typeof document === 'undefined') return;
+  if (document.querySelector(`script[src="${SCRIPT_WIDGET}"]`)) return;
+  const script = document.createElement('script');
+  script.src = SCRIPT_WIDGET;
+  script.async = true;
+  document.head.appendChild(script);
+};
+
 /**
  * Réglages effectifs de KKiaPay. L'écran « Moyens de paiement » du gérant
  * prime sur les variables de build : changer d'agrégateur ou passer en réel
@@ -84,7 +97,9 @@ export default function KkiapayButton({
   // lieu d'abandonner définitivement — sinon le retour de paiement n'était
   // jamais enregistré quand le réseau était lent.
   useEffect(() => {
-    if (!kkiapayKey) return undefined;
+    // Mode test : le bouton n'est pas affiché, le widget n'a rien à faire ici.
+    if (!kkiapayKey || SANDBOX) return undefined;
+    chargerWidgetKkiapay();
     let arrete = false;
     let minuteur;
 
@@ -119,7 +134,7 @@ export default function KkiapayButton({
       window.removeFailedListener?.(echec);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kkiapayKey]);
+  }, [kkiapayKey, SANDBOX]);
 
   // Qui règle l'encaissement : l'admin plateforme avec un backend (c'est la
   // configuration de BestaSolar qui encaisse), le gérant en mode local. Le
@@ -163,7 +178,9 @@ export default function KkiapayButton({
       return;
     }
     if (typeof window.openKkiapayWidget !== 'function') {
-      toast('Le widget KKiaPay est indisponible. Rechargez la page puis réessayez.', { type: 'error' });
+      // Chargé à la demande : il peut simplement ne pas être encore arrivé.
+      chargerWidgetKkiapay();
+      toast('Le paiement KKiaPay se charge — réessayez dans quelques secondes. Si cela persiste, vérifiez votre connexion.', { type: 'error' });
       return;
     }
     setOuvert(true);

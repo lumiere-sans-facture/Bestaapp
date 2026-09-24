@@ -13,6 +13,7 @@ const config = (mode) => ({ id: 'cfg-kkia', provider: 'kkiapay', actif: true, mo
 // Chaque scénario : son propre contexte. La configuration est injectée par
 // un script d'initialisation, AVANT que l'app ne lise son stockage : écrite
 // après coup, elle serait écrasée par l'état en mémoire au déchargement.
+const scriptWidget = {};
 const fiche = async (utilisateur, mode) => {
   const ctx = await nav.newContext({ viewport: { width: 1280, height: 950 } });
   const page = await ctx.newPage();
@@ -33,6 +34,9 @@ const fiche = async (utilisateur, mode) => {
   await page.waitForSelector('.sheet', { timeout: 15000 });
   await page.waitForTimeout(500);
   const texte = await page.evaluate(() => document.querySelector('.sheet')?.innerText || '');
+  // Le script du widget n'est chargé que là où un bouton de paiement s'affiche
+  // (il bloquait autrefois l'ouverture de toute l'app, depuis index.html).
+  scriptWidget[`${utilisateur.role}-${mode}`] = await page.evaluate(() => !!document.querySelector('script[src*="cdn.kkiapay.me"]'));
   if (process.env.DEBUG) console.log(mode, texte);
   await ctx.close();
   return texte;
@@ -51,6 +55,9 @@ ok(!/numéros acceptés|Payer 5 000/.test(gerantTest), 'aucun bouton ni numéro 
 const clientReel = await fiche(TECH, 'live');
 ok(/Payer 5 000 F par Mobile Money/.test(clientReel), 'mode réel : le bouton de paiement s’affiche, sans « (test) »');
 ok(!/\(test\)|masqué/.test(clientReel), 'mode réel : aucune mention de test');
+
+ok(!scriptWidget['technicien-sandbox'] && !scriptWidget['gerant-sandbox'], 'mode test : le script KKiaPay n’est même pas téléchargé');
+ok(scriptWidget['technicien-live'] === true, 'mode réel : le script KKiaPay est chargé à la demande, avec le bouton');
 
 console.log('\n' + R.join('\n'));
 await nav.close();

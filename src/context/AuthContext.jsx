@@ -70,12 +70,15 @@ export function AuthProvider({ children }) {
   // Attache l'organisation au profil (type interne/pro, nom, code d'invitation).
   // user.org absent = ancien schéma mono-équipe ou mode local → comportement
   // « interne » (CRM complet), comme avant.
-  const adoptProfile = async (profile) => {
+  // `orgEnCours` : lecture de l'organisation déjà lancée par l'appelant, EN
+  // PARALLÈLE de celle du profil — un aller-retour réseau de moins à la
+  // connexion (sur mobile, chaque aller-retour compte).
+  const adoptProfile = async (profile, orgEnCours = null) => {
     setPendingAuthUser(null);
     localStorage.removeItem(OAUTH_CONTEXT_KEY);
     setSyncOrg(profile?.org_id);
     let org = null;
-    if (profile?.org_id) org = await fetchMyOrg();
+    if (profile?.org_id) org = await (orgEnCours || fetchMyOrg());
     // Serveur injoignable : `fetchMyOrg` rend null. Reprendre l'organisation
     // connue plutôt que de repartir sans — un type d'organisation inconnu
     // suspend la réplication du catalogue pour toute la session.
@@ -216,9 +219,11 @@ export function AuthProvider({ children }) {
     }
 
     touchSession();
+    // Profil et organisation lus en même temps, pas l'un après l'autre.
+    const orgEnCours = fetchMyOrg();
     const { profile, injoignable } = await fetchProfile(email);
     if (profile) {
-      await adoptProfile(profile);
+      await adoptProfile(profile, orgEnCours);
       return { ok: true };
     }
 
@@ -248,14 +253,21 @@ export function AuthProvider({ children }) {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) return false;
       touchSession();
-      const profile = (await fetchProfile(email.trim())).profile || (await provisionProfile(email.trim()));
+      // Profil et organisation lus EN MÊME TEMPS : la connexion enchaînait
+      // trois allers-retours (identifiants, profil, organisation), soit une à
+      // deux secondes de plus sur un réseau mobile.
+      const orgEnCours = fetchMyOrg();
+      const existant = (await fetchProfile(email.trim())).profile;
+      const profile = existant || (await provisionProfile(email.trim()));
       if (!profile) {
         // Compte Auth valide mais profil jamais créé (inscription interrompue,
         // autre navigateur…) : on garde la session et on laisse l'écran de
         // connexion proposer de terminer l'inscription.
         return 'incomplete';
       }
-      await adoptProfile(profile);
+      // Profil tout juste créé : l'organisation aussi — la lecture lancée
+      // avant sa création ne la connaissait pas, on la relit.
+      await adoptProfile(profile, existant ? orgEnCours : null);
       return true;
     }
     const found = users.find(

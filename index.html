@@ -26,12 +26,19 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Police chargée SANS bloquer l'affichage : l'app s'ouvre aussitôt avec
+         la police du téléphone, puis Inter la remplace dès qu'elle arrive.
+         En feuille de style ordinaire, tout l'écran attendait Google Fonts —
+         des secondes sur un réseau mobile lent. -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <!-- Widget de paiement KKiaPay : clé publique injectée via Vite, jamais ici. -->
-  <script src="https://cdn.kkiapay.me/k.js"></script>
-</body>
+    <!-- Le widget de paiement KKiaPay n'est PLUS chargé ici : en script
+         ordinaire, il bloquait le démarrage de l'app à chaque ouverture, le
+         temps que cdn.kkiapay.me réponde. Il est chargé à la demande par le
+         bouton de paiement (components/KkiapayButton.jsx). -->
+  </body>
 </html>
