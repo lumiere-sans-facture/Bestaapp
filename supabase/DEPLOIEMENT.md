@@ -59,6 +59,8 @@ correspond à une fonctionnalité livrée après la première installation :
 | 11 | `codes-promo.sql` | Codes d'essai Devis Pro (30 jours sans paiement) : le code est jugé par le serveur, les tables sont illisibles depuis l'app. Sans ce script, « Activer » répond « connexion indisponible » et la section « Codes d'essai » de l'admin reste vide |
 | 12 | `suppression-compte.sql` | « Supprimer mon compte » (Plus › Paramètres › Profil), exigé par Google Play et l'App Store : supprime le compte, et toute l'entreprise si le compte y travaille seul. Sans ce script, le bouton répond « serveur injoignable » |
 
+> **Raccourci** : `a-executer-2026-09.sql` réunit les scripts 11 et 12 en un seul copier-coller, avec un tableau de contrôle final. À passer dans les deux projets.
+
 L'ordre 8 → 9 n'est pas indifférent : l'index unique répare d'abord les
 doublons hérités, le renommage travaille ensuite sur une base saine.
 
