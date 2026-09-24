@@ -360,8 +360,12 @@ export function AuthProvider({ children }) {
     return { ok: !error, error: error?.message };
   };
 
+  // Renvoie la promesse de déconnexion serveur : qui recharge la page juste
+  // après (suppression de compte) doit l'attendre, sinon la session survit.
   const logout = () => {
-    if (isSupabaseConfigured) supabase.auth.signOut();
+    const deconnexion = isSupabaseConfigured
+      ? supabase.auth.signOut().catch(() => {})
+      : Promise.resolve();
     // Le profil mémorisé pour l'ouverture hors-ligne part avec la session :
     // le laisser rouvrirait l'app sur le compte précédent.
     oublierProfilCache();
@@ -375,6 +379,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(OAUTH_CONTEXT_KEY);
     clearSessionLifetime();
+    return deconnexion;
   };
 
   /** Recharge l'organisation attachée au profil (après attribution du parrainage…). */

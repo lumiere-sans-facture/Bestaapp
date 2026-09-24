@@ -38,4 +38,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- « Ma position » du dimensionnement solaire (ville et ensoleillement).
+         Demandée au moment du clic seulement, jamais en arrière-plan. Sans
+         ces lignes, le bouton échouait en silence dans l'app installée. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 </manifest>

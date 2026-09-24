@@ -6,6 +6,8 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-09-24
+- **Supprimer mon compte** (Plus › Paramètres › Profil), exigé par Google Play et l'App Store : confirmation en tapant SUPPRIMER, le compte part — et toute l'entreprise s'il y travaille seul ; en équipe, le travail reste aux collègues. L'appareil est nettoyé, session comprise. Page publique `suppression-compte.html` pour la fiche Play Store. Nécessite `supabase/suppression-compte.sql` dans les deux projets
+- **App Android / iOS** : « Ma position » fonctionne dans l'app installée (permission de localisation déclarée, texte d'autorisation iOS) ; le numéro de version se déduit de package.json (1.1.0 → 10100), le deuxième envoi au Play Store n'est plus bloqué ; l'app des stores embarque enfin Sentry et PostHog
 - **Plus aucun paiement de test visible des clients** : tant que KKiaPay est en mode test, le bouton de paiement en ligne, les numéros de test et la mention « (test) » disparaissent — seul l'administrateur de l'encaissement est prévenu. Le paiement Mobile Money manuel reste proposé, et la boutique ne promet plus un règlement en ligne qui n'est pas ouvert
 
 ## 2026-09-22

@@ -47,5 +47,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Votre position sert à retrouver votre ville et son ensoleillement pour dimensionner l'installation solaire. Elle n'est ni enregistrée ni partagée.</string>
 </dict>
 </plist>

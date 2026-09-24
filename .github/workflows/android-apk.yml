@@ -32,6 +32,12 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Sans elles, l'app installée depuis le store ne remonterait ni ses
+          # plantages (Sentry) ni son usage (PostHog) : ce sont des valeurs
+          # PUBLIQUES, à recopier depuis Vercel dans les secrets GitHub.
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
 
       - name: Sync Capacitor
         run: npx cap sync android

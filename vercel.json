@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/((?!api/|privacy\\.html|assets/|favicon\\.svg).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|privacy\\.html|suppression-compte\\.html|assets/|favicon\\.svg).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

@@ -526,6 +526,17 @@ export async function adminConfirmSubscriptionPayment(orgId, paymentId) {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Supprime le compte connecté, et son entreprise s'il y travaille seul
+ * (supabase/suppression-compte.sql — le serveur décide de la portée).
+ * @returns {Promise<{ok: true, portee: 'compte'|'entreprise'} | {ok: false, raison: string}>}
+ */
+export async function supprimerMonCompte() {
+  const { data, error } = await supabase.rpc('supprimer_mon_compte');
+  if (error) throw new Error(error.message);
+  return data || { ok: false, raison: 'reseau' };
+}
+
 // ---- Codes d'essai Devis Pro (supabase/codes-promo.sql) ----
 
 /**

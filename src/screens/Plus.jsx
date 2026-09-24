@@ -17,6 +17,7 @@ import { estEssai } from '../utils/codePromo';
 import { lireFormuleChoisie, oublierFormuleChoisie } from '../utils/formuleChoisie';
 import ChoixFormule from '../components/ChoixFormule';
 import CodeEssai from '../components/CodeEssai';
+import SuppressionCompte from '../components/SuppressionCompte';
 import { PAY_NUMBER } from '../config/company';
 import { downloadBackup, readBackupFile } from '../utils/backup';
 import PageHeader from '../components/PageHeader';
@@ -588,7 +589,14 @@ export default function Plus() {
     </>
   );
 
-  const renderProfile = () => <MyProfile />;
+  // La suppression de compte vit sous le profil : c'est là que les stores
+  // (et les utilisateurs) la cherchent.
+  const renderProfile = () => (
+    <>
+      <MyProfile />
+      <SuppressionCompte />
+    </>
+  );
 
   const renderBackup = () => (
     <div className="settings-tab">

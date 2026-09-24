@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// Numéro de version : UNE seule source, le champ "version" de package.json
+// (le CI peut le forcer via VERSION_NAME, depuis l'étiquette vX.Y.Z).
+// Le Play Store refuse tout envoi dont le versionCode n'augmente pas : il est
+// donc DÉDUIT de la version — 1.1.0 → 10100, 1.2.3 → 10203 — au lieu d'un
+// « 1 » figé qui bloquait le deuxième envoi. Mineure et correctif < 100.
+def versionApp = (System.getenv("VERSION_NAME") ?: new groovy.json.JsonSlurper().parse(file("../../package.json")).version).toString()
+def partiesVersion = (versionApp.tokenize('.') + ['0', '0', '0']).take(3).collect { (it.replaceAll(/[^0-9].*$/, '') ?: '0').toInteger() }
+
 android {
     namespace = "com.bestasolar.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +15,8 @@ android {
         applicationId "com.bestasolar.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode partiesVersion[0] * 10000 + partiesVersion[1] * 100 + partiesVersion[2]
+        versionName versionApp
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

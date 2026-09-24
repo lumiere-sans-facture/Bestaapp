@@ -1,3 +1,6 @@
+// Compte supprimé à la session précédente : ses données locales partent
+// AVANT que quoi que ce soit ne les relise — d'où ce premier import.
+import './purgeDemarrage'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
