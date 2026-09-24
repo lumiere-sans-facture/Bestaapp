@@ -1,18 +1,26 @@
 // Coordonnées officielles BestaSolar — utilisées sur les devis PDF.
 export const COMPANY = {
-  name: 'BESTA SOLAR',
+  name: 'BESTA SOLAR TOGO',
   slogan: 'Énergie lumineuse sans facture',
-  // Coordonnées OFFICIELLES BestaSolar (immatriculation béninoise) — celles
-  // qui figurent sur les devis, factures et fiches techniques. L'application
-  // s'adresse au marché togolais, mais l'entreprise émettrice reste celle-ci.
+  // Coordonnées OFFICIELLES de l'entreprise émettrice — celles qui figurent
+  // sur les devis, factures et fiches techniques BestaSolar : BESTA SOLAR
+  // TOGO, entreprise individuelle (voir aussi config/legal.js, l'éditeur de
+  // l'application).
+  //
+  // `phone` : UN numéro, celui des liens WhatsApp (wa.me) et du signalement
+  // d'incident — un lien ne peut viser qu'un seul numéro.
+  // `telephones` : les numéros IMPRIMÉS sur les documents (Togo et Bénin).
   phone: '+229 016 173 2956',
+  telephones: ['+228 799 802 090', '+229 01 61 73 29 56'],
   email: 'contact@bestasolar.com',
   website: 'www.bestasolar.com',
-  address: 'Cotonou Saint Rita, République du Bénin',
-  addressShort: 'Cotonou Saint Rita, Bénin',
+  address: 'Adidoadin, Lomé — Togo',
+  addressShort: 'Adidoadin, Lomé',
   // Mentions légales portées en pied des documents techniques
-  rccm: 'RB/PKO/23 A 19308',
-  ifu: '0202274882317', // IFU béninois (clé `ifu` : données existantes)
+  rccm: 'TG-LFW-01-2025-A10-01086',
+  // Numéro d'identification fiscale togolais (NIF). La clé reste `ifu` :
+  // c'est elle que lisent les documents et les données déjà enregistrées.
+  ifu: '1002023475',
   bank: {
     name: 'Bank of Africa Bénin',
     account: 'BJ66 BJ01 1000 0000 0123 4567 890',
@@ -27,6 +35,14 @@ export const COMPANY = {
 
 // Alias historique : les documents existants lisent encore COMPANY.terms.
 COMPANY.terms = COMPANY.termsDevis;
+
+/**
+ * Numéros tels qu'imprimés sur un document : « +228 … / +229 … ». Espaces
+ * INSÉCABLES à l'intérieur de chaque numéro : une ligne trop courte ne peut
+ * couper qu'entre les deux, jamais au milieu d'un numéro.
+ */
+export const telephonesImprimes = (liste = []) => liste.map((t) => String(t).replace(/ /g, '\u00A0')).join(' / ');
+export const TELEPHONES_DOCUMENTS = telephonesImprimes(COMPANY.telephones);
 
 // Numéro Mobile Money encaissant les abonnements Devis Pro (paywall public
 // et écran Abonnement des installateurs inscrits).

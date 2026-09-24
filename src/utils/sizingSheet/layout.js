@@ -268,7 +268,8 @@ export function renderSheet(d, c) {
   const piedLong = piedCourt + (e.phone ? ` · ${esc(e.phone)}` : '');
   const mentionsLegales = [
     e.rccm ? `RCCM ${esc(e.rccm)}` : '',
-    e.ifu ? `IFU ${esc(e.ifu)}` : '',
+    // « NIF », comme sur les devis et factures (numéro fiscal togolais).
+    e.ifu ? `NIF ${esc(e.ifu)}` : '',
     d.apporteur?.name
       ? `Apporteur d’affaires : ${esc(d.apporteur.name)}${d.apporteur.code ? ` · ${esc(d.apporteur.code)}` : ''}`
       : '',

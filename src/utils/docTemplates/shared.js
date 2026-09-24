@@ -2,7 +2,7 @@
 // Formatage, normalisation des données, primitives de page A4 et pagination.
 // Aucun modèle ne réimplémente ces briques : elles garantissent que les trois
 // rendus partagent la même grille, la même typographie et les mêmes nombres.
-import { COMPANY } from '../../config/company';
+import { COMPANY, TELEPHONES_DOCUMENTS, telephonesImprimes } from '../../config/company';
 import { dateEmissionDevis } from '../dateEmission';
 import { LOGO_BESTASOLAR } from '../../assets/logoBestaSolar';
 import { prixPublic } from '../price';
@@ -95,7 +95,10 @@ export function emetteurDe(source = {}) {
     : {
         name: source.name || COMPANY.name,
         slogan: source.slogan ?? COMPANY.slogan,
-        phone: source.phone ?? COMPANY.phone,
+        // Les deux numéros (Togo et Bénin) figurent sur les documents. Les
+        // écrans passent COMPANY lui-même : sa liste `telephones` prime sur
+        // `phone`, qui n'est que le numéro des liens WhatsApp.
+        phone: (source.telephones && telephonesImprimes(source.telephones)) ?? source.phone ?? TELEPHONES_DOCUMENTS,
         email: source.email ?? COMPANY.email,
         website: source.website ?? COMPANY.website,
         address: source.address ?? COMPANY.address,

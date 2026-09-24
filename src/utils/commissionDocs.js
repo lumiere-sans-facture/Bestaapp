@@ -1,7 +1,8 @@
 // Documents de commissions conformes aux usages comptables : reçu de paiement
 // (avec montant arrêté en lettres) et relevé de commissions par partenaire.
 // HTML autonome imprimable (Ctrl+P) — même approche que la fiche de dimensionnement.
-import { COMPANY } from '../config/company';
+import { COMPANY, TELEPHONES_DOCUMENTS } from '../config/company';
+import { LOGO_BESTASOLAR } from '../assets/logoBestaSolar';
 
 const nf = (v) =>
   Math.round(Number(v) || 0).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ');
@@ -64,7 +65,7 @@ const shell = (titre, corps) => `<!DOCTYPE html>
   .sheet { max-width: 760px; margin: 0 auto; background: white; }
   @media screen { .sheet { margin: 24px auto; box-shadow: 0 8px 30px rgba(10,36,114,.16); border-radius: 8px; overflow: hidden; } }
   header { background: var(--bleu); color: white; padding: 20px 28px; display: flex; align-items: center; gap: 14px; }
-  .logo { width: 42px; height: 42px; border-radius: 11px; background: var(--orange); color: var(--bleu-fonce); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+  .logo-img { height: 30px; width: auto; display: block; margin-bottom: 4px; }
   .brand-name { font-size: 16px; font-weight: 800; }
   .brand-slogan { font-size: 10.5px; opacity: .85; font-style: italic; }
   .doc-meta { margin-left: auto; text-align: right; }
@@ -100,10 +101,9 @@ const shell = (titre, corps) => `<!DOCTYPE html>
 <body>
 <div class="sheet">
   <header>
-    <div class="logo">☀</div>
     <div>
-      <div class="brand-name">${esc(COMPANY.name)}</div>
-      <div class="brand-slogan">${esc(COMPANY.slogan)}</div>
+      <img class="logo-img" src="${LOGO_BESTASOLAR}" alt="BestaSolar Pro">
+      <div class="brand-slogan">${esc(COMPANY.name)} · ${esc(COMPANY.slogan)}</div>
     </div>
     <div class="doc-meta">
       <div class="doc-title">${esc(titre)}</div>
@@ -113,7 +113,7 @@ const shell = (titre, corps) => `<!DOCTYPE html>
   <div class="band"></div>
   <main>${corps}</main>
   <footer>
-    <span>${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)} · ${esc(COMPANY.phone)}</span>
+    <span>${esc(COMPANY.name)} — ${esc(COMPANY.addressShort)} · ${esc(TELEPHONES_DOCUMENTS)}</span>
     <span>Document généré par BestaSolar Pro</span>
   </footer>
   <div class="footer-band"></div>

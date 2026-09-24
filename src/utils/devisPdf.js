@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { COMPANY } from '../config/company';
+import { COMPANY, TELEPHONES_DOCUMENTS } from '../config/company';
 import { prixPublic } from './price';
 import { dateEmissionDevis } from './dateEmission';
 
@@ -52,7 +52,7 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
   doc.text(COMPANY.slogan, M + 44, 64);
 
   doc.setFontSize(7.5);
-  doc.text(`P. ${COMPANY.phone}  |  E. ${COMPANY.email}`, W - M, 48, { align: 'right' });
+  doc.text(`P. ${TELEPHONES_DOCUMENTS}  |  E. ${COMPANY.email}`, W - M, 48, { align: 'right' });
   doc.text(`W. ${COMPANY.website}  |  A. ${COMPANY.address}`, W - M, 60, { align: 'right' });
 
   doc.setDrawColor(...NAVY);
@@ -262,7 +262,7 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
   doc.setFontSize(7.5);
   doc.setTextColor(...GRAY);
   doc.text(
-    `BestaSolar  ·  ${COMPANY.phone}  ·  ${COMPANY.email}  ·  ${COMPANY.website}  ·  ${COMPANY.addressShort}`,
+    `BestaSolar  ·  ${TELEPHONES_DOCUMENTS}  ·  ${COMPANY.email}  ·  ${COMPANY.website}  ·  ${COMPANY.addressShort}`,
     W / 2, H - 50, { align: 'center' }
   );
   doc.setFillColor(...ACCENT);

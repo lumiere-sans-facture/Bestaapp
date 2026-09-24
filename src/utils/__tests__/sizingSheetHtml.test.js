@@ -165,8 +165,8 @@ describe('buildSizingSheetHtml — 3 pages', () => {
 
   it('mentions légales et prudence commerciale au pied de la page 3', () => {
     const avec = buildSizingSheetHtml({ ...data, apporteur: { name: 'Aminata Kesso', code: 'AMINATA' } });
-    expect(avec).toContain('RCCM RB/PKO/23 A 19308');
-    expect(avec).toContain('IFU 0202274882317');
+    expect(avec).toContain('RCCM TG-LFW-01-2025-A10-01086');
+    expect(avec).toContain('NIF 1002023475');
     expect(avec).toContain('Aminata Kesso');
     expect(avec).toContain('Estimation indicative — ne constitue pas une offre de prix ferme.');
   });
@@ -229,8 +229,8 @@ describe('buildSizingSheetHtml — émetteur Pro (entreprise abonnée)', () => {
     expect(html).toContain('Lomé, Nyékonakpoè');
     expect(html).toContain('+228 90 11 22 33');
     expect(html).toContain('RCCM TG-LOM-2024-B-1234');
-    expect(html).toContain('IFU 1000987654321');
-    for (const bestasolar of ['BESTA SOLAR', 'Cotonou Saint Rita', 'RB/PKO/23 A 19308', '0202274882317']) {
+    expect(html).toContain('NIF 1000987654321');
+    for (const bestasolar of ['BESTA SOLAR', 'Adidoadin', 'TG-LFW-01-2025-A10-01086', '1002023475', '+228 799 802 090']) {
       expect(html).not.toContain(bestasolar);
     }
   });
