@@ -226,9 +226,9 @@ export function generateDevisPdf(devis, lead, partner, products = []) {
   py += 14;
   doc.setFontSize(8);
   const payRows = [
-    ['Banque :', COMPANY.bank.name],
-    ['Compte :', COMPANY.bank.account],
-    ['SWIFT :', COMPANY.bank.swift],
+    ...(COMPANY.bank
+      ? [['Banque :', COMPANY.bank.name], ['Compte :', COMPANY.bank.account], ['SWIFT :', COMPANY.bank.swift]]
+      : [['Règlement :', 'à convenir avec BestaSolar']]),
     ['Email :', COMPANY.email],
   ];
   payRows.forEach(([label, value]) => {

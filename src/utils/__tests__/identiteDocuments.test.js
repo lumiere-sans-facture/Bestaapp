@@ -39,6 +39,8 @@ describe('identité BestaSolar sur les documents', () => {
       expect(html).toContain('TG-LFW-01-2025-A10-01086');
       expect(html).toContain('1002023475');
       expect(html).not.toMatch(/RB\/PKO|0202274882317|Cotonou Saint Rita/);
+      // Plus aucun compte bancaire (celui d'avant était un exemple).
+      expect(html).not.toMatch(/Bank of Africa|BJ66|AFRIBJBJ/);
     });
   }
 });

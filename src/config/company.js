@@ -21,11 +21,10 @@ export const COMPANY = {
   // Numéro d'identification fiscale togolais (NIF). La clé reste `ifu` :
   // c'est elle que lisent les documents et les données déjà enregistrées.
   ifu: '1002023475',
-  bank: {
-    name: 'Bank of Africa Bénin',
-    account: 'BJ66 BJ01 1000 0000 0123 4567 890',
-    swift: 'AFRIBJBJ',
-  },
+  // Aucun compte bancaire imprimé : celui qui figurait ici était un exemple
+  // (« … 0123 4567 890 »). Un client aurait pu y virer un paiement. Les
+  // documents affichent alors « Règlement à convenir avec l'émetteur. ».
+  bank: null,
   // Conditions générales : la clause de validité ne vaut que pour un devis.
   termsDevis:
     "Ce devis est valable 30 jours. Tout acompte versé est non remboursable. BestaSolar se réserve le droit de réviser les prix en cas de variation significative des cours. La livraison est effectuée après réception de l'acompte convenu.",
