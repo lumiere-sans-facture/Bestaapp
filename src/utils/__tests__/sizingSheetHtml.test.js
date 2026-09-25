@@ -230,7 +230,7 @@ describe('buildSizingSheetHtml — émetteur Pro (entreprise abonnée)', () => {
     expect(html).toContain('+228 90 11 22 33');
     expect(html).toContain('RCCM TG-LOM-2024-B-1234');
     expect(html).toContain('NIF 1000987654321');
-    for (const bestasolar of ['BESTA SOLAR', 'Adidoadin', 'TG-LFW-01-2025-A10-01086', '1002023475', '+228 799 802 090']) {
+    for (const bestasolar of ['BESTA SOLAR', 'Adidoadin', 'TG-LFW-01-2025-A10-01086', '1002023475', '+228 79 98 02 09']) {
       expect(html).not.toContain(bestasolar);
     }
   });

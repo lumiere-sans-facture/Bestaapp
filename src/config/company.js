@@ -11,7 +11,7 @@ export const COMPANY = {
   // d'incident — un lien ne peut viser qu'un seul numéro.
   // `telephones` : les numéros IMPRIMÉS sur les documents (Togo et Bénin).
   phone: '+229 016 173 2956',
-  telephones: ['+228 799 802 090', '+229 01 61 73 29 56'],
+  telephones: ['+228 79 98 02 09', '+229 01 61 73 29 56'],
   email: 'contact@bestasolar.com',
   website: 'www.bestasolar.com',
   address: 'Adidoadin, Lomé — Togo',

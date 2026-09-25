@@ -20,7 +20,7 @@ describe('identité BestaSolar sur les documents', () => {
 
   it('les deux numéros, Togo et Bénin, sont imprimés', () => {
     // Insécables DANS chaque numéro, coupure possible seulement entre les deux.
-    expect(TELEPHONES_DOCUMENTS).toBe('+228\u00A0799\u00A0802\u00A0090 / +229\u00A001\u00A061\u00A073\u00A029\u00A056');
+    expect(TELEPHONES_DOCUMENTS).toBe('+228\u00A079\u00A098\u00A002\u00A009 / +229\u00A001\u00A061\u00A073\u00A029\u00A056');
     // Le numéro des liens WhatsApp reste UN numéro exploitable.
     expect(COMPANY.phone.replace(/\D/g, '')).toMatch(/^229\d{10}$/);
   });
@@ -34,7 +34,7 @@ describe('identité BestaSolar sur les documents', () => {
       // « Classique » est sans logo par conception (document administratif) ;
       // les devis BestaSolar utilisent « Studio ».
       if (model !== 'classique') expect(html).toContain(LOGO_BESTASOLAR.slice(0, 80));
-      expect(html).toContain('+228 799 802 090');
+      expect(html).toContain('+228 79 98 02 09');
       expect(html).toContain('+229 01 61 73 29 56');
       expect(html).toContain('TG-LFW-01-2025-A10-01086');
       expect(html).toContain('1002023475');
