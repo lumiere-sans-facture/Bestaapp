@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-09-25
+- **Onduleur toujours de la tension de la batterie du kit (12, 24 ou 48 V).** L'assistant de devis pouvait remplacer l'onduleur 3 kVA d'un kit 24 V par un 6 kVA 48 V, qui ne démarre pas sur cette batterie. Il ne propose désormais que des onduleurs de la même tension ; si aucun ne suffit, même à deux, il l'annonce au lieu de glisser un modèle incompatible. La tension se saisit dans « Plus › Onduleurs » et « Plus › Mes kits » et s'affiche dans les listes ; les kits et onduleurs officiels déjà enregistrés la reçoivent automatiquement
 - **Devis et factures au nom de BESTA SOLAR TOGO** : RCCM TG-LFW-01-2025-A10-01086, NIF 1002023475, Adidoadin (Lomé), et les deux numéros — Togo et Bénin — imprimés côte à côte sans jamais couper un numéro. Logo BestaSolar Pro sur les devis, les factures, la fiche de dimensionnement et désormais les relevés de commissions ; « NIF » au lieu de « IFU » sur la fiche
 - **L'app s'ouvre et se connecte plus vite.** Le script de paiement KKiaPay, placé dans la page d'accueil, bloquait le démarrage de toute l'app le temps que son serveur réponde — à chaque ouverture, même sans payer (mesuré : 3,4 s → 0,15 s avec un serveur KKiaPay lent). Il n'est plus chargé qu'avec le bouton de paiement. La police Inter ne bloque plus l'affichage. À la connexion, profil et entreprise se lisent en même temps : un aller-retour réseau de moins
 

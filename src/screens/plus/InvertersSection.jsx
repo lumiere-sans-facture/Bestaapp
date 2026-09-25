@@ -7,6 +7,7 @@ import { nouvelOnduleur, onduleurEstValide, resumeOnduleur } from '../../utils/i
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import Field from '../../components/Field';
+import { TENSIONS_BATTERIE } from '../../utils/tension';
 import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../components/Toast';
 
@@ -56,7 +57,8 @@ export default function InvertersSection({ onBack }) {
       <p className="text-sm text-secondary" style={{ marginBottom: 12 }}>
         Si l'onduleur prévu dans un kit ne prend pas assez de panneaux pour le
         besoin calculé du client, l'assistant de devis le remplace automatiquement
-        par le plus petit onduleur ci-dessous qui convient — jamais un plus faible.
+        par le plus petit onduleur ci-dessous qui convient — jamais un plus faible,
+        et toujours de la même tension batterie que le kit.
       </p>
 
       {/* Rattrapage : ne réapparaît que si un onduleur d'origine a été supprimé. */}
@@ -132,6 +134,13 @@ export default function InvertersSection({ onBack }) {
                 <input className="input" type="number" min="0" step="0.5" required value={edition.onduleur.capacity}
                   onChange={(e) => majOnduleur({ capacity: e.target.value })} />
               </Field>
+              <Field label="Tension batterie">
+                <select className="input" value={edition.onduleur.tension ?? ''}
+                  onChange={(e) => majOnduleur({ tension: e.target.value })}>
+                  <option value="">Non renseignée</option>
+                  {TENSIONS_BATTERIE.map((t) => <option key={t} value={t}>{t} V</option>)}
+                </select>
+              </Field>
               <Field label="Rendement (%)">
                 <input className="input" type="number" min="0" max="100" value={edition.onduleur.efficiency}
                   onChange={(e) => majOnduleur({ efficiency: e.target.value })} />
@@ -149,7 +158,8 @@ export default function InvertersSection({ onBack }) {
               La puissance PV max (« Max. PV Input Power » sur la fiche technique du
               fabricant) est ce qui permet à l'assistant de vérifier qu'un onduleur
               encaisse les panneaux calculés — pas sa capacité kVA, qui est la
-              puissance de SORTIE.
+              puissance de SORTIE. La tension batterie (12, 24 ou 48 V) empêche
+              de proposer cet onduleur pour un kit d'une autre tension.
             </div>
 
             <button type="submit" className="btn btn-primary btn-block">

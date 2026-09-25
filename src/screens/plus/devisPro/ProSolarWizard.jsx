@@ -709,6 +709,18 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                     {kitQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
                   </div>
                 )}
+                {/* Aucun onduleur de la tension du kit ne tient ce besoin, même à deux :
+                    le dire, plutôt que de glisser un modèle d'une autre tension, qui ne
+                    fonctionnerait pas avec cette batterie. */}
+                {kitQuotation?.inverterInsuffisant && (
+                  <div className="storage-alert abo-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
+                    <div>
+                      <Cpu size={13} style={{ verticalAlign: -2 }} /> Aucun onduleur{kitQuotation.tension ? ` ${kitQuotation.tension} V` : ''} configuré
+                      ne tient ce besoin, même à deux. Choisissez un kit plus grand, ou ajoutez un onduleur{' '}
+                      {kitQuotation.tension ? `${kitQuotation.tension} V ` : ''}plus puissant dans <strong>Plus › Onduleurs</strong>.
+                    </div>
+                  </div>
+                )}
 
                 <div className="chip-selector">
                   <span className="chip-selector-label"><PanelTop size={13} /> Type de support</span>

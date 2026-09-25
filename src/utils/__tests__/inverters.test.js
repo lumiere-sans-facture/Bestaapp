@@ -251,22 +251,42 @@ describe('aucun onduleur disponible ne convient : le dire, pas le taire', () => 
 });
 
 describe('buildKitQuotation — remplacement automatique de l’onduleur', () => {
-  it('remplace la ligne « Onduleur » si celui du kit ne prend pas assez de panneaux', () => {
-    // Kit 2,5 kWh Eco : onduleur 3 kVA (INVERTER_MODELS: hz-3kva, PV max 3900 W).
+  it('remplace la ligne « Onduleur » par un modèle PLUS GRAND DE LA MÊME TENSION', () => {
+    // Kit 2,5 kWh Eco : batterie 24 V, onduleur 3 kVA (hz-3kva, PV max 3900 W).
     const kit = SOLAR_KITS.find((k) => k.id === 'kit-2.5kwh-eco');
     expect(kit.inverter).toBe(3);
-    // Besoin bien au-delà de ce que 3 kVA (3900 W PV max) encaisse même avec marge.
-    const sizing = { requiredPanelPower: 8000 };
-    const q = buildKitQuotation(kit, 'tole', true, sizing, INVERTER_MODELS);
-    expect(q.inverterSuggested).not.toBeNull();
-    expect(q.inverterSuggested.capacity).toBeGreaterThan(3);
+    expect(kit.tension).toBe(24);
+    // Un 5 kVA 24 V est configuré à côté des modèles 48 V.
+    const cinq24 = { id: 'x-5kva-24', brand: 'Must', model: 'Onduleur hybride 5kVA', capacity: 5, maxPvPower: 6500, price: 420000, tension: 24 };
+    // 5 000 Wc de panneaux : au-delà de l'entrée PV du 3 kVA (3 900 Wc).
+    const sizing = { requiredPanelPower: 5000, installedPvPower: 5000, peakLoad: 2000 };
+    const q = buildKitQuotation(kit, 'tole', true, sizing, [...INVERTER_MODELS, cinq24]);
+    expect(q.inverterSuggested).toMatchObject({ id: 'x-5kva-24', quantite: 1 });
     const ligneOnduleur = q.components.find((c) => /onduleur/i.test(c.name));
-    expect(ligneOnduleur.name).toContain(`${q.inverterSuggested.capacity}kVA`);
+    expect(ligneOnduleur.name).toContain('5kVA');
     // Le nom n'apparaît qu'une fois, marque comprise.
     expect(ligneOnduleur.name.match(/onduleur/gi)).toHaveLength(1);
-    expect(ligneOnduleur.unitPrice).toBe(
-      INVERTER_MODELS.find((o) => o.id === q.inverterSuggested.id).price
-    );
+    expect(ligneOnduleur.unitPrice).toBe(420000);
+  });
+
+  it('ne propose JAMAIS un onduleur 48 V pour un kit 24 V, même plus puissant', () => {
+    // Seuls les modèles officiels : aucun onduleur 24 V au-dessus de 3 kVA.
+    const kit = SOLAR_KITS.find((k) => k.id === 'kit-2.5kwh-eco');
+    const sizing = { requiredPanelPower: 8000 };
+    const q = buildKitQuotation(kit, 'tole', true, sizing, INVERTER_MODELS);
+    const retenu = INVERTER_MODELS.find((o) => o.id === q.inverterSuggested?.id);
+    expect(retenu?.tension).toBe(24);
+    expect(q.components.some((c) => /6kVA|12kVA/i.test(c.name))).toBe(false);
+    // Deux 3 kVA 24 V ne suffisent pas : l'écran doit le dire.
+    expect(q.inverterInsuffisant).toBe(true);
+    expect(q.tension).toBe(24);
+  });
+
+  it('un kit 48 V garde l’accès aux onduleurs 48 V', () => {
+    const kit = SOLAR_KITS.find((k) => k.id === 'kit-32kwh'); // 48 V, 6 kVA
+    const q = buildKitQuotation(kit, 'tole', true, { requiredPanelPower: 11780, installedPvPower: 11780, peakLoad: 5000 }, INVERTER_MODELS);
+    expect(q.inverterSuggested).toMatchObject({ capacity: 12, quantite: 1 });
+    expect(q.inverterInsuffisant).toBe(false);
   });
 
   it('ne touche pas à l’onduleur du kit s’il suffit déjà', () => {

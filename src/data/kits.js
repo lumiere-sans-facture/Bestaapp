@@ -16,6 +16,7 @@ export const SOLAR_KITS = [
     panels: 2,
     panelW: 500, // Wc par panneau
     inverter: 3, // kVA
+    tension: 24, // V — tension du parc batterie
     lines: toLines([
       ['Batterie lithium 24V (2,5kwh) HZ', 1, 'pcs', 230000],
       ['Panneaux photovoltaïque 500Wc', 2, 'pcs', 60000],
@@ -33,6 +34,7 @@ export const SOLAR_KITS = [
     panels: 2,
     panelW: 590,
     inverter: 3,
+    tension: 24, // V — tension du parc batterie
     lines: toLines([
       ['Batterie lithium 24V (2,5kwh) BEVE Smart BMS', 1, 'pcs', 250000],
       ['Panneaux photovoltaïque 590Wc', 2, 'pcs', 65000],
@@ -52,6 +54,7 @@ export const SOLAR_KITS = [
     panels: 3,
     panelW: 590,
     inverter: 2,
+    tension: 12, // V — tension du parc batterie
     lines: toLines([
       ['Batterie lithium 12V 300A (3,8kWh)', 1, 'pcs', 245000],
       ['Onduleur hybride 2kVA', 1, 'pcs', 140000],
@@ -72,6 +75,7 @@ export const SOLAR_KITS = [
     panels: 4,
     panelW: 590,
     inverter: 6,
+    tension: 48, // V — tension du parc batterie
     lines: toLines([
       ['Batterie lithium 48V (5kwh) HZ', 1, 'pcs', 460000],
       ['Panneaux photovoltaïque 590Wc', 4, 'pcs', 65000],
@@ -91,6 +95,7 @@ export const SOLAR_KITS = [
     panels: 4,
     panelW: 620,
     inverter: 6,
+    tension: 48, // V — batterie non marquée : 48 V, comme son onduleur Deye 6 kVA
     lines: toLines([
       ['Batterie lithium 5kWh Deye', 1, 'pcs', 480000],
       ['Panneaux photovoltaïque 620Wc Jinko double face', 4, 'pcs', 75000],
@@ -120,6 +125,7 @@ export const SOLAR_KITS = [
     panels: 8,
     panelW: 590,
     inverter: 5,
+    tension: 48, // V — batterie non marquée : 48 V (lithium 10 kWh en armoire)
     lines: toLines([
       ['Batterie lithium 10kWh Taico', 1, 'pcs', 895000],
       ['Onduleur hybride 5kVA Growatt', 1, 'pcs', 330000],
@@ -155,6 +161,7 @@ export const SOLAR_KITS = [
     panels: 10,
     panelW: 590,
     inverter: 6,
+    tension: 48, // V — tension du parc batterie
     lines: toLines([
       ['Batterie lithium 48V (16kwh) Beve', 1, 'pcs', 1000000],
       ['Panneaux photovoltaïque 590Wc', 10, 'pcs', 63000],
@@ -179,6 +186,7 @@ export const SOLAR_KITS = [
     panels: 12,
     panelW: 620,
     inverter: 6,
+    tension: 48, // V — tension du parc batterie
     lines: toLines([
       ['Batterie lithium 48V (20kwh) Taico', 1, 'pcs', 1500000],
       ['Panneaux photovoltaïque Jinko Double face 620Wc', 12, 'pcs', 75000],
@@ -203,6 +211,7 @@ export const SOLAR_KITS = [
     panels: 16,
     panelW: 620,
     inverter: 8,
+    tension: 48, // V — batterie non marquée : 48 V (lithium 25 kWh en armoire)
     lines: toLines([
       ['Batterie lithium 25kWh Felicity', 1, 'pcs', 1900000],
       ['Panneaux photovoltaïque 620Wc Jinko bifacial', 16, 'pcs', 75000],
@@ -232,6 +241,7 @@ export const SOLAR_KITS = [
     panels: 16,
     panelW: 620,
     inverter: 6,
+    tension: 48, // V — tension du parc batterie
     lines: toLines([
       ['Batterie lithium 48V (16kwh) Taico', 2, 'pcs', 1150000],
       ['Panneaux photovoltaïque Jinko Double face 620Wc', 16, 'pcs', 75000],
@@ -259,6 +269,7 @@ export const SOLAR_KITS = [
     panels: 24,
     panelW: 620,
     inverter: 12,
+    tension: 48, // V — batteries non marquées : 48 V, comme son onduleur Deye 12 kVA
     lines: toLines([
       ['Batterie lithium 16kwh Taico', 3, 'pcs', 1155000],
       ['Panneaux Photovoltaïque 620W Jinko', 24, 'pcs', 74800],

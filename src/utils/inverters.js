@@ -1,11 +1,12 @@
 // Onduleurs : logique pure de saisie et de validation. Même esprit que
 // utils/kits.js — normalisation d'un brouillon de formulaire, contrôle de
 // validité, rien qui dépende de React.
+import { lireTension, libelleTension, tensionOnduleur } from './tension';
 
 /** Un onduleur vierge, prêt pour le formulaire de création. */
 export const nouvelOnduleur = () => ({
   id: crypto.randomUUID(),
-  brand: '', model: '', capacity: '', maxPvPower: '', price: '', efficiency: '',
+  brand: '', model: '', capacity: '', maxPvPower: '', price: '', efficiency: '', tension: '',
 });
 
 const nombre = (v, defaut = 0) => {
@@ -22,6 +23,8 @@ export const normaliserOnduleur = (brouillon) => ({
   maxPvPower: Math.round(nombre(brouillon.maxPvPower)),
   price: Math.round(nombre(brouillon.price)),
   efficiency: nombre(brouillon.efficiency),
+  // 12, 24 ou 48 V — vide si non renseignée (voir utils/tension.js).
+  tension: lireTension(brouillon.tension),
 });
 
 /**
@@ -37,6 +40,7 @@ export const onduleurEstValide = (onduleur) => {
 /** Libellé technique court, affiché sous le nom dans les listes. */
 export const resumeOnduleur = (o) => [
   o.capacity ? `${o.capacity} kVA` : null,
+  libelleTension(tensionOnduleur(o)) || null,
   o.maxPvPower ? `PV max ${o.maxPvPower} Wc` : null,
   o.efficiency ? `rendement ${o.efficiency}%` : null,
 ].filter(Boolean).join(' · ');

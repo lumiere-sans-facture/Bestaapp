@@ -4,6 +4,7 @@
 // porte tout ce qui se teste sans React : normalisation d'un brouillon de
 // formulaire, total, contrôle de validité.
 import { prixPublic } from './price';
+import { lireTension, libelleTension, tensionKit } from './tension';
 
 export const UNITES_KIT = ['pcs', 'm', 'ml', 'kg', 'forfait'];
 
@@ -14,7 +15,7 @@ export const nouvelleLigneKit = () => ({ designation: '', qty: 1, unit: 'pcs', p
 export const nouveauKit = () => ({
   id: crypto.randomUUID(),
   name: '',
-  battery: '', panels: '', panelW: '', inverter: '',
+  battery: '', panels: '', panelW: '', inverter: '', tension: '',
   lines: [nouvelleLigneKit()],
 });
 
@@ -36,6 +37,10 @@ export const normaliserKit = (brouillon) => ({
   panels: Math.round(nombre(brouillon.panels)),
   panelW: Math.round(nombre(brouillon.panelW)),
   inverter: nombre(brouillon.inverter),
+  // Tension du parc batterie (12/24/48 V) : saisie, sinon lue sur la ligne
+  // batterie (« Batterie lithium 24V … »). Elle décide des onduleurs
+  // proposables pour ce kit.
+  tension: lireTension(brouillon.tension) ?? tensionKit({ lines: brouillon.lines }),
   lines: (brouillon.lines || [])
     .filter((l) => (l.designation || '').trim() !== '')
     .map((l) => ({
@@ -83,6 +88,7 @@ export const resumeKit = (kit) => [
   kit.battery ? `${kit.battery} kWh` : null,
   kit.panels ? `${kit.panels} × ${kit.panelW || '?'} Wc` : null,
   kit.inverter ? `onduleur ${kit.inverter} kVA` : null,
+  libelleTension(tensionKit(kit)) ? `batterie ${libelleTension(tensionKit(kit))}` : null,
 ].filter(Boolean).join(' · ');
 
 /** Trie les kits par capacité de stockage ; les capacités inconnues restent à la fin. */

@@ -457,6 +457,7 @@ export const calculateSystemSize = (
 // ---- Chiffrage (devis) ----
 
 import { TVA_RATE } from '../config/company';
+import { tensionKit, onduleursCompatibles } from './tension';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
 // Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
@@ -676,13 +677,24 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // le pic de consommation du client, soit il n'accepte pas les panneaux
   // désormais complétés. On ne peut le vérifier que si sa capacité kVA
   // correspond à un onduleur configuré (donc aux caractéristiques connues).
-  const currentSpec = inverters.find((o) => o.capacity === kit.inverter);
-  const pvPose = sizing?.installedPvPower || (neededPanels * (kit.panelW || 0));
+  //
+  // Seuls les onduleurs de la TENSION de la batterie du kit sont candidats :
+  // un 6 kVA 48 V ne fonctionne pas sur une batterie 24 V, aussi puissant
+  // soit-il. Une tension inconnue (kit ou onduleur non renseigné) ne bloque
+  // rien — impossible de la contredire (voir utils/tension.js).
+  const tension = tensionKit(kit);
+  const candidats = onduleursCompatibles(inverters, tension);
+  const currentSpec = candidats.find((o) => o.capacity === kit.inverter);
+  // Puissance PV RÉELLEMENT posée : les panneaux du devis (ceux du kit,
+  // complétés au besoin), pas seulement ceux du besoin calculé — un kit peut
+  // en compter davantage, et c'est bien l'onduleur qui les recevra tous.
+  const pvDuDevis = neededPanels * (Number(kit.panelW) || 0);
+  const pvPose = Math.max(pvDuDevis, Number(sizing?.installedPvPower) || 0);
   const critere = { peakLoad: sizing?.peakLoad || 0, pvPower: pvPose, configures: inverters };
   // Escalade : l'onduleur du kit d'abord, puis un modèle supérieur SEUL —
   // on ne double qu'une fois tous les modèles seuls épuisés (voir
   // resoudreOnduleur), deux appareils au maximum.
-  const retenu = currentSpec ? resoudreOnduleur(inverters, critere, { prefere: currentSpec }) : null;
+  const retenu = currentSpec ? resoudreOnduleur(candidats, critere, { prefere: currentSpec }) : null;
   const change = retenu && (retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
   const inverterSuggested = change ? { ...retenu.modele, quantite: retenu.quantite } : null;
   // productId retiré sur les lignes remplacées : elles ne représentent plus
@@ -747,6 +759,10 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
           capacity: inverterSuggested.capacity, quantite: inverterSuggested.quantite,
         }
       : null,
+    // Aucun onduleur de la tension du kit ne tient le besoin, même à deux :
+    // l'écran le dit, plutôt que de proposer un modèle d'une autre tension.
+    inverterInsuffisant: retenu ? !retenu.suffisant : false,
+    tension,
     total,
     roi: 0,
     kitId: kit.id,

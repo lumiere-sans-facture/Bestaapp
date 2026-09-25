@@ -16,16 +16,20 @@
 // usuelle pour un onduleur hybride) — PAS un chiffre de fiche technique
 // vérifié. Corrigez-le depuis « Plus › Onduleurs » avec la vraie valeur
 // « Max. PV Input Power » de chaque modèle avant de vous y fier.
+// tension (V) : tension du parc batterie que l'onduleur accepte. Relevée sur
+// les kits officiels où chaque modèle est monté : les 3 kVA HZ et Itel avec
+// des batteries 24 V, les 6 et 12 kVA avec des batteries 48 V. Un onduleur
+// n'est jamais proposé pour un kit d'une autre tension (utils/tension.js).
 export const INVERTER_MODELS = [
-  { id: 'hz-3kva', brand: 'HZ', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 160000, efficiency: 95 },
-  { id: 'itel-3kva', brand: 'Itel', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 190000, efficiency: 95 },
-  { id: 'hz-6kva', brand: 'HZ', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 250000, efficiency: 95 },
-  { id: 'deye-6kva', brand: 'Deye', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 390000, efficiency: 96 },
+  { id: 'hz-3kva', brand: 'HZ', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 160000, efficiency: 95, tension: 24 },
+  { id: 'itel-3kva', brand: 'Itel', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 190000, efficiency: 95, tension: 24 },
+  { id: 'hz-6kva', brand: 'HZ', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 250000, efficiency: 95, tension: 48 },
+  { id: 'deye-6kva', brand: 'Deye', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 390000, efficiency: 96, tension: 48 },
   // Onduleur du kit 48 kWh. SEUL modèle dont `maxPvPower` soit une vraie
   // valeur constructeur (15 000 Wc) et non l'estimation kVA × 1,3, qui
   // donnerait 15 600. Prix repris de la ligne « Onduleur » du kit.
   // Rendement volontairement absent : il n'a pas été relevé sur la fiche
   // technique, et l'inventer vaut moins que de le laisser vide — le résumé
   // l'omet simplement, et « Plus › Onduleurs » permet de le renseigner.
-  { id: 'deye-12kva', brand: 'Deye', model: 'Onduleur hybride 12kVA', capacity: 12, maxPvPower: 15000, price: 1100000 },
+  { id: 'deye-12kva', brand: 'Deye', model: 'Onduleur hybride 12kVA', capacity: 12, maxPvPower: 15000, price: 1100000, tension: 48 },
 ];

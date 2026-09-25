@@ -656,6 +656,18 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                 {displayQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
               </div>
             )}
+            {/* Aucun onduleur de la tension du kit ne tient ce besoin, même à deux :
+                le dire, plutôt que de glisser un modèle d'une autre tension, qui ne
+                fonctionnerait pas avec cette batterie. */}
+            {displayQuotation?.inverterInsuffisant && (
+              <div className="storage-alert abo-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
+                <div>
+                  <Cpu size={13} style={{ verticalAlign: -2 }} /> Aucun onduleur{displayQuotation.tension ? ` ${displayQuotation.tension} V` : ''} configuré
+                  ne tient ce besoin, même à deux. Choisissez un kit plus grand, ou ajoutez un onduleur{' '}
+                  {displayQuotation.tension ? `${displayQuotation.tension} V ` : ''}plus puissant dans <strong>Plus › Onduleurs</strong>.
+                </div>
+              </div>
+            )}
             {/* Aucun onduleur configuré ne convient : le dire AVANT le devis,
                 sinon un modèle sous-calibré part chez le client. Deux causes
                 possibles — la puissance de sortie (pic) et l'entrée PV du MPPT

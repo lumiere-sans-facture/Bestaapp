@@ -8,6 +8,7 @@ import { nouveauKit, nouvelleLigneKit, kitTotal, kitEstValide, resumeKit, resolv
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import Field from '../../components/Field';
+import { TENSIONS_BATTERIE, tensionKit } from '../../utils/tension';
 import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../components/Toast';
 
@@ -156,6 +157,17 @@ export default function KitsSection({ onBack }) {
                 <input className="input" type="number" min="0" step="0.5" value={edition.kit.inverter}
                   onChange={(e) => majKit({ inverter: e.target.value })} />
               </Field>
+              <Field label="Tension batterie">
+                <select className="input" value={edition.kit.tension ?? ''}
+                  onChange={(e) => majKit({ tension: e.target.value })}>
+                  <option value="">
+                    {tensionKit({ lines: edition.kit.lines })
+                      ? `Selon la batterie (${tensionKit({ lines: edition.kit.lines })} V)`
+                      : 'Non renseignée'}
+                  </option>
+                  {TENSIONS_BATTERIE.map((t) => <option key={t} value={t}>{t} V</option>)}
+                </select>
+              </Field>
               <Field label="Nombre de panneaux">
                 <input className="input" type="number" min="0" value={edition.kit.panels}
                   onChange={(e) => majKit({ panels: e.target.value })} />
@@ -168,6 +180,7 @@ export default function KitsSection({ onBack }) {
             <div className="field-hint" style={{ marginBottom: 14 }}>
               La capacité de stockage sert à proposer automatiquement le bon kit selon
               la consommation calculée du client. Toute valeur décimale est acceptée (ex. 1,2 ou 5,12 kWh).
+              La tension batterie garantit qu'un onduleur de remplacement sera de la même tension.
             </div>
 
             <div className="sheet-section-title">Composition</div>

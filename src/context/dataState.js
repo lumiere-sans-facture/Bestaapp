@@ -3,6 +3,7 @@
 import * as seed from '../data/seed';
 import { SOLAR_KITS, KITS_DOTES_AVANT_REGISTRE } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
+import { completerTensions } from '../utils/tension';
 import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { generatePartnerCode, normaliseCode } from '../utils/referral';
@@ -114,6 +115,11 @@ export const loadState = (scope = null) => {
       saved.kitsDotes = [...new Set([...kitsDotes, ...SOLAR_KITS.map((k) => k.id)])];
       // Migration « Onduleurs » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.inverters)) saved.inverters = INVERTER_MODELS;
+      // Migration « tension batterie » : les kits et onduleurs officiels
+      // enregistrés avant l'existence du champ reçoivent leur tension (12,
+      // 24, 48 V). Une valeur saisie n'est jamais écrasée.
+      saved.kits = completerTensions(saved.kits, SOLAR_KITS);
+      saved.inverters = completerTensions(saved.inverters, INVERTER_MODELS);
       // Migration « Kits pompage » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.pompeKits)) saved.pompeKits = POMPE_KITS;
       if (!saved.payoutRequests) saved.payoutRequests = [];
