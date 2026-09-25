@@ -23,7 +23,7 @@ describe('normaliserOnduleur / onduleurEstValide', () => {
   });
 
   it('resumeOnduleur assemble capacité, puissance PV max et rendement', () => {
-    expect(resumeOnduleur({ capacity: 5, maxPvPower: 6500, efficiency: 96 })).toBe('5 kVA · PV max 6500 Wc · rendement 96%');
+    expect(resumeOnduleur({ capacity: 5, maxPvPower: 6500, efficiency: 96 })).toBe('5 kVA · PV max 6500 Wc · parallèle ×2 max · rendement 96%');
   });
 
   it('dupliquerOnduleur change l’id et suffixe le modèle', () => {

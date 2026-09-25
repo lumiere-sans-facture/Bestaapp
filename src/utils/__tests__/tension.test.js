@@ -65,7 +65,7 @@ describe('formulaires et résumés', () => {
     expect(normaliserKit({ name: 'K', tension: '12', lines: [{ designation: 'Batterie 48V', qty: 1, pu: 1 }] }).tension).toBe(12);
   });
   it('les résumés affichent la tension', () => {
-    expect(resumeOnduleur({ capacity: 3, tension: 24, maxPvPower: 3900 })).toBe('3 kVA · 24 V · PV max 3900 Wc');
+    expect(resumeOnduleur({ capacity: 3, tension: 24, maxPvPower: 3900 })).toBe('3 kVA · 24 V · PV max 3900 Wc · parallèle ×2 max');
     expect(resumeKit({ battery: 2.5, panels: 2, panelW: 500, inverter: 3, tension: 24 })).toContain('batterie 24 V');
     expect(libelleTension(null)).toBe('');
   });

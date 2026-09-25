@@ -3,7 +3,7 @@ import { ChevronLeft, Plus, Pencil, Copy, Trash2, Check, Cpu, RotateCcw } from '
 import { useData } from '../../context/DataContext';
 import { INVERTER_MODELS } from '../../data/inverters';
 import { formatCFA } from '../../utils/format';
-import { nouvelOnduleur, onduleurEstValide, resumeOnduleur } from '../../utils/inverters';
+import { nouvelOnduleur, onduleurEstValide, resumeOnduleur, maxEnParallele, PARALLELE_MAX_SAISIE } from '../../utils/inverters';
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import Field from '../../components/Field';
@@ -28,7 +28,12 @@ export default function InvertersSection({ onBack }) {
   const manquants = INVERTER_MODELS.filter((o) => !liste.some((i) => i.id === o.id));
 
   const ouvrirNouveau = () => setEdition({ onduleur: nouvelOnduleur(), estNouveau: true });
-  const ouvrirEdition = (onduleur) => setEdition({ onduleur: { ...onduleur }, estNouveau: false });
+  // Un onduleur enregistré avant le réglage « parallèle » s'ouvre avec la
+  // règle qui s'appliquait jusque-là : parallèle, deux appareils au plus.
+  const ouvrirEdition = (onduleur) => setEdition({
+    onduleur: { ...onduleur, parallele: onduleur.parallele !== false, maxParallele: onduleur.parallele === false ? '' : maxEnParallele(onduleur) },
+    estNouveau: false,
+  });
   const majOnduleur = (patch) => setEdition((e) => ({ ...e, onduleur: { ...e.onduleur, ...patch } }));
 
   const enregistrer = (e) => {
@@ -141,6 +146,22 @@ export default function InvertersSection({ onBack }) {
                   {TENSIONS_BATTERIE.map((t) => <option key={t} value={t}>{t} V</option>)}
                 </select>
               </Field>
+              <Field label="Mise en parallèle">
+                <select className="input" value={edition.onduleur.parallele === false ? 'non' : 'oui'}
+                  onChange={(e) => majOnduleur(e.target.value === 'oui'
+                    ? { parallele: true, maxParallele: maxEnParallele({ maxParallele: edition.onduleur.maxParallele }) }
+                    : { parallele: false })}>
+                  <option value="oui">Oui, couplable</option>
+                  <option value="non">Non, un seul appareil</option>
+                </select>
+              </Field>
+              {edition.onduleur.parallele !== false && (
+                <Field label="Nombre max en parallèle">
+                  <input className="input" type="number" min="2" max={PARALLELE_MAX_SAISIE} step="1"
+                    value={edition.onduleur.maxParallele}
+                    onChange={(e) => majOnduleur({ maxParallele: e.target.value })} />
+                </Field>
+              )}
               <Field label="Rendement (%)">
                 <input className="input" type="number" min="0" max="100" value={edition.onduleur.efficiency}
                   onChange={(e) => majOnduleur({ efficiency: e.target.value })} />
@@ -159,7 +180,9 @@ export default function InvertersSection({ onBack }) {
               fabricant) est ce qui permet à l'assistant de vérifier qu'un onduleur
               encaisse les panneaux calculés — pas sa capacité kVA, qui est la
               puissance de SORTIE. La tension batterie (12, 24 ou 48 V) empêche
-              de proposer cet onduleur pour un kit d'une autre tension.
+              de proposer cet onduleur pour un kit d'une autre tension. La mise en
+              parallèle (selon la fiche du fabricant) dit si l'assistant peut en
+              coupler plusieurs quand un seul ne suffit pas, et jusqu'à combien.
             </div>
 
             <button type="submit" className="btn btn-primary btn-block">

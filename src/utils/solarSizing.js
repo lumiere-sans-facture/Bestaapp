@@ -1,6 +1,7 @@
 // Dimensionnement et chiffrage d'une installation solaire.
 // Logique portée depuis l'application besta-solar (calculations + pricing).
 // Toutes les valeurs monétaires sont en F CFA (XOF).
+import { maxEnParallele, PARALLELE_PAR_DEFAUT } from './inverters';
 import { prixPublic } from './price';
 import { resolveLignePrice } from './kits';
 
@@ -199,11 +200,12 @@ export const onduleurAccepteLePv = (inv, { pvPower = 0, configures = [] } = {}) 
 export const onduleurSuffisant = (inv, critere = {}) =>
   onduleurTientLePic(inv, critere) && onduleurAccepteLePv(inv, critere);
 
-// Au-delà d'un seul appareil, on met deux onduleurs identiques EN PARALLÈLE :
-// puissance de sortie et entrée PV s'additionnent. Deux au maximum — au-delà,
-// l'installation change de nature (triphasé, armoire dédiée) et se chiffre sur
-// place.
-export const MAX_ONDULEURS = 2;
+// Au-delà d'un seul appareil, on met des onduleurs identiques EN PARALLÈLE :
+// puissance de sortie et entrée PV s'additionnent. Combien au plus ? C'est le
+// réglage de chaque modèle (« Plus › Onduleurs » : parallèle oui/non et nombre
+// maximal, voir utils/inverters.js) ; un modèle non réglé garde l'ancienne
+// règle de deux appareils.
+export const MAX_ONDULEURS = PARALLELE_PAR_DEFAUT;
 
 /** Un même modèle en `n` exemplaires : puissances cumulées. */
 export const onduleursEnParallele = (inv, n = 1, configures = []) => {
@@ -213,30 +215,38 @@ export const onduleursEnParallele = (inv, n = 1, configures = []) => {
 };
 
 /**
- * Onduleur(s) à retenir, par ESCALADE — jamais plus de deux appareils :
+ * Onduleur(s) à retenir, par ESCALADE :
  *   1. le modèle préféré (celui du kit) en 1 exemplaire ;
  *   2. les modèles de la liste en 1 exemplaire, du plus petit au plus grand ;
- *   3. le modèle préféré en 2 exemplaires ;
- *   4. les modèles de la liste en 2 exemplaires.
+ *   3. puis la même chose en 2 exemplaires, en 3… jusqu'au maximum accepté
+ *      par chaque modèle — un onduleur « sans parallèle » ne sort jamais de
+ *      l'étape 1 ou 2.
  * UN SEUL appareil d'abord, toujours : tant qu'un modèle du catalogue suffit
  * à lui seul, on ne met pas deux boîtiers en parallèle — c'est un câblage de
- * plus, un point de panne de plus et une facture de plus. Le modèle du kit
- * passe devant les autres à quantité égale, pour garder la cohérence du kit.
+ * plus, un point de panne de plus et une facture de plus. Et toujours le
+ * MOINS d'appareils possible. Le modèle du kit passe devant les autres à
+ * quantité égale, pour garder la cohérence du kit.
+ * Si rien ne suffit : l'ensemble le plus puissant autorisé.
  * @returns {{modele:object, quantite:number, suffisant:boolean}|null}
  */
 export const resoudreOnduleur = (options = [], critere = {}, { prefere = null } = {}) => {
   const choix = critereDeChoix(critere);
   const liste = [...options].sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
-  const pour = (quantite) => [
-    ...(prefere ? [{ modele: prefere, quantite }] : []),
-    ...liste.map((o) => ({ modele: o, quantite })),
-  ];
-  const escalade = [...pour(1), ...pour(MAX_ONDULEURS)];
-  if (!escalade.length) return null;
-  const convient = ({ modele, quantite }) =>
-    onduleurSuffisant(onduleursEnParallele(modele, quantite, choix.configures), choix);
-  const choisi = escalade.find(convient);
-  return choisi ? { ...choisi, suffisant: true } : { ...escalade[escalade.length - 1], suffisant: false };
+  const modeles = [...(prefere ? [prefere] : []), ...liste];
+  if (!modeles.length) return null;
+  const plafond = Math.max(...modeles.map(maxEnParallele));
+  const escalade = [];
+  for (let quantite = 1; quantite <= plafond; quantite += 1) {
+    for (const modele of modeles) {
+      if (maxEnParallele(modele) >= quantite) escalade.push({ modele, quantite });
+    }
+  }
+  const ensemble = ({ modele, quantite }) => onduleursEnParallele(modele, quantite, choix.configures);
+  const choisi = escalade.find((e) => onduleurSuffisant(ensemble(e), choix));
+  if (choisi) return { ...choisi, suffisant: true };
+  const plusPuissant = escalade.reduce((best, e) =>
+    (puissanceSortie(ensemble(e)) >= puissanceSortie(ensemble(best)) ? e : best));
+  return { ...plusPuissant, suffisant: false };
 };
 
 export const suggestInverterFor = (options = [], { peakLoad = 0, pvPower = 0, margin = SIZING_PARAMS.inverterMargin, configures = [] } = {}) => {
@@ -412,7 +422,7 @@ export const calculateSystemSize = (
   const inverterSortieRequise = sortieOnduleurRequise(peakLoad, installedPvPower);
   const inverterCalibreRequis = calibreRequis(inverterSortieRequise);
   const critereRetenu = inverters.length ? critereOnduleur : { peakLoad, pvPower: installedPvPower };
-  // Les vérifications portent sur l'ENSEMBLE retenu (un ou deux appareils en
+  // Les vérifications portent sur l'ENSEMBLE retenu (un appareil ou plusieurs en
   // parallèle). Les deux causes d'insuffisance restent distinguées : le
   // message doit désigner ce qui bloque — le pic ou l'entrée PV (MPPT).
   const ensembleOnduleur = onduleursEnParallele(selectedInverter, inverterQuantite, critereRetenu.configures);
@@ -438,7 +448,7 @@ export const calculateSystemSize = (
     peakLoad,           // W — pic de consommation ayant servi au choix onduleur
     panelCapacity: (numberOfPanels * panelPower) / 1000, // kWc
     inverter: selectedInverter,
-    inverterQuantite,        // 1 ou 2 appareils identiques en parallèle
+    inverterQuantite,        // nombre d'appareils identiques en parallèle
     inverterSortieRequise,   // W  — puissance de sortie exigée (pic × marge)
     inverterCalibreRequis,   // kVA — calibre du marché à retenir
     inverterSuffisant,       // false = aucun modèle disponible ne convient
@@ -692,8 +702,8 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const pvPose = Math.max(pvDuDevis, Number(sizing?.installedPvPower) || 0);
   const critere = { peakLoad: sizing?.peakLoad || 0, pvPower: pvPose, configures: inverters };
   // Escalade : l'onduleur du kit d'abord, puis un modèle supérieur SEUL —
-  // on ne double qu'une fois tous les modèles seuls épuisés (voir
-  // resoudreOnduleur), deux appareils au maximum.
+  // on ne met en parallèle qu'une fois tous les modèles seuls épuisés, et
+  // jamais au-delà du maximum réglé pour le modèle (voir resoudreOnduleur).
   const retenu = currentSpec ? resoudreOnduleur(candidats, critere, { prefere: currentSpec }) : null;
   const change = retenu && (retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
   const inverterSuggested = change ? { ...retenu.modele, quantite: retenu.quantite } : null;
@@ -759,7 +769,8 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
           capacity: inverterSuggested.capacity, quantite: inverterSuggested.quantite,
         }
       : null,
-    // Aucun onduleur de la tension du kit ne tient le besoin, même à deux :
+    // Aucun onduleur de la tension du kit ne tient le besoin, même en
+    // parallèle au maximum autorisé :
     // l'écran le dit, plutôt que de proposer un modèle d'une autre tension.
     inverterInsuffisant: retenu ? !retenu.suffisant : false,
     tension,

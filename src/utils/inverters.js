@@ -3,10 +3,30 @@
 // validité, rien qui dépende de React.
 import { lireTension, libelleTension, tensionOnduleur } from './tension';
 
+// ---- Mise en parallèle ----
+// Certains onduleurs se couplent en parallèle (sorties et entrées PV
+// s'additionnent), d'autres non : c'est une donnée du constructeur, saisie
+// dans « Plus › Onduleurs » avec le nombre maximal d'appareils accepté.
+// Un onduleur enregistré avant ce réglage garde l'ancienne règle : deux
+// appareils au plus.
+export const PARALLELE_PAR_DEFAUT = 2;
+// Borne de saisie : au-delà, l'installation se chiffre sur place.
+export const PARALLELE_MAX_SAISIE = 12;
+
+/** Nombre maximal d'exemplaires de cet onduleur montables ensemble (≥ 1). */
+export const maxEnParallele = (onduleur) => {
+  if (!onduleur) return 1;
+  if (onduleur.parallele === false) return 1;
+  const n = Math.floor(Number(onduleur.maxParallele));
+  if (!Number.isFinite(n) || n < 2) return PARALLELE_PAR_DEFAUT;
+  return Math.min(n, PARALLELE_MAX_SAISIE);
+};
+
 /** Un onduleur vierge, prêt pour le formulaire de création. */
 export const nouvelOnduleur = () => ({
   id: crypto.randomUUID(),
   brand: '', model: '', capacity: '', maxPvPower: '', price: '', efficiency: '', tension: '',
+  parallele: true, maxParallele: PARALLELE_PAR_DEFAUT,
 });
 
 const nombre = (v, defaut = 0) => {
@@ -25,6 +45,11 @@ export const normaliserOnduleur = (brouillon) => ({
   efficiency: nombre(brouillon.efficiency),
   // 12, 24 ou 48 V — vide si non renseignée (voir utils/tension.js).
   tension: lireTension(brouillon.tension),
+  // Mise en parallèle : oui/non, et combien d'appareils au plus (2 à 12).
+  parallele: brouillon.parallele !== false && brouillon.parallele !== 'non',
+  maxParallele: brouillon.parallele === false || brouillon.parallele === 'non'
+    ? 1
+    : maxEnParallele({ maxParallele: brouillon.maxParallele }),
 });
 
 /**
@@ -42,6 +67,7 @@ export const resumeOnduleur = (o) => [
   o.capacity ? `${o.capacity} kVA` : null,
   libelleTension(tensionOnduleur(o)) || null,
   o.maxPvPower ? `PV max ${o.maxPvPower} Wc` : null,
+  maxEnParallele(o) > 1 ? `parallèle ×${maxEnParallele(o)} max` : 'sans parallèle',
   o.efficiency ? `rendement ${o.efficiency}%` : null,
 ].filter(Boolean).join(' · ');
 
