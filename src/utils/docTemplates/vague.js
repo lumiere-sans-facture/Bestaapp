@@ -3,7 +3,7 @@
 // couleur secondaire réservée aux traits de titre, au filet du total et au
 // montant du total. En Pro, les couleurs de l'abonné remplacent navy/orange ;
 // la vague claire est une teinte éclaircie de la primaire.
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, libelleApporteur, eclaircir } from './shared';
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, eclaircir } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 10, suite: 14, derniere: 8 };
@@ -85,6 +85,7 @@ export function renderVague({ kind, data }) {
   const e = data.emetteur;
   const t = data.totaux;
   const pages = paginer(data.lignes, CAPACITES);
+  const ref = piedApporteur(data);
   const total = pages.length;
   // Vague claire : la primaire de l'émetteur éclaircie (le second tracé du ruban).
   const clair = eclaircir(e.couleurPrimaire, 0.24);
@@ -134,7 +135,6 @@ export function renderVague({ kind, data }) {
         <div class="meta-ligne"><span class="libelle">${L.numeroLabel}</span><span>${esc(data.numero || '—')}</span></div>
         <div class="meta-ligne"><span class="libelle">Date</span><span>${dateFr(data.date)}</span></div>
         <div class="meta-ligne"><span class="libelle">${L.dateSecondaireLabel}</span><span>${data.dateSecondaire ? dateFr(data.dateSecondaire) : '—'}</span></div>
-        ${data.apporteur ? `<div class="meta-ligne"><span class="libelle">Partenaire</span><span>${libelleApporteur(data.apporteur)}</span></div>` : ''}
       </div>
     </div>` : ''}
 
@@ -171,9 +171,10 @@ export function renderVague({ kind, data }) {
       <div class="conditions">${esc(conditionsPour(kind, e))}</div>
     </div>` : ''}
 
-    <div class="legal push">
+    ${ref.ligne}
+    <div class="legal ${ref.push}">
       <span>${esc(e.name)}${e.slogan ? ` — ${esc(e.slogan)}` : ''}</span>
-      <span>${e.rccm ? `RCCM ${esc(e.rccm)}` : ''}${e.rccm && e.ifu ? ' · ' : ''}${e.ifu ? `NIF ${esc(e.ifu)}` : ''}${total > 1 ? ` · Page ${i + 1} / ${total}` : ''}</span>
+      <span>${[e.rccm ? `RCCM ${esc(e.rccm)}` : '', e.ifu ? `NIF ${esc(e.ifu)}` : '', total > 1 ? `Page ${i + 1} / ${total}` : ''].filter(Boolean).join(' · ')}</span>
     </div>
   </div>
   ${vagueBasse(e.couleurPrimaire, clair)}

@@ -264,35 +264,46 @@ describe('pagination', () => {
 
 describe('partenaire apporteur sur le devis', () => {
   const PARTENAIRE = { id: 'p1', name: 'Kodjo Agbeko', code: 'BS-KODJO' };
+  // Sur sa ligne, juste avant le pied de page (qui cède son margin-top: auto).
+  const PIED = /<div class="push"[^>]*>Réf\. partenaire : BS-KODJO<\/div>\s*<div class="(pied|legal) ">/;
 
-  it('figure sur les trois modèles : nom et code', () => {
+  it('son code figure en pied de page des trois modèles', () => {
     const data = donneesDeDevis({ devis: { ...DEVIS_SOLAIRE, partnerId: 'p1', partnerCode: 'BS-KODJO' }, company: COMPANY, lead: LEAD, partner: PARTENAIRE });
     for (const m of MODELS) {
       const html = buildDocHtml({ kind: 'devis', model: m.id, data });
-      expect(html).toMatch(/Réf\. partenaire|>Partenaire</);
-      expect(html).toMatch(/Kodjo Agbeko <span style="white-space:nowrap">· BS-KODJO<\/span>/);
+      expect(html).toMatch(PIED);
+      expect(html.match(/Réf\. partenaire/g)).toHaveLength(1);
+      expect(html.match(/class="push"/g)).toHaveLength(1);
     }
-  });
-
-  it('nom et code sont échappés', () => {
-    const data = donneesDeDevis({ devis: { ...DEVIS_SOLAIRE, partnerCode: 'A<B' }, company: COMPANY, lead: LEAD, partner: { name: 'Jo & <i>Co</i>' } });
-    const html = buildDocHtml({ kind: 'devis', model: 'classique', data });
-    expect(html).toContain('Jo &amp; &lt;i&gt;Co&lt;/i&gt;');
-    expect(html).toContain('· A&lt;B');
   });
 
   it('le code figé sur le devis suffit, même sans la fiche partenaire', () => {
     const data = donneesDeDevis({ devis: { ...DEVIS_SOLAIRE, partnerId: 'p1', partnerCode: 'BS-KODJO' }, company: COMPANY, lead: LEAD, partner: null });
     expect(data.apporteur).toEqual({ name: '', code: 'BS-KODJO' });
-    expect(buildDocHtml({ kind: 'devis', model: 'studio', data })).toContain('BS-KODJO');
+    expect(buildDocHtml({ kind: 'devis', model: 'studio', data })).toMatch(PIED);
+  });
+
+  it('Classique : la référence prend la place d’une ligne sur la page unique', () => {
+    const lignes = Array.from({ length: 12 }, (_, i) => ({ designation: `Article ${i}`, qty: 1, pu: 1000 }));
+    const devis = { ...DEVIS_LIBRE, type: 'manuel', lignes, items: lignes.map((l) => ({ name: l.designation, qty: l.qty, price: l.pu })) };
+    const pages = (d) => (buildDocHtml({ kind: 'devis', model: 'classique', data: d }).match(/<section/g) || []).length;
+    expect(pages(donneesDeDevis({ devis, company: COMPANY, lead: null, partner: null }))).toBe(1);
+    expect(pages(donneesDeDevis({ devis: { ...devis, partnerCode: 'BS-KODJO' }, company: COMPANY, lead: null, partner: null }))).toBe(2);
   });
 
   it('le code figé prime sur le code actuel de la fiche', () => {
     expect(apporteurDe({ partnerCode: 'ANCIEN' }, { name: 'X', code: 'NOUVEAU' })).toEqual({ name: 'X', code: 'ANCIEN' });
   });
 
-  it('rien sans partenaire, ni sur un devis Pro', () => {
-    expect(buildDocHtml({ kind: 'devis', model: 'studio', data: dataDevis })).not.toContain('Réf. partenaire');
+  it('sans code, le nom ; toujours échappé', () => {
+    const data = donneesDeDevis({ devis: DEVIS_SOLAIRE, company: COMPANY, lead: LEAD, partner: { name: 'Jo & <i>Co</i>' } });
+    expect(buildDocHtml({ kind: 'devis', model: 'classique', data })).toContain('Réf. partenaire : Jo &amp; &lt;i&gt;Co&lt;/i&gt;');
+  });
+
+  it('rien sans partenaire, ni sur un devis Pro, ni sur une facture', () => {
+    const sans = buildDocHtml({ kind: 'devis', model: 'studio', data: dataDevis });
+    expect(sans).not.toContain('Réf. partenaire');
+    expect(sans).toContain('class="pied push"');
     expect(apporteurDe({ type: 'pro', partnerCode: 'BS-KODJO' }, PARTENAIRE)).toBeNull();
     const facture = donneesDeFacture({ facture: { numero: 'FAC-2026-001', lignes: [] }, company: COMPANY });
     expect(buildDocHtml({ kind: 'facture', model: 'studio', data: facture })).not.toContain('Réf. partenaire');

@@ -2,7 +2,7 @@
 // quadrillé, lisible à l'identique en noir et blanc. Aucune couleur de marque :
 // ni navy #0a2472, ni orange #f5a623 — uniquement des gris et deux bleus très
 // clairs pour les fonds de tableau.
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, libelleApporteur } from './shared';
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 12, premiere: 13, suite: 17, derniere: 11 };
@@ -68,7 +68,10 @@ export function renderClassique({ kind, data }) {
   const L = libelles(kind);
   const e = data.emetteur;
   const t = data.totaux;
-  const pages = paginer(data.lignes, CAPACITES);
+  const ref = piedApporteur(data);
+  // La ligne de référence partenaire prend la place d'une ligne d'article sur
+  // la page unique, la seule qui n'ait plus de marge (mesuré au navigateur).
+  const pages = paginer(data.lignes, ref.ligne ? { ...CAPACITES, seule: CAPACITES.seule - 1 } : CAPACITES);
   const total = pages.length;
   let rang = 0;
 
@@ -124,7 +127,6 @@ export function renderClassique({ kind, data }) {
         ${champ('Société', data.client.societe)}
         ${champ('Adresse', data.client.adresse)}
         ${champ('Contact', data.client.phone)}
-        ${data.apporteur ? `<div class="ital">Réf. partenaire</div><div>${libelleApporteur(data.apporteur)}</div>` : ''}
       </div>
     </div>
   </div>` : ''}
@@ -160,7 +162,8 @@ export function renderClassique({ kind, data }) {
     <div class="cg-texte">${esc(conditionsPour(kind, e))}</div>
   </div>` : ''}
 
-  <div class="pied push">
+  ${ref.ligne}
+  <div class="pied ${ref.push}">
     <span>${esc(e.name)}${e.slogan ? ` — ${esc(e.slogan)}` : ''}${e.website ? ` · ${esc(e.website)}` : ''}</span>
     <span>Page ${i + 1} / ${total}</span>
   </div>

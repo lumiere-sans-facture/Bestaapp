@@ -1,4 +1,4 @@
-/* Code partenaire imprimé sur le devis : un client de démonstration apporté par un partenaire
+/* Code partenaire imprimé en pied de page du devis : un client de démonstration apporté par un partenaire
    → devis créé par l'assistant → le document imprimable porte la référence
    (nom et code). Lancer `npm run dev` à côté. */
 import { chromium } from '@playwright/test';
@@ -49,11 +49,18 @@ await page.waitForTimeout(700);
 const [doc] = await Promise.all([ctx.waitForEvent('page'), page.locator('.sheet button', { hasText: 'Devis imprimable' }).click()]);
 await doc.waitForLoadState(); await doc.waitForTimeout(800);
 const texte = await doc.evaluate(() => document.body.innerText);
-const attendu = `Réf. partenaire : ${partenaire?.name} · ${partenaire?.code}`;
+const attendu = `Réf. partenaire : ${partenaire?.code}`;
 ok(texte.includes(attendu), `le devis imprimé porte « ${attendu} »`);
+const pieds = await doc.evaluate(() => [...document.querySelectorAll('.page')].map((p) => {
+  const pied = p.querySelector('.pied');
+  const ref = pied?.previousElementSibling;
+  return { ref: ref?.innerText || '', pied: Math.round(pied?.getBoundingClientRect().height || 0) };
+}));
+ok(pieds.every((p) => p.ref === attendu), `la référence est juste au-dessus du pied, sur chaque page [${pieds.length} page(s)]`);
+ok(pieds.every((p) => p.pied < 30), `le pied lui-même reste sur une ligne [${pieds.map((p) => p.pied).join(', ')} px]`);
 const deborde = await doc.evaluate(() => [...document.querySelectorAll('.page')].some((p) => p.scrollHeight > p.clientHeight + 1));
 ok(!deborde, 'aucune page du document ne déborde');
-await doc.screenshot({ path: '/tmp/claude-0/devis-partenaire.png', clip: { x: 0, y: 0, width: 1280, height: 620 } });
+await doc.locator('.page').first().screenshot({ path: '/tmp/claude-0/devis-partenaire.png' });
 
 console.log('\n' + R.join('\n'));
 await nav.close();

@@ -183,13 +183,18 @@ export function apporteurDe(devis, partner) {
 }
 
 /**
- * « Nom · CODE » (ou l'un des deux seul) de l'apporteur, en HTML échappé : le
- * code ne se coupe jamais, et un retour à la ligne ne laisse pas « · » seul.
+ * Référence partenaire, sur sa propre ligne juste au-dessus du pied de page
+ * (le pied, déjà plein, la ferait passer à la ligne). Elle prend alors le
+ * `margin-top: auto` du pied : renvoie `{ ligne, push }` à insérer avant le
+ * pied et la classe à donner au pied. Le code seul ; le nom à défaut de code.
  */
-export const libelleApporteur = (a) => {
-  if (!a) return '';
-  const code = a.code ? `<span style="white-space:nowrap">${a.name ? '· ' : ''}${esc(a.code)}</span>` : '';
-  return [esc(a.name), code].filter(Boolean).join(' ');
+export const piedApporteur = (data) => {
+  const a = data.apporteur;
+  if (!a) return { ligne: '', push: 'push' };
+  return {
+    ligne: `<div class="push" style="text-align:right;font-size:11px;color:#6b6b6b;margin-bottom:4px">Réf. partenaire : ${esc(a.code || a.name)}</div>`,
+    push: '',
+  };
 };
 
 /** Données de document depuis une facture Pro. */
