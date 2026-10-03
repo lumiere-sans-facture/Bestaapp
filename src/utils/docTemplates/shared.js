@@ -165,9 +165,32 @@ export function donneesDeDevis({ devis, company, lead, partner, products = [] })
     client,
     lignes,
     totaux: totauxDe(lignes, { tva, tvaActive: tva > 0 }),
-    apporteur: partner ? { name: partner.name, code: partner.code } : null,
+    apporteur: apporteurDe(devis, partner),
   };
 }
+
+/**
+ * Partenaire apporteur imprimé sur un devis BestaSolar. Le code figé sur le
+ * devis fait foi (il survit au renommage du partenaire, et reste lisible
+ * quand la fiche partenaire n'est pas chargée sur l'appareil). Un devis Pro
+ * est émis par l'entreprise de l'abonné : jamais de partenaire BestaSolar.
+ */
+export function apporteurDe(devis, partner) {
+  if (devis.type === 'pro') return null;
+  const code = devis.partnerCode || partner?.code || '';
+  const name = partner?.name || '';
+  return code || name ? { name, code } : null;
+}
+
+/**
+ * « Nom · CODE » (ou l'un des deux seul) de l'apporteur, en HTML échappé : le
+ * code ne se coupe jamais, et un retour à la ligne ne laisse pas « · » seul.
+ */
+export const libelleApporteur = (a) => {
+  if (!a) return '';
+  const code = a.code ? `<span style="white-space:nowrap">${a.name ? '· ' : ''}${esc(a.code)}</span>` : '';
+  return [esc(a.name), code].filter(Boolean).join(' ');
+};
 
 /** Données de document depuis une facture Pro. */
 export function donneesDeFacture({ facture, company }) {

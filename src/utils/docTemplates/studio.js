@@ -3,7 +3,7 @@
 // réservée aux trois pastilles, montant focal en primaire. En Pro, ce sont les
 // couleurs de l'abonné (couleurPrimaire / couleurSecondaire) qui s'appliquent.
 // Marges 40 px, angles 8 px (blocs) / 6 px (pastilles, totaux).
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml } from './shared';
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, libelleApporteur } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 11, suite: 16, derniere: 8 };
@@ -84,7 +84,11 @@ export function renderStudio({ kind, data }) {
   const L = libelles(kind);
   const e = data.emetteur;
   const t = data.totaux;
-  const pages = paginer(data.lignes, CAPACITES);
+  // La référence partenaire ajoute une ligne sous le client : une ligne
+  // d'article de moins sur la première page, pour qu'elle ne déborde jamais.
+  const pages = paginer(data.lignes, data.apporteur
+    ? { ...CAPACITES, seule: CAPACITES.seule - 1, premiere: CAPACITES.premiere - 1 }
+    : CAPACITES);
   const total = pages.length;
 
   const corps = pages.map((lignes, i) => {
@@ -120,6 +124,7 @@ export function renderStudio({ kind, data }) {
       ${data.client.societe ? `<div class="val">${esc(data.client.societe)}</div>` : ''}
       <div class="val">${esc(data.client.phone || '—')}</div>
       <div class="val">${esc(data.client.adresse || '—')}</div>
+      ${data.apporteur ? `<div class="val">Réf. partenaire : ${libelleApporteur(data.apporteur)}</div>` : ''}
     </div>
     <div class="focal">
       <span class="pastille">Total à régler</span>

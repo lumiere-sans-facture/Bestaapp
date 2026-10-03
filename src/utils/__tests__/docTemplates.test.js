@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildDocHtml, MODELS, modelsPour, normaliserModel } from '../docTemplates';
-import { donneesDeDevis, donneesDeFacture, lignesDeDevis, totauxDe, nf, emetteurDe, eclaircir } from '../docTemplates/shared';
+import { donneesDeDevis, donneesDeFacture, lignesDeDevis, totauxDe, nf, emetteurDe, eclaircir, apporteurDe } from '../docTemplates/shared';
 import { COMPANY } from '../../config/company';
 
 const LEAD = { name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+228 94 22 33 44', address: 'Lomé' };
@@ -259,5 +259,42 @@ describe('pagination', () => {
       const html = buildDocHtml({ kind: 'devis', model, data: dataDevis });
       expect((html.match(/<section class="page">/g) || [])).toHaveLength(1);
     }
+  });
+});
+
+describe('partenaire apporteur sur le devis', () => {
+  const PARTENAIRE = { id: 'p1', name: 'Kodjo Agbeko', code: 'BS-KODJO' };
+
+  it('figure sur les trois modèles : nom et code', () => {
+    const data = donneesDeDevis({ devis: { ...DEVIS_SOLAIRE, partnerId: 'p1', partnerCode: 'BS-KODJO' }, company: COMPANY, lead: LEAD, partner: PARTENAIRE });
+    for (const m of MODELS) {
+      const html = buildDocHtml({ kind: 'devis', model: m.id, data });
+      expect(html).toMatch(/Réf\. partenaire|>Partenaire</);
+      expect(html).toMatch(/Kodjo Agbeko <span style="white-space:nowrap">· BS-KODJO<\/span>/);
+    }
+  });
+
+  it('nom et code sont échappés', () => {
+    const data = donneesDeDevis({ devis: { ...DEVIS_SOLAIRE, partnerCode: 'A<B' }, company: COMPANY, lead: LEAD, partner: { name: 'Jo & <i>Co</i>' } });
+    const html = buildDocHtml({ kind: 'devis', model: 'classique', data });
+    expect(html).toContain('Jo &amp; &lt;i&gt;Co&lt;/i&gt;');
+    expect(html).toContain('· A&lt;B');
+  });
+
+  it('le code figé sur le devis suffit, même sans la fiche partenaire', () => {
+    const data = donneesDeDevis({ devis: { ...DEVIS_SOLAIRE, partnerId: 'p1', partnerCode: 'BS-KODJO' }, company: COMPANY, lead: LEAD, partner: null });
+    expect(data.apporteur).toEqual({ name: '', code: 'BS-KODJO' });
+    expect(buildDocHtml({ kind: 'devis', model: 'studio', data })).toContain('BS-KODJO');
+  });
+
+  it('le code figé prime sur le code actuel de la fiche', () => {
+    expect(apporteurDe({ partnerCode: 'ANCIEN' }, { name: 'X', code: 'NOUVEAU' })).toEqual({ name: 'X', code: 'ANCIEN' });
+  });
+
+  it('rien sans partenaire, ni sur un devis Pro', () => {
+    expect(buildDocHtml({ kind: 'devis', model: 'studio', data: dataDevis })).not.toContain('Réf. partenaire');
+    expect(apporteurDe({ type: 'pro', partnerCode: 'BS-KODJO' }, PARTENAIRE)).toBeNull();
+    const facture = donneesDeFacture({ facture: { numero: 'FAC-2026-001', lignes: [] }, company: COMPANY });
+    expect(buildDocHtml({ kind: 'facture', model: 'studio', data: facture })).not.toContain('Réf. partenaire');
   });
 });

@@ -2,7 +2,7 @@
 // quadrillé, lisible à l'identique en noir et blanc. Aucune couleur de marque :
 // ni navy #0a2472, ni orange #f5a623 — uniquement des gris et deux bleus très
 // clairs pour les fonds de tableau.
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml } from './shared';
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, libelleApporteur } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 12, premiere: 13, suite: 17, derniere: 11 };
@@ -124,6 +124,7 @@ export function renderClassique({ kind, data }) {
         ${champ('Société', data.client.societe)}
         ${champ('Adresse', data.client.adresse)}
         ${champ('Contact', data.client.phone)}
+        ${data.apporteur ? `<div class="ital">Réf. partenaire</div><div>${libelleApporteur(data.apporteur)}</div>` : ''}
       </div>
     </div>
   </div>` : ''}

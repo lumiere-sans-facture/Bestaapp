@@ -5,6 +5,9 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-10-03
+- **Le code partenaire figure de nouveau sur les devis.** Depuis le passage aux nouveaux modèles de document, l'apporteur était bien enregistré sur le devis mais n'était plus imprimé. Le devis affiche désormais « Réf. partenaire : Nom · CODE » sous les coordonnées du client. Le code imprimé est celui figé à la création du devis : il reste juste si le partenaire est renommé, et s'imprime même quand sa fiche n'est pas sur l'appareil. Une ligne d'article de moins sur la première page quand la référence est présente, pour que la page ne déborde jamais. Jamais de partenaire BestaSolar sur un devis Pro
+
 ## 2026-09-25
 - **Onduleurs en parallèle : réglés modèle par modèle.** Dans « Plus › Onduleurs », chaque onduleur indique s'il se couple en parallèle et jusqu'à combien d'appareils (2 à 12, selon la fiche du fabricant). L'assistant de devis respecte ce réglage : un seul appareil tant que possible, puis 2, 3… jusqu'au maximum du modèle ; un onduleur « non couplable » n'est jamais doublé. La liste l'affiche (« parallèle ×4 max », « sans parallèle »). Les onduleurs non encore réglés gardent l'ancienne règle de deux au plus
 - **Onduleur toujours de la tension de la batterie du kit (12, 24 ou 48 V).** L'assistant de devis pouvait remplacer l'onduleur 3 kVA d'un kit 24 V par un 6 kVA 48 V, qui ne démarre pas sur cette batterie. Il ne propose désormais que des onduleurs de la même tension ; si aucun ne suffit, même à deux, il l'annonce au lieu de glisser un modèle incompatible. La tension se saisit dans « Plus › Onduleurs » et « Plus › Mes kits » et s'affiche dans les listes ; les kits et onduleurs officiels déjà enregistrés la reçoivent automatiquement
