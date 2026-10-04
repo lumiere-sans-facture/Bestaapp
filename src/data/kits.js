@@ -340,6 +340,10 @@ export const SOLAR_KITS = [
     name: 'Kit 128 kWh (8 × 16) — Deye HV triphasé',
     battery: 128,
     batteryModules: [{ capacity: 16, qty: 8 }], // détail réel pour la fiche technique
+    // Extensible par modules de 16 kWh jusqu'à 200 kWh — soit 12 modules,
+    // 192 kWh, au plus. Au-delà, le kit 208 kWh est proposé (règle du gérant,
+    // voir utils/extensionBatterie.js).
+    extensionBatterie: { moduleKwh: 16, maxKwh: 200 },
     panels: 100,
     panelW: 620,
     inverter: 50,

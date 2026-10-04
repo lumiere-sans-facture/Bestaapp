@@ -82,12 +82,19 @@ ok(!!t128, `kit 128 kWh suggéré pour un très gros besoin [${togoXL.map((k) =>
 ok(t128 && b128 && chiffre(t128.total) === chiffre(b128.total),
    `128 kWh : même prix au Togo et au Bénin [Togo ${t128?.total} · Bénin ${b128?.total}]`);
 
-// Au-delà de 128 kWh : le kit 208 kWh (PCS 125 kW), même prix des deux côtés.
+// Entre 128 et 192 kWh : le 128 kWh reçoit des modules de 16 kWh.
+const grand = await kitsProposes('+228', '70', '120');
+const g128 = grand.find((k) => /128 kWh/.test(k.nom));
+const cap = Number(/batterie (\d+) kWh/.exec(g128?.resume || '')?.[1] || 0);
+ok(grand.length === 1 && !!g128 && cap > 128 && cap <= 192 && cap % 16 === 0 && /étendue depuis 128/.test(g128.resume),
+   `entre 128 et 192 kWh : kit 128 kWh étendu, pas le 208 kWh [${grand.map((k) => k.nom).join(' · ')} — ${g128?.resume.replace(/\s+/g, ' ')}]`);
+
+// Au-delà de 192 kWh : le kit 208 kWh (PCS 125 kW), même prix des deux côtés.
 const togoXXL = await kitsProposes('+228', '100', '180');
 const beninXXL = await kitsProposes('+229', '100', '180');
 const t208 = togoXXL.find((k) => /208 kWh/.test(k.nom));
 const b208 = beninXXL.find((k) => /208 kWh/.test(k.nom));
-ok(!!t208, `kit 208 kWh suggéré au-delà de 128 kWh [${togoXXL.map((k) => k.nom).join(' · ')}]`);
+ok(!!t208, `kit 208 kWh suggéré au-delà de 192 kWh [${togoXXL.map((k) => k.nom).join(' · ')}]`);
 ok(t208 && b208 && chiffre(t208.total) === chiffre(b208.total) && chiffre(t208.total) >= 50055000,
    `208 kWh : même prix au Togo et au Bénin [Togo ${t208?.total} · Bénin ${b208?.total}]`);
 

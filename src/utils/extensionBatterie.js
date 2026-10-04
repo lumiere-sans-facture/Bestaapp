@@ -1,8 +1,10 @@
 // Kits à batterie EXTENSIBLE par modules.
 //
-// Règle posée par le gérant : entre le kit 60 kWh et le kit 128 kWh, on ne
-// saute pas au 128 kWh — on ajoute des modules de batterie au kit 60 kWh
-// (modules de 12 kWh), jusqu'à 120 kWh. Au-delà, le 128 kWh est proposé.
+// Règle posée par le gérant : on ne saute pas au kit suivant dès que le
+// besoin dépasse un kit — on lui ajoute des modules de batterie :
+//   - kit 60 kWh  : modules de 12 kWh jusqu'à 120 kWh, puis le 128 kWh ;
+//   - kit 128 kWh : modules de 16 kWh jusqu'à 200 kWh (192 kWh au plus, en
+//     modules entiers), puis le 208 kWh.
 //
 // Un kit extensible porte `extensionBatterie: { moduleKwh, maxKwh }`. Seule la
 // ligne des modules batterie change de quantité : le reste de la composition
