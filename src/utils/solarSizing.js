@@ -467,7 +467,7 @@ export const calculateSystemSize = (
 // ---- Chiffrage (devis) ----
 
 import { TVA_RATE } from '../config/company';
-import { tensionKit, onduleursCompatibles } from './tension';
+import { tensionKit, onduleursCompatibles, estKitHauteTension } from './tension';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
 // Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
@@ -667,7 +667,8 @@ const ONDULEUR_LINE_RE = /onduleur/i;
  *   ACTUEL plutôt que le prix figé à la composition du kit — modifier le prix
  *   en Boutique se répercute alors automatiquement, ici et sur les devis.
  * @param {number} coefMainOeuvre  multiplicateur des seules lignes de main
- *   d'œuvre : 2 pour un chantier togolais (voir utils/mainOeuvre.js), 1 sinon.
+ *   d'œuvre : 2 pour un chantier togolais (voir utils/mainOeuvre.js), 1 sinon
+ *   — sauf kit haute tension, au même tarif dans les deux pays.
  *   Le matériel n'est jamais touché — même fournisseur des deux côtés.
  */
 export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = [], coefMainOeuvre = 1) => {
@@ -745,7 +746,9 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // Prix résolu ligne par ligne : celui du produit boutique lié s'il existe
   // encore (suit ses changements de prix), sinon le prix figé de la ligne.
   // La main d'œuvre porte en plus le coefficient du pays du chantier.
-  const coef = Number(coefMainOeuvre) > 0 ? Number(coefMainOeuvre) : 1;
+  // Exception posée par le gérant : un kit haute tension (HV) garde la même
+  // main d'œuvre au Togo et au Bénin — jamais doublée.
+  const coef = !estKitHauteTension(kit) && Number(coefMainOeuvre) > 0 ? Number(coefMainOeuvre) : 1;
   const prixUnitaire = (l) => resolveLignePrice(l, products) * (l.labor ? coef : 1);
   const toItem = (l, type) => {
     const unitPrice = prixUnitaire(l);

@@ -47,6 +47,13 @@ export const tensionKit = (kit) => {
   return null;
 };
 
+/**
+ * Kit à batterie HAUTE tension (« HV », plusieurs centaines de volts) : sa
+ * ligne batterie le dit. Hors des choix 12 / 24 / 48 V, sa tension reste vide.
+ */
+export const estKitHauteTension = (kit) =>
+  (kit?.lines || []).some((l) => LIGNE_BATTERIE.test(l?.designation || '') && /\bHV\b/.test(l.designation));
+
 /** Même tension — ou l'une des deux inconnue, donc invérifiable. */
 export const tensionsCompatibles = (a, b) => !a || !b || a === b;
 

@@ -1,0 +1,65 @@
+/* Kit 60 kWh Deye haute tension : suggéré par l'assistant pour un gros
+   besoin, et sa main d'œuvre reste la même au Togo qu'au Bénin (les autres
+   kits la doublent au Togo). Lancer `npm run dev` à côté. */
+import { chromium } from '@playwright/test';
+const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const R = []; const ok = (c, m) => { R.push(`${c ? '✓ ' : '❌'} ${m}`); return c; };
+const ctx = await nav.newContext({ viewport: { width: 1280, height: 950 } });
+const page = await ctx.newPage();
+page.on('pageerror', (e) => R.push('❌ ERREUR JS : ' + e));
+const B = 'http://localhost:3000';
+const GERANT = { id: 'u1', email: 'adam@bestasolar.tg', name: 'Adam', role: 'gerant', phone: '+228', avatar: 'A' };
+await page.goto(B + '/');
+await page.evaluate((u) => localStorage.setItem('bestasolar_user', JSON.stringify(u)), GERANT);
+// Aucun client béninois dans les données de démonstration : un client togolais
+// en devient un (adresse et numéro +229), posé avant que l'app ne lise son état.
+await ctx.addInitScript(() => {
+  const brut = localStorage.getItem('bestasolar_data');
+  if (!brut) return;
+  const s = JSON.parse(brut);
+  if (s.leads?.some((l) => l.id === 'e2e-benin')) return;
+  const modele = s.leads.find((l) => String(l.phone || '').startsWith('+228'));
+  s.leads = [...s.leads, { ...modele, id: 'e2e-benin', name: 'Client Cotonou', contact: 'Client Cotonou', phone: '+229 01 97 00 00 00', address: 'Akpakpa, Cotonou' }];
+  localStorage.setItem('bestasolar_data', JSON.stringify(s));
+});
+const suivant = () => page.locator('button:has-text("Suivant")').first();
+const chiffre = (t) => Number(String(t).replace(/\D/g, ''));
+
+// Parcours jusqu'au choix du kit, pour un client donné (par son téléphone).
+async function kitsProposes(indicatif) {
+  await page.goto(B + '/devis');
+  await page.waitForTimeout(1500);
+  await page.locator('button:has-text("Créer un devis"), button:has-text("Nouveau devis")').first().click();
+  await page.waitForTimeout(800);
+  await page.locator(':text("Dimensionnement solaire")').first().click();
+  await page.waitForTimeout(900);
+  const leads = await page.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).leads);
+  const lead = leads.find((l) => String(l.phone || '').replace(/\s/g, '').startsWith(indicatif));
+  await page.locator('.page-content button', { hasText: lead.contact || lead.name }).first().click();
+  await page.waitForTimeout(400);
+  await suivant().click(); await page.waitForTimeout(700);
+  await page.locator('button:has-text("Saisie directe")').click();
+  await page.locator('.manual-consumption-grid input').nth(0).fill('30');
+  await page.locator('.manual-consumption-grid input').nth(1).fill('50');
+  await page.waitForTimeout(300);
+  await suivant().click(); await page.waitForTimeout(900);
+  await suivant().click(); await page.waitForTimeout(1500);
+  return page.evaluate(() => [...document.querySelectorAll('.kit-option')].map((b) => ({
+    nom: b.querySelector('.kit-option-name')?.firstChild?.textContent?.trim(),
+    total: b.querySelector('.kit-option-meta')?.innerText,
+  })));
+}
+
+const togo = await kitsProposes('+228');
+const benin = await kitsProposes('+229');
+const t60 = togo.find((k) => /60 kWh/.test(k.nom));
+const b60 = benin.find((k) => /60 kWh/.test(k.nom));
+ok(!!t60, `kit 60 kWh suggéré pour un gros besoin [${togo.map((k) => k.nom).join(' · ')}]`);
+ok(t60 && b60 && chiffre(t60.total) === chiffre(b60.total),
+   `même prix au Togo et au Bénin : main d'œuvre non doublée [Togo ${t60?.total} · Bénin ${b60?.total}]`);
+
+console.log('\n' + R.join('\n'));
+await nav.close();
+const echecs = R.filter((l) => l.startsWith('❌')).length;
+console.log(echecs ? `\n❌ ${echecs} échec(s)` : '\n✅ Kit haute tension : suggéré, même main d’œuvre au Togo et au Bénin');
+process.exit(echecs ? 1 : 0);

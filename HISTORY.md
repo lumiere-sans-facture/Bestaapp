@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-04
+- **Kits haute tension : même main d'œuvre au Togo et au Bénin.** La main d'œuvre des kits est doublée pour un chantier togolais ; les kits à batterie haute tension (HV) font exception et gardent le même tarif des deux côtés de la frontière — le kit 60 kWh Deye reste à 15 044 000 F CFA au Togo comme au Bénin. La règle vaut aussi pour un kit HV créé dans « Mes kits » : il suffit que sa ligne batterie mentionne « HV »
 - **Nouveau kit 60 kWh Deye haute tension (triphasé).** Cinq batteries Deye GB-W de 12 kWh avec leur boîtier de contrôle et leur socle, un onduleur hybride Deye 30 kW (SUN-30K-SG02HP3), 42 panneaux Jinko bifaciaux de 620 Wc et tout le câblage : 15 044 000 F CFA, au franc près le devis d'origine. Il apparaît tout seul dans « Mes kits » et dans l'assistant de devis, y compris sur les appareils déjà utilisés. Sa batterie haute tension n'entre pas dans les choix 12 / 24 / 48 V : l'assistant garde toujours son onduleur 30 kW et ne lui substitue jamais un modèle basse tension
 
 ## 2026-10-03

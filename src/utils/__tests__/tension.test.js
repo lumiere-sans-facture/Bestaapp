@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   lireTension, tensionDansTexte, tensionOnduleur, tensionKit, tensionsCompatibles,
-  onduleursCompatibles, completerTensions, libelleTension,
+  onduleursCompatibles, completerTensions, libelleTension, estKitHauteTension,
 } from '../tension';
 import { SOLAR_KITS } from '../../data/kits';
 import { INVERTER_MODELS } from '../../data/inverters';
@@ -39,8 +39,7 @@ describe('onduleurs et kits', () => {
   it('chaque kit officiel porte une tension, cohérente avec sa ligne batterie', () => {
     for (const kit of SOLAR_KITS) {
       // Seule exception : batterie haute tension (« HV »), hors 12 / 24 / 48 V.
-      const hauteTension = kit.lines.some((l) => /batterie/i.test(l.designation) && /\bHV\b/.test(l.designation));
-      if (hauteTension) { expect(kit.tension, kit.id).toBeNull(); continue; }
+      if (estKitHauteTension(kit)) { expect(kit.tension, kit.id).toBeNull(); continue; }
       expect([12, 24, 48], kit.id).toContain(kit.tension);
       const lue = tensionKit({ lines: kit.lines });
       if (lue) expect(lue, kit.id).toBe(kit.tension);
@@ -99,5 +98,28 @@ describe('kit 60 kWh Deye haute tension', () => {
     const devis = buildKitQuotation(kit, 'tole', true, { peakLoad: 20000, requiredPanelPower: 26000 }, INVERTER_MODELS);
     expect(lignes(devis).filter((n) => /onduleur/i.test(n))).toEqual(['Onduleur Hybride Deye SUN-30K-SG02HP3-EU-AM3']);
     expect(devis.inverterInsuffisant).toBe(false);
+  });
+});
+
+describe('main d’œuvre des kits haute tension', () => {
+  const kitHV = SOLAR_KITS.find((k) => k.id === 'kit-60kwh-deye-hv');
+  const mo = (kit, coef) => buildKitQuotation(kit, 'tole', true, null, [], [], coef).installationCost;
+
+  it('même tarif au Togo et au Bénin : 650 000 F, jamais doublé', () => {
+    expect(mo(kitHV, 1)).toBe(650000);
+    expect(mo(kitHV, 2)).toBe(650000);
+    expect(buildKitQuotation(kitHV, 'tole', true, null, [], [], 2).total).toBe(15044000);
+  });
+
+  it('les autres kits restent doublés au Togo', () => {
+    const k48 = SOLAR_KITS.find((k) => k.id === 'kit-48kwh');
+    expect(mo(k48, 2)).toBe(2 * mo(k48, 1));
+  });
+
+  it('repère un kit HV à sa ligne batterie, y compris un kit créé à la main', () => {
+    expect(estKitHauteTension(kitHV)).toBe(true);
+    expect(estKitHauteTension({ lines: [{ designation: 'Batterie Pylontech H2 HV 10 kWh' }] })).toBe(true);
+    expect(estKitHauteTension({ lines: [{ designation: 'Batterie lithium 48V 16 kWh' }, { designation: 'Disjoncteur HV' }] })).toBe(false);
+    expect(estKitHauteTension({ lines: [{ designation: 'Batterie HVAC' }] })).toBe(false);
   });
 });
