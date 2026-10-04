@@ -285,7 +285,8 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
         ? { model: `Onduleur hybride ${inv.capacity}kVA ${inv.brand} ${inv.model}`, capacity: inv.capacity }
         : { model: `Onduleur hybride ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter },
       batteries: [],
-      batteryCapacity: selectedKit.battery,
+      // Modules ajoutés compris (kit extensible, voir utils/extensionBatterie).
+      batteryCapacity: displayQuotation.batteryCapacity ?? selectedKit.battery,
       estimatedProduction: Math.round((installedPanels * selectedKit.panelW * psh * 365) / 1000),
       systemType,
       peakSunHours: psh,
@@ -641,7 +642,9 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
               <span>
                 {selectedKit.name} — {installedPanels} panneaux {selectedKit.panelW}Wc
                 {installedPanels > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
-                {' '}· batterie {selectedKit.battery} kWh · onduleur{' '}
+                {' '}· batterie {displayQuotation.batteryCapacity ?? selectedKit.battery} kWh
+                {(displayQuotation.batteryCapacity ?? 0) > Number(selectedKit.battery) && ` (étendue depuis ${selectedKit.battery})`}
+                {' '}· onduleur{' '}
                 {displayQuotation.inverterSuggested
                   ? `${displayQuotation.inverterSuggested.quantite > 1 ? `${displayQuotation.inverterSuggested.quantite} × ` : ''}${displayQuotation.inverterSuggested.capacity} kVA ${displayQuotation.inverterSuggested.brand}`
                   : `${selectedKit.inverter} kVA`}

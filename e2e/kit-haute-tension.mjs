@@ -44,10 +44,12 @@ async function kitsProposes(indicatif, jour = '25', nuit = '42') {
   await page.waitForTimeout(300);
   await suivant().click(); await page.waitForTimeout(900);
   await suivant().click(); await page.waitForTimeout(1500);
-  return page.evaluate(() => [...document.querySelectorAll('.kit-option')].map((b) => ({
+  const resume = await page.locator('.kit-summary').innerText().catch(() => '');
+  return page.evaluate((resume) => [...document.querySelectorAll('.kit-option')].map((b) => ({
     nom: b.querySelector('.kit-option-name')?.firstChild?.textContent?.trim(),
     total: b.querySelector('.kit-option-meta')?.innerText,
-  })));
+    resume,
+  })), resume);
 }
 
 const togo = await kitsProposes('+228');
@@ -57,6 +59,19 @@ const b60 = benin.find((k) => /60 kWh/.test(k.nom));
 ok(!!t60, `kit 60 kWh suggéré pour un gros besoin [${togo.map((k) => k.nom).join(' · ')}]`);
 ok(t60 && b60 && chiffre(t60.total) === chiffre(b60.total),
    `même prix au Togo et au Bénin : main d'œuvre non doublée [Togo ${t60?.total} · Bénin ${b60?.total}]`);
+
+// Besoin intermédiaire (entre 60 et 120 kWh) : le 60 kWh reçoit des modules
+// de 12 kWh au lieu de sauter au 128 kWh.
+const moyen = await kitsProposes('+228', '40', '70');
+const m60 = moyen.find((k) => /60 kWh/.test(k.nom));
+const etendu = /batterie (\d+) kWh/.exec(m60?.resume || '');
+ok(moyen.length === 1 && !!m60 && etendu && Number(etendu[1]) > 60 && Number(etendu[1]) <= 120 && Number(etendu[1]) % 12 === 0,
+   `besoin intermédiaire : kit 60 kWh étendu, pas le 128 kWh [${moyen.map((k) => k.nom).join(' · ')} — ${m60?.resume.replace(/\s+/g, ' ')}]`);
+const modules = Number(etendu?.[1]) / 12;
+// Les panneaux complétés (75 000 F + 10 000 F de structure) s'ajoutent aussi.
+const panneaux = Number(/(\d+) panneaux/.exec(m60?.resume || '')?.[1] || 42);
+ok(m60 && chiffre(m60.total) === 15044000 + (modules - 5) * 1245000 + (panneaux - 42) * 85000,
+   `prix : ${modules - 5} module(s) de 1 245 000 F et ${panneaux - 42} panneau(x) ajoutés [${m60?.total}]`);
 
 // Très gros besoin : le kit 128 kWh, lui aussi au même prix des deux côtés.
 const togoXL = await kitsProposes('+228', '60', '110');

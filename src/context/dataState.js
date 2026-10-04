@@ -4,6 +4,7 @@ import * as seed from '../data/seed';
 import { SOLAR_KITS, KITS_DOTES_AVANT_REGISTRE } from '../data/kits';
 import { INVERTER_MODELS } from '../data/inverters';
 import { completerTensions } from '../utils/tension';
+import { completerExtensions } from '../utils/extensionBatterie';
 import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { generatePartnerCode, normaliseCode } from '../utils/referral';
@@ -120,6 +121,9 @@ export const loadState = (scope = null) => {
       // 24, 48 V). Une valeur saisie n'est jamais écrasée.
       saved.kits = completerTensions(saved.kits, SOLAR_KITS);
       saved.inverters = completerTensions(saved.inverters, INVERTER_MODELS);
+      // Migration « extension batterie » : le kit 60 kWh enregistré avant la
+      // règle des modules ajoutés (jusqu'à 120 kWh) la reçoit.
+      saved.kits = completerExtensions(saved.kits, SOLAR_KITS);
       // Migration « Kits pompage » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.pompeKits)) saved.pompeKits = POMPE_KITS;
       if (!saved.payoutRequests) saved.payoutRequests = [];

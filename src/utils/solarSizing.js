@@ -468,6 +468,7 @@ export const calculateSystemSize = (
 
 import { TVA_RATE } from '../config/company';
 import { tensionKit, onduleursCompatibles, estKitHauteTension } from './tension';
+import { capacitePourBesoin, capaciteMaxKit, etendreBatterie } from './extensionBatterie';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
 // Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
@@ -623,13 +624,17 @@ export const suggestKitsForBattery = (kits = [], batteryNeed = 0) => {
   // La capacité saisie dans « Mes kits » peut revenir en texte (formulaire,
   // réplication) : la comparer telle quelle laissait « 10 » ≠ 10 et vidait la
   // liste des kits proposés. On la lit toujours en nombre.
-  const capaciteKit = (k) => Number(k?.battery) || 0;
-  const suffisants = kits.filter((k) => capaciteKit(k) >= need);
-  const pool = suffisants.length ? suffisants : kits;
-  const capacity = suffisants.length
-    ? Math.min(...pool.map(capaciteKit))
-    : Math.max(...pool.map(capaciteKit));
-  return pool.filter((k) => capaciteKit(k) === capacity);
+  // Un kit extensible (modules ajoutés, voir utils/extensionBatterie.js) se
+  // compare à la capacité qu'il installerait POUR CE BESOIN : le 60 kWh
+  // porté à 72 kWh passe devant le 128 kWh pour un besoin de 70 kWh.
+  const suffisants = kits.filter((k) => capacitePourBesoin(k, need) != null);
+  if (!suffisants.length) {
+    // Rien ne suffit : le plus gros possible (mieux vaut le plus proche que rien).
+    const max = Math.max(...kits.map(capaciteMaxKit));
+    return kits.filter((k) => capaciteMaxKit(k) === max);
+  }
+  const capacity = Math.min(...suffisants.map((k) => capacitePourBesoin(k, need)));
+  return suffisants.filter((k) => capacitePourBesoin(k, need) === capacity);
 };
 
 /** Compatibilité : le premier kit suggéré reste disponible pour les appels unitaires. */
@@ -680,7 +685,9 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const neededPanels = sizing?.requiredPanelPower && kit.panelW
     ? Math.max(kit.panels, Math.ceil(sizing.requiredPanelPower / kit.panelW))
     : kit.panels;
-  const withPanels = kit.lines.map((l) => (
+  // Kit extensible : modules batterie ajoutés jusqu'à couvrir le besoin.
+  const batterie = etendreBatterie(kit, kit.lines, sizing?.batteryCapacity);
+  const withPanels = batterie.lignes.map((l) => (
     PANEL_LINE_RE.test(l.designation) && neededPanels > l.qty ? { ...l, qty: neededPanels } : l
   ));
 
@@ -777,6 +784,8 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     // l'écran le dit, plutôt que de proposer un modèle d'une autre tension.
     inverterInsuffisant: retenu ? !retenu.suffisant : false,
     tension,
+    // Capacité batterie RÉELLEMENT posée (modules ajoutés compris).
+    batteryCapacity: batterie.capacite,
     total,
     roi: 0,
     kitId: kit.id,

@@ -336,7 +336,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
       ? (kitQuotation?.inverterSuggested || (selectedKit ? { model: `Onduleur du kit ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter } : null))
       : inverter;
     const ficheBatteries = proposalMode === 'kit' && selectedKit
-      ? [{ model: `Batterie du kit ${selectedKit.name}`, capacity: selectedKit.battery, qty: 1 }]
+      ? [{ model: `Batterie du kit ${selectedKit.name}`, capacity: kitQuotation?.batteryCapacity ?? selectedKit.battery, qty: 1 }]
       : batteryList;
     await ouvrirFichePdf({
       // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
@@ -692,7 +692,9 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                     <span>
                       {selectedKit.name} — {kitQuotation?.panelsIncluded || selectedKit.panels} panneaux {selectedKit.panelW}Wc
                       {(kitQuotation?.panelsIncluded || selectedKit.panels) > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
-                      {' '}· batterie {selectedKit.battery} kWh · onduleur{' '}
+                      {' '}· batterie {kitQuotation?.batteryCapacity ?? selectedKit.battery} kWh
+                      {(kitQuotation?.batteryCapacity ?? 0) > Number(selectedKit.battery) && ` (étendue depuis ${selectedKit.battery})`}
+                      {' '}· onduleur{' '}
                       {kitQuotation?.inverterSuggested
                         ? `${kitQuotation.inverterSuggested.quantite > 1 ? `${kitQuotation.inverterSuggested.quantite} × ` : ''}${kitQuotation.inverterSuggested.capacity} kVA ${kitQuotation.inverterSuggested.brand}`
                         : `${selectedKit.inverter} kVA`}
