@@ -5,6 +5,9 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-10-04
+- **Nouveau kit 60 kWh Deye haute tension (triphasé).** Cinq batteries Deye GB-W de 12 kWh avec leur boîtier de contrôle et leur socle, un onduleur hybride Deye 30 kW (SUN-30K-SG02HP3), 42 panneaux Jinko bifaciaux de 620 Wc et tout le câblage : 15 044 000 F CFA, au franc près le devis d'origine. Il apparaît tout seul dans « Mes kits » et dans l'assistant de devis, y compris sur les appareils déjà utilisés. Sa batterie haute tension n'entre pas dans les choix 12 / 24 / 48 V : l'assistant garde toujours son onduleur 30 kW et ne lui substitue jamais un modèle basse tension
+
 ## 2026-10-03
 - **Le code partenaire figure de nouveau sur les devis, en pied de page.** Depuis le passage aux nouveaux modèles de document, l'apporteur était bien enregistré sur le devis mais n'était plus imprimé. Chaque page porte désormais « Réf. partenaire : CODE », discrètement, juste au-dessus du pied. Le code imprimé est celui figé à la création du devis : il reste juste si le partenaire est renommé, et s'imprime même quand sa fiche n'est pas sur l'appareil. Aucune page ne déborde (mesuré sur les trois modèles, d'une à trois pages). Jamais de partenaire BestaSolar sur un devis Pro
 

@@ -5,6 +5,7 @@ import {
 } from '../tension';
 import { SOLAR_KITS } from '../../data/kits';
 import { INVERTER_MODELS } from '../../data/inverters';
+import { buildKitQuotation } from '../solarSizing';
 import { normaliserKit, resumeKit } from '../kits';
 import { normaliserOnduleur, resumeOnduleur } from '../inverters';
 
@@ -37,6 +38,9 @@ describe('onduleurs et kits', () => {
   });
   it('chaque kit officiel porte une tension, cohérente avec sa ligne batterie', () => {
     for (const kit of SOLAR_KITS) {
+      // Seule exception : batterie haute tension (« HV »), hors 12 / 24 / 48 V.
+      const hauteTension = kit.lines.some((l) => /batterie/i.test(l.designation) && /\bHV\b/.test(l.designation));
+      if (hauteTension) { expect(kit.tension, kit.id).toBeNull(); continue; }
       expect([12, 24, 48], kit.id).toContain(kit.tension);
       const lue = tensionKit({ lines: kit.lines });
       if (lue) expect(lue, kit.id).toBe(kit.tension);
@@ -80,5 +84,20 @@ describe('completerTensions (données enregistrées avant le champ)', () => {
   it('rend la même liste si rien ne change (pas de réplication inutile)', () => {
     const liste = [{ id: 'perso' }];
     expect(completerTensions(liste, INVERTER_MODELS)).toBe(liste);
+  });
+});
+
+describe('kit 60 kWh Deye haute tension', () => {
+  const kit = SOLAR_KITS.find((k) => k.id === 'kit-60kwh-deye-hv');
+  const lignes = (d) => d.components.map((c) => c.name || c.designation);
+
+  it('reprend le devis : 15 044 000 F CFA, structure en tôle comprise', () => {
+    expect(kit.lines.reduce((s, l) => s + l.qty * l.pu, 0)).toBe(15044000);
+  });
+
+  it('garde son onduleur 30 kW : jamais remplacé par un modèle 48 V', () => {
+    const devis = buildKitQuotation(kit, 'tole', true, { peakLoad: 20000, requiredPanelPower: 26000 }, INVERTER_MODELS);
+    expect(lignes(devis).filter((n) => /onduleur/i.test(n))).toEqual(['Onduleur Hybride Deye SUN-30K-SG02HP3-EU-AM3']);
+    expect(devis.inverterInsuffisant).toBe(false);
   });
 });

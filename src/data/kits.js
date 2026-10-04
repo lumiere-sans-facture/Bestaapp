@@ -290,6 +290,44 @@ export const SOLAR_KITS = [
       ["Main d'œuvre", 1, 'pcs', 240000],
     ]),
   },
+  {
+    // Composition relevée sur un devis du 4 octobre 2026 (15 044 000 F CFA).
+    // Installation triphasée haute tension : cinq modules Deye GB-W de 12 kWh
+    // sur un onduleur Deye 30 kW.
+    id: 'kit-60kwh-deye-hv',
+    name: 'Kit 60 kWh (5 × 12) — Deye HV triphasé',
+    battery: 60,
+    batteryModules: [{ capacity: 12, qty: 5 }], // détail réel pour la fiche technique
+    panels: 42,
+    panelW: 620,
+    inverter: 30,
+    // Batterie HAUTE tension (plusieurs centaines de volts), hors de la liste
+    // 12 / 24 / 48 V. Tension laissée vide : aucun onduleur de la liste n'a
+    // 30 kVA, l'assistant garde donc toujours l'onduleur du kit et ne lui
+    // substitue jamais un modèle basse tension (voir buildKitQuotation).
+    tension: null,
+    lines: toLines([
+      ['Batterie Lithium Deye 12 KWH HV GB-W', 5, 'pcs', 1245000],
+      ['GB-W HV CONTROL BOX+BASE', 1, 'pcs', 925000],
+      ['GB-W BASE+RAIL+COVER', 1, 'pcs', 255000],
+      ['Onduleur Hybride Deye SUN-30K-SG02HP3-EU-AM3', 1, 'pcs', 2650000],
+      ['Panneaux photovoltaïque Jinko bifacial 620Wc', 42, 'pcs', 75000],
+      ['Coffret de protection DC + Ensemble fusible 4 entrée et 4 sortie', 1, 'pcs', 120000],
+      // Forfait du devis (420 000) ramené au prix par panneau des autres kits :
+      // l'assistant recalcule cette ligne selon le support choisi.
+      ['Structure de montage PV rails galvanisé (Tôle)', 42, 'pcs', 10000],
+      ['Câble batterie 1x35mm²', 20, 'm', 4000],
+      ['Câble PV 1x6mm²', 140, 'm', 1100],
+      ['Câble AC 1x10mm²', 25, 'm', 1500],
+      ['Kit terre', 2, 'pcs', 30000],
+      ['Câble de terre 10mm²', 125, 'm', 1500],
+      ['Câble de terre 16mm²', 15, 'm', 2000],
+      ['Disjoncteur compact DC 250A', 1, 'pcs', 25000],
+      ['Connecteur MC4 (mâle + femelle)', 25, 'pcs', 1000],
+      ['Lot de petites fournitures (moulure, ceinture, cosse…)', 1, 'pcs', 50000],
+      ["Main d'œuvre", 1, 'pcs', 650000],
+    ]),
+  },
 ];
 
 // Kits officiels déjà dotés AVANT l'introduction du registre `kitsDotes`
