@@ -111,6 +111,15 @@ describe('main d’œuvre des kits haute tension', () => {
     expect(buildKitQuotation(kitHV, 'tole', true, null, [], [], 2).total).toBe(15044000);
   });
 
+  it('kit 128 kWh : 1 500 000 F au Togo comme au Bénin, onduleur 50 kW conservé', () => {
+    const k128 = SOLAR_KITS.find((k) => k.id === 'kit-128kwh-deye-hv');
+    expect(estKitHauteTension(k128)).toBe(true);
+    expect(mo(k128, 2)).toBe(1500000);
+    const devis = buildKitQuotation(k128, 'tole', true, { peakLoad: 40000, requiredPanelPower: 62000 }, INVERTER_MODELS, [], 2);
+    expect(devis.total).toBe(28110000);
+    expect(devis.components.filter((c) => /onduleur/i.test(c.name)).map((c) => c.name)).toEqual(['Onduleur Hybride Deye SUN-50K-SG01HP3-EU']);
+  });
+
   it('les autres kits restent doublés au Togo', () => {
     const k48 = SOLAR_KITS.find((k) => k.id === 'kit-48kwh');
     expect(mo(k48, 2)).toBe(2 * mo(k48, 1));

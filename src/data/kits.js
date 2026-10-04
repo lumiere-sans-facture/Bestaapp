@@ -328,6 +328,43 @@ export const SOLAR_KITS = [
       ["Main d'œuvre", 1, 'pcs', 650000],
     ]),
   },
+  {
+    // Composition relevée sur un devis du 4 octobre 2026 (28 110 000 F CFA).
+    // Le plus gros kit : huit modules Deye B-PRO de 16 kWh haute tension sur
+    // un onduleur Deye 50 kW triphasé.
+    id: 'kit-128kwh-deye-hv',
+    name: 'Kit 128 kWh (8 × 16) — Deye HV triphasé',
+    battery: 128,
+    batteryModules: [{ capacity: 16, qty: 8 }], // détail réel pour la fiche technique
+    panels: 100,
+    panelW: 620,
+    inverter: 50,
+    // Batterie haute tension : même traitement que le kit 60 kWh — tension
+    // vide, onduleur du kit toujours conservé, main d'œuvre identique au Togo
+    // et au Bénin (« HV » sur la ligne batterie, voir utils/tension.js).
+    tension: null,
+    lines: toLines([
+      ['Batterie Lithium Deye HV 16KWH B-PRO', 8, 'pcs', 1375000],
+      ['DEYEHVBOS-B-PCBOS-B-PRO16KWH CONTROL BOX+ACC', 1, 'pcs', 1225000],
+      ['GB-W BASE+RAIL+COVER', 1, 'pcs', 255000],
+      ['Onduleur Hybride Deye SUN-50K-SG01HP3-EU', 1, 'pcs', 3650000],
+      ['Panneaux photovoltaïque Jinko bifacial 620Wc', 100, 'pcs', 75000],
+      ['Coffret de protection DC + Ensemble fusible 4 entrée et 4 sortie', 1, 'pcs', 120000],
+      // Forfait du devis (1 000 000) ramené au prix par panneau des autres
+      // kits : l'assistant recalcule cette ligne selon le support choisi.
+      ['Structure de montage PV rails galvanisé (Tôle)', 100, 'pcs', 10000],
+      ['Câble batterie 1x35mm²', 50, 'm', 4000],
+      ['Câble PV 1x6mm²', 300, 'm', 1100],
+      ['Câble AC 2x16mm²', 100, 'm', 4000],
+      ['Kit terre', 4, 'pcs', 30000],
+      ['Câble de terre 10mm²', 250, 'm', 1500],
+      ['Câble de terre 16mm²', 50, 'm', 2000],
+      ['Disjoncteur compact DC 400A', 1, 'pcs', 85000],
+      ['Connecteur MC4 (mâle + femelle)', 100, 'pcs', 1000],
+      ['Lot de petites fournitures (moulure, ceinture, cosse…)', 1, 'pcs', 150000],
+      ["Main d'œuvre", 1, 'pcs', 1500000],
+    ]),
+  },
 ];
 
 // Kits officiels déjà dotés AVANT l'introduction du registre `kitsDotes`

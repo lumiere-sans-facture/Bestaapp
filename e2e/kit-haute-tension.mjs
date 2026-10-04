@@ -1,4 +1,4 @@
-/* Kit 60 kWh Deye haute tension : suggéré par l'assistant pour un gros
+/* Kits Deye haute tension (60 et 128 kWh) : suggérés par l'assistant pour un gros
    besoin, et sa main d'œuvre reste la même au Togo qu'au Bénin (les autres
    kits la doublent au Togo). Lancer `npm run dev` à côté. */
 import { chromium } from '@playwright/test';
@@ -26,7 +26,7 @@ const suivant = () => page.locator('button:has-text("Suivant")').first();
 const chiffre = (t) => Number(String(t).replace(/\D/g, ''));
 
 // Parcours jusqu'au choix du kit, pour un client donné (par son téléphone).
-async function kitsProposes(indicatif) {
+async function kitsProposes(indicatif, jour = '25', nuit = '42') {
   await page.goto(B + '/devis');
   await page.waitForTimeout(1500);
   await page.locator('button:has-text("Créer un devis"), button:has-text("Nouveau devis")').first().click();
@@ -39,8 +39,8 @@ async function kitsProposes(indicatif) {
   await page.waitForTimeout(400);
   await suivant().click(); await page.waitForTimeout(700);
   await page.locator('button:has-text("Saisie directe")').click();
-  await page.locator('.manual-consumption-grid input').nth(0).fill('30');
-  await page.locator('.manual-consumption-grid input').nth(1).fill('50');
+  await page.locator('.manual-consumption-grid input').nth(0).fill(jour);
+  await page.locator('.manual-consumption-grid input').nth(1).fill(nuit);
   await page.waitForTimeout(300);
   await suivant().click(); await page.waitForTimeout(900);
   await suivant().click(); await page.waitForTimeout(1500);
@@ -57,6 +57,15 @@ const b60 = benin.find((k) => /60 kWh/.test(k.nom));
 ok(!!t60, `kit 60 kWh suggéré pour un gros besoin [${togo.map((k) => k.nom).join(' · ')}]`);
 ok(t60 && b60 && chiffre(t60.total) === chiffre(b60.total),
    `même prix au Togo et au Bénin : main d'œuvre non doublée [Togo ${t60?.total} · Bénin ${b60?.total}]`);
+
+// Très gros besoin : le kit 128 kWh, lui aussi au même prix des deux côtés.
+const togoXL = await kitsProposes('+228', '60', '110');
+const beninXL = await kitsProposes('+229', '60', '110');
+const t128 = togoXL.find((k) => /128 kWh/.test(k.nom));
+const b128 = beninXL.find((k) => /128 kWh/.test(k.nom));
+ok(!!t128, `kit 128 kWh suggéré pour un très gros besoin [${togoXL.map((k) => k.nom).join(' · ')}]`);
+ok(t128 && b128 && chiffre(t128.total) === chiffre(b128.total),
+   `128 kWh : même prix au Togo et au Bénin [Togo ${t128?.total} · Bénin ${b128?.total}]`);
 
 console.log('\n' + R.join('\n'));
 await nav.close();
