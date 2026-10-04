@@ -21,7 +21,10 @@ describe('kit 60 kWh extensible jusqu’à 120 kWh', () => {
     expect(noms(70)).toEqual(['kit-60kwh-deye-hv']);
     expect(noms(120)).toEqual(['kit-60kwh-deye-hv']);
     expect(noms(121)).toEqual(['kit-128kwh-deye-hv']);
-    expect(noms(500)).toEqual(['kit-128kwh-deye-hv']);
+    expect(noms(128)).toEqual(['kit-128kwh-deye-hv']);
+    // Au-delà du 128 kWh : le 208 kWh, puis le plus gros possible.
+    expect(noms(129)).toEqual(['kit-208kwh-deye-hv']);
+    expect(noms(500)).toEqual(['kit-208kwh-deye-hv']);
     // Les petits besoins ne bougent pas.
     expect(noms(40)).toEqual(['kit-48kwh']);
   });

@@ -1,4 +1,4 @@
-/* Kits Deye haute tension (60 et 128 kWh) : suggérés par l'assistant pour un gros
+/* Kits Deye haute tension (60, 128 et 208 kWh) : suggérés par l'assistant pour un gros
    besoin, et sa main d'œuvre reste la même au Togo qu'au Bénin (les autres
    kits la doublent au Togo). Lancer `npm run dev` à côté. */
 import { chromium } from '@playwright/test';
@@ -74,13 +74,22 @@ ok(m60 && chiffre(m60.total) === 15044000 + (modules - 5) * 1245000 + (panneaux 
    `prix : ${modules - 5} module(s) de 1 245 000 F et ${panneaux - 42} panneau(x) ajoutés [${m60?.total}]`);
 
 // Très gros besoin : le kit 128 kWh, lui aussi au même prix des deux côtés.
-const togoXL = await kitsProposes('+228', '60', '110');
-const beninXL = await kitsProposes('+229', '60', '110');
+const togoXL = await kitsProposes('+228', '50', '94');
+const beninXL = await kitsProposes('+229', '50', '94');
 const t128 = togoXL.find((k) => /128 kWh/.test(k.nom));
 const b128 = beninXL.find((k) => /128 kWh/.test(k.nom));
 ok(!!t128, `kit 128 kWh suggéré pour un très gros besoin [${togoXL.map((k) => k.nom).join(' · ')}]`);
 ok(t128 && b128 && chiffre(t128.total) === chiffre(b128.total),
    `128 kWh : même prix au Togo et au Bénin [Togo ${t128?.total} · Bénin ${b128?.total}]`);
+
+// Au-delà de 128 kWh : le kit 208 kWh (PCS 125 kW), même prix des deux côtés.
+const togoXXL = await kitsProposes('+228', '100', '180');
+const beninXXL = await kitsProposes('+229', '100', '180');
+const t208 = togoXXL.find((k) => /208 kWh/.test(k.nom));
+const b208 = beninXXL.find((k) => /208 kWh/.test(k.nom));
+ok(!!t208, `kit 208 kWh suggéré au-delà de 128 kWh [${togoXXL.map((k) => k.nom).join(' · ')}]`);
+ok(t208 && b208 && chiffre(t208.total) === chiffre(b208.total) && chiffre(t208.total) >= 50055000,
+   `208 kWh : même prix au Togo et au Bénin [Togo ${t208?.total} · Bénin ${b208?.total}]`);
 
 console.log('\n' + R.join('\n'));
 await nav.close();

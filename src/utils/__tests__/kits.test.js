@@ -41,9 +41,12 @@ describe('buildKitQuotation', () => {
     // 128 kWh Deye HV : au franc près le devis du 4 octobre 2026 (structure
     // inscrite à 100 panneaux × 10 000 sur tôle).
     'kit-128kwh-deye-hv': 28110000,
+    // 208 kWh Deye HV (devis n° 254) : au franc près, structure inscrite à
+    // 175 panneaux × 10 000 sur tôle.
+    'kit-208kwh-deye-hv': 50055000,
   };
 
-  it('propose les 13 kits officiels', () => {
+  it('propose les 14 kits officiels', () => {
     expect(SOLAR_KITS.map((k) => k.id)).toEqual(Object.keys(TOTALS));
   });
 

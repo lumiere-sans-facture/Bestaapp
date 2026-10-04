@@ -369,6 +369,48 @@ export const SOLAR_KITS = [
       ["Main d'œuvre", 1, 'pcs', 1500000],
     ]),
   },
+  {
+    // Composition relevée sur le devis n° 254 du 4 octobre 2026
+    // (50 055 000 F CFA). Installation commerciale et industrielle : treize
+    // modules Deye B-PRO de 16 kWh haute tension, un convertisseur de
+    // puissance (PCS) 125 kW, un module de charge MPPT 200 kW et un
+    // commutateur de transfert statique 500 kW.
+    id: 'kit-208kwh-deye-hv',
+    name: 'Kit 208 kWh (13 × 16) — Deye HV 125 kW',
+    battery: 208,
+    batteryModules: [{ capacity: 16, qty: 13 }], // détail réel pour la fiche technique
+    panels: 175,
+    panelW: 620,
+    inverter: 125,
+    // Batterie haute tension : tension vide, PCS du kit toujours conservé,
+    // main d'œuvre identique au Togo et au Bénin (voir utils/tension.js).
+    tension: null,
+    lines: toLines([
+      ['Batterie Lithium Deye HV 16KWH B-PRO', 13, 'pcs', 1375000],
+      ['DEYEHVBOS-B-PCBOS-B-PRO16KWH CONTROL BOX+ACC', 1, 'pcs', 1225000],
+      ['GB-W BASE+RAIL+COVER', 1, 'pcs', 255000],
+      // « Onduleur » en tête de désignation : l'app y reconnaît l'onduleur du
+      // devis (provision de remplacement de la fiche de rentabilité).
+      ['Onduleur PCS Deye 125 kW (DEYEPCS125K-L0)', 1, 'pcs', 4150000],
+      ['Module de charge MPPT Deye 200 kW (DEYEMPPT200KW)', 1, 'pcs', 1500000],
+      ['Commutateur de transfert statique Deye 500 kW (DEYESTS500L)', 1, 'pcs', 4750000],
+      ['Panneaux photovoltaïque Jinko bifacial 620Wc', 175, 'pcs', 75000],
+      ['Coffret de protection DC + Ensemble fusible 8 entrée et 8 sortie', 1, 'pcs', 450000],
+      // Forfait du devis (1 750 000) ramené au prix par panneau des autres
+      // kits : l'assistant recalcule cette ligne selon le support choisi.
+      ['Structure de montage PV rails galvanisé (Tôle)', 175, 'pcs', 10000],
+      ['Câble batterie 1x35mm²', 50, 'm', 4000],
+      ['Câble PV 1x6mm²', 300, 'm', 1100],
+      ['Câble AC 2x16mm²', 100, 'm', 4000],
+      ['Kit terre', 4, 'pcs', 50000],
+      ['Câble de terre 10mm²', 450, 'm', 1500],
+      ['Câble de terre 16mm²', 50, 'm', 2000],
+      ['Disjoncteur compact DC 400A', 2, 'pcs', 85000],
+      ['Connecteur MC4 (mâle + femelle)', 150, 'pcs', 1000],
+      ['Lot de petites fournitures (moulure, ceinture, cosse…)', 1, 'pcs', 250000],
+      ["Main d'œuvre", 1, 'pcs', 2500000],
+    ]),
+  },
 ];
 
 // Kits officiels déjà dotés AVANT l'introduction du registre `kitsDotes`

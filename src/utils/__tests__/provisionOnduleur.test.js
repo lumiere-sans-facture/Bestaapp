@@ -61,3 +61,10 @@ describe('effet sur la rentabilité', () => {
     expect(reel.roiMois).toBeLessThanOrEqual(parDefaut.roiMois);
   });
 });
+
+describe('provision du kit 208 kWh', () => {
+  it('reconnaît le PCS 125 kW comme onduleur du devis', () => {
+    const kit = SOLAR_KITS.find((k) => k.id === 'kit-208kwh-deye-hv');
+    expect(provisionOnduleurDuDevis(buildKitQuotation(kit).components)).toBe(4150000);
+  });
+});
