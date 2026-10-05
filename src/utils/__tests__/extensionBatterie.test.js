@@ -93,3 +93,41 @@ describe('kit 128 kWh extensible jusqu’à 200 kWh', () => {
     expect(completerExtensions([ancien], SOLAR_KITS)[0].extensionBatterie).toEqual({ moduleKwh: 16, maxKwh: 200 });
   });
 });
+
+describe('kit 208 kWh extensible jusqu’à 256 kWh (16 modules B-PRO)', () => {
+  const k208 = SOLAR_KITS.find((k) => k.id === 'kit-208kwh-deye-hv');
+  const modules = (d) => d.components.find((c) => /^Batterie/.test(c.name)).quantity;
+
+  it('paliers 224, 240, 256 kWh', () => {
+    expect(capacitePourBesoin(k208, 200)).toBe(208);
+    expect(capacitePourBesoin(k208, 209)).toBe(224);
+    expect(capacitePourBesoin(k208, 240)).toBe(240);
+    expect(capacitePourBesoin(k208, 256)).toBe(256);
+    expect(capaciteMaxKit(k208)).toBe(256);
+  });
+
+  it('suggestion : le 208 kWh, étendu, pour tout besoin au-delà de 192 kWh', () => {
+    expect(noms(230)).toEqual(['kit-208kwh-deye-hv']);
+    expect(noms(400)).toEqual(['kit-208kwh-deye-hv']);
+  });
+
+  it('devis : 15 modules pour 240 kWh, boîtier unique', () => {
+    const d = buildKitQuotation(k208, 'tole', true, { batteryCapacity: 235 });
+    expect(d.batteryCapacity).toBe(240);
+    expect(modules(d)).toBe(15);
+    expect(d.components.find((c) => /CONTROL BOX/.test(c.name)).quantity).toBe(1);
+    expect(d.total).toBe(50055000 + 2 * 1375000);
+  });
+
+  it('besoin au-delà de 256 kWh : porté au maximum, 16 modules', () => {
+    const d = buildKitQuotation(k208, 'tole', true, { batteryCapacity: 400 });
+    expect(d.batteryCapacity).toBe(256);
+    expect(modules(d)).toBe(16);
+  });
+
+  it('migration : le 208 kWh déjà enregistré reçoit l’extension', () => {
+    const ancien = { ...k208 };
+    delete ancien.extensionBatterie;
+    expect(completerExtensions([ancien], SOLAR_KITS)[0].extensionBatterie).toEqual({ moduleKwh: 16, maxKwh: 256 });
+  });
+});

@@ -5,6 +5,10 @@
 //   - kit 60 kWh  : modules de 12 kWh jusqu'à 120 kWh, puis le 128 kWh ;
 //   - kit 128 kWh : modules de 16 kWh jusqu'à 200 kWh (192 kWh au plus, en
 //     modules entiers), puis le 208 kWh.
+//   - kit 208 kWh : modules de 16 kWh jusqu'à 256 kWh (16 modules, le
+//     maximum du boîtier B-PRO).
+// Un seul boîtier de contrôle dans tous les cas : le GB-W gère 10 modules,
+// le B-PRO 16 (confirmé par le gérant).
 //
 // Un kit extensible porte `extensionBatterie: { moduleKwh, maxKwh }`. Seule la
 // ligne des modules batterie change de quantité : le reste de la composition
@@ -53,7 +57,10 @@ export const capacitePourBesoin = (kit, besoin = 0) => {
 export const etendreBatterie = (kit, lignes, besoin = 0) => {
   const base = capaciteDeBase(kit);
   const e = lireExtension(kit);
-  const capacite = capacitePourBesoin(kit, besoin);
+  // Besoin au-delà même de l'extension (aucun kit plus grand) : le kit est
+  // porté à son maximum — mieux vaut le plus proche que rien.
+  const capacite = capacitePourBesoin(kit, besoin)
+    ?? (Number(besoin) > base ? capaciteMaxKit(kit) : base);
   const i = (lignes || []).findIndex((l) => LIGNE_MODULES.test(l?.designation || ''));
   if (!e || i === -1 || capacite == null || capacite <= base) {
     return { lignes, capacite: base, modules: i === -1 ? null : lignes[i].qty };

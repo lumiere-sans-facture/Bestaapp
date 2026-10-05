@@ -299,7 +299,7 @@ export const SOLAR_KITS = [
     battery: 60,
     batteryModules: [{ capacity: 12, qty: 5 }], // détail réel pour la fiche technique
     // Extensible : de 60 à 120 kWh par modules de 12 kWh (6 à 10 modules)
-    // ajoutés selon le besoin. Au-delà de 120 kWh, le kit 128 kWh est proposé
+    // ajoutés selon le besoin — le boîtier de contrôle GB-W en gère 10. Au-delà de 120 kWh, le kit 128 kWh est proposé
     // (règle du gérant, voir utils/extensionBatterie.js).
     extensionBatterie: { moduleKwh: 12, maxKwh: 120 },
     panels: 42,
@@ -341,7 +341,7 @@ export const SOLAR_KITS = [
     battery: 128,
     batteryModules: [{ capacity: 16, qty: 8 }], // détail réel pour la fiche technique
     // Extensible par modules de 16 kWh jusqu'à 200 kWh — soit 12 modules,
-    // 192 kWh, au plus. Au-delà, le kit 208 kWh est proposé (règle du gérant,
+    // 192 kWh, au plus ; le boîtier B-PRO en gère 16. Au-delà, le kit 208 kWh est proposé (règle du gérant,
     // voir utils/extensionBatterie.js).
     extensionBatterie: { moduleKwh: 16, maxKwh: 200 },
     panels: 100,
@@ -383,6 +383,10 @@ export const SOLAR_KITS = [
     name: 'Kit 208 kWh (13 × 16) — Deye HV 125 kW',
     battery: 208,
     batteryModules: [{ capacity: 16, qty: 13 }], // détail réel pour la fiche technique
+    // Extensible par modules de 16 kWh jusqu'à 256 kWh (16 modules, le
+    // maximum du boîtier de contrôle B-PRO). Au-delà, rien de plus grand :
+    // le kit étendu au maximum reste proposé (voir utils/extensionBatterie.js).
+    extensionBatterie: { moduleKwh: 16, maxKwh: 256 },
     panels: 175,
     panelW: 620,
     inverter: 125,

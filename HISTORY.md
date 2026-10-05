@@ -5,6 +5,9 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-10-05
+- **Le kit 208 kWh reçoit lui aussi des modules, jusqu'à 256 kWh.** Au-delà de 192 kWh, l'assistant propose le kit 208 kWh Deye et lui ajoute des modules de 16 kWh (1 375 000 F pièce) juste ce qu'il faut : 224, 240 puis 256 kWh (16 modules, le maximum du boîtier B-PRO). Pour un besoin plus grand encore, le kit est porté à 256 kWh. Un seul boîtier de contrôle dans tous les cas (GB-W : 10 modules, B-PRO : 16)
+
 ## 2026-10-04
 - **Le kit 128 kWh reçoit lui aussi des modules, jusqu'à 200 kWh.** Au-delà de 128 kWh, l'assistant garde le kit 128 kWh Deye et ajoute des modules de 16 kWh (1 375 000 F pièce) juste ce qu'il faut : 144, 160, 176 puis 192 kWh (12 modules, le maximum en modules entiers sous 200 kWh). Au-delà, le kit 208 kWh est proposé
 - **Nouveau kit 208 kWh Deye haute tension (125 kW).** Pour les installations commerciales et industrielles : treize batteries Deye B-PRO de 16 kWh avec leur boîtier de contrôle, un convertisseur de puissance (PCS) Deye 125 kW, un module de charge MPPT 200 kW, un commutateur de transfert statique 500 kW et 175 panneaux Jinko bifaciaux de 620 Wc : 50 055 000 F CFA, au franc près le devis n° 254. Proposé par l'assistant au-delà de 128 kWh ; même main d'œuvre (2 500 000 F) au Togo et au Bénin
