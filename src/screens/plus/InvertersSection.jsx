@@ -3,7 +3,7 @@ import { ChevronLeft, Plus, Pencil, Copy, Trash2, Check, Cpu, RotateCcw } from '
 import { useData } from '../../context/DataContext';
 import { INVERTER_MODELS } from '../../data/inverters';
 import { formatCFA } from '../../utils/format';
-import { nouvelOnduleur, onduleurEstValide, resumeOnduleur, maxEnParallele, PARALLELE_MAX_SAISIE, CHAMPS_ELECTRIQUES } from '../../utils/inverters';
+import { nouvelOnduleur, onduleurEstValide, resumeOnduleur, maxEnParallele, PARALLELE_MAX_SAISIE, CHAMPS_ELECTRIQUES, electriqueManquante } from '../../utils/inverters';
 import Sheet from '../../components/Sheet';
 import ConfirmSheet from '../../components/ConfirmSheet';
 import Field from '../../components/Field';
@@ -104,7 +104,12 @@ export default function InvertersSection({ onBack }) {
               <div className="kit-card-price">{formatCFA(o.price)}</div>
             </div>
             <div className="kit-card-foot">
-              <span className="kit-card-lines">Puissance PV max {o.maxPvPower ? `${o.maxPvPower} Wc` : '— à renseigner'}</span>
+              <span className="kit-card-lines">
+                Puissance PV max {o.maxPvPower ? `${o.maxPvPower} Wc` : '— à renseigner'}
+                {electriqueManquante(o).length > 0 && (
+                  <span className="onduleur-a-completer"> · à compléter : {electriqueManquante(o).join(' et ')}</span>
+                )}
+              </span>
               <div className="kit-card-actions">
                 <button className="btn btn-sm btn-outline" onClick={() => ouvrirEdition(o)}>
                   <Pencil size={14} /> Modifier
@@ -173,24 +178,38 @@ export default function InvertersSection({ onBack }) {
                 <input className="input" type="number" min="0" required value={edition.onduleur.maxPvPower}
                   onChange={(e) => majOnduleur({ maxPvPower: e.target.value })} />
               </Field>
-              {/* Entrée PV : de quoi calculer les chaînes d'un kit étendu. */}
-              <div className="sheet-section-title">
-                Entrée PV — calcul des chaînes (fiche du fabricant)
-              </div>
-              {CHAMPS_ELECTRIQUES.map(({ cle, libelle }) => (
+              {/* Tension max et nombre de MPPT : les deux valeurs qui suffisent à
+                  calculer les chaînes d'un kit étendu (voir utils/chainesPv.js). */}
+              {CHAMPS_ELECTRIQUES.filter((c) => c.essentiel).map(({ cle, libelle }) => (
                 <Field key={cle} label={libelle}>
-                  <input className="input" type="number" min="0" step="any"
+                  <input className="input" type="number" min={cle === 'nbMppt' ? 1 : 0} step={cle === 'nbMppt' ? 1 : 'any'}
                     value={edition.onduleur.electrique?.[cle] || ''}
                     onChange={(e) => majElectrique({ [cle]: e.target.value })} />
                 </Field>
               ))}
-              <Field label="Sortie AC">
-                <select className="input" value={Number(edition.onduleur.electrique?.phases) === 3 ? '3' : '1'}
-                  onChange={(e) => majElectrique({ phases: Number(e.target.value) })}>
-                  <option value="1">Monophasée</option>
-                  <option value="3">Triphasée</option>
-                </select>
-              </Field>
+              <details className="onduleur-details">
+                <summary>
+                  Détails de l’entrée PV (facultatif)
+                  {(() => {
+                    const n = CHAMPS_ELECTRIQUES.filter((c) => !c.essentiel && Number(edition.onduleur.electrique?.[c.cle]) > 0).length;
+                    return n ? ` — ${n} renseigné${n > 1 ? 's' : ''}` : '';
+                  })()}
+                </summary>
+                {CHAMPS_ELECTRIQUES.filter((c) => !c.essentiel).map(({ cle, libelle }) => (
+                  <Field key={cle} label={libelle}>
+                    <input className="input" type="number" min="0" step="any"
+                      value={edition.onduleur.electrique?.[cle] || ''}
+                      onChange={(e) => majElectrique({ [cle]: e.target.value })} />
+                  </Field>
+                ))}
+                <Field label="Sortie AC">
+                  <select className="input" value={Number(edition.onduleur.electrique?.phases) === 3 ? '3' : '1'}
+                    onChange={(e) => majElectrique({ phases: Number(e.target.value) })}>
+                    <option value="1">Monophasée</option>
+                    <option value="3">Triphasée</option>
+                  </select>
+                </Field>
+              </details>
               <Field label="Prix (F CFA) *">
                 <input className="input" type="number" min="0" required value={edition.onduleur.price}
                   onChange={(e) => majOnduleur({ price: e.target.value })} />
@@ -204,9 +223,11 @@ export default function InvertersSection({ onBack }) {
               de proposer cet onduleur pour un kit d'une autre tension. La mise en
               parallèle (selon la fiche du fabricant) dit si l'assistant peut en
               coupler plusieurs quand un seul ne suffit pas, et jusqu'à combien.
-              L'entrée PV (tension DC max, plage MPPT, nombre de MPPT, courants)
-              permet de calculer les chaînes de panneaux quand un kit est étendu :
-              sans elle, l'assistant signale des chaînes « non vérifiées ».
+              La tension DC max (« Max. DC Input Voltage ») et le nombre de MPPT
+              permettent de calculer les chaînes de panneaux quand un kit est
+              étendu : aucune chaîne ne dépassera cette tension, même par temps
+              froid. Sans elles, l'assistant signale des chaînes « non vérifiées ».
+              Les détails (plage MPPT, courants) affinent le calcul.
             </div>
 
             <button type="submit" className="btn btn-primary btn-block">

@@ -28,8 +28,12 @@ export const specPanneau = (panelW, references = PANNEAUX_REFERENCE) => {
 
 /**
  * Caractéristiques électriques d'un onduleur (champ `electrique`), ou null
- * si l'essentiel manque : sans tension DC max, plage MPPT et nombre de MPPT,
- * aucune chaîne ne peut être vérifiée.
+ * si l'ESSENTIEL manque : la tension DC max (limite de sécurité, jamais
+ * dépassée) et le nombre de MPPT. Le reste est facultatif :
+ *   - plage MPPT inconnue → max = tension DC max, min = 0 (démarrage à chaud
+ *     non vérifiable, signalé) ;
+ *   - chaînes par MPPT inconnues → 1 ;
+ *   - courants inconnus → pas de limite de courant vérifiable.
  */
 export const lireElectrique = (onduleur) => {
   const e = onduleur?.electrique;
@@ -44,7 +48,9 @@ export const lireElectrique = (onduleur) => {
     iscMaxMppt: nombre(e.iscMaxMppt),
     phases: Number(e.phases) === 3 ? 3 : 1,
   };
-  if (!spec.vocMax || !spec.mpptMin || !spec.mpptMax || !spec.nbMppt) return null;
+  if (!spec.vocMax || !spec.nbMppt) return null;
+  spec.plageMppt = spec.mpptMin > 0 && spec.mpptMax > 0;
+  if (!spec.mpptMax || spec.mpptMax > spec.vocMax) spec.mpptMax = spec.vocMax;
   return spec;
 };
 
@@ -60,7 +66,7 @@ export const limitesChaine = (panneau, elec, site = CONDITIONS_SITE) => {
   const vmpFroid = corriger(panneau.vmp, panneau.coefVmp, site.temperatureMin);
   const vmpChaud = corriger(panneau.vmp, panneau.coefVmp, site.temperatureCelluleMax);
   return {
-    nMin: Math.ceil(elec.mpptMin / vmpChaud),
+    nMin: Math.max(1, Math.ceil((elec.mpptMin || 0) / vmpChaud)),
     nMax: Math.min(Math.floor(elec.vocMax / vocFroid), Math.floor(elec.mpptMax / vmpFroid)),
     vocFroid, vmpChaud, vmpFroid,
   };
@@ -124,6 +130,9 @@ export const configurerChaines = (nbPanneaux, panneau, elec, { site = CONDITIONS
     const alertes = [];
     // Courant de fonctionnement au-delà de l'entrée : pas dangereux (l'onduleur
     // écrête), mais de la production perdue — le dire.
+    if (elec.plageMppt === false) {
+      alertes.push('plage MPPT de l’onduleur non renseignée : tension de démarrage à chaud non vérifiée');
+    }
     if (elec.iMaxMppt && mppt.some((g) => g.length * panneau.imp > elec.iMaxMppt)) {
       alertes.push(`courant de fonctionnement au-delà de ${elec.iMaxMppt} A sur une entrée MPPT : légère perte de production (écrêtage)`);
     }

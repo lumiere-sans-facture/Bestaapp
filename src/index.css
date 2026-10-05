@@ -1636,6 +1636,10 @@ form .login-link { width: 100%; margin-top: 4px; }
 .bom-price { font-weight: 500; white-space: nowrap; }
 /* Ajustements d'un kit étendu : libellés longs (chaînes, onduleurs) autorisés
    à passer à la ligne, total de section souligné. */
+/* Onduleurs : détails facultatifs de l'entrée PV, repliés ; valeurs manquantes. */
+.onduleur-details { margin: 4px 0 12px; }
+.onduleur-details > summary { cursor: pointer; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); padding: 6px 0 10px; }
+.onduleur-a-completer { color: var(--warning-dark); font-weight: 600; }
 .ajustements-kit { margin-bottom: 12px; }
 .ajustements-kit .ajustements-texte { white-space: normal; text-align: right; font-weight: 500; }
 .ajustements-kit .ajustements-total .bom-name,

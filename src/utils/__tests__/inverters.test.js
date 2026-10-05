@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
 import { INVERTER_MODELS } from '../../data/inverters';
-import { normaliserOnduleur, onduleurEstValide, resumeOnduleur, dupliquerOnduleur } from '../inverters';
+import { normaliserOnduleur, onduleurEstValide, resumeOnduleur, dupliquerOnduleur, electriqueManquante } from '../inverters';
 import {
   buildKitQuotation, suggestInverterFor, puissanceSortie, limitePv, resoudreOnduleur,
   calibreRequis, sortieOnduleurRequise, onduleurSuffisant, onduleurTientLePic,
@@ -312,5 +312,20 @@ describe('buildKitQuotation — remplacement automatique de l’onduleur', () =>
     const sizing = { requiredPanelPower: 8000 };
     const q = buildKitQuotation(kit, 'tole', true, sizing); // 5e paramètre omis
     expect(q.inverterSuggested).toBeNull();
+  });
+});
+
+describe('caractéristiques électriques : tension max et nombre de MPPT', () => {
+  it('signale ce qui manque', () => {
+    expect(electriqueManquante({})).toEqual(['tension max', 'nombre de MPPT']);
+    expect(electriqueManquante({ electrique: { vocMax: 500 } })).toEqual(['nombre de MPPT']);
+    expect(electriqueManquante({ electrique: { vocMax: 500, nbMppt: 2 } })).toEqual([]);
+  });
+
+  it('le formulaire enregistre les deux valeurs, et le résumé les affiche', () => {
+    const o = normaliserOnduleur({ model: 'X', capacity: '6', electrique: { vocMax: '500', nbMppt: '2' } });
+    expect(o.electrique).toMatchObject({ vocMax: 500, nbMppt: 2 });
+    expect(resumeOnduleur(o)).toContain('2 MPPT · 500 V DC max');
+    expect(normaliserOnduleur({ model: 'X', electrique: { vocMax: '', nbMppt: '' } }).electrique).toBeNull();
   });
 });

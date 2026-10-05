@@ -27,11 +27,12 @@ export const maxEnParallele = (onduleur) => {
 // Facultatives : elles permettent de calculer les chaînes d'un kit étendu
 // (utils/chainesPv.js). Sans elles, l'assistant le signale au lieu de
 // supposer — voir data/inverters.js pour le sens de chaque champ.
+// `essentiel` : les deux valeurs qui suffisent au calcul des chaînes.
 export const CHAMPS_ELECTRIQUES = [
-  { cle: 'vocMax', libelle: 'Tension DC max (V)' },
+  { cle: 'vocMax', libelle: 'Tension DC max (V)', essentiel: true },
+  { cle: 'nbMppt', libelle: 'Nombre de MPPT', essentiel: true },
   { cle: 'mpptMin', libelle: 'Plage MPPT min (V)' },
   { cle: 'mpptMax', libelle: 'Plage MPPT max (V)' },
-  { cle: 'nbMppt', libelle: 'Nombre de MPPT' },
   { cle: 'chainesParMppt', libelle: 'Chaînes par MPPT' },
   { cle: 'iMaxMppt', libelle: 'Courant max par MPPT (A)' },
   { cle: 'iscMaxMppt', libelle: 'Courant de court-circuit max par MPPT (A)' },
@@ -49,6 +50,18 @@ const normaliserElectrique = (e) => {
   }
   sortie.phases = Number(e.phases) === 3 ? 3 : 1;
   return saisi ? sortie : null;
+};
+
+/**
+ * Ce qui manque encore pour calculer les chaînes d'un onduleur : la tension
+ * DC max et/ou le nombre de MPPT (libellés courts, liste vide si complet).
+ */
+export const electriqueManquante = (onduleur) => {
+  const e = onduleur?.electrique || {};
+  const manque = [];
+  if (!(Number(e.vocMax) > 0)) manque.push('tension max');
+  if (!(Number(e.nbMppt) >= 1)) manque.push('nombre de MPPT');
+  return manque;
 };
 
 /**

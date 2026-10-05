@@ -292,3 +292,30 @@ describe('document imprimé : annexe « Ajustements du kit »', () => {
     expect(doc(q, 'studio', { lignes: [{ designation: 'X', qty: 1, pu: 1 }] })).not.toContain('<h2>Ajustements du kit</h2>');
   });
 });
+
+describe('onduleur décrit par sa seule tension max et son nombre de MPPT', () => {
+  const p620 = specPanneau(620);
+  const minimal = { electrique: { vocMax: 500, nbMppt: 2 } };
+
+  it('ces deux valeurs suffisent au calcul ; le reste prend des valeurs prudentes', () => {
+    const e = lireElectrique(minimal);
+    expect(e).toMatchObject({ vocMax: 500, nbMppt: 2, chainesParMppt: 1, mpptMax: 500, plageMppt: false });
+    expect(lireElectrique({ electrique: { vocMax: 500 } })).toBeNull();
+    expect(lireElectrique({ electrique: { nbMppt: 2 } })).toBeNull();
+  });
+
+  it('la tension max n’est jamais dépassée ; la plage inconnue est signalée', () => {
+    const c = configurerChaines(14, p620, lireElectrique(minimal));
+    expect(c).toMatchObject({ ok: true, chaines: [7, 7] });
+    expect(c.alertes.join(' ')).toMatch(/plage MPPT .* non renseignée/);
+    // 1 MPPT : 14 panneaux en une chaîne dépasseraient 500 V à froid.
+    expect(configurerChaines(14, p620, lireElectrique({ electrique: { vocMax: 500, nbMppt: 1 } })).ok).toBe(false);
+  });
+
+  it('au devis : un kit étendu est vérifié avec ces deux seules valeurs', () => {
+    const onduleur = { ...OND_8K, electrique: { vocMax: 500, nbMppt: 2 } };
+    const q = devis(KIT_8K, 14, [onduleur]);
+    expect(q.ajustements.verification).toBe('verifie');
+    expect(q.ajustements.chaines.final[0].chaines).toEqual([7, 7]);
+  });
+});
