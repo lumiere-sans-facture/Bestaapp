@@ -57,7 +57,10 @@ await creer.click();
 await page.waitForTimeout(2000);
 const d = await page.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).devis.find((x) => x.type === 'solar'));
 ok(d?.quotation?.ajustements?.actif === true, 'les ajustements sont enregistrés avec le devis');
-ok(d?.quotation?.prestations?.some((p) => /supplément/.test(p.name)), 'lignes de supplément de main-d’œuvre au devis');
+// Suppléments fondus dans LA ligne « Main d'œuvre » : une seule ligne, au montant final.
+const prest = d?.quotation?.prestations || [];
+ok(prest.length === 1 && prest[0].totalPrice === d.quotation.ajustements.mainOeuvre.totalFinal && !prest.some((p) => /supplément/.test(p.name)),
+   `une seule ligne de main-d’œuvre au devis, suppléments inclus [${prest.map((p) => `${p.name} ${p.totalPrice}`).join(' · ')}]`);
 await page.goto(B + '/devis'); await page.waitForTimeout(1500);
 await page.locator('.flat-row').first().click(); await page.waitForTimeout(700);
 const [doc] = await Promise.all([ctx.waitForEvent('page'), page.locator('.sheet button', { hasText: 'Devis imprimable' }).click()]);
@@ -103,8 +106,10 @@ const pro = (await page.locator('.ajustements-kit').innerText().catch(() => ''))
 ok(/Onduleur remplacé/.test(pro) && /Main-d’œuvre finale/.test(pro), 'espace Pro : section « Ajustements du kit » identique');
 await page.locator('button:has-text("Créer le devis")').click(); await page.waitForTimeout(1500);
 const dPro = await page.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).devis.find((x) => x.pro));
-ok(dPro?.ajustements?.actif === true && dPro.lignes.some((l) => /supplément/.test(l.designation)),
-   'devis Pro : ajustements et lignes de supplément enregistrés');
+const moPro = (dPro?.lignes || []).filter((l) => /main d.œuvre/i.test(l.designation));
+ok(dPro?.ajustements?.actif === true && moPro.length === 1 && moPro[0].qty * moPro[0].pu === dPro.ajustements.mainOeuvre.totalFinal
+   && !dPro.lignes.some((l) => /supplément/.test(l.designation)),
+   `devis Pro : ajustements enregistrés, une seule ligne de main-d’œuvre [${moPro.map((l) => l.qty * l.pu).join(' · ')}]`);
 
 // ---- 5. CONFIGURATION IMPOSSIBLE : alerte, devis bloqué ----
 // Sans le 12 kVA, et le 6 kVA non couplable, rien n'accepte 15 panneaux.

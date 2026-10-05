@@ -667,7 +667,7 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
   }
   const materiel = lines.filter((l) => l.ajustement === 'materiel');
   poste('Câbles, connecteurs et protections', materiel.reduce((s, l) => s + l.qty * prixUnitaire(l), 0));
-  const supplementsMo = lines.filter((l) => l.ajustement === 'main-oeuvre').reduce((s, l) => s + l.qty * prixUnitaire(l), 0);
+  const supplementsMo = ajustements.mainOeuvre ? (ajustements.mainOeuvre.total - ajustements.mainOeuvre.base) * coef : 0;
   poste('Main-d’œuvre (suppléments)', supplementsMo);
   const ecart = Math.round(total - totalBase);
   const reste = ecart - postes.reduce((s, p) => s + p.montant, 0);
@@ -855,11 +855,23 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // le kit d'origine n'est jamais retouché.
   if (ajustements.lignes.length) {
     const materiel = ajustements.lignes.filter((l) => !l.labor);
-    const supplements = ajustements.lignes.filter((l) => l.labor);
+    // Suppléments de main-d'œuvre (panneaux, batterie) : fondus dans LA ligne
+    // « Main d'œuvre » du kit, à la demande du gérant — une seule ligne au
+    // devis, au montant final. Le détail reste dans la section « Ajustements
+    // du kit » et l'annexe imprimée.
+    const supplement = ajustements.lignes.filter((l) => l.labor).reduce((t, l) => t + l.qty * l.pu, 0);
     const iMo = lines.findIndex((l) => l.labor);
     const avant = iMo === -1 ? lines : lines.slice(0, iMo);
-    const mo = iMo === -1 ? [] : lines.slice(iMo);
-    lines = [...avant, ...materiel, ...mo, ...supplements];
+    let mo = iMo === -1 ? [] : lines.slice(iMo);
+    if (supplement > 0) {
+      if (iMo === -1) {
+        mo = [{ designation: "Main d'œuvre", qty: 1, unit: 'pcs', pu: supplement, labor: true, productId: null }];
+      } else {
+        const l = mo[0];
+        mo = [{ ...l, productId: null, qty: 1, pu: (Number(l.qty) || 0) * resolveLignePrice(l, products) + supplement }, ...mo.slice(1)];
+      }
+    }
+    lines = [...avant, ...materiel, ...mo];
   }
   // Prix résolu ligne par ligne : celui du produit boutique lié s'il existe
   // encore (suit ses changements de prix), sinon le prix figé de la ligne.
