@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
 import SkeletonPageContent from './SkeletonPageContent';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets, ChevronLeft, ChevronRight, Calculator } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets, ChevronLeft, ChevronRight, Calculator, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -48,6 +48,7 @@ const plusSections = (user) => [
     { path: '/plus/commissions', label: 'Commissions', icon: DollarSign },
     { path: '/plus/kits', label: 'Mes kits', icon: Package },
     { path: '/plus/inverters', label: 'Onduleurs', icon: Cpu },
+    { path: '/plus/agentdevis', label: 'Agent devis', icon: Bot },
     { path: '/plus/pompekits', label: 'Kits pompage', icon: Droplets },
   ] : []),
   // Outil de vente, ouvert à toute l'équipe : c'est le technicien en visite
