@@ -35,7 +35,8 @@ describe('kit 60 kWh extensible jusqu’à 120 kWh', () => {
     const a84 = de(80);
     expect(a84.batteryCapacity).toBe(84);
     expect(a84.components.find((c) => /^Batterie/.test(c.name)).quantity).toBe(7);
-    expect(a84.total).toBe(15044000 + 2 * 1245000);
+    // + supplément main-d'œuvre : 24 kWh ajoutés × 3 500 F.
+    expect(a84.total).toBe(15044000 + 2 * 1245000 + 24 * 3500);
     // Le boîtier de contrôle et le socle restent uniques.
     expect(a84.components.find((c) => /CONTROL BOX/.test(c.name)).quantity).toBe(1);
     expect(de(120).components.find((c) => /^Batterie/.test(c.name)).quantity).toBe(10);
@@ -84,7 +85,7 @@ describe('kit 128 kWh extensible jusqu’à 200 kWh', () => {
     expect(d.batteryCapacity).toBe(160);
     expect(d.components.find((c) => /^Batterie/.test(c.name)).quantity).toBe(10);
     expect(d.components.find((c) => /CONTROL BOX/.test(c.name)).quantity).toBe(1);
-    expect(d.total).toBe(28110000 + 2 * 1375000);
+    expect(d.total).toBe(28110000 + 2 * 1375000 + 32 * 3500);
   });
 
   it('migration : le 128 kWh déjà enregistré reçoit aussi l’extension', () => {
@@ -116,7 +117,7 @@ describe('kit 208 kWh extensible jusqu’à 256 kWh (16 modules B-PRO)', () => {
     expect(d.batteryCapacity).toBe(240);
     expect(modules(d)).toBe(15);
     expect(d.components.find((c) => /CONTROL BOX/.test(c.name)).quantity).toBe(1);
-    expect(d.total).toBe(50055000 + 2 * 1375000);
+    expect(d.total).toBe(50055000 + 2 * 1375000 + 32 * 3500);
   });
 
   it('besoin au-delà de 256 kWh : porté au maximum, 16 modules', () => {

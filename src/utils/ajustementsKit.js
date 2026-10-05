@@ -17,31 +17,32 @@ import { resolveLignePrice } from './kits';
 import { prixPublic } from './price';
 
 const kwc = (panneaux, wc) => (panneaux * (Number(wc) || 0)) / 1000;
-const fmtKwc = (v) => v.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 
 /** Répartition de N panneaux sur q onduleurs, la plus égale possible. */
 const partager = (n, q) => Array.from({ length: q }, (_, i) => Math.floor(n / q) + (i < n % q ? 1 : 0));
 
 /**
  * Main-d'œuvre d'un kit étendu (règle du gérant) :
- *   base + panneaux ajoutés × tarif panneau + kWc ajoutés × tarif kWc.
- * Les kWc gardent leur précision décimale ; seul le montant final du
- * supplément puissance est arrondi au franc.
+ *   base + panneaux ajoutés × tarif panneau + kWh de batterie ajoutés × tarif kWh.
+ * Les kWh gardent leur précision décimale ; seul le montant final du
+ * supplément batterie est arrondi au franc.
  * @returns {{base:number, panneaux:{nombre:number,tarif:number,montant:number},
- *   puissance:{kwc:number,tarif:number,montant:number}, total:number}}
+ *   batterie:{kwh:number,tarif:number,montant:number}, total:number}}
  */
-export const mainOeuvreEtendue = (base, panneauxAjoutes, panelW, tarifs = MAIN_OEUVRE_EXTENSION) => {
+export const mainOeuvreEtendue = (base, panneauxAjoutes, kwhAjoutes, tarifs = MAIN_OEUVRE_EXTENSION) => {
   const nombre = Math.max(0, Math.floor(Number(panneauxAjoutes) || 0));
-  const kwcAjoutes = kwc(nombre, panelW);
+  const kwh = Math.max(0, Number(kwhAjoutes) || 0);
   const montantPanneaux = nombre * tarifs.parPanneau;
-  const montantPuissance = Math.round(kwcAjoutes * tarifs.parKwc);
+  const montantBatterie = Math.round(kwh * tarifs.parKwhBatterie);
   return {
     base: Math.round(Number(base) || 0),
     panneaux: { nombre, tarif: tarifs.parPanneau, montant: montantPanneaux },
-    puissance: { kwc: kwcAjoutes, tarif: tarifs.parKwc, montant: montantPuissance },
-    total: Math.round(Number(base) || 0) + montantPanneaux + montantPuissance,
+    batterie: { kwh, tarif: tarifs.parKwhBatterie, montant: montantBatterie },
+    total: Math.round(Number(base) || 0) + montantPanneaux + montantBatterie,
   };
 };
+
+const fmtKwh = (v) => v.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 
 /** Section de câble PV (mm²) adaptée au courant d'une chaîne. */
 export const sectionCablePv = (panneau) => {
@@ -126,8 +127,14 @@ const evaluer = ({ modele, quantite, panneaux, panneau, wc, equilibreSeulement, 
  */
 export const ajusterKit = ({
   kit, lignesKit = kit?.lines || [], panneauxDemandes = 0, onduleurKit = null, candidats = [],
+  batterieFinale = null,
   outils, products = [], tarifs = MAIN_OEUVRE_EXTENSION, site = CONDITIONS_SITE,
 }) => {
+  // Batterie : capacité du kit et capacité posée (modules ajoutés compris,
+  // voir utils/extensionBatterie.js).
+  const kwhBase = Number(kit?.battery) || 0;
+  const kwhFinal = Math.max(kwhBase, Number(batterieFinale) || kwhBase);
+  const batterie = { base: kwhBase, finale: kwhFinal, ajoutes: kwhFinal - kwhBase };
   const base = Number(kit?.panels) || 0;
   const wc = Number(kit?.panelW) || 0;
   const demande = Math.max(0, Math.ceil(Number(panneauxDemandes) || 0));
@@ -138,22 +145,28 @@ export const ajusterKit = ({
     base, demande, final, ajoutes, wc, cas,
     kwcBase: kwc(base, wc), kwcFinal: kwc(final, wc), kwcAjoutes: kwc(ajoutes, wc),
   };
-  if (ajoutes === 0) {
-    return { actif: false, panneaux, verification: null, onduleur: null, chaines: null, lignes: [], mainOeuvre: null, alertes: [] };
+  if (ajoutes === 0 && batterie.ajoutes === 0) {
+    return { actif: false, panneaux, batterie, verification: null, onduleur: null, chaines: null, lignes: [], mainOeuvre: null, alertes: [] };
   }
 
   const baseMo = lignesKit.filter((l) => l.labor).reduce((s, l) => s + (Number(l.qty) || 0) * resolveLignePrice(l, products), 0);
-  const mainOeuvre = mainOeuvreEtendue(baseMo, ajoutes, wc, tarifs);
+  const mainOeuvre = mainOeuvreEtendue(baseMo, ajoutes, batterie.ajoutes, tarifs);
   const lignesMo = [
     {
       designation: `Main d'œuvre — supplément ${ajoutes} panneau${ajoutes > 1 ? 'x' : ''} ajouté${ajoutes > 1 ? 's' : ''}`,
       qty: ajoutes, unit: 'pcs', pu: tarifs.parPanneau, labor: true, ajustement: 'main-oeuvre',
     },
     {
-      designation: `Main d'œuvre — supplément puissance (+${fmtKwc(panneaux.kwcAjoutes)} kWc)`,
-      qty: 1, unit: 'forfait', pu: mainOeuvre.puissance.montant, labor: true, ajustement: 'main-oeuvre',
+      designation: `Main d'œuvre — supplément batterie (+${fmtKwh(batterie.ajoutes)} kWh)`,
+      qty: 1, unit: 'forfait', pu: mainOeuvre.batterie.montant, labor: true, ajustement: 'main-oeuvre',
     },
-  ].filter((l) => l.pu > 0);
+  ].filter((l) => l.pu > 0 && l.qty > 0);
+
+  // Batterie seule étendue, aucun panneau ajouté : chaînes et onduleur ne
+  // bougent pas — seule la main-d'œuvre suit.
+  if (ajoutes === 0) {
+    return { actif: true, panneaux, batterie, verification: null, onduleur: null, chaines: null, lignes: lignesMo, mainOeuvre, alertes: [] };
+  }
 
   const panneau = specPanneau(wc);
   const elecKit = lireElectrique(onduleurKit);
@@ -168,7 +181,7 @@ export const ajusterKit = ({
       ? `panneau de ${wc} Wc absent des références électriques`
       : 'caractéristiques électriques de l’onduleur du kit non renseignées (Plus › Onduleurs)';
     return {
-      actif: true, panneaux, verification: 'non-verifie',
+      actif: true, panneaux, batterie, verification: 'non-verifie',
       onduleur: { statut: 'non-verifie', ancien, nouveau: null, quantite: 1, raisons: [manque] },
       chaines: null, lignes: lignesMo, mainOeuvre,
       alertes: [`Chaînes non vérifiées : ${manque}. Câbles et protections des chaînes ajoutées à prévoir sur place.`],
@@ -203,7 +216,7 @@ export const ajusterKit = ({
 
   if (!retenu) {
     return {
-      actif: true, panneaux, verification: 'impossible',
+      actif: true, panneaux, batterie, verification: 'impossible',
       onduleur: { statut: 'impossible', ancien, nouveau: null, quantite: 1, raisons: evalKit.raisons },
       chaines: { base: cfgBase.ok ? cfgBase : null, final: [], libelle: '—' },
       lignes: lignesMo, mainOeuvre,
@@ -276,7 +289,7 @@ export const ajusterKit = ({
   }
 
   return {
-    actif: true, panneaux, verification: 'verifie',
+    actif: true, panneaux, batterie, verification: 'verifie',
     onduleur: {
       statut, ancien, raisons,
       nouveau: statut === 'conserve' ? null : {

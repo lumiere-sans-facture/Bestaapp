@@ -672,7 +672,7 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
   const ecart = Math.round(total - totalBase);
   const reste = ecart - postes.reduce((s, p) => s + p.montant, 0);
   // Ce qui ne relève pas des panneaux (modules batterie ajoutés) ferme le compte.
-  poste('Modules batterie et autres', reste);
+  poste(ajustements.batterie?.ajoutes > 0 ? `Modules batterie (+${ajustements.batterie.ajoutes} kWh)` : 'Autres', reste);
   const coutConnu = materiel.reduce((s, l) => s + (l.cout || 0), 0);
   const venteConnue = materiel.filter((l) => l.cout != null).reduce((s, l) => s + l.qty * prixUnitaire(l), 0);
   return {
@@ -779,6 +779,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     kit,
     lignesKit: batterie.lignes,
     panneauxDemandes,
+    batterieFinale: batterie.capacite,
     onduleurKit: currentSpec || null,
     candidats,
     products,

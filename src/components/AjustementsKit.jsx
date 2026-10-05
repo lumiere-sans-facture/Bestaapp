@@ -19,7 +19,8 @@ const STATUT_ONDULEUR = {
  */
 export default function AjustementsKit({ ajustements, kitName }) {
   if (!ajustements?.actif) return null;
-  const { panneaux: p, chaines, onduleur, materiel = [], mainOeuvre, impact, alertes = [] } = ajustements;
+  const { panneaux: p, batterie, chaines, onduleur, materiel = [], mainOeuvre, impact, alertes = [] } = ajustements;
+  const kwh = (v) => `${(Number(v) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWh`;
   const ancien = onduleur?.ancien;
   const nouveau = onduleur?.nouveau;
 
@@ -38,12 +39,19 @@ export default function AjustementsKit({ ajustements, kitName }) {
         <div className="bom-price">{panneaux(p.final)} · {kwc(p.kwcFinal)}</div>
       </div>
 
+      {batterie?.ajoutes > 0 && (
+        <div className="bom-row">
+          <div className="bom-name">Batterie <span className="bom-qty">(+{kwh(batterie.ajoutes)} en modules)</span></div>
+          <div className="bom-price">{kwh(batterie.base)} → {kwh(batterie.finale)}</div>
+        </div>
+      )}
+
       <div className="bom-row">
         <div className="bom-name">Chaînes solaires</div>
         <div className="bom-price ajustements-texte">
           {chaines
             ? <>{chaines.base?.libelle ? `${chaines.base.libelle} → ` : ''}{chaines.final.map((f) => f.libelle).join(' / ') || '—'}</>
-            : 'non vérifiées'}
+            : p.ajoutes === 0 ? 'inchangées (aucun panneau ajouté)' : 'non vérifiées'}
         </div>
       </div>
 
@@ -82,14 +90,14 @@ export default function AjustementsKit({ ajustements, kitName }) {
         <>
           <div className="bom-title">Main-d’œuvre</div>
           <div className="bom-row"><div className="bom-name">Main-d’œuvre initiale du kit</div><div className="bom-price">{formatCFA(mainOeuvre.base)}</div></div>
-          <div className="bom-row">
+          {mainOeuvre.panneaux.montant > 0 && <div className="bom-row">
             <div className="bom-name">Supplément panneaux <span className="bom-qty">({mainOeuvre.panneaux.nombre} × {formatCFA(mainOeuvre.panneaux.tarif)})</span></div>
             <div className="bom-price">{formatCFA(mainOeuvre.panneaux.montant)}</div>
-          </div>
-          <div className="bom-row">
-            <div className="bom-name">Supplément puissance <span className="bom-qty">({kwc(mainOeuvre.puissance.kwc)} × {formatCFA(mainOeuvre.puissance.tarif)})</span></div>
-            <div className="bom-price">{formatCFA(mainOeuvre.puissance.montant)}</div>
-          </div>
+          </div>}
+          {mainOeuvre.batterie.montant > 0 && <div className="bom-row">
+            <div className="bom-name">Supplément batterie <span className="bom-qty">({kwh(mainOeuvre.batterie.kwh)} × {formatCFA(mainOeuvre.batterie.tarif)})</span></div>
+            <div className="bom-price">{formatCFA(mainOeuvre.batterie.montant)}</div>
+          </div>}
           {mainOeuvre.coef > 1 && (
             <div className="bom-row"><div className="bom-name">Chantier au Togo <span className="bom-qty">(× {mainOeuvre.coef})</span></div><div className="bom-price">{formatCFA(mainOeuvre.totalFinal - mainOeuvre.total)}</div></div>
           )}

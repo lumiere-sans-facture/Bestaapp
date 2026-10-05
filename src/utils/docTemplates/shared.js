@@ -318,6 +318,7 @@ const CSS_BASE = `
 `;
 
 /** Assemble le document complet (police, styles, pages, barre d'impression). */
+const kwhFr = (v) => `${(Number(v) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWh`;
 const kwcFr = (v) => `${(Number(v) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWc`;
 const STATUTS_ONDULEUR = {
   conserve: 'conservé', remplace: 'remplacé', double: 'doublé (en parallèle)',
@@ -334,6 +335,7 @@ export function pageAjustements(data) {
   const a = data?.ajustements;
   if (!a?.actif) return '';
   const p = a.panneaux;
+  const b = a.batterie;
   const ligne = (g, d) => `<tr><td>${g}</td><td class="num">${d}</td></tr>`;
   const o = a.onduleur;
   const nouveau = o?.nouveau ? [o.nouveau.brand, o.nouveau.model].filter(Boolean).join(' ') : '';
@@ -341,12 +343,13 @@ export function pageAjustements(data) {
   return `<section class="page annexe">
   <h2>Ajustements du kit</h2>
   <div class="annexe-intro">Devis ${esc(data.numero || '')} — le kit de base est la référence ; voici ce que son extension ajoute.</div>
-  <h3>Panneaux et puissance</h3>
+  <h3>Panneaux et batterie</h3>
   <table>
     ${ligne('Kit de base', `${p.base} panneaux · ${kwcFr(p.kwcBase)}`)}
     ${ligne(`Proposition (${p.demande} demandés)`, `${p.final} panneaux · ${kwcFr(p.kwcFinal)}`)}
-    ${ligne('Ajoutés', `+${p.ajoutes} panneaux de ${p.wc} Wc · +${kwcFr(p.kwcAjoutes)}`)}
-    ${ligne('Chaînes solaires', a.chaines ? esc(a.chaines.final.map((f) => f.libelle).join(' / ')) : 'non vérifiées')}
+    ${p.ajoutes > 0 ? ligne('Ajoutés', `+${p.ajoutes} panneaux de ${p.wc} Wc · +${kwcFr(p.kwcAjoutes)}`) : ''}
+    ${b?.ajoutes > 0 ? ligne(`Batterie (+${kwhFr(b.ajoutes)} en modules)`, `${kwhFr(b.base)} → ${kwhFr(b.finale)}`) : ''}
+    ${ligne('Chaînes solaires', a.chaines ? esc(a.chaines.final.map((f) => f.libelle).join(' / ')) : p.ajoutes === 0 ? 'inchangées (aucun panneau ajouté)' : 'non vérifiées')}
     ${o ? ligne(`Onduleur ${STATUTS_ONDULEUR[o.statut] || ''}`, esc(nouveau ? `${o.ancien?.designation || ''} → ${o.quantite > 1 ? `${o.quantite} × ` : ''}${nouveau}` : o.ancien?.designation || '')) : ''}
   </table>
   ${o?.raisons?.length && o.statut !== 'conserve' ? `<div class="note">Raison technique : ${esc(o.raisons.join(' ; '))}</div>` : ''}
@@ -354,8 +357,8 @@ export function pageAjustements(data) {
     ligne(`${esc(m.designation.replace(/ — extension$/, ''))} × ${m.qty}${m.unit === 'm' ? ' m' : ''}${m.motif ? ` <span class="note">(${esc(m.motif)})</span>` : ''}`, `${nf(m.qty * m.pu)} F`)).join('')}</table>` : ''}
   ${mo ? `<h3>Main-d'œuvre</h3><table>
     ${ligne('Main-d’œuvre initiale du kit', `${nf(mo.base)} F`)}
-    ${ligne(`Supplément panneaux (${mo.panneaux.nombre} × ${nf(mo.panneaux.tarif)} F)`, `${nf(mo.panneaux.montant)} F`)}
-    ${ligne(`Supplément puissance (${kwcFr(mo.puissance.kwc)} × ${nf(mo.puissance.tarif)} F)`, `${nf(mo.puissance.montant)} F`)}
+    ${mo.panneaux.montant ? ligne(`Supplément panneaux (${mo.panneaux.nombre} × ${nf(mo.panneaux.tarif)} F)`, `${nf(mo.panneaux.montant)} F`) : ''}
+    ${mo.batterie.montant ? ligne(`Supplément batterie (${kwhFr(mo.batterie.kwh)} × ${nf(mo.batterie.tarif)} F)`, `${nf(mo.batterie.montant)} F`) : ''}
     ${mo.coef > 1 ? ligne(`Chantier au Togo (× ${mo.coef})`, `${nf((mo.totalFinal || 0) - mo.total)} F`) : ''}
     <tr class="total"><td>Main-d’œuvre finale</td><td class="num">${nf(mo.totalFinal ?? mo.total)} F</td></tr>
   </table>` : ''}

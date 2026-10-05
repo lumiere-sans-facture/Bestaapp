@@ -182,9 +182,10 @@ describe('buildKitQuotation', () => {
     expect(lignePanneaux.quantity).toBe(16);
     expect(lignePanneaux.totalPrice).toBe(16 * lignePanneaux.unitPrice);
     // Le total intègre les panneaux ajoutés, leur structure (au panneau) et
-    // les suppléments de main-d'œuvre (10 000 F par panneau + 3 500 F par kWc).
+    // le supplément de main-d'œuvre (10 000 F par panneau ; la batterie, non
+    // étendue, n'en ajoute pas).
     const sansSizing = buildKitQuotation(kit, 'tole', true);
-    const supplementMo = 4 * 10000 + Math.round(4 * 0.62 * 3500);
+    const supplementMo = 4 * 10000;
     expect(q.total).toBe(sansSizing.total + 4 * lignePanneaux.unitPrice + 4 * 10000 + supplementMo);
   });
 

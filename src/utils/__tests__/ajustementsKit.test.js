@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildKitQuotation } from '../solarSizing';
 import { mainOeuvreEtendue, protectionAc, sectionCablePv } from '../ajustementsKit';
 import { buildDocHtml, MODELS } from '../docTemplates';
+import { SOLAR_KITS } from '../../data/kits';
 import { donneesDeDevis } from '../docTemplates/shared';
 import { COMPANY } from '../../config/company';
 import { configurerChaines, limitesChaine, specPanneau, lireElectrique, libelleChaines } from '../chainesPv';
@@ -99,29 +100,55 @@ describe('extension de 8 à 14 panneaux', () => {
   });
 });
 
-describe('main-d’œuvre : base + 10 000 F par panneau + 3 500 F par kWc', () => {
-  it('formule, kWc décimaux, arrondi du seul montant final', () => {
-    const mo = mainOeuvreEtendue(100000, 6, 620);
+describe('main-d’œuvre : base + 10 000 F par panneau + 3 500 F par kWh de batterie', () => {
+  it('formule, kWh décimaux, arrondi du seul montant final', () => {
+    const mo = mainOeuvreEtendue(100000, 6, 36);
     expect(mo.panneaux.montant).toBe(60000);
-    expect(mo.puissance.kwc).toBeCloseTo(3.72);
-    expect(mo.puissance.montant).toBe(13020);
-    expect(mo.total).toBe(173020);
-    // 3 × 590 Wc = 1,77 kWc → 6 195 F.
-    expect(mainOeuvreEtendue(50000, 3, 590).puissance.montant).toBe(6195);
+    expect(mo.batterie).toMatchObject({ kwh: 36, tarif: 3500, montant: 126000 });
+    expect(mo.total).toBe(286000);
+    // 5,12 kWh → 17 920 F ; 2,5 kWh → 8 750 F.
+    expect(mainOeuvreEtendue(0, 0, 5.12).batterie.montant).toBe(17920);
+    expect(mainOeuvreEtendue(50000, 0, 2.5).total).toBe(58750);
+    // Des panneaux sans batterie ajoutée : aucun supplément batterie.
+    expect(mainOeuvreEtendue(100000, 6, 0).total).toBe(160000);
   });
 
-  it('au devis : deux lignes de supplément, justifiées', () => {
+  it('au devis : panneaux ajoutés, batterie inchangée → seul le supplément panneaux', () => {
     const q = devis(KIT_8K, 14, [OND_8K]);
     expect(ligne(q, /supplément 6 panneaux/)).toMatchObject({ quantity: 6, unitPrice: 10000, totalPrice: 60000 });
-    expect(ligne(q, /supplément puissance \(\+3,72 kWc\)/)).toMatchObject({ totalPrice: 13020 });
-    expect(q.installationCost).toBe(173020);
-    expect(q.ajustements.mainOeuvre).toMatchObject({ base: 100000, total: 173020, coef: 1, totalFinal: 173020 });
+    expect(ligne(q, /supplément batterie/)).toBeUndefined();
+    expect(ligne(q, /kWc\)/)).toBeUndefined();
+    expect(q.installationCost).toBe(160000);
+    expect(q.ajustements.mainOeuvre).toMatchObject({ base: 100000, total: 160000, coef: 1, totalFinal: 160000 });
   });
 
   it('chantier togolais : coefficient appliqué à toute la main-d’œuvre', () => {
     const q = devis(KIT_8K, 14, [OND_8K], { coef: 2 });
-    expect(q.installationCost).toBe(2 * 173020);
-    expect(q.ajustements.mainOeuvre.totalFinal).toBe(346040);
+    expect(q.installationCost).toBe(320000);
+    expect(q.ajustements.mainOeuvre.totalFinal).toBe(320000);
+  });
+
+  it('batterie étendue sans panneau ajouté : supplément batterie seul', () => {
+    const k60 = SOLAR_KITS.find((k) => k.id === 'kit-60kwh-deye-hv');
+    const q = buildKitQuotation(k60, 'tole', true, { batteryCapacity: 80 });
+    // 60 → 84 kWh (2 modules de 12) : +24 kWh × 3 500 F.
+    expect(q.ajustements).toMatchObject({ actif: true, batterie: { base: 60, finale: 84, ajoutes: 24 }, chaines: null, onduleur: null });
+    expect(ligne(q, /supplément batterie \(\+24 kWh\)/)).toMatchObject({ totalPrice: 84000 });
+    expect(ligne(q, /supplément .* panneau/)).toBeUndefined();
+    expect(q.ajustements.mainOeuvre).toMatchObject({ base: 650000, total: 734000 });
+    expect(q.total).toBe(15044000 + 2 * 1245000 + 84000);
+    expect(q.ajustements.impact.postes.map((x) => x.libelle)).toEqual(['Main-d’œuvre (suppléments)', 'Modules batterie (+24 kWh)']);
+  });
+
+  it('panneaux ET batterie ajoutés : les deux suppléments', () => {
+    const k60 = SOLAR_KITS.find((k) => k.id === 'kit-60kwh-deye-hv');
+    const q = buildKitQuotation(k60, 'tole', true, { batteryCapacity: 80, requiredPanelPower: 49 * 620 });
+    expect(ligne(q, /supplément 7 panneaux/)).toMatchObject({ totalPrice: 70000 });
+    expect(ligne(q, /supplément batterie \(\+24 kWh\)/)).toMatchObject({ totalPrice: 84000 });
+    expect(q.ajustements.mainOeuvre.total).toBe(650000 + 70000 + 84000);
+    const html = buildDocHtml({ kind: 'devis', model: 'studio', data: donneesDeDevis({ devis: { devisNumber: 'BS-2', type: 'solar', createdAt: '2026-10-05', quotation: q }, company: COMPANY, lead: null, partner: null }) });
+    expect(html).toContain('Supplément batterie (24 kWh × 3 500 F)');
+    expect(html).toContain('Batterie (+24 kWh en modules)');
   });
 });
 
@@ -254,6 +281,8 @@ describe('document imprimé : annexe « Ajustements du kit »', () => {
       expect(html).toContain('<h2>Ajustements du kit</h2>');
       expect(html).toContain('2 chaînes de 7 panneaux');
       expect(html).toContain('Supplément panneaux (6 × 10 000 F)');
+      // Batterie inchangée : pas de ligne de supplément à 0 F.
+      expect(html).not.toContain('Supplément batterie');
       expect(html).toContain('Main-d’œuvre finale');
     }
   });

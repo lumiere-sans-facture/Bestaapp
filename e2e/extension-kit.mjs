@@ -44,7 +44,9 @@ ok(/Chaînes solaires 1 chaîne de 4 panneaux → \d+ chaînes? de \d+ panneaux/
 ok(/Onduleur remplacé/.test(texte) && /Deye Onduleur hybride 12kVA/.test(texte) && /Raison :/.test(texte),
    `onduleur remplacé, raison donnée [${raison}]`);
 ok(/Matériel ajouté/i.test(texte) && /Disjoncteur AC 25 A tétrapolaire/.test(texte), 'câbles, protections et disjoncteur AC du nouvel onduleur ajoutés');
-ok(/Supplément panneaux \(\d+ × 10 000 F\)/.test(texte.replace(/ /g, ' ')) && /Supplément puissance/.test(texte), 'main-d’œuvre justifiée : base, panneaux, puissance');
+// Batterie du kit inchangée (5 kWh) : le supplément batterie n'apparaît pas.
+ok(/Supplément panneaux \(\d+ × 10 000 F\)/.test(texte.replace(/ /g, ' ')) && !/Supplément batterie|kWc ×/.test(texte),
+   'main-d’œuvre justifiée : base et panneaux ; aucun supplément batterie sans module ajouté');
 ok(/Kit de base [\d  ]+ F → proposition/.test(texte), 'impact sur le prix total');
 const creer = page.locator('button:has-text("Créer le devis")');
 ok(!(await creer.isDisabled()), 'configuration sûre : le devis peut être créé');

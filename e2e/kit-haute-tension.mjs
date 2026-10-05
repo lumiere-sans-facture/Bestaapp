@@ -70,9 +70,10 @@ ok(moyen.length === 1 && !!m60 && etendu && Number(etendu[1]) > 60 && Number(ete
 const modules = Number(etendu?.[1]) / 12;
 // Les panneaux complétés (75 000 F + 10 000 F de structure) s'ajoutent aussi.
 const panneaux = Number(/(\d+) panneaux/.exec(m60?.resume || '')?.[1] || 42);
-// … ainsi que les suppléments de main-d'œuvre d'un kit étendu (10 000 F par
-// panneau + 3 500 F par kWc ; kit haute tension : jamais doublée au Togo).
-const supplementMo = (panneaux - 42) * 10000 + Math.round((panneaux - 42) * 0.62 * 3500);
+// … ainsi que les suppléments de main-d'œuvre d'un kit étendu (kit haute
+// tension : jamais doublée au Togo).
+// 10 000 F par panneau ajouté + 3 500 F par kWh de batterie ajouté.
+const supplementMo = (panneaux - 42) * 10000 + (Number(etendu?.[1]) - 60) * 3500;
 ok(m60 && chiffre(m60.total) === 15044000 + (modules - 5) * 1245000 + (panneaux - 42) * 85000 + supplementMo,
    `prix : ${modules - 5} module(s) de 1 245 000 F, ${panneaux - 42} panneau(x) et leur main-d’œuvre [${m60?.total}]`);
 

@@ -12,12 +12,14 @@
 // ---- Main-d'œuvre (règle du gérant) ----
 // main_oeuvre_finale = main_oeuvre_kit_base
 //                    + panneaux_supplementaires × parPanneau
-//                    + kWc_supplementaires × parKwc
-// Le coefficient pays (Togo × 2, sauf kits haute tension) s'applique ensuite
-// à toute la main-d'œuvre, suppléments compris (utils/mainOeuvre.js).
+//                    + kWh_batterie_supplementaires × parKwhBatterie
+// Le supplément de 3 500 F se compte par kWh de BATTERIE ajouté (modules d'un
+// kit extensible), pas par kWc de panneaux. Le coefficient pays (Togo × 2,
+// sauf kits haute tension) s'applique ensuite à toute la main-d'œuvre,
+// suppléments compris (utils/mainOeuvre.js).
 export const MAIN_OEUVRE_EXTENSION = {
-  parPanneau: 10000, // F CFA par panneau ajouté
-  parKwc: 3500,      // F CFA par kWc ajouté (précision décimale gardée)
+  parPanneau: 10000,     // F CFA par panneau ajouté
+  parKwhBatterie: 3500,  // F CFA par kWh de batterie ajouté (précision décimale gardée)
 };
 
 // ---- Conditions du site (calcul des tensions de chaîne) ----
