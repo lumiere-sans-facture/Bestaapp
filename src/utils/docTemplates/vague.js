@@ -3,7 +3,7 @@
 // couleur secondaire réservée aux traits de titre, au filet du total et au
 // montant du total. En Pro, les couleurs de l'abonné remplacent navy/orange ;
 // la vague claire est une teinte éclaircie de la primaire.
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, eclaircir } from './shared';
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, eclaircir, pageAjustements } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 10, suite: 14, derniere: 8 };
@@ -185,5 +185,6 @@ export function renderVague({ kind, data }) {
     titre: `${L.titre} ${data.numero} — ${data.client.name}`,
     css: cssPour(e.couleurPrimaire, e.couleurSecondaire),
     pages: corps,
+    annexe: pageAjustements(data),
   });
 }

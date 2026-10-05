@@ -20,16 +20,35 @@
 // les kits officiels où chaque modèle est monté : les 3 kVA HZ et Itel avec
 // des batteries 24 V, les 6 et 12 kVA avec des batteries 48 V. Un onduleur
 // n'est jamais proposé pour un kit d'une autre tension (utils/tension.js).
+// electrique : caractéristiques de l'ENTRÉE PV, qui permettent de calculer
+// les chaînes de panneaux (utils/chainesPv.js) quand un kit est étendu.
+//   vocMax        tension DC max admise (V) — jamais dépassée, même à froid
+//   mpptMin/Max   plage de tension MPPT (V)
+//   nbMppt        nombre d'entrées MPPT indépendantes
+//   chainesParMppt chaînes en parallèle admises par entrée
+//   iMaxMppt      courant max d'entrée par MPPT (A)
+//   iscMaxMppt    courant de court-circuit max par MPPT (A)
+//   phases        1 (monophasé) ou 3 (triphasé), pour la protection AC
+// Renseignées pour les deux Deye d'après leurs fiches constructeur (séries
+// SUN-6K-SG03LP1 et SUN-12K-SG04LP3) ; les HZ et Itel restent à compléter
+// dans « Plus › Onduleurs » — sans elles, les chaînes d'un kit étendu sont
+// signalées « non vérifiées », jamais supposées.
 export const INVERTER_MODELS = [
   { id: 'hz-3kva', brand: 'HZ', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 160000, efficiency: 95, tension: 24 },
   { id: 'itel-3kva', brand: 'Itel', model: 'Onduleur hybride 3kVA', capacity: 3, maxPvPower: 3900, price: 190000, efficiency: 95, tension: 24 },
   { id: 'hz-6kva', brand: 'HZ', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 250000, efficiency: 95, tension: 48 },
-  { id: 'deye-6kva', brand: 'Deye', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 390000, efficiency: 96, tension: 48 },
+  {
+    id: 'deye-6kva', brand: 'Deye', model: 'Onduleur hybride 6kVA', capacity: 6, maxPvPower: 7800, price: 390000, efficiency: 96, tension: 48,
+    electrique: { vocMax: 500, mpptMin: 150, mpptMax: 425, nbMppt: 2, chainesParMppt: 1, iMaxMppt: 13, iscMaxMppt: 17, phases: 1 },
+  },
   // Onduleur du kit 48 kWh. SEUL modèle dont `maxPvPower` soit une vraie
   // valeur constructeur (15 000 Wc) et non l'estimation kVA × 1,3, qui
   // donnerait 15 600. Prix repris de la ligne « Onduleur » du kit.
   // Rendement volontairement absent : il n'a pas été relevé sur la fiche
   // technique, et l'inventer vaut moins que de le laisser vide — le résumé
   // l'omet simplement, et « Plus › Onduleurs » permet de le renseigner.
-  { id: 'deye-12kva', brand: 'Deye', model: 'Onduleur hybride 12kVA', capacity: 12, maxPvPower: 15000, price: 1100000, tension: 48 },
+  {
+    id: 'deye-12kva', brand: 'Deye', model: 'Onduleur hybride 12kVA', capacity: 12, maxPvPower: 15000, price: 1100000, tension: 48,
+    electrique: { vocMax: 800, mpptMin: 200, mpptMax: 650, nbMppt: 2, chainesParMppt: 2, iMaxMppt: 26, iscMaxMppt: 34, phases: 3 },
+  },
 ];

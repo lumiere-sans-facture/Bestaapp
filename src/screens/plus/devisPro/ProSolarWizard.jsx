@@ -20,6 +20,7 @@ import ClientIdentityFields, { contactEffectif } from '../../../components/Clien
 import TvaToggle from '../../../components/TvaToggle';
 import EditableQuotation, { lignesDepuisDevisKit, lignesModifiables } from '../../../components/EditableQuotation';
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../components/SolarConsumptionControls';
+import AjustementsKit from '../../../components/AjustementsKit';
 import { signalerErreur } from '../../../lib/rapportErreur';
 import {
   capturerDimensionnement, restaurerDimensionnement, prochainRowId,
@@ -372,8 +373,11 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     }).finally(() => setFicheEnCours(false));
   };
 
+  // Jamais un devis finalisé hors des limites électriques de l'onduleur.
+  const configurationImpossible = proposalMode === 'kit' && !!kitQuotation?.configurationImpossible;
   const submit = (statut = 'finalise') => {
     if (!sizing || !proposalReady) return;
+    if (statut === 'finalise' && configurationImpossible) return;
     let client;
     if (clientMode === 'new') {
       if (!newClient.name.trim()) return;
@@ -409,6 +413,8 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
       pro: true,
       kitId: proposalMode === 'kit' ? selectedKit?.id || null : null,
       kitName: proposalMode === 'kit' ? selectedKit?.name || null : null,
+      // Détail des ajustements d'un kit étendu, pour l'annexe du document.
+      ajustements: proposalMode === 'kit' ? kitQuotation?.ajustements || null : null,
       consumption,
       dimensionnement,
       sizing: {
@@ -711,6 +717,18 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                     {kitQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
                   </div>
                 )}
+                {/* Kit étendu au-delà de ses limites électriques : le devis ne part pas. */}
+                {kitQuotation?.configurationImpossible && (
+                  <div className="storage-alert abo-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
+                    <div>
+                      <Cpu size={13} style={{ verticalAlign: -2 }} /> <strong>Configuration impossible</strong> :
+                      aucun onduleur du catalogue, même en parallèle, n'accepte {kitQuotation.panelsIncluded} panneaux de{' '}
+                      {selectedKit.panelW} Wc dans ses limites électriques. Choisissez un kit plus grand ou ajoutez
+                      un onduleur adapté dans <strong>Plus › Onduleurs</strong>.
+                    </div>
+                  </div>
+                )}
+                <AjustementsKit ajustements={kitQuotation?.ajustements} kitName={selectedKit.name} />
                 {/* Aucun onduleur de la tension du kit ne tient ce besoin, même en parallèle :
                     le dire, plutôt que de glisser un modèle d'une autre tension, qui ne
                     fonctionnerait pas avec cette batterie. */}
@@ -887,7 +905,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
             </button>
           ) : (
             <>
-              <button className="btn btn-accent btn-block" onClick={() => submit(devisAModifier?.statut || 'finalise')} disabled={!clientReady || !proposalReady}><Check size={18} /> {devisAModifier ? 'Mettre à jour le devis' : 'Créer le devis'}</button>
+              <button className="btn btn-accent btn-block" onClick={() => submit(devisAModifier?.statut || 'finalise')} disabled={!clientReady || !proposalReady || ((devisAModifier?.statut || 'finalise') === 'finalise' && configurationImpossible)}><Check size={18} /> {devisAModifier ? 'Mettre à jour le devis' : 'Créer le devis'}</button>
               {!devisAModifier && <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => submit('brouillon')} disabled={!clientReady || !proposalReady}>Brouillon</button>}
             </>
           )}

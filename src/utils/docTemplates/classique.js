@@ -2,7 +2,7 @@
 // quadrillé, lisible à l'identique en noir et blanc. Aucune couleur de marque :
 // ni navy #0a2472, ni orange #f5a623 — uniquement des gris et deux bleus très
 // clairs pour les fonds de tableau.
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur } from './shared';
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, pageAjustements } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 12, premiere: 13, suite: 17, derniere: 11 };
@@ -174,5 +174,6 @@ export function renderClassique({ kind, data }) {
     titre: `${L.titre} ${data.numero} — ${data.client.name}`,
     css: CSS,
     pages: corps,
+    annexe: pageAjustements(data),
   });
 }

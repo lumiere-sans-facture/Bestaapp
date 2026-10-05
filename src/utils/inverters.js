@@ -2,6 +2,7 @@
 // utils/kits.js — normalisation d'un brouillon de formulaire, contrôle de
 // validité, rien qui dépende de React.
 import { lireTension, libelleTension, tensionOnduleur } from './tension';
+import { lireElectrique } from './chainesPv';
 
 // ---- Mise en parallèle ----
 // Certains onduleurs se couplent en parallèle (sorties et entrées PV
@@ -22,11 +23,59 @@ export const maxEnParallele = (onduleur) => {
   return Math.min(n, PARALLELE_MAX_SAISIE);
 };
 
+// ---- Caractéristiques électriques de l'entrée PV ----
+// Facultatives : elles permettent de calculer les chaînes d'un kit étendu
+// (utils/chainesPv.js). Sans elles, l'assistant le signale au lieu de
+// supposer — voir data/inverters.js pour le sens de chaque champ.
+export const CHAMPS_ELECTRIQUES = [
+  { cle: 'vocMax', libelle: 'Tension DC max (V)' },
+  { cle: 'mpptMin', libelle: 'Plage MPPT min (V)' },
+  { cle: 'mpptMax', libelle: 'Plage MPPT max (V)' },
+  { cle: 'nbMppt', libelle: 'Nombre de MPPT' },
+  { cle: 'chainesParMppt', libelle: 'Chaînes par MPPT' },
+  { cle: 'iMaxMppt', libelle: 'Courant max par MPPT (A)' },
+  { cle: 'iscMaxMppt', libelle: 'Courant de court-circuit max par MPPT (A)' },
+];
+
+/** Brouillon → caractéristiques électriques (null si rien n'est saisi). */
+const normaliserElectrique = (e) => {
+  if (!e) return null;
+  const sortie = {};
+  let saisi = false;
+  for (const { cle } of CHAMPS_ELECTRIQUES) {
+    const v = String(e[cle] ?? '').trim();
+    if (v !== '') saisi = true;
+    sortie[cle] = nombre(v);
+  }
+  sortie.phases = Number(e.phases) === 3 ? 3 : 1;
+  return saisi ? sortie : null;
+};
+
+/**
+ * Migration : les onduleurs officiels enregistrés avant l'existence du champ
+ * reçoivent leurs caractéristiques électriques (même identifiant). Un
+ * onduleur qui porte déjà le champ — même vidé — n'est pas touché. Renvoie
+ * la liste d'origine si rien ne change.
+ */
+export const completerElectrique = (liste = [], reference = []) => {
+  if (!Array.isArray(liste)) return liste;
+  const parId = new Map((reference || []).filter((r) => r.electrique).map((r) => [r.id, r.electrique]));
+  let change = false;
+  const suite = liste.map((o) => {
+    if (!o || Object.prototype.hasOwnProperty.call(o, 'electrique')) return o;
+    const e = parId.get(o.id);
+    if (!e) return o;
+    change = true;
+    return { ...o, electrique: { ...e } };
+  });
+  return change ? suite : liste;
+};
+
 /** Un onduleur vierge, prêt pour le formulaire de création. */
 export const nouvelOnduleur = () => ({
   id: crypto.randomUUID(),
   brand: '', model: '', capacity: '', maxPvPower: '', price: '', efficiency: '', tension: '',
-  parallele: true, maxParallele: PARALLELE_PAR_DEFAUT,
+  parallele: true, maxParallele: PARALLELE_PAR_DEFAUT, electrique: null,
 });
 
 const nombre = (v, defaut = 0) => {
@@ -50,6 +99,8 @@ export const normaliserOnduleur = (brouillon) => ({
   maxParallele: brouillon.parallele === false || brouillon.parallele === 'non'
     ? 1
     : maxEnParallele({ maxParallele: brouillon.maxParallele }),
+  // Entrée PV : tension max, plage MPPT, courants (facultatif).
+  electrique: normaliserElectrique(brouillon.electrique),
 });
 
 /**
@@ -68,6 +119,7 @@ export const resumeOnduleur = (o) => [
   libelleTension(tensionOnduleur(o)) || null,
   o.maxPvPower ? `PV max ${o.maxPvPower} Wc` : null,
   maxEnParallele(o) > 1 ? `parallèle ×${maxEnParallele(o)} max` : 'sans parallèle',
+  lireElectrique(o) ? `${lireElectrique(o).nbMppt} MPPT · ${lireElectrique(o).vocMax} V DC max` : null,
   o.efficiency ? `rendement ${o.efficiency}%` : null,
 ].filter(Boolean).join(' · ');
 

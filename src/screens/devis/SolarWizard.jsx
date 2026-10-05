@@ -15,6 +15,7 @@ import LeadPicker from './LeadPicker';
 import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../components/SolarConsumptionControls';
+import AjustementsKit from '../../components/AjustementsKit';
 import { TVA_PCT } from '../../config/company';
 import { signalerErreur } from '../../lib/rapportErreur';
 import {
@@ -274,6 +275,8 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
 
   const handleSubmit = (statut = 'finalise') => {
     if (!selectedKit || !displayQuotation) return; // aucun kit disponible
+    // Jamais un devis finalisé hors des limites électriques de l'onduleur.
+    if (statut === 'finalise' && displayQuotation.configurationImpossible) return;
     const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     // Onduleur réellement retenu : celui du kit, ou celui suggéré en
     // remplacement si le premier ne suffisait pas pour les panneaux calculés.
@@ -659,6 +662,19 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                 {displayQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
               </div>
             )}
+            {/* Kit étendu au-delà de ses limites électriques : aucun onduleur,
+                même doublé, n'accepte ces panneaux. Le devis ne part pas. */}
+            {displayQuotation?.configurationImpossible && (
+              <div className="storage-alert abo-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
+                <div>
+                  <Cpu size={13} style={{ verticalAlign: -2 }} /> <strong>Configuration impossible</strong> :
+                  aucun onduleur du catalogue, même en parallèle, n'accepte {installedPanels} panneaux de{' '}
+                  {selectedKit.panelW} Wc dans ses limites électriques. Choisissez un kit plus grand ou ajoutez
+                  un onduleur adapté dans <strong>Plus › Onduleurs</strong> — le devis ne peut pas être créé en l'état.
+                </div>
+              </div>
+            )}
+            <AjustementsKit ajustements={displayQuotation.ajustements} kitName={selectedKit.name} />
             {/* Aucun onduleur de la tension du kit ne tient ce besoin, même en parallèle :
                 le dire, plutôt que de glisser un modèle d'une autre tension, qui ne
                 fonctionnerait pas avec cette batterie. */}
@@ -785,7 +801,8 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
               <button className="btn btn-outline" style={{ flex: '0 0 auto' }} onClick={() => handleSubmit('brouillon')} disabled={!selectedKit}>
                 Brouillon
               </button>
-              <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')} disabled={!selectedKit}>
+              <button className="btn btn-accent btn-block" onClick={() => handleSubmit('finalise')}
+                disabled={!selectedKit || !!displayQuotation?.configurationImpossible}>
                 <Check size={18} /> Créer le devis{selectedLead ? ` pour ${selectedLead.name}` : ''}
               </button>
             </>

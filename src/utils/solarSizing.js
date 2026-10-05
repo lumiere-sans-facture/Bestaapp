@@ -469,6 +469,7 @@ export const calculateSystemSize = (
 import { TVA_RATE } from '../config/company';
 import { tensionKit, onduleursCompatibles, estKitHauteTension } from './tension';
 import { capacitePourBesoin, capaciteMaxKit, etendreBatterie } from './extensionBatterie';
+import { ajusterKit } from './ajustementsKit';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
 // Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
@@ -641,8 +642,55 @@ export const suggestKitsForBattery = (kits = [], batteryNeed = 0) => {
 export const suggestKitForBattery = (kits = [], batteryNeed = 0) =>
   suggestKitsForBattery(kits, batteryNeed)[0] || null;
 
-const PANEL_LINE_RE = /panneau/i;
+// Ligne de PANNEAUX : elle commence par « Panneau(x) ». Chercher le mot
+// n'importe où attrapait aussi « Disjoncteur/sectionneur DC panneaux », dont
+// la quantité suivait alors le nombre de panneaux (16 sectionneurs au lieu
+// de 2 dans le kit 25 kWh).
+const PANEL_LINE_RE = /^\s*(\d+\s*)?panneaux?\b/i;
 const ONDULEUR_LINE_RE = /onduleur/i;
+
+/**
+ * Synthèse affichable des ajustements d'un kit étendu : postes chiffrés au
+ * prix du devis (coefficient pays compris) et impact sur le total.
+ */
+const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, prixUnitaire, mounting, includeMounting, inverterSuggested }) => {
+  const { panneaux } = ajustements;
+  const lignePanneaux = lines.find((l) => PANEL_LINE_RE.test(l.designation) && !l.ajustement);
+  const postes = [];
+  const poste = (libelle, montant) => { if (Math.round(montant)) postes.push({ libelle, montant: Math.round(montant) }); };
+  poste(`Panneaux (+${panneaux.ajoutes})`, lignePanneaux ? panneaux.ajoutes * prixUnitaire(lignePanneaux) : 0);
+  poste(`Structure (${mounting.label}, +${panneaux.ajoutes} panneaux)`, includeMounting ? panneaux.ajoutes * mounting.pricePerPanel : 0);
+  if (inverterSuggested) {
+    const ligneKit = kit.lines.find((l) => ONDULEUR_LINE_RE.test(l.designation));
+    const avant = ligneKit ? ligneKit.qty * prixUnitaire(ligneKit) : 0;
+    poste('Onduleur', inverterSuggested.quantite * (Number(inverterSuggested.price) || 0) - avant);
+  }
+  const materiel = lines.filter((l) => l.ajustement === 'materiel');
+  poste('Câbles, connecteurs et protections', materiel.reduce((s, l) => s + l.qty * prixUnitaire(l), 0));
+  const supplementsMo = lines.filter((l) => l.ajustement === 'main-oeuvre').reduce((s, l) => s + l.qty * prixUnitaire(l), 0);
+  poste('Main-d’œuvre (suppléments)', supplementsMo);
+  const ecart = Math.round(total - totalBase);
+  const reste = ecart - postes.reduce((s, p) => s + p.montant, 0);
+  // Ce qui ne relève pas des panneaux (modules batterie ajoutés) ferme le compte.
+  poste('Modules batterie et autres', reste);
+  const coutConnu = materiel.reduce((s, l) => s + (l.cout || 0), 0);
+  const venteConnue = materiel.filter((l) => l.cout != null).reduce((s, l) => s + l.qty * prixUnitaire(l), 0);
+  return {
+    ...ajustements,
+    mainOeuvre: ajustements.mainOeuvre && {
+      ...ajustements.mainOeuvre,
+      coef,
+      totalFinal: Math.round(ajustements.mainOeuvre.total * coef),
+    },
+    lignes: undefined,
+    materiel: materiel.map((l) => ({ designation: l.designation, qty: l.qty, unit: l.unit, pu: prixUnitaire(l), motif: l.motif })),
+    impact: {
+      totalBase: Math.round(totalBase), total: Math.round(total), ecart, postes,
+      // Marge (règle unique de utils/price.js) sur le matériel pris en boutique.
+      margeMateriel: coutConnu ? Math.round(venteConnue - coutConnu) : null,
+    },
+  };
+};
 
 /**
  * Devis à partir d'un kit préconfiguré : toutes les lignes du kit, sans calcul
@@ -682,9 +730,10 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // le kit est choisi sur sa batterie, pas sur son nombre de panneaux, donc
   // il peut en manquer pour couvrir le besoin réel (ex. besoin 16 panneaux,
   // kit à batterie suffisante mais composé pour 12).
-  const neededPanels = sizing?.requiredPanelPower && kit.panelW
-    ? Math.max(kit.panels, Math.ceil(sizing.requiredPanelPower / kit.panelW))
+  const panneauxDemandes = sizing?.requiredPanelPower && kit.panelW
+    ? Math.ceil(sizing.requiredPanelPower / kit.panelW)
     : kit.panels;
+  const neededPanels = Math.max(kit.panels, panneauxDemandes);
   // Kit extensible : modules batterie ajoutés jusqu'à couvrir le besoin.
   const batterie = etendreBatterie(kit, kit.lines, sizing?.batteryCapacity);
   const withPanels = batterie.lignes.map((l) => (
@@ -702,7 +751,14 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // rien — impossible de la contredire (voir utils/tension.js).
   const tension = tensionKit(kit);
   const candidats = onduleursCompatibles(inverters, tension);
-  const currentSpec = candidats.find((o) => o.capacity === kit.inverter);
+  // Spec de l'onduleur du kit : même calibre, et de préférence la MARQUE
+  // écrite sur sa ligne (« Onduleur hybride Deye 6kva » → le Deye 6 kVA, pas
+  // le premier 6 kVA venu) — ses limites électriques en dépendent.
+  const ligneOnduleurKit = kit.lines.find((l) => ONDULEUR_LINE_RE.test(l.designation || ''));
+  const memeCalibre = candidats.filter((o) => o.capacity === kit.inverter);
+  const currentSpec = memeCalibre.find((o) => o.brand
+    && new RegExp(`\\b${String(o.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(ligneOnduleurKit?.designation || ''))
+    || memeCalibre[0];
   // Puissance PV RÉELLEMENT posée : les panneaux du devis (ceux du kit,
   // complétés au besoin), pas seulement ceux du besoin calculé — un kit peut
   // en compter davantage, et c'est bien l'onduleur qui les recevra tous.
@@ -712,8 +768,51 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // Escalade : l'onduleur du kit d'abord, puis un modèle supérieur SEUL —
   // on ne met en parallèle qu'une fois tous les modèles seuls épuisés, et
   // jamais au-delà du maximum réglé pour le modèle (voir resoudreOnduleur).
-  const retenu = currentSpec ? resoudreOnduleur(candidats, critere, { prefere: currentSpec }) : null;
-  const change = retenu && (retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
+  //
+  // Kit ÉTENDU (plus de panneaux que le kit) : les ajustements (chaînes,
+  // onduleur vérifié électriquement, câbles, protections, main-d'œuvre) sont
+  // calculés par utils/ajustementsKit.js. Quand les caractéristiques
+  // électriques manquent, l'escalade historique (pic + puissance PV) reste
+  // celle qui choisit l'onduleur.
+  const choix = critereDeChoix(critere);
+  const ajustements = ajusterKit({
+    kit,
+    lignesKit: batterie.lignes,
+    panneauxDemandes,
+    onduleurKit: currentSpec || null,
+    candidats,
+    products,
+    outils: {
+      controlePic: (modele, quantite) => {
+        const ensemble = onduleursEnParallele(modele, quantite, inverters);
+        const ok = onduleurTientLePic(ensemble, choix);
+        return ok ? { ok } : {
+          ok,
+          raison: `sortie ${puissanceSortie(ensemble).toLocaleString('fr-FR')} W insuffisante (${Math.round(sortieOnduleurRequise(choix.peakLoad, choix.pvPower)).toLocaleString('fr-FR')} W requis, marge comprise)`,
+        };
+      },
+      limitePv: (modele) => limitePv(modele, inverters),
+      puissanceSortie,
+    },
+  });
+  const verifie = ajustements.verification === 'verifie';
+  const impossible = ajustements.verification === 'impossible';
+  let retenu = null;
+  if (verifie) {
+    const nouveau = ajustements.onduleur.nouveau;
+    retenu = {
+      modele: nouveau ? candidats.find((o) => o.id === nouveau.id) || { ...currentSpec, ...nouveau } : currentSpec,
+      quantite: ajustements.onduleur.quantite,
+      suffisant: true,
+    };
+  } else if (!impossible && currentSpec) {
+    retenu = resoudreOnduleur(candidats, critere, { prefere: currentSpec });
+  }
+  // Vérifié : le statut fait foi (un remplacement à calibre égal, autre
+  // marque, reste un remplacement) ; sinon, l'ancienne règle du calibre.
+  const change = retenu && (verifie
+    ? ajustements.onduleur.statut !== 'conserve'
+    : retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
   const inverterSuggested = change ? { ...retenu.modele, quantite: retenu.quantite } : null;
   // productId retiré sur les lignes remplacées : elles ne représentent plus
   // le produit boutique éventuellement lié, `pu` (fixé ci-dessous) prime.
@@ -750,6 +849,17 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     const place = iMainDoeuvre === -1 ? withInverter.length : iMainDoeuvre;
     lines = [...withInverter.slice(0, place), ligneSupport, ...withInverter.slice(place)];
   }
+  // Ajustements du kit étendu : le matériel s'insère avant la main-d'œuvre,
+  // les suppléments de main-d'œuvre juste après elle — lignes explicites,
+  // le kit d'origine n'est jamais retouché.
+  if (ajustements.lignes.length) {
+    const materiel = ajustements.lignes.filter((l) => !l.labor);
+    const supplements = ajustements.lignes.filter((l) => l.labor);
+    const iMo = lines.findIndex((l) => l.labor);
+    const avant = iMo === -1 ? lines : lines.slice(0, iMo);
+    const mo = iMo === -1 ? [] : lines.slice(iMo);
+    lines = [...avant, ...materiel, ...mo, ...supplements];
+  }
   // Prix résolu ligne par ligne : celui du produit boutique lié s'il existe
   // encore (suit ses changements de prix), sinon le prix figé de la ligne.
   // La main d'œuvre porte en plus le coefficient du pays du chantier.
@@ -764,6 +874,12 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const components = lines.filter((l) => !l.labor).map((l) => toItem(l, 'kit'));
   const prestations = lines.filter((l) => l.labor).map((l) => toItem(l, 'prestation'));
   const total = lines.reduce((s, l) => s + l.qty * prixUnitaire(l), 0);
+  // Impact des ajustements sur le prix : écart avec le kit de base (même
+  // support, même pays), décomposé par poste.
+  const synthese = ajustements.actif
+    ? syntheseAjustements({ ajustements, kit, lines, total, coef, prixUnitaire, mounting, includeMounting, inverterSuggested,
+        totalBase: buildKitQuotation(kit, mountingType, includeMounting, null, inverters, products, coefMainOeuvre).total })
+    : ajustements;
   return {
     components, prestations,
     equipmentCost: components.reduce((s, c) => s + c.totalPrice, 0),
@@ -783,6 +899,11 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     // parallèle au maximum autorisé :
     // l'écran le dit, plutôt que de proposer un modèle d'une autre tension.
     inverterInsuffisant: retenu ? !retenu.suffisant : false,
+    // Kit étendu dont AUCUN onduleur (même doublé) ne tient les limites
+    // électriques : le devis ne doit pas partir en l'état.
+    configurationImpossible: impossible,
+    // Section « Ajustements du kit » (null quand le kit est posé tel quel).
+    ajustements: synthese.actif ? synthese : null,
     tension,
     // Capacité batterie RÉELLEMENT posée (modules ajoutés compris).
     batteryCapacity: batterie.capacite,

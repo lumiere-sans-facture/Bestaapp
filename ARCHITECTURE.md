@@ -124,6 +124,9 @@ Bestaapp/
     │
     └── utils/                  ── LOGIQUE MÉTIER PURE (testable) ──
         ├── solarSizing.js      Dimensionnement + génération de devis solaire
+        ├── ajustementsKit.js   Kit étendu : onduleur vérifié, matériel, main-d'œuvre (règles : config/extensionKit.js)
+        ├── chainesPv.js        Chaînes de panneaux dans les limites électriques de l'onduleur
+        ├── extensionBatterie.js Modules batterie ajoutés à un kit extensible
         ├── roi.js              Retour sur investissement (coût réel, projection 25 ans, CO₂)
         ├── referral.js         Affiliation (capture ?ref=, codes, last-click 30j)
         ├── subscription.js     Règles d'abonnement Devis Pro

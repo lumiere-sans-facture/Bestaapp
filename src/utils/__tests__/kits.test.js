@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
 import { buildKitQuotation, suggestKitForBattery, suggestKitsForBattery, MOUNTING_TYPES } from '../solarSizing';
+import { kitTotal } from '../kits';
 
 const byId = (id) => SOLAR_KITS.find((k) => k.id === id);
 
@@ -23,13 +24,17 @@ describe('buildKitQuotation', () => {
     // ajoute donc la structure standard (3 × 10 000 F sur tôle).
     'kit-3.8kwh-2kva': 775000,
     'kit-5kwh': 1180000,
-    'kit-5kwh-deye': 1453000,
-    'kit-10kwh-taico': 2119000,
+    // 5 kWh Deye, 10 kWh Taico, 25 kWh Felicity : la somme exacte de leurs
+    // lignes. Les anciens montants (1 453 000, 2 119 000, 4 315 000) comptaient
+    // un « Disjoncteur/sectionneur DC panneaux » PAR PANNEAU — la ligne était
+    // prise pour celle des panneaux.
+    'kit-5kwh-deye': 1429000,
+    'kit-10kwh-taico': 2063000,
     // 16, 20 et 32 kWh : leur composition ne porte aucune structure ; le devis
     // l'ajoute au panneau (10 × 10 000, 12 × 10 000, 16 × 10 000 sur tôle).
     'kit-16kwh': 2419000,
     'kit-20kwh': 3344000,
-    'kit-25kwh-felicity': 4315000,
+    'kit-25kwh-felicity': 4203000,
     'kit-32kwh': 4518000,
     // 48 kWh : seul kit dont le bordereau porte DÉJÀ sa structure au bon
     // compte (24 panneaux × 10 000 sur tôle) — devis et bordereau coïncident
@@ -176,9 +181,11 @@ describe('buildKitQuotation', () => {
     expect(q.panelsIncluded).toBe(16);
     expect(lignePanneaux.quantity).toBe(16);
     expect(lignePanneaux.totalPrice).toBe(16 * lignePanneaux.unitPrice);
-    // Le total intègre les panneaux ajoutés ET leur structure (au panneau).
+    // Le total intègre les panneaux ajoutés, leur structure (au panneau) et
+    // les suppléments de main-d'œuvre (10 000 F par panneau + 3 500 F par kWc).
     const sansSizing = buildKitQuotation(kit, 'tole', true);
-    expect(q.total).toBe(sansSizing.total + 4 * lignePanneaux.unitPrice + 4 * 10000);
+    const supplementMo = 4 * 10000 + Math.round(4 * 0.62 * 3500);
+    expect(q.total).toBe(sansSizing.total + 4 * lignePanneaux.unitPrice + 4 * 10000 + supplementMo);
   });
 
   it('ne réduit jamais les panneaux du kit si le besoin calculé en exige moins', () => {
@@ -287,6 +294,21 @@ describe('suggestKitForBattery', () => {
       const suggestion = suggestKitForBattery(SOLAR_KITS, need);
       const couverts = SOLAR_KITS.filter((k) => k.battery >= need);
       if (couverts.length) expect(suggestion.battery).toBeGreaterThanOrEqual(need);
+    }
+  });
+});
+
+describe('ligne « sectionneur DC panneaux » : pas une ligne de panneaux', () => {
+  it('sa quantité ne suit ni le kit ni les panneaux ajoutés', () => {
+    for (const id of ['kit-5kwh-deye', 'kit-10kwh-taico', 'kit-25kwh-felicity']) {
+      const kit = SOLAR_KITS.find((k) => k.id === id);
+      const origine = kit.lines.find((l) => /sectionneur/i.test(l.designation)).qty;
+      for (const sizing of [null, { requiredPanelPower: (kit.panels + 5) * kit.panelW }]) {
+        const q = buildKitQuotation(kit, 'tole', true, sizing);
+        expect(q.components.find((c) => /^Disjoncteur\/sectionneur DC panneaux/.test(c.name)).quantity, id).toBe(origine);
+      }
+      // Le total d'un kit posé tel quel = la somme de ses lignes.
+      expect(buildKitQuotation(kit).total, id).toBe(kitTotal(kit));
     }
   });
 });

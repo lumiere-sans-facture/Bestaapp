@@ -3,7 +3,7 @@
 // réservée aux trois pastilles, montant focal en primaire. En Pro, ce sont les
 // couleurs de l'abonné (couleurPrimaire / couleurSecondaire) qui s'appliquent.
 // Marges 40 px, angles 8 px (blocs) / 6 px (pastilles, totaux).
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur } from './shared';
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, pageAjustements } from './shared';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 11, suite: 16, derniere: 8 };
@@ -184,5 +184,6 @@ export function renderStudio({ kind, data }) {
     titre: `${L.titre} ${data.numero} — ${data.client.name}`,
     css: cssPour(e.couleurPrimaire, e.couleurSecondaire),
     pages: corps,
+    annexe: pageAjustements(data),
   });
 }
