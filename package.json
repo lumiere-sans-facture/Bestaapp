@@ -12,6 +12,7 @@
     "e2e": "node e2e/suivi-clients.mjs && node e2e/commissions.mjs && node e2e/validation.mjs && node e2e/espace-partenaire.mjs && node e2e/acces-sections.mjs && node e2e/mes-kits.mjs && node e2e/demande-paiement.mjs && node e2e/formulaire-client.mjs && node e2e/devis-conversion.mjs && node e2e/dimensionnement-reprise.mjs && node e2e/kit-48kwh.mjs && node e2e/guide-nouveau-utilisateur.mjs && node e2e/landing.mjs && node e2e/abonnement-inscription.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@capacitor/android": "^8.4.0",
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",
@@ -22,11 +23,11 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "libphonenumber-js": "^1.11.9",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0",
-    "libphonenumber-js": "^1.11.9"
+    "react-router-dom": "^6.22.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

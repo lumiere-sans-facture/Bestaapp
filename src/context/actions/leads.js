@@ -103,7 +103,10 @@ export function createLeadActions(setState) {
           };
         }
 
-        const leadId = crypto.randomUUID();
+        // Identifiant fourni par l'appelant (déjà tiré au sort avec
+        // crypto.randomUUID) quand il doit rattacher aussitôt un devis à la
+        // nouvelle piste — l'agent devis, par exemple.
+        const leadId = lead.id || crypto.randomUUID();
         const referrals = parrain
           ? [newReferral(parrain.code, 'piste', { leadId }), ...(s.referrals || [])]
           : (s.referrals || []);

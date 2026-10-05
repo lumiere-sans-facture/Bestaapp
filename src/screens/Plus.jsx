@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, Calculator } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, Calculator, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -40,6 +40,7 @@ import AppearanceSection from './plus/AppearanceSection';
 import GoogleContactsSection from './plus/GoogleContactsSection';
 import KkiapayButton from '../components/KkiapayButton';
 import InvertersSection from './plus/InvertersSection';
+import AgentDevisSection from './plus/AgentDevisSection';
 import PompeKitsSection from './plus/PompeKitsSection';
 import RoiSection from './plus/RoiSection';
 import { SyncStatusRow } from '../components/SyncStatus';
@@ -78,14 +79,14 @@ export default function Plus() {
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup', 'roi', 'googlecontacts'];
+  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup', 'roi', 'googlecontacts', 'agentdevis'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
   // simple utilisateur restait ainsi sur l'écran des commissions du gérant,
   // boutons « Payer » et « Commission manuelle » compris. L'autorisation se
   // décide donc ici, à la section, pas au bouton.
-  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'backup', 'googlecontacts'];
+  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'backup', 'googlecontacts', 'agentdevis'];
   const sectionAutorisee = (tab) => {
     if (!KNOWN_TABS.includes(tab)) return false;
     if (tab === 'subsadmin') {
@@ -787,6 +788,7 @@ export default function Plus() {
               <MenuItem icon={DollarSign} title="Commissions" subtitle={pendingCommissions.length > 0 ? `${formatCFA(pendingTotal)} en attente` : 'Tout est payé'} onClick={() => setActiveTab('commissions')} />
               <MenuItem icon={Package} title="Mes kits" subtitle={`${(kits || []).length} kits proposés par l'assistant de devis`} onClick={() => setActiveTab('kits')} />
               <MenuItem icon={Cpu} title="Onduleurs" subtitle={`${(inverters || []).length} onduleurs, suggérés si celui du kit ne suffit pas`} onClick={() => setActiveTab('inverters')} />
+              <MenuItem icon={Bot} title="Agent devis (prototype)" subtitle="Une conversation qui dimensionne et chiffre avec vos kits" onClick={() => setActiveTab('agentdevis')} />
               <MenuItem icon={Droplets} title="Kits pompage" subtitle={`${(pompeKits || []).length} kits proposés par l'assistant Pompe solaire`} onClick={() => setActiveTab('pompekits')} />
             </div>
           </div>
@@ -830,7 +832,7 @@ export default function Plus() {
   const TAB_TITLES = {
     menu: 'Plus', parametres: 'Paramètres', apparence: 'Apparence', partners: 'Partenaires', commissions: 'Commissions',
     orders: 'Commandes en ligne', team: 'Équipe', formation: 'Formation',
-    subsadmin: 'Abonnements Devis Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', pompekits: 'Kits pompage',
+    subsadmin: 'Abonnements Devis Pro', mypartner: 'Mon espace partenaire', kits: 'Mes kits', inverters: 'Onduleurs', agentdevis: 'Agent devis', pompekits: 'Kits pompage',
     paiements: 'Moyens de paiement', googlecontacts: 'Google Contacts',
     profile: 'Profil', backup: 'Sauvegarde des données',
     roi: 'Simulateur ROI',
@@ -866,6 +868,7 @@ export default function Plus() {
         {activeTab === 'team' && <TeamSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'kits' && <KitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'inverters' && <InvertersSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'agentdevis' && <AgentDevisSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'pompekits' && <PompeKitsSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'roi' && <RoiSection />}
         {activeTab === 'paiements' && <PaiementsSection />}

@@ -3266,3 +3266,18 @@ form .login-link { width: 100%; margin-top: 4px; }
 .sidebar-brand-public-meta .sidebar-subtitle {
   margin: 0;
 }
+
+/* Agent devis (prototype) : conversation façon messagerie. */
+.agent-chat { display: flex; flex-direction: column; gap: 8px; min-height: 240px; max-height: 60vh; overflow-y: auto;
+  padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.agent-vide { color: var(--text-muted); font-size: 0.875rem; margin: auto; text-align: center; padding: 0 16px; }
+.agent-bulle { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 0.9rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.agent-bulle-client { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+.agent-bulle-agent { align-self: flex-start; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.agent-etape { align-self: flex-start; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+.agent-proposition { align-self: stretch; margin: 4px 0; }
+.agent-proposition-titre { font-weight: 700; margin-bottom: 4px; }
+.agent-proposition-ligne { font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 6px; }
+.agent-proposition-fait { display: flex; align-items: center; gap: 6px; color: var(--success-dark, var(--success)); font-weight: 600; font-size: 0.875rem; }
+.agent-saisie { display: flex; gap: 8px; margin-top: 10px; }
+.agent-saisie .input { flex: 1; }

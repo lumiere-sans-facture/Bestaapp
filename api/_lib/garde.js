@@ -29,6 +29,9 @@ export const PLAFONDS = {
   // par le CDN — seuls les nouveaux points de coordonnées arrivent jusqu'ici.
   solar: 30,
   youtube: 20,
+  // Agent devis : chaque tour d'outil est une requête, et chacune coûte un
+  // appel payant à Claude. Large pour une conversation, borné contre une boucle.
+  agentDevis: 30,
 };
 
 /** Journal de sécurité : une ligne par événement, horodatée et attribuée. */
