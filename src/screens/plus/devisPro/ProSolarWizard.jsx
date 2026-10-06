@@ -6,7 +6,7 @@ import { formatCFA } from '../../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
   calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
-  inverterOptionsFromCatalog, batteryOptionsFromCatalog, brandsOf, suggestInverterFor, onduleurSuffisant, critereDeChoix, suggestBatteryCombo,
+  batteryOptionsFromCatalog, brandsOf, suggestInverterFor, onduleurSuffisant, critereDeChoix, suggestBatteryCombo,
   AUTONOMY_OPTIONS, MOUNTING_TYPES,
 } from '../../../utils/solarSizing';
 import { factureVersConsommation } from '../../../utils/factureConso';
@@ -64,7 +64,13 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   const company = getCompanyForUser(user.id);
 
   // Options matériel issues de la boutique
-  const inverterOptions = useMemo(() => inverterOptionsFromCatalog(products), [products]);
+  // Onduleurs proposés : ceux de « Mes onduleurs » (Plus › Onduleurs), jamais
+  // la boutique — c'est là que l'entreprise tient ses modèles, leurs prix et
+  // leurs limites électriques. Même source que le parcours « kit ».
+  const inverterOptions = useMemo(() => (onduleursConfigures || [])
+    .filter((o) => Number(o.capacity) > 0)
+    .map((o) => ({ ...o, brand: o.brand || 'Autre', model: designationOnduleur(o), price: Number(o.price) || 0 }))
+    .sort((a, b) => a.capacity - b.capacity), [onduleursConfigures]);
   const batteryOptions = useMemo(() => batteryOptionsFromCatalog(products), [products]);
   const brands = useMemo(() => brandsOf(inverterOptions), [inverterOptions]);
   const panelProduct = useMemo(() => products.find((p) => p.category === 'panneaux'), [products]);
@@ -809,7 +815,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                   </label>
                 )}
               </>
-            ) : <div className="empty-state">Aucun onduleur dans la boutique.</div>}
+            ) : <div className="empty-state">Aucun onduleur configuré : ajoutez vos modèles dans Plus › Onduleurs.</div>}
 
             {/* --- Batteries --- */}
             <div className="mat-section-head" style={{ marginTop: 18 }}>
