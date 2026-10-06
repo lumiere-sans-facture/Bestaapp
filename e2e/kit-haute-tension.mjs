@@ -102,7 +102,9 @@ ok(!!t208, `kit 208 kWh suggéré au-delà de 192 kWh [${togoXXL.map((k) => k.no
 const cap208 = Number(/batterie (\d+) kWh/.exec(t208?.resume || '')?.[1] || 0);
 ok([224, 240, 256].includes(cap208) && /étendue depuis 208/.test(t208.resume),
    `très gros besoin : 208 kWh étendu par modules de 16 kWh [${t208?.resume.replace(/\s+/g, ' ')}]`);
-ok(t208 && b208 && chiffre(t208.total) === chiffre(b208.total) && chiffre(t208.total) >= 50055000,
+// Prix différent du devis de référence (50 055 000 F) : les panneaux suivent
+// le dimensionnement, au-dessus comme en dessous des 175 du kit.
+ok(t208 && b208 && chiffre(t208.total) === chiffre(b208.total) && chiffre(t208.total) > 0,
    `208 kWh : même prix au Togo et au Bénin [Togo ${t208?.total} · Bénin ${b208?.total}]`);
 
 console.log('\n' + R.join('\n'));

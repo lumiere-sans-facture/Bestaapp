@@ -342,14 +342,15 @@ export function pageAjustements(data) {
   const mo = a.mainOeuvre;
   return `<section class="page annexe">
   <h2>Ajustements du kit</h2>
-  <div class="annexe-intro">Devis ${esc(data.numero || '')} — le kit de base est la référence ; voici ce que son extension ajoute.</div>
+  <div class="annexe-intro">Devis ${esc(data.numero || '')} — le kit de base est la référence ; voici comment il est ajusté au besoin.</div>
   <h3>Panneaux et batterie</h3>
   <table>
     ${ligne('Kit de base', `${p.base} panneaux · ${kwcFr(p.kwcBase)}`)}
     ${ligne(`Proposition (${p.demande} demandés)`, `${p.final} panneaux · ${kwcFr(p.kwcFinal)}`)}
     ${p.ajoutes > 0 ? ligne('Ajoutés', `+${p.ajoutes} panneaux de ${p.wc} Wc · +${kwcFr(p.kwcAjoutes)}`) : ''}
+    ${p.retires > 0 ? ligne('En moins (ajustés au besoin)', `−${p.retires} panneaux de ${p.wc} Wc · −${kwcFr(p.kwcRetires)}`) : ''}
     ${b?.ajoutes > 0 ? ligne(`Batterie (+${kwhFr(b.ajoutes)} en modules)`, `${kwhFr(b.base)} → ${kwhFr(b.finale)}`) : ''}
-    ${ligne('Chaînes solaires', a.chaines ? esc(a.chaines.final.map((f) => f.libelle).join(' / ')) : p.ajoutes === 0 ? 'inchangées (aucun panneau ajouté)' : 'non vérifiées')}
+    ${ligne('Chaînes solaires', a.chaines ? esc(a.chaines.final.map((f) => f.libelle).join(' / ')) : p.ajoutes === 0 && !p.retires ? 'inchangées (aucun panneau ajouté)' : 'non vérifiées')}
     ${o ? ligne(`Onduleur ${STATUTS_ONDULEUR[o.statut] || ''}`, esc(nouveau ? `${o.ancien?.designation || ''} → ${o.quantite > 1 ? `${o.quantite} × ` : ''}${nouveau}` : o.ancien?.designation || '')) : ''}
   </table>
   ${o?.raisons?.length && o.statut !== 'conserve' ? `<div class="note">Raison technique : ${esc(o.raisons.join(' ; '))}</div>` : ''}
@@ -357,7 +358,7 @@ export function pageAjustements(data) {
     ligne(`${esc(m.designation.replace(/ — extension$/, ''))} × ${m.qty}${m.unit === 'm' ? ' m' : ''}${m.motif ? ` <span class="note">(${esc(m.motif)})</span>` : ''}`, `${nf(m.qty * m.pu)} F`)).join('')}</table>` : ''}
   ${mo ? `<h3>Main-d'œuvre</h3><table>
     ${ligne('Main-d’œuvre initiale du kit', `${nf(mo.base)} F`)}
-    ${mo.panneaux.montant ? ligne(`Supplément panneaux (${mo.panneaux.nombre} × ${nf(mo.panneaux.tarif)} F)`, `${nf(mo.panneaux.montant)} F`) : ''}
+    ${mo.panneaux.montant ? ligne(`${mo.panneaux.montant > 0 ? 'Supplément panneaux' : 'Panneaux en moins'} (${Math.abs(mo.panneaux.nombre)} × ${nf(mo.panneaux.tarif)} F)`, `${nf(mo.panneaux.montant)} F`) : ''}
     ${mo.batterie.montant ? ligne(`Supplément batterie (${kwhFr(mo.batterie.kwh)} × ${nf(mo.batterie.tarif)} F)`, `${nf(mo.batterie.montant)} F`) : ''}
     ${mo.coef > 1 ? ligne(`Chantier au Togo (× ${mo.coef})`, `${nf((mo.totalFinal || 0) - mo.total)} F`) : ''}
     <tr class="total"><td>Main-d’œuvre finale</td><td class="num">${nf(mo.totalFinal ?? mo.total)} F</td></tr>

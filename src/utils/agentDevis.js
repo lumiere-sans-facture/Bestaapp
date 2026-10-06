@@ -80,6 +80,7 @@ export const calculerProposition = (entree, ctx) => {
       ajustements: q.ajustements
         ? [
             q.ajustements.panneaux?.ajoutes ? `+${q.ajustements.panneaux.ajoutes} panneaux` : null,
+            q.ajustements.panneaux?.retires ? `${q.ajustements.panneaux.retires} panneaux de moins que le kit (ajustés au besoin)` : null,
             q.ajustements.batterie?.ajoutes ? `batterie étendue à ${q.ajustements.batterie.finale} kWh` : null,
             q.ajustements.chaines?.libelle ? `chaînes : ${q.ajustements.chaines.libelle}` : null,
           ].filter(Boolean).join(' · ')

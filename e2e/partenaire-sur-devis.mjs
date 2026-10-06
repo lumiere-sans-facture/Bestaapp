@@ -51,7 +51,8 @@ await doc.waitForLoadState(); await doc.waitForTimeout(800);
 const texte = await doc.evaluate(() => document.body.innerText);
 const attendu = `Réf. partenaire : ${partenaire?.code}`;
 ok(texte.includes(attendu), `le devis imprimé porte « ${attendu} »`);
-const pieds = await doc.evaluate(() => [...document.querySelectorAll('.page')].map((p) => {
+// Pages du devis seulement : l'annexe « Ajustements du kit » n'a pas de pied.
+const pieds = await doc.evaluate(() => [...document.querySelectorAll('.page:not(.annexe)')].map((p) => {
   const pied = p.querySelector('.pied');
   const ref = pied?.previousElementSibling;
   return { ref: ref?.innerText || '', pied: Math.round(pied?.getBoundingClientRect().height || 0) };

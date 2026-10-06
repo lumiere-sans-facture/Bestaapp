@@ -124,7 +124,8 @@ describe('main d’œuvre des kits haute tension', () => {
     const k208 = SOLAR_KITS.find((k) => k.id === 'kit-208kwh-deye-hv');
     expect(estKitHauteTension(k208)).toBe(true);
     expect(mo(k208, 2)).toBe(2500000);
-    const devis = buildKitQuotation(k208, 'tole', true, { peakLoad: 100000, requiredPanelPower: 100000 }, INVERTER_MODELS, [], 2);
+    // Besoin égal au kit (175 panneaux) : le devis de référence, à l'identique.
+    const devis = buildKitQuotation(k208, 'tole', true, { peakLoad: 100000, requiredPanelPower: k208.panels * k208.panelW }, INVERTER_MODELS, [], 2);
     expect(devis.total).toBe(50055000);
     expect(devis.components.filter((c) => /onduleur/i.test(c.name)).map((c) => c.name)).toEqual(['Onduleur PCS Deye 125 kW (DEYEPCS125K-L0)']);
   });

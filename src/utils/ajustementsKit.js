@@ -30,16 +30,39 @@ const partager = (n, q) => Array.from({ length: q }, (_, i) => Math.floor(n / q)
  *   batterie:{kwh:number,tarif:number,montant:number}, total:number}}
  */
 export const mainOeuvreEtendue = (base, panneauxAjoutes, kwhAjoutes, tarifs = MAIN_OEUVRE_EXTENSION) => {
-  const nombre = Math.max(0, Math.floor(Number(panneauxAjoutes) || 0));
+  // Négatif = panneaux RETIRÉS (dimensionnement sous le kit) : la
+  // main-d'œuvre baisse du même tarif par panneau, sans passer sous zéro.
+  const nombre = Math.trunc(Number(panneauxAjoutes) || 0);
   const kwh = Math.max(0, Number(kwhAjoutes) || 0);
-  const montantPanneaux = nombre * tarifs.parPanneau;
+  const baseArrondie = Math.round(Number(base) || 0);
+  const montantPanneaux = Math.max(nombre * tarifs.parPanneau, -baseArrondie);
   const montantBatterie = Math.round(kwh * tarifs.parKwhBatterie);
   return {
-    base: Math.round(Number(base) || 0),
+    base: baseArrondie,
     panneaux: { nombre, tarif: tarifs.parPanneau, montant: montantPanneaux },
     batterie: { kwh, tarif: tarifs.parKwhBatterie, montant: montantBatterie },
-    total: Math.round(Number(base) || 0) + montantPanneaux + montantBatterie,
+    total: baseArrondie + montantPanneaux + montantBatterie,
   };
+};
+
+/**
+ * Nombre de panneaux POSÉS pour un kit : toujours celui du dimensionnement
+ * (règle du gérant), au-dessus comme EN DESSOUS du kit de base. Sous le kit,
+ * jamais moins qu'une configuration de chaînes valide sur l'onduleur du kit
+ * (tension MPPT minimale) — sinon le nombre valide le plus proche.
+ * Sans dimensionnement (`demande` nulle), le kit tel quel.
+ */
+export const panneauxPourKit = (kit, demande, onduleurKit = null, site = CONDITIONS_SITE) => {
+  const base = Number(kit?.panels) || 0;
+  const d = Math.ceil(Number(demande) || 0);
+  if (d <= 0 || d >= base) return d > 0 ? d : base;
+  const panneau = specPanneau(kit?.panelW);
+  const elec = lireElectrique(onduleurKit);
+  if (!panneau || !elec) return Math.max(1, d);
+  for (let n = Math.max(1, d); n < base; n += 1) {
+    if (configurerChaines(n, panneau, elec, { site }).ok) return n;
+  }
+  return base;
 };
 
 const fmtKwh = (v) => v.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
@@ -147,7 +170,7 @@ export const ordreEscalade = (onduleurKit, autres = []) => {
  * @returns {object} synthèse des ajustements (voir le retour ci-dessous)
  */
 export const ajusterKit = ({
-  kit, lignesKit = kit?.lines || [], panneauxDemandes = 0, onduleurKit = null, candidats = [],
+  kit, lignesKit = kit?.lines || [], panneauxDemandes = 0, panneauxRetenus = null, onduleurKit = null, candidats = [],
   batterieFinale = null,
   outils, products = [], tarifs = MAIN_OEUVRE_EXTENSION, site = CONDITIONS_SITE,
 }) => {
@@ -159,34 +182,58 @@ export const ajusterKit = ({
   const base = Number(kit?.panels) || 0;
   const wc = Number(kit?.panelW) || 0;
   const demande = Math.max(0, Math.ceil(Number(panneauxDemandes) || 0));
-  const final = Math.max(base, demande);
-  const ajoutes = final - base;
+  // Panneaux posés : ceux retenus par l'appelant (voir panneauxPourKit),
+  // sinon au moins ceux du kit.
+  const final = panneauxRetenus != null ? Math.max(0, Math.round(Number(panneauxRetenus) || 0)) : Math.max(base, demande);
+  const ajoutes = Math.max(0, final - base);
+  const retires = Math.max(0, base - final);
   const cas = demande < base ? 'inferieur' : demande === base ? 'egal' : 'superieur';
   const panneaux = {
-    base, demande, final, ajoutes, wc, cas,
-    kwcBase: kwc(base, wc), kwcFinal: kwc(final, wc), kwcAjoutes: kwc(ajoutes, wc),
+    base, demande, final, ajoutes, retires, wc, cas,
+    kwcBase: kwc(base, wc), kwcFinal: kwc(final, wc), kwcAjoutes: kwc(ajoutes, wc), kwcRetires: kwc(retires, wc),
   };
-  if (ajoutes === 0 && batterie.ajoutes === 0) {
+  if (ajoutes === 0 && retires === 0 && batterie.ajoutes === 0) {
     return { actif: false, panneaux, batterie, verification: null, onduleur: null, chaines: null, lignes: [], mainOeuvre: null, alertes: [] };
   }
 
   const baseMo = lignesKit.filter((l) => l.labor).reduce((s, l) => s + (Number(l.qty) || 0) * resolveLignePrice(l, products), 0);
-  const mainOeuvre = mainOeuvreEtendue(baseMo, ajoutes, batterie.ajoutes, tarifs);
+  const mainOeuvre = mainOeuvreEtendue(baseMo, ajoutes - retires, batterie.ajoutes, tarifs);
   const lignesMo = [
     {
       designation: `Main d'œuvre — supplément ${ajoutes} panneau${ajoutes > 1 ? 'x' : ''} ajouté${ajoutes > 1 ? 's' : ''}`,
       qty: ajoutes, unit: 'pcs', pu: tarifs.parPanneau, labor: true, ajustement: 'main-oeuvre',
     },
     {
+      designation: `Main d'œuvre — ${retires} panneau${retires > 1 ? 'x' : ''} en moins`,
+      qty: 1, unit: 'forfait', pu: retires > 0 ? mainOeuvre.panneaux.montant : 0, labor: true, ajustement: 'main-oeuvre',
+    },
+    {
       designation: `Main d'œuvre — supplément batterie (+${fmtKwh(batterie.ajoutes)} kWh)`,
       qty: 1, unit: 'forfait', pu: mainOeuvre.batterie.montant, labor: true, ajustement: 'main-oeuvre',
     },
-  ].filter((l) => l.pu > 0 && l.qty > 0);
+  ].filter((l) => l.pu !== 0 && l.qty > 0);
 
-  // Batterie seule étendue, aucun panneau ajouté : chaînes et onduleur ne
-  // bougent pas — seule la main-d'œuvre suit.
+  // Aucun panneau ajouté (batterie seule étendue, ou panneaux EN MOINS) :
+  // l'onduleur du kit reste ; seules les chaînes (recalculées sur lui) et la
+  // main-d'œuvre suivent.
   if (ajoutes === 0) {
-    return { actif: true, panneaux, batterie, verification: null, onduleur: null, chaines: null, lignes: lignesMo, mainOeuvre, alertes: [] };
+    let chaines = null;
+    const panneauRef = retires > 0 ? specPanneau(wc) : null;
+    const elec = retires > 0 ? lireElectrique(onduleurKit) : null;
+    if (panneauRef && elec) {
+      const cfgB = configurerChaines(base, panneauRef, elec, { site });
+      const cfgF = configurerChaines(final, panneauRef, elec, { site });
+      if (cfgF.ok) {
+        chaines = {
+          base: cfgB.ok ? { chaines: cfgB.chaines, mppt: cfgB.mppt, libelle: libelleChaines(cfgB.chaines) } : null,
+          final: [{ panneaux: final, chaines: cfgF.chaines, mppt: cfgF.mppt, libelle: libelleChaines(cfgF.chaines), vocChaine: Math.round(cfgF.vocChaine) }],
+          libelle: libelleChaines(cfgF.chaines),
+          ajoutees: 0,
+          mpptAjoutes: 0,
+        };
+      }
+    }
+    return { actif: true, panneaux, batterie, verification: null, onduleur: null, chaines, lignes: lignesMo, mainOeuvre, alertes: [] };
   }
 
   const panneau = specPanneau(wc);

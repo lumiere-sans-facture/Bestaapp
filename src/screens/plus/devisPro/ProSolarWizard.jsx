@@ -698,6 +698,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                     <span>
                       {selectedKit.name} — {kitQuotation?.panelsIncluded || selectedKit.panels} panneaux {selectedKit.panelW}Wc
                       {(kitQuotation?.panelsIncluded || selectedKit.panels) > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
+                      {(kitQuotation?.panelsIncluded || selectedKit.panels) < selectedKit.panels && ` (ajustés au besoin, au lieu de ${selectedKit.panels})`}
                       {' '}· batterie {kitQuotation?.batteryCapacity ?? selectedKit.battery} kWh
                       {(kitQuotation?.batteryCapacity ?? 0) > Number(selectedKit.battery) && ` (étendue depuis ${selectedKit.battery})`}
                       {' '}· onduleur{' '}

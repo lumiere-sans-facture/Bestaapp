@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildKitQuotation } from '../solarSizing';
-import { mainOeuvreEtendue, protectionAc, sectionCablePv, ordreEscalade } from '../ajustementsKit';
+import { mainOeuvreEtendue, protectionAc, sectionCablePv, ordreEscalade, panneauxPourKit } from '../ajustementsKit';
 import { buildDocHtml, MODELS } from '../docTemplates';
 import { SOLAR_KITS } from '../../data/kits';
 import { donneesDeDevis } from '../docTemplates/shared';
@@ -41,10 +41,31 @@ describe('kit de base conservé sans ajustement', () => {
     expect(q.components.some((c) => /extension/.test(c.name))).toBe(false);
   });
 
-  it('demande inférieure au kit : le kit n’est jamais réduit', () => {
+  it('demande inférieure au kit : les panneaux DIMENSIONNÉS, main-d’œuvre réduite d’autant', () => {
+    // 5 panneaux : une chaîne valide sur le 8 kVA (tension MPPT minimale tenue).
     const q = devis(KIT_8K, 5, [OND_8K]);
-    expect(q.ajustements).toBeNull();
-    expect(q.panelsIncluded).toBe(8);
+    expect(q.panelsIncluded).toBe(5);
+    expect(q.ajustements.panneaux).toMatchObject({ base: 8, demande: 5, final: 5, ajoutes: 0, retires: 3, cas: 'inferieur' });
+    expect(q.inverterSuggested).toBeNull();
+    // Main-d'œuvre : base 100 000 − 3 × 10 000.
+    expect(q.installationCost).toBe(70000);
+    expect(ligne(q, /^Panneaux/).quantity).toBe(5);
+    // Prix : 3 panneaux et 3 structures en moins, et 30 000 F de main-d'œuvre.
+    const base = devis(KIT_8K, 8, [OND_8K]);
+    expect(base.total - q.total).toBe(3 * ligne(base, /^Panneaux/).unitPrice + 3 * 10000 + 30000);
+    expect(q.ajustements.impact.ecart).toBe(q.total - base.total);
+  });
+
+  it('jamais sous une chaîne valide pour l’onduleur du kit', () => {
+    // Tension MPPT minimale du 8 kVA : 150 V ; un seul panneau n'y suffit pas.
+    const { nMin } = limitesChaine(specPanneau(620), lireElectrique({ electrique: ELEC_2MPPT }));
+    const q = devis(KIT_8K, 1, [OND_8K]);
+    expect(q.panelsIncluded).toBe(nMin);
+    expect(panneauxPourKit(KIT_8K, 1, OND_8K)).toBe(nMin);
+    // Onduleur inconnu : les panneaux dimensionnés, au moins un.
+    expect(panneauxPourKit(KIT_8K, 1, null)).toBe(1);
+    // Sans dimensionnement : le kit tel quel.
+    expect(panneauxPourKit(KIT_8K, 0, OND_8K)).toBe(8);
   });
 });
 

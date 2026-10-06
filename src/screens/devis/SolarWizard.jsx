@@ -223,7 +223,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre) : null),
     [selectedKit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre]
   );
-  // Panneaux réellement inclus au devis : ceux du kit, complétés si le besoin
+  // Panneaux réellement inclus au devis : ceux du dimensionnement (plus ou moins que le kit) ;
   // calculé en exige plus (kit choisi sur sa batterie, pas ses panneaux).
   const installedPanels = displayQuotation?.panelsIncluded || selectedKit?.panels || 0;
 
@@ -645,6 +645,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
               <span>
                 {selectedKit.name} — {installedPanels} panneaux {selectedKit.panelW}Wc
                 {installedPanels > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
+                {installedPanels < selectedKit.panels && ` (ajustés au besoin, au lieu de ${selectedKit.panels})`}
                 {' '}· batterie {displayQuotation.batteryCapacity ?? selectedKit.battery} kWh
                 {(displayQuotation.batteryCapacity ?? 0) > Number(selectedKit.battery) && ` (étendue depuis ${selectedKit.battery})`}
                 {' '}· onduleur{' '}

@@ -22,7 +22,7 @@ const choix = await page.locator('.sheet select').first().evaluate((s) => [...s.
 ok(choix.join('|') === 'Non renseignée|12 V|24 V|48 V', `formulaire onduleur : ${choix.join(' / ')}`);
 await page.keyboard.press('Escape');
 
-// ---- 2. MES KITS : tension affichée ; on gonfle le kit 2,5 kWh à 20 panneaux (10 000 Wc, au-delà de 2 × 3 kVA) ----
+// ---- 2. MES KITS : tension affichée dans la liste et le formulaire ----
 await page.goto(B + '/plus/kits');
 await page.waitForTimeout(1500);
 const listeKits = await page.evaluate(() => document.querySelector('.page-content')?.innerText || '');
@@ -32,12 +32,10 @@ await carte.locator('button:has-text("Modifier")').click();
 await page.waitForTimeout(400);
 const tensionKit = await page.locator('.sheet select').first().inputValue();
 ok(tensionKit === '24', `formulaire kit : tension 24 V déjà renseignée [${tensionKit}]`);
-const champPanneaux = page.locator('.sheet .input-group', { hasText: 'Nombre de panneaux' }).locator('input');
-await champPanneaux.fill('20');
 await page.locator('.sheet button[type="submit"]').click();
 await page.waitForTimeout(800);
 
-// ---- 3. ASSISTANT : un petit besoin → kit 2,5 kWh 24 V, 20 panneaux ----
+// ---- 3. ASSISTANT : besoin de jour → kit 2,5 kWh 24 V et ~20 panneaux (10 000 Wc, au-delà de 2 × 3 kVA) ----
 const suivant = () => page.locator('button:has-text("Suivant")').first();
 await page.goto(B + '/devis');
 await page.waitForTimeout(1500);
@@ -48,11 +46,12 @@ await page.waitForTimeout(900);
 await page.locator('.page-content button').nth(1).click();
 await page.waitForTimeout(300);
 await suivant().click(); await page.waitForTimeout(800);
-const sel = page.locator('select').first();
-await sel.selectOption(await sel.evaluate((el) => [...el.options].find((x) => x.text.includes('Téléviseur'))?.value || ''));
-await page.locator('.wizard-form button.btn-primary').first().click(); await page.waitForTimeout(500);
+await page.locator('button:has-text("Saisie directe")').click();
+await page.locator('.manual-consumption-grid input').nth(0).fill('35');
+await page.locator('.manual-consumption-grid input').nth(1).fill('0.5');
 await suivant().click(); await page.waitForTimeout(800);
 await suivant().click(); await page.waitForTimeout(1600);
+await page.locator('.kit-option', { hasText: 'Kit 2,5 kWh — Essentiel' }).first().click(); await page.waitForTimeout(800);
 const ecran = await page.evaluate(() => document.querySelector('.page-content')?.innerText || '');
 if (process.env.DEBUG) console.log(ecran.slice(0, 1500));
 ok(/Kit 2,5 kWh — Essentiel/.test(ecran), 'le kit 2,5 kWh (24 V) est suggéré pour ce petit besoin');

@@ -1,6 +1,6 @@
 /* Mise en parallèle des onduleurs : réglée par modèle dans « Plus ›
-   Onduleurs » (oui/non + nombre maximal). Un kit 24 V gonflé à 20 panneaux
-   (10 000 Wc) reçoit 3 × 3 kVA si le modèle en accepte 4 ; si le modèle est
+   Onduleurs » (oui/non + nombre maximal). Un kit 24 V dimensionné à ~20 panneaux
+   (10 000 Wc, besoin de jour) reçoit 3 × 3 kVA si le modèle en accepte 4 ; si le modèle est
    déclaré « non couplable », l'assistant avertit au lieu d'en doubler. */
 import { chromium } from '@playwright/test';
 const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
@@ -36,22 +36,17 @@ const devis = async () => {
   await page.locator('.page-content button').nth(1).click();
   await page.waitForTimeout(300);
   await suivant().click(); await page.waitForTimeout(800);
-  const sel = page.locator('select').first();
-  await sel.selectOption(await sel.evaluate((el) => [...el.options].find((x) => x.text.includes('Téléviseur'))?.value || ''));
-  await page.locator('.wizard-form button.btn-primary').first().click(); await page.waitForTimeout(500);
+  // Besoin réel : beaucoup d'énergie de jour, presque rien la nuit — le kit
+  // 2,5 kWh suffit en batterie, mais il faut ~20 panneaux de 500 Wc.
+  await page.locator('button:has-text("Saisie directe")').click();
+  await page.locator('.manual-consumption-grid input').nth(0).fill('35');
+  await page.locator('.manual-consumption-grid input').nth(1).fill('0.5');
   await suivant().click(); await page.waitForTimeout(800);
   await suivant().click(); await page.waitForTimeout(1600);
+  await page.locator('.kit-option', { hasText: 'Kit 2,5 kWh — Essentiel' }).first().click();
+  await page.waitForTimeout(800);
   return page.evaluate(() => document.querySelector('.page-content')?.innerText || '');
 };
-
-// Kit 2,5 kWh Essentiel (24 V) gonflé à 20 panneaux 500 Wc.
-await page.goto(B + '/plus/kits');
-await page.waitForTimeout(1500);
-await page.locator('.kit-card', { hasText: 'Kit 2,5 kWh — Essentiel' }).locator('button:has-text("Modifier")').click();
-await page.waitForTimeout(400);
-await page.locator('.sheet .input-group', { hasText: 'Nombre de panneaux' }).locator('input').fill('20');
-await page.locator('.sheet button[type="submit"]').click();
-await page.waitForTimeout(800);
 
 // ---- 1. Parallèle jusqu'à 4 ----
 const liste = await regler(true, 4);

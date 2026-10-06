@@ -34,7 +34,7 @@ export default function AjustementsKit({ ajustements, kitName }) {
       </div>
       <div className="bom-row">
         <div className="bom-name">
-          Proposition <span className="bom-qty">({p.demande} demandés, +{p.ajoutes} ajoutés)</span>
+          Proposition <span className="bom-qty">({p.demande} demandés, {p.retires > 0 ? `−${p.retires} en moins` : `+${p.ajoutes} ajoutés`})</span>
         </div>
         <div className="bom-price">{panneaux(p.final)} · {kwc(p.kwcFinal)}</div>
       </div>
@@ -51,7 +51,7 @@ export default function AjustementsKit({ ajustements, kitName }) {
         <div className="bom-price ajustements-texte">
           {chaines
             ? <>{chaines.base?.libelle ? `${chaines.base.libelle} → ` : ''}{chaines.final.map((f) => f.libelle).join(' / ') || '—'}</>
-            : p.ajoutes === 0 ? 'inchangées (aucun panneau ajouté)' : 'non vérifiées'}
+            : p.ajoutes === 0 && !p.retires ? 'inchangées (aucun panneau ajouté)' : 'non vérifiées'}
         </div>
       </div>
 
@@ -90,8 +90,11 @@ export default function AjustementsKit({ ajustements, kitName }) {
         <>
           <div className="bom-title">Main-d’œuvre</div>
           <div className="bom-row"><div className="bom-name">Main-d’œuvre initiale du kit</div><div className="bom-price">{formatCFA(mainOeuvre.base)}</div></div>
-          {mainOeuvre.panneaux.montant > 0 && <div className="bom-row">
-            <div className="bom-name">Supplément panneaux <span className="bom-qty">({mainOeuvre.panneaux.nombre} × {formatCFA(mainOeuvre.panneaux.tarif)})</span></div>
+          {mainOeuvre.panneaux.montant !== 0 && <div className="bom-row">
+            <div className="bom-name">
+              {mainOeuvre.panneaux.montant > 0 ? 'Supplément panneaux' : 'Panneaux en moins'}{' '}
+              <span className="bom-qty">({Math.abs(mainOeuvre.panneaux.nombre)} × {formatCFA(mainOeuvre.panneaux.tarif)})</span>
+            </div>
             <div className="bom-price">{formatCFA(mainOeuvre.panneaux.montant)}</div>
           </div>}
           {mainOeuvre.batterie.montant > 0 && <div className="bom-row">
@@ -113,7 +116,7 @@ export default function AjustementsKit({ ajustements, kitName }) {
           ))}
           <div className="bom-row ajustements-total">
             <div className="bom-name">Kit de base {formatCFA(impact.totalBase)} → proposition</div>
-            <div className="bom-price">{formatCFA(impact.total)} <span className="bom-qty">(+{formatCFA(impact.ecart)})</span></div>
+            <div className="bom-price">{formatCFA(impact.total)} <span className="bom-qty">({impact.ecart >= 0 ? '+' : '−'}{formatCFA(Math.abs(impact.ecart))})</span></div>
           </div>
         </>
       )}

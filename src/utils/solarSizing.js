@@ -469,7 +469,7 @@ export const calculateSystemSize = (
 import { TVA_RATE } from '../config/company';
 import { tensionKit, onduleursCompatibles, estKitHauteTension } from './tension';
 import { capacitePourBesoin, capaciteMaxKit, etendreBatterie } from './extensionBatterie';
-import { ajusterKit, ordreEscalade } from './ajustementsKit';
+import { ajusterKit, ordreEscalade, panneauxPourKit } from './ajustementsKit';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
 // Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
@@ -677,8 +677,11 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
   const lignePanneaux = lines.find((l) => PANEL_LINE_RE.test(l.designation) && !l.ajustement);
   const postes = [];
   const poste = (libelle, montant) => { if (Math.round(montant)) postes.push({ libelle, montant: Math.round(montant) }); };
-  poste(`Panneaux (+${panneaux.ajoutes})`, lignePanneaux ? panneaux.ajoutes * prixUnitaire(lignePanneaux) : 0);
-  poste(`Structure (${mounting.label}, +${panneaux.ajoutes} panneaux)`, includeMounting ? panneaux.ajoutes * mounting.pricePerPanel : 0);
+  // Écart de panneaux avec le kit : positif (ajoutés) ou négatif (en moins).
+  const delta = panneaux.final - panneaux.base;
+  const signe = `${delta > 0 ? '+' : '−'}${Math.abs(delta)}`;
+  poste(`Panneaux (${signe})`, lignePanneaux ? delta * prixUnitaire(lignePanneaux) : 0);
+  poste(`Structure (${mounting.label}, ${signe} panneaux)`, includeMounting ? delta * mounting.pricePerPanel : 0);
   if (inverterSuggested) {
     const ligneKit = kit.lines.find((l) => ONDULEUR_LINE_RE.test(l.designation));
     const avant = ligneKit ? ligneKit.qty * prixUnitaire(ligneKit) : 0;
@@ -687,7 +690,7 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
   const materiel = lines.filter((l) => l.ajustement === 'materiel');
   poste('Câbles, connecteurs et protections', materiel.reduce((s, l) => s + l.qty * prixUnitaire(l), 0));
   const supplementsMo = ajustements.mainOeuvre ? (ajustements.mainOeuvre.total - ajustements.mainOeuvre.base) * coef : 0;
-  poste('Main-d’œuvre (suppléments)', supplementsMo);
+  poste(supplementsMo < 0 ? 'Main-d’œuvre (panneaux en moins)' : 'Main-d’œuvre (suppléments)', supplementsMo);
   const ecart = Math.round(total - totalBase);
   const reste = ecart - postes.reduce((s, p) => s + p.montant, 0);
   // Ce qui ne relève pas des panneaux (modules batterie ajoutés) ferme le compte.
@@ -745,20 +748,6 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
  */
 export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = [], coefMainOeuvre = 1) => {
   const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
-  // Nombre de panneaux réellement nécessaires, à la puissance crête DU KIT —
-  // le kit est choisi sur sa batterie, pas sur son nombre de panneaux, donc
-  // il peut en manquer pour couvrir le besoin réel (ex. besoin 16 panneaux,
-  // kit à batterie suffisante mais composé pour 12).
-  const panneauxDemandes = sizing?.requiredPanelPower && kit.panelW
-    ? Math.ceil(sizing.requiredPanelPower / kit.panelW)
-    : kit.panels;
-  const neededPanels = Math.max(kit.panels, panneauxDemandes);
-  // Kit extensible : modules batterie ajoutés jusqu'à couvrir le besoin.
-  const batterie = etendreBatterie(kit, kit.lines, sizing?.batteryCapacity);
-  const withPanels = batterie.lignes.map((l) => (
-    PANEL_LINE_RE.test(l.designation) && neededPanels > l.qty ? { ...l, qty: neededPanels } : l
-  ));
-
   // Onduleur : celui du kit ne convient peut-être pas — soit il ne tient pas
   // le pic de consommation du client, soit il n'accepte pas les panneaux
   // désormais complétés. On ne peut le vérifier que si sa capacité kVA
@@ -778,8 +767,23 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const currentSpec = memeCalibre.find((o) => o.brand
     && new RegExp(`\\b${String(o.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(ligneOnduleurKit?.designation || ''))
     || memeCalibre[0];
-  // Puissance PV RÉELLEMENT posée : les panneaux du devis (ceux du kit,
-  // complétés au besoin), pas seulement ceux du besoin calculé — un kit peut
+  // Nombre de panneaux POSÉS, à la puissance crête DU KIT : TOUJOURS celui du
+  // dimensionnement (règle du gérant) — au-dessus du kit (besoin 16, kit
+  // composé pour 12) comme en dessous (besoin 7, kit de 10). Sous le kit, on
+  // ne descend pas plus bas qu'une chaîne valide sur l'onduleur du kit (voir
+  // panneauxPourKit). Sans dimensionnement, le kit tel quel.
+  const panneauxDemandes = sizing?.requiredPanelPower && kit.panelW
+    ? Math.ceil(sizing.requiredPanelPower / kit.panelW)
+    : kit.panels;
+  const neededPanels = panneauxPourKit(kit, panneauxDemandes, currentSpec || null);
+  // Kit extensible : modules batterie ajoutés jusqu'à couvrir le besoin.
+  const batterie = etendreBatterie(kit, kit.lines, sizing?.batteryCapacity);
+  const withPanels = batterie.lignes.map((l) => (
+    PANEL_LINE_RE.test(l.designation) && neededPanels !== l.qty ? { ...l, qty: neededPanels } : l
+  ));
+
+  // Puissance PV RÉELLEMENT posée : les panneaux du devis (ceux du
+  // dimensionnement), pas seulement ceux du besoin calculé — un kit peut
   // en compter davantage, et c'est bien l'onduleur qui les recevra tous.
   const pvDuDevis = neededPanels * (Number(kit.panelW) || 0);
   const pvPose = Math.max(pvDuDevis, Number(sizing?.installedPvPower) || 0);
@@ -799,6 +803,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     kit,
     lignesKit: batterie.lignes,
     panneauxDemandes,
+    panneauxRetenus: neededPanels,
     batterieFinale: batterie.capacite,
     onduleurKit: currentSpec || null,
     candidats,
@@ -886,9 +891,12 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     const iMo = lines.findIndex((l) => l.labor);
     const avant = iMo === -1 ? lines : lines.slice(0, iMo);
     let mo = iMo === -1 ? [] : lines.slice(iMo);
-    if (supplement > 0) {
+    // Négatif quand des panneaux sont EN MOINS que dans le kit.
+    if (supplement !== 0) {
       if (iMo === -1) {
-        mo = [{ designation: "Main d'œuvre", qty: 1, unit: 'pcs', pu: supplement, labor: true, productId: null }];
+        if (supplement > 0) {
+          mo = [{ designation: "Main d'œuvre", qty: 1, unit: 'pcs', pu: supplement, labor: true, productId: null }];
+        }
       } else {
         const l = mo[0];
         mo = [{ ...l, productId: null, qty: 1, pu: (Number(l.qty) || 0) * resolveLignePrice(l, products) + supplement }, ...mo.slice(1)];

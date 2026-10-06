@@ -189,11 +189,15 @@ describe('buildKitQuotation', () => {
     expect(q.total).toBe(sansSizing.total + 4 * lignePanneaux.unitPrice + 4 * 10000 + supplementMo);
   });
 
-  it('ne réduit jamais les panneaux du kit si le besoin calculé en exige moins', () => {
+  it('prend les panneaux DIMENSIONNÉS même sous ceux du kit (règle du gérant)', () => {
     const kit = byId('kit-20kwh'); // 12 panneaux
     const sizing = { requiredPanelPower: 5 * kit.panelW }; // besoin ne demande que 5 panneaux
     const q = buildKitQuotation(kit, 'tole', true, sizing);
-    expect(q.panelsIncluded).toBe(kit.panels);
+    expect(q.panelsIncluded).toBe(5);
+    expect(q.components.find((c) => /^Panneaux/i.test(c.name)).quantity).toBe(5);
+    expect(q.components.find((c) => /structure de montage/i.test(c.name)).quantity).toBe(5);
+    // Main-d'œuvre : 120 000 − 7 × 10 000.
+    expect(q.installationCost).toBe(50000);
   });
 
   it('la complétion des panneaux fait aussi grandir la structure de montage (au panneau)', () => {
