@@ -49,7 +49,7 @@ await page.locator('.kit-option', { hasText: /^Kit 5 kWh\s*Suggéré/ }).first()
 const section = (await page.locator('.ajustements-kit').innerText()).replace(/\s+/g, ' ');
 ok(/Kit de base — Kit 5 kWh 4 panneaux/.test(section), 'kit 5 kWh HZ étendu');
 ok(!/non vérifiées/.test(section) && /Chaînes solaires 1 chaîne de 4 panneaux →/.test(section), `chaînes calculées avec les valeurs saisies [${/Chaînes solaires (.*?) Onduleur/.exec(section)?.[1]}]`);
-ok(/Onduleur remplacé/i.test(section) && /au plus 1 chaîne/.test(section), 'raison : 1 seul MPPT, une seule chaîne possible');
+ok(/Onduleur doublé/i.test(section) && /au plus 1 chaîne/.test(section), `raison : 1 seul MPPT, une seule chaîne possible — le HZ du kit est doublé [${/Onduleur (\S+)/.exec(section)?.[1]}]`);
 
 console.log('\n' + R.join('\n'));
 await nav.close();

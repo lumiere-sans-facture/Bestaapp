@@ -94,7 +94,9 @@ const evaluer = ({ modele, quantite, panneaux, panneau, wc, equilibreSeulement, 
   const raisons = [];
   if (!elec) return { ok: false, raisons: ['caractéristiques électriques non renseignées'] };
   if (quantite > maxEnParallele(modele)) return { ok: false, raisons: ['mise en parallèle non autorisée'] };
-  const pic = outils.controlePic(modele, quantite);
+  // Contrôle du pic facultatif : pour un kit, seul l'accueil des panneaux
+  // décide de l'onduleur (règle du gérant, voir utils/solarSizing.js).
+  const pic = outils.controlePic ? outils.controlePic(modele, quantite) : { ok: true };
   if (!pic.ok) raisons.push(pic.raison);
   const parts = partager(panneaux, quantite);
   if (equilibreSeulement && parts.some((p) => p !== parts[0])) {
@@ -109,6 +111,25 @@ const evaluer = ({ modele, quantite, panneaux, panneau, wc, equilibreSeulement, 
     if (!configs[i].ok) raisons.push(...configs[i].raisons);
   });
   return { ok: raisons.length === 0, raisons: [...new Set(raisons)], configs, elec, parts };
+};
+
+/**
+ * Ordre d'essai des onduleurs d'un kit (règle du gérant) : l'onduleur du kit
+ * seul, puis le même en parallèle jusqu'à son maximum réglé ; ensuite
+ * seulement les autres modèles (`autres`, déjà triés du plus petit au plus
+ * grand), seuls d'abord, puis en parallèle.
+ * @returns {Array<{modele:object, quantite:number}>}
+ */
+export const ordreEscalade = (onduleurKit, autres = []) => {
+  const etapes = [];
+  if (onduleurKit) {
+    for (let q = 1; q <= maxEnParallele(onduleurKit); q += 1) etapes.push({ modele: onduleurKit, quantite: q });
+  }
+  const plafond = Math.max(1, ...autres.map(maxEnParallele));
+  for (let q = 1; q <= plafond; q += 1) {
+    for (const modele of autres) if (maxEnParallele(modele) >= q) etapes.push({ modele, quantite: q });
+  }
+  return etapes;
 };
 
 /**
@@ -193,23 +214,24 @@ export const ajusterKit = ({
   const chainesBase = cfgBase.ok ? cfgBase.chaines.length : 1;
   const mpptBase = cfgBase.ok ? cfgBase.mppt.length : 1;
 
-  // Escalade (règle du gérant) : chaînes ÉQUILIBRÉES d'abord — l'onduleur du
-  // kit, puis un autre du catalogue, puis le même doublé (parallèle) ; en
-  // dernier recours seulement, des chaînes inégales sur entrées distinctes.
+  // Escalade (règle du gérant) : tant que l'onduleur du kit prend les
+  // panneaux, on le GARDE. Sinon, le même en parallèle (×2, ×3… jusqu'au
+  // maximum réglé) ; un autre modèle du catalogue seulement après — seul
+  // d'abord, du plus petit au plus grand, puis en parallèle. À chaque étape,
+  // chaînes ÉQUILIBRÉES d'abord, sinon chaînes inégales chacune sur sa
+  // propre entrée MPPT : garder l'onduleur du kit prime sur l'égalité des
+  // chaînes.
   const autres = [...candidats]
     .filter((o) => o !== onduleurKit && o.id !== onduleurKit.id)
     .sort((a, b) => outils.puissanceSortie(a) - outils.puissanceSortie(b));
-  const modeles = [onduleurKit, ...autres];
-  const plafond = Math.max(1, ...modeles.map(maxEnParallele));
+  const escalade = ordreEscalade(onduleurKit, autres);
   const contexte = { panneaux: final, panneau, wc, outils, site };
   const evalKit = evaluer({ ...contexte, modele: onduleurKit, quantite: 1, equilibreSeulement: true });
   let retenu = null;
-  for (const equilibreSeulement of [true, false]) {
-    for (let quantite = 1; quantite <= plafond && !retenu; quantite += 1) {
-      for (const modele of modeles) {
-        const r = evaluer({ ...contexte, modele, quantite, equilibreSeulement });
-        if (r.ok) { retenu = { modele, quantite, ...r }; break; }
-      }
+  for (const { modele, quantite } of escalade) {
+    for (const equilibreSeulement of [true, false]) {
+      const r = evaluer({ ...contexte, modele, quantite, equilibreSeulement });
+      if (r.ok) { retenu = { modele, quantite, ...r }; break; }
     }
     if (retenu) break;
   }

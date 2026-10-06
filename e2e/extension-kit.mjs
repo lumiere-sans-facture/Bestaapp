@@ -36,14 +36,15 @@ await page.waitForTimeout(800);
 const section = page.locator('.ajustements-kit');
 ok(await section.count() === 1, 'la section « Ajustements du kit » s’affiche pour un kit étendu');
 const texte = (await section.innerText().catch(() => '')).replace(/\s+/g, ' ');
-const raison = /Onduleur remplacé(.*?)Matériel/i.exec(texte)?.[1]?.slice(0, 160);
+const raison = /Onduleur doublé(.*?)Matériel/i.exec(texte)?.[1]?.slice(0, 160);
 ok(/Kit de base — Kit 5 kWh — Deye 4 panneaux/.test(texte), `kit de base : 4 panneaux [${texte.slice(0, 90)}…]`);
 const final = Number(/Proposition \((\d+) demandés, \+(\d+) ajoutés\)/.exec(texte)?.[1] || 0);
 ok(final > 4, `panneaux demandés et ajoutés affichés [${final} demandés]`);
 ok(/Chaînes solaires 1 chaîne de 4 panneaux → \d+ chaînes? de \d+ panneaux/.test(texte), `chaînes calculées [${/Chaînes solaires (.*?) Onduleur/.exec(texte)?.[1]}]`);
-ok(/Onduleur remplacé/.test(texte) && /Deye Onduleur hybride 12kVA/.test(texte) && /Raison :/.test(texte),
-   `onduleur remplacé, raison donnée [${raison}]`);
-ok(/Matériel ajouté/i.test(texte) && /Disjoncteur AC 25 A tétrapolaire/.test(texte), 'câbles, protections et disjoncteur AC du nouvel onduleur ajoutés');
+// Règle du gérant : le 6 kVA du kit est DOUBLÉ, pas remplacé par un 12 kVA.
+ok(/Onduleur doublé/.test(texte) && /2 × Deye Onduleur hybride 6kVA/.test(texte) && !/12kVA/.test(texte) && /Raison :/.test(texte),
+   `onduleur du kit doublé, raison donnée [${raison}]`);
+ok(/Matériel ajouté/i.test(texte) && /Disjoncteur AC 40 A/.test(texte), 'câbles, protections et disjoncteur AC du second onduleur ajoutés');
 // Batterie du kit inchangée (5 kWh) : le supplément batterie n'apparaît pas.
 ok(/Supplément panneaux \(\d+ × 10 000 F\)/.test(texte.replace(/ /g, ' ')) && !/Supplément batterie|kWc ×/.test(texte),
    'main-d’œuvre justifiée : base et panneaux ; aucun supplément batterie sans module ajouté');
@@ -103,7 +104,7 @@ await etapeSuivante().click(); await page.waitForTimeout(800);
 await etapeSuivante().click(); await page.waitForTimeout(1500);
 await page.locator('.kit-option', { hasText: 'Deye' }).first().click(); await page.waitForTimeout(800);
 const pro = (await page.locator('.ajustements-kit').innerText().catch(() => '')).replace(/\s+/g, ' ');
-ok(/Onduleur remplacé/.test(pro) && /Main-d’œuvre finale/.test(pro), 'espace Pro : section « Ajustements du kit » identique');
+ok(/Onduleur doublé/.test(pro) && /Main-d’œuvre finale/.test(pro), 'espace Pro : section « Ajustements du kit » identique');
 await page.locator('button:has-text("Créer le devis")').click(); await page.waitForTimeout(1500);
 const dPro = await page.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).devis.find((x) => x.pro));
 const moPro = (dPro?.lignes || []).filter((l) => /main d.œuvre/i.test(l.designation));

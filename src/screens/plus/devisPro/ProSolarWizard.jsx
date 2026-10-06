@@ -732,6 +732,19 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                 {/* Aucun onduleur de la tension du kit ne tient ce besoin, même en parallèle :
                     le dire, plutôt que de glisser un modèle d'une autre tension, qui ne
                     fonctionnerait pas avec cette batterie. */}
+                {/* Pic mesuré au-delà de la sortie de l'onduleur du kit : l'onduleur
+                    n'est changé que pour les panneaux (règle du gérant) ; le pic, lui,
+                    est signalé pour que le vendeur en parle au client. */}
+                {kitQuotation?.picNonCouvert && (
+                  <div className="storage-alert abo-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
+                    <div>
+                      <Cpu size={13} style={{ verticalAlign: -2 }} /> Pic de consommation de {kitQuotation.picNonCouvert.picW.toLocaleString('fr-FR')} W :
+                      l’onduleur du kit fournit {kitQuotation.picNonCouvert.sortieW.toLocaleString('fr-FR')} W
+                      ({kitQuotation.picNonCouvert.requisW.toLocaleString('fr-FR')} W conseillés, marge comprise). Il prend bien les panneaux,
+                      il est donc gardé : éviter de faire tourner ces appareils en même temps, ou choisir un kit plus grand.
+                    </div>
+                  </div>
+                )}
                 {kitQuotation?.inverterInsuffisant && (
                   <div className="storage-alert abo-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
                     <div>

@@ -75,6 +75,8 @@ export const calculerProposition = (entree, ctx) => {
       onduleur: inv ? `${inv.quantite > 1 ? `${inv.quantite} × ` : ''}${designationOnduleur(inv)}` : `${kit.inverter} kVA (celui du kit)`,
       configuration_impossible: !!q.configurationImpossible,
       onduleur_insuffisant: !!q.inverterInsuffisant,
+      // Pic des appareils au-delà de la sortie de l'onduleur (W), sinon null.
+      pic_non_couvert_w: q.picNonCouvert ? q.picNonCouvert.picW : null,
       ajustements: q.ajustements
         ? [
             q.ajustements.panneaux?.ajoutes ? `+${q.ajustements.panneaux.ajoutes} panneaux` : null,

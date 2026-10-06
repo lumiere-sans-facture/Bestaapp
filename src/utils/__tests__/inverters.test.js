@@ -260,7 +260,13 @@ describe('buildKitQuotation — remplacement automatique de l’onduleur', () =>
     const cinq24 = { id: 'x-5kva-24', brand: 'Must', model: 'Onduleur hybride 5kVA', capacity: 5, maxPvPower: 6500, price: 420000, tension: 24 };
     // 5 000 Wc de panneaux : au-delà de l'entrée PV du 3 kVA (3 900 Wc).
     const sizing = { requiredPanelPower: 5000, installedPvPower: 5000, peakLoad: 2000 };
-    const q = buildKitQuotation(kit, 'tole', true, sizing, [...INVERTER_MODELS, cinq24]);
+    // Règle du gérant : deux 3 kVA du kit en parallèle (7 800 Wc) passent
+    // avant un modèle plus grand…
+    const double = buildKitQuotation(kit, 'tole', true, sizing, [...INVERTER_MODELS, cinq24]);
+    expect(double.inverterSuggested).toMatchObject({ id: 'hz-3kva', quantite: 2 });
+    // … le 5 kVA n'arrive que si celui du kit ne se met pas en parallèle.
+    const sansParallele = INVERTER_MODELS.map((o) => (o.id === 'hz-3kva' ? { ...o, parallele: false } : o));
+    const q = buildKitQuotation(kit, 'tole', true, sizing, [...sansParallele, cinq24]);
     expect(q.inverterSuggested).toMatchObject({ id: 'x-5kva-24', quantite: 1 });
     const ligneOnduleur = q.components.find((c) => /onduleur/i.test(c.name));
     expect(ligneOnduleur.name).toContain('5kVA');
@@ -285,8 +291,26 @@ describe('buildKitQuotation — remplacement automatique de l’onduleur', () =>
   it('un kit 48 V garde l’accès aux onduleurs 48 V', () => {
     const kit = SOLAR_KITS.find((k) => k.id === 'kit-32kwh'); // 48 V, 6 kVA
     const q = buildKitQuotation(kit, 'tole', true, { requiredPanelPower: 11780, installedPvPower: 11780, peakLoad: 5000 }, INVERTER_MODELS);
-    expect(q.inverterSuggested).toMatchObject({ capacity: 12, quantite: 1 });
+    // 19 panneaux : le 6 kVA du kit, doublé, les prend — pas besoin du 12 kVA.
+    expect(q.inverterSuggested).toMatchObject({ capacity: 6, quantite: 2 });
     expect(q.inverterInsuffisant).toBe(false);
+    // Le 6 kVA du kit ne se met pas en parallèle : alors le 12 kVA (48 V aussi).
+    const sansParallele = INVERTER_MODELS.map((o) => (o.capacity === 6 ? { ...o, parallele: false } : o));
+    const r = buildKitQuotation(kit, 'tole', true, { requiredPanelPower: 11780, installedPvPower: 11780, peakLoad: 5000 }, sansParallele);
+    expect(r.inverterSuggested).toMatchObject({ capacity: 12, quantite: 1 });
+    expect(q.inverterInsuffisant).toBe(false);
+  });
+
+  it('le PIC de consommation ne fait jamais changer l’onduleur d’un kit : il est signalé', () => {
+    // Kit 16 kWh, ses 10 panneaux d'origine sur son 6 kVA : avant, la puissance
+    // PV tenait lieu de pic et faisait monter au 12 kVA.
+    const kit = SOLAR_KITS.find((k) => k.id === 'kit-16kwh');
+    const sansPic = buildKitQuotation(kit, 'tole', true, { requiredPanelPower: kit.panels * kit.panelW, peakLoad: 0 }, INVERTER_MODELS);
+    expect(sansPic.inverterSuggested).toBeNull();
+    expect(sansPic.picNonCouvert).toBeNull();
+    const gros = buildKitQuotation(kit, 'tole', true, { requiredPanelPower: kit.panels * kit.panelW, peakLoad: 9000 }, INVERTER_MODELS);
+    expect(gros.inverterSuggested).toBeNull();
+    expect(gros.picNonCouvert).toMatchObject({ picW: 9000, sortieW: 6000 });
   });
 
   it('ne touche pas à l’onduleur du kit s’il suffit déjà', () => {

@@ -1,8 +1,9 @@
-/* Un seul onduleur tant qu'un modèle suffit : l'assistant ne met deux
-   appareils en parallèle que lorsque AUCUN modèle configuré ne tient le
-   besoin à lui seul. Cas relevé sur le kit 32 kWh — 19 panneaux de 620 Wc
-   (11 780 Wc) : l'onduleur 6 kVA du kit n'accepte que 7 800 Wc, mais un seul
-   12 kVA (15 000 Wc) suffit. */
+/* Règle du gérant (octobre 2026) : l'onduleur du kit est GARDÉ tant qu'il
+   prend les panneaux ; sinon il est mis en PARALLÈLE avec un second
+   identique, et un modèle plus grand n'arrive qu'en dernier. Cas du kit
+   32 kWh — 19 panneaux de 620 Wc (11 780 Wc) : le 6 kVA du kit n'accepte que
+   7 800 Wc ; deux 6 kVA en parallèle (15 600 Wc) les prennent, le 12 kVA
+   n'est donc PAS proposé. */
 import { chromium } from '@playwright/test';
 const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const R = []; const ok = (c, m) => { R.push(`${c ? '✓ ' : '❌'} ${m}`); return c; };
@@ -48,23 +49,19 @@ await suivant().click(); await page.waitForTimeout(1800);  // étape 4 : kit + d
 const ecran = await page.evaluate(() => document.querySelector('.page-content')?.innerText || '');
 ok(/Kit 32 kWh/.test(ecran), 'le kit 32 kWh est suggéré pour ce besoin');
 
-// Le résumé du kit annonce l'onduleur retenu : « 12 kVA », sans « 2 × ».
+// Le résumé du kit annonce l'onduleur retenu : deux 6 kVA du kit.
 const resume = (ecran.match(/onduleur [^\n]*/) || ['—'])[0];
-ok(/onduleur 12 kVA/.test(resume) && !/2 ×/.test(resume),
-   `un seul onduleur retenu, pas deux en parallèle [${resume}]`);
+ok(/2 × 6 kVA/.test(resume) && !/12 kVA/.test(resume),
+   `l’onduleur du kit doublé, pas un 12 kVA [${resume}]`);
 
-// Et la ligne du devis le confirme : un seul appareil facturé (la quantité
-// n'est affichée qu'au-delà de 1 — « × 2 » signalerait deux boîtiers).
+// La ligne du devis : le 6 kVA du kit, en deux exemplaires.
 const equipements = ecran.slice(ecran.indexOf('ÉQUIPEMENTS'));
 const ligne = (equipements.match(/Onduleur hybride[^\n]*/) || ['—'])[0];
-ok(/12kVA/.test(ligne) && !/×/.test(ligne), `la ligne du devis porte un seul onduleur [${ligne}]`);
-
-// Français : « retenu » au singulier quand il n'y en a qu'un.
-ok(/Deye retenu à la place/.test(ecran) && !/retenus à la place/.test(ecran),
-   'le message d’adaptation est au singulier');
+ok(/6kVA/.test(ligne) && /× 2/.test(ligne), `la ligne du devis porte deux 6 kVA [${ligne}]`);
+ok(!/12kVA/.test(equipements), 'aucun 12 kVA dans le devis');
 
 console.log('\n' + R.join('\n'));
 await nav.close();
 const echecs = R.filter((l) => l.startsWith('❌')).length;
-console.log(echecs ? `\n❌ ${echecs} échec(s)` : '\n✅ Onduleur : un seul appareil tant qu’un modèle suffit');
+console.log(echecs ? `\n❌ ${echecs} échec(s)` : '\n✅ Onduleur : celui du kit, doublé avant tout modèle plus grand');
 process.exit(echecs ? 1 : 0);

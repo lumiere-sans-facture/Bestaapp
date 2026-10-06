@@ -469,7 +469,7 @@ export const calculateSystemSize = (
 import { TVA_RATE } from '../config/company';
 import { tensionKit, onduleursCompatibles, estKitHauteTension } from './tension';
 import { capacitePourBesoin, capaciteMaxKit, etendreBatterie } from './extensionBatterie';
-import { ajusterKit } from './ajustementsKit';
+import { ajusterKit, ordreEscalade } from './ajustementsKit';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
 // Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
@@ -650,6 +650,25 @@ const PANEL_LINE_RE = /^\s*(\d+\s*)?panneaux?\b/i;
 const ONDULEUR_LINE_RE = /onduleur/i;
 
 /**
+ * Onduleur(s) d'un kit quand ses caractéristiques électriques manquent :
+ * seule la puissance PV admise départage, dans l'ordre de la règle du
+ * gérant — celui du kit, le même en parallèle, puis un autre modèle.
+ * @returns {{modele:object, quantite:number, suffisant:boolean}}
+ */
+export const onduleurPourPanneaux = (onduleurKit, candidats = [], { pvPower = 0, configures = [] } = {}) => {
+  const autres = [...candidats]
+    .filter((o) => o !== onduleurKit && o.id !== onduleurKit.id)
+    .sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
+  const escalade = ordreEscalade(onduleurKit, autres);
+  const ensemble = ({ modele, quantite }) => onduleursEnParallele(modele, quantite, configures);
+  const choisi = escalade.find((e) => onduleurAccepteLePv(ensemble(e), { pvPower, configures }));
+  if (choisi) return { ...choisi, suffisant: true };
+  // Rien ne suffit : l'ensemble qui admet le plus de PV, signalé insuffisant.
+  const pv = (e) => limitePv(ensemble(e), configures);
+  return { ...escalade.reduce((best, e) => (pv(e) > pv(best) ? e : best)), suffisant: false };
+};
+
+/**
  * Synthèse affichable des ajustements d'un kit étendu : postes chiffrés au
  * prix du devis (coefficient pays compris) et impact sur le total.
  */
@@ -764,17 +783,18 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // en compter davantage, et c'est bien l'onduleur qui les recevra tous.
   const pvDuDevis = neededPanels * (Number(kit.panelW) || 0);
   const pvPose = Math.max(pvDuDevis, Number(sizing?.installedPvPower) || 0);
-  const critere = { peakLoad: sizing?.peakLoad || 0, pvPower: pvPose, configures: inverters };
-  // Escalade : l'onduleur du kit d'abord, puis un modèle supérieur SEUL —
-  // on ne met en parallèle qu'une fois tous les modèles seuls épuisés, et
-  // jamais au-delà du maximum réglé pour le modèle (voir resoudreOnduleur).
+  // RÈGLE DU GÉRANT : l'onduleur d'un kit ne change QUE s'il ne peut pas
+  // prendre les panneaux à poser. Il est alors d'abord mis en parallèle avec
+  // un second identique ; un autre modèle seulement si le parallèle ne suffit
+  // pas (voir ordreEscalade). Le pic de consommation ne fait plus changer
+  // l'onduleur d'un kit — un pic mesuré qui dépasse sa sortie est SIGNALÉ
+  // (picNonCouvert), jamais corrigé en douce par un modèle plus gros.
   //
   // Kit ÉTENDU (plus de panneaux que le kit) : les ajustements (chaînes,
   // onduleur vérifié électriquement, câbles, protections, main-d'œuvre) sont
   // calculés par utils/ajustementsKit.js. Quand les caractéristiques
-  // électriques manquent, l'escalade historique (pic + puissance PV) reste
-  // celle qui choisit l'onduleur.
-  const choix = critereDeChoix(critere);
+  // électriques manquent, seule la puissance PV admise départage.
+  const critere = { pvPower: pvPose, configures: inverters };
   const ajustements = ajusterKit({
     kit,
     lignesKit: batterie.lignes,
@@ -784,14 +804,6 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     candidats,
     products,
     outils: {
-      controlePic: (modele, quantite) => {
-        const ensemble = onduleursEnParallele(modele, quantite, inverters);
-        const ok = onduleurTientLePic(ensemble, choix);
-        return ok ? { ok } : {
-          ok,
-          raison: `sortie ${puissanceSortie(ensemble).toLocaleString('fr-FR')} W insuffisante (${Math.round(sortieOnduleurRequise(choix.peakLoad, choix.pvPower)).toLocaleString('fr-FR')} W requis, marge comprise)`,
-        };
-      },
       limitePv: (modele) => limitePv(modele, inverters),
       puissanceSortie,
     },
@@ -807,7 +819,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
       suffisant: true,
     };
   } else if (!impossible && currentSpec) {
-    retenu = resoudreOnduleur(candidats, critere, { prefere: currentSpec });
+    retenu = onduleurPourPanneaux(currentSpec, candidats, critere);
   }
   // Vérifié : le statut fait foi (un remplacement à calibre égal, autre
   // marque, reste un remplacement) ; sinon, l'ancienne règle du calibre.
@@ -815,6 +827,17 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     ? ajustements.onduleur.statut !== 'conserve'
     : retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
   const inverterSuggested = change ? { ...retenu.modele, quantite: retenu.quantite } : null;
+  // Pic de consommation MESURÉ (appareils listés) que l'onduleur retenu ne
+  // tient pas : signalé au vendeur, sans changer l'onduleur.
+  const peakLoad = Number(sizing?.peakLoad) || 0;
+  const onduleurPose = retenu ? onduleursEnParallele(retenu.modele, retenu.quantite, inverters) : currentSpec;
+  const picNonCouvert = peakLoad > 0 && onduleurPose && !onduleurTientLePic(onduleurPose, { peakLoad })
+    ? {
+        picW: peakLoad,
+        requisW: Math.round(sortieOnduleurRequise(peakLoad)),
+        sortieW: Math.round(puissanceSortie(onduleurPose)),
+      }
+    : null;
   // productId retiré sur les lignes remplacées : elles ne représentent plus
   // le produit boutique éventuellement lié, `pu` (fixé ci-dessous) prime.
   const withInverter = inverterSuggested
@@ -912,6 +935,8 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     // parallèle au maximum autorisé :
     // l'écran le dit, plutôt que de proposer un modèle d'une autre tension.
     inverterInsuffisant: retenu ? !retenu.suffisant : false,
+    // Pic mesuré au-delà de la sortie de l'onduleur du devis (null sinon).
+    picNonCouvert,
     // Kit étendu dont AUCUN onduleur (même doublé) ne tient les limites
     // électriques : le devis ne doit pas partir en l'état.
     configurationImpossible: impossible,

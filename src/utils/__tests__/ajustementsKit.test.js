@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildKitQuotation } from '../solarSizing';
-import { mainOeuvreEtendue, protectionAc, sectionCablePv } from '../ajustementsKit';
+import { mainOeuvreEtendue, protectionAc, sectionCablePv, ordreEscalade } from '../ajustementsKit';
 import { buildDocHtml, MODELS } from '../docTemplates';
 import { SOLAR_KITS } from '../../data/kits';
 import { donneesDeDevis } from '../docTemplates/shared';
@@ -151,11 +151,45 @@ describe('main-d’œuvre : base + 10 000 F par panneau + 3 500 F par kWh de bat
   });
 });
 
+describe('règle du gérant : l’onduleur du kit d’abord, puis en parallèle, puis plus grand', () => {
+  it('il prend les panneaux : GARDÉ, même si un plus grand existe et que le pic est élevé', () => {
+    // Les 8 panneaux du kit (1 chaîne) sur son 5 kVA ; pic de 9 000 W, bien
+    // au-delà de sa sortie. Kit posé tel quel : aucun ajustement.
+    const q = devis(KIT_5K, 8, [OND_5K, OND_8K], { peakLoad: 9000 });
+    expect(q.ajustements).toBeNull();
+    expect(q.inverterSuggested).toBeNull();
+    expect(ligne(q, /^Onduleur/).name).toMatch(/Petit 5kVA/);
+    // Le pic n'est pas corrigé en douce : il est signalé.
+    expect(q.picNonCouvert).toMatchObject({ picW: 9000, sortieW: 5000 });
+  });
+
+  it('il ne les prend pas seul : DOUBLÉ avant tout modèle plus grand', () => {
+    // 14 panneaux : impossible sur un seul 5 kVA (1 MPPT), le 8 kVA les prendrait seul.
+    const q = devis(KIT_5K, 14, [OND_5K, OND_8K]);
+    expect(q.ajustements.onduleur.statut).toBe('double');
+    expect(q.inverterSuggested).toMatchObject({ id: 'test-5k', quantite: 2 });
+  });
+
+  it('pas de pic signalé quand il est couvert ou non mesuré', () => {
+    expect(devis(KIT_5K, 8, [OND_5K], { peakLoad: 3000 }).picNonCouvert).toBeNull();
+    expect(devis(KIT_5K, 8, [OND_5K], { peakLoad: 0 }).picNonCouvert).toBeNull();
+  });
+
+  it('ordreEscalade : kit ×1, kit ×2…, puis les autres seuls, puis en parallèle', () => {
+    const autres = [{ id: 'a', maxParallele: 2 }, { id: 'b', parallele: false }];
+    const ordre = ordreEscalade({ id: 'kit', maxParallele: 3 }, autres).map((e) => `${e.modele.id}×${e.quantite}`);
+    expect(ordre).toEqual(['kit×1', 'kit×2', 'kit×3', 'a×1', 'b×1', 'a×2']);
+    expect(ordreEscalade({ id: 'kit', parallele: false }, []).map((e) => e.quantite)).toEqual([1]);
+  });
+});
+
 describe('changement d’onduleur requis', () => {
-  const q = devis(KIT_5K, 14, [OND_5K, OND_8K]);
+  // Onduleur du kit SANS mise en parallèle : seul un autre modèle peut suivre.
+  const OND_5K_SEUL = { ...OND_5K, parallele: false };
+  const q = devis(KIT_5K, 14, [OND_5K_SEUL, OND_8K]);
   const a = q.ajustements;
 
-  it('l’onduleur du kit (1 MPPT) ne tient pas 14 panneaux : remplacé par le 8 kVA', () => {
+  it('l’onduleur du kit (1 MPPT, sans parallèle) ne tient pas 14 panneaux : remplacé par le 8 kVA', () => {
     expect(a.onduleur.statut).toBe('remplace');
     expect(a.onduleur.ancien.capacity).toBe(5);
     expect(a.onduleur.nouveau).toMatchObject({ id: 'test-8k', capacity: 8 });
@@ -175,7 +209,7 @@ describe('remplacement à calibre égal (autre modèle)', () => {
     // Un 5 kVA à 2 MPPT accepte 2 × 7 là où celui du kit (1 MPPT) ne le peut pas.
     const autre5k = { ...OND_8K, id: 'autre-5k', brand: 'Autre', model: 'Onduleur hybride 5kVA', capacity: 5, maxPvPower: 9000, price: 350000 };
     // Pic de 3 000 W : un seul 5 kVA suffit en sortie (3 600 W marge comprise).
-    const q = devis(KIT_5K, 14, [OND_5K, autre5k], { peakLoad: 3000 });
+    const q = devis(KIT_5K, 14, [{ ...OND_5K, parallele: false }, autre5k], { peakLoad: 3000 });
     expect(q.ajustements.onduleur.statut).toBe('remplace');
     expect(q.inverterSuggested).toMatchObject({ id: 'autre-5k', capacity: 5 });
     expect(ligne(q, /^Onduleur/)).toMatchObject({ unitPrice: 350000 });
