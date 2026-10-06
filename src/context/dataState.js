@@ -12,6 +12,17 @@ import { generatePartnerCode, normaliseCode } from '../utils/referral';
 
 export const STORAGE_KEY = 'bestasolar_data';
 
+/**
+ * Champs de référence des kits officiels (tension batterie, extension par
+ * modules) recomplétés quand ils manquent — au chargement ET à chaque
+ * réception du serveur. Les kits sont une table PARTAGÉE : la copie reçue
+ * remplace la copie locale, et une copie enregistrée avant l'apparition de
+ * ces champs les effaçait. Le kit 60 kWh perdait ainsi son extension
+ * (jusqu'à 120 kWh) et le 128 kWh était proposé dès 61 kWh. Une valeur
+ * présente, même modifiée par le gérant, n'est jamais écrasée.
+ */
+export const completerKits = (kits) => completerExtensions(completerTensions(kits, SOLAR_KITS), SOLAR_KITS);
+
 // Clé de stockage par PÉRIMÈTRE de compte. En mode SaaS (backend configuré),
 // le cache local est séparé par organisation : sans cela, deux comptes
 // utilisés sur le même appareil partageraient leurs données — et la sync
@@ -120,14 +131,13 @@ export const loadState = (scope = null) => {
       // Migration « tension batterie » : les kits et onduleurs officiels
       // enregistrés avant l'existence du champ reçoivent leur tension (12,
       // 24, 48 V). Une valeur saisie n'est jamais écrasée.
-      saved.kits = completerTensions(saved.kits, SOLAR_KITS);
       saved.inverters = completerTensions(saved.inverters, INVERTER_MODELS);
       // Migration « caractéristiques électriques » : les onduleurs officiels
       // déjà enregistrés reçoivent celles de leur fiche (calcul des chaînes).
       saved.inverters = completerElectrique(saved.inverters, INVERTER_MODELS);
       // Migration « extension batterie » : le kit 60 kWh enregistré avant la
       // règle des modules ajoutés (jusqu'à 120 kWh) la reçoit.
-      saved.kits = completerExtensions(saved.kits, SOLAR_KITS);
+      saved.kits = completerKits(saved.kits);
       // Migration « Kits pompage » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.pompeKits)) saved.pompeKits = POMPE_KITS;
       if (!saved.payoutRequests) saved.payoutRequests = [];

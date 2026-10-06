@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { pullAll, pushCollections, pushTombstone, resynchroniserOrg, subscribeToChanges, lignesRefuseesParTable, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 import { estRefusRls, MESSAGE_REFUS_RLS, messageLignesRefusees } from '../utils/erreurSync';
 import { peutEnvoyer } from '../utils/etatSync';
-import { loadFileSync, persistFileSync } from './dataState';
+import { loadFileSync, persistFileSync, completerKits } from './dataState';
 import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection } from '../utils/fileSync';
 
 // Filet de sécurité du temps réel : intervalle entre deux relectures du
@@ -104,6 +104,9 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
           enAttentePourTable(fileRef.current, table)
         );
       }
+      // Kits reçus sans leurs champs de référence (copie partagée ancienne) :
+      // recomplétés comme au chargement, sinon l'extension batterie se perd.
+      merged.kits = completerKits(merged.kits);
       syncedRef.current = collections;
       setState(merged);
       // La file se recalcule maintenant depuis le serveur : ce qui vient d'en
