@@ -690,7 +690,7 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
   const materiel = lines.filter((l) => l.ajustement === 'materiel');
   poste('Câbles, connecteurs et protections', materiel.reduce((s, l) => s + l.qty * prixUnitaire(l), 0));
   const supplementsMo = ajustements.mainOeuvre ? (ajustements.mainOeuvre.total - ajustements.mainOeuvre.base) * coef : 0;
-  poste(supplementsMo < 0 ? 'Main-d’œuvre (panneaux en moins)' : 'Main-d’œuvre (suppléments)', supplementsMo);
+  poste('Main-d’œuvre (suppléments)', supplementsMo);
   const ecart = Math.round(total - totalBase);
   const reste = ecart - postes.reduce((s, p) => s + p.montant, 0);
   // Ce qui ne relève pas des panneaux (modules batterie ajoutés) ferme le compte.
@@ -891,12 +891,9 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     const iMo = lines.findIndex((l) => l.labor);
     const avant = iMo === -1 ? lines : lines.slice(0, iMo);
     let mo = iMo === -1 ? [] : lines.slice(iMo);
-    // Négatif quand des panneaux sont EN MOINS que dans le kit.
-    if (supplement !== 0) {
+    if (supplement > 0) {
       if (iMo === -1) {
-        if (supplement > 0) {
-          mo = [{ designation: "Main d'œuvre", qty: 1, unit: 'pcs', pu: supplement, labor: true, productId: null }];
-        }
+        mo = [{ designation: "Main d'œuvre", qty: 1, unit: 'pcs', pu: supplement, labor: true, productId: null }];
       } else {
         const l = mo[0];
         mo = [{ ...l, productId: null, qty: 1, pu: (Number(l.qty) || 0) * resolveLignePrice(l, products) + supplement }, ...mo.slice(1)];

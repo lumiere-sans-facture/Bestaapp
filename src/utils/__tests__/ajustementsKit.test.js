@@ -41,18 +41,19 @@ describe('kit de base conservé sans ajustement', () => {
     expect(q.components.some((c) => /extension/.test(c.name))).toBe(false);
   });
 
-  it('demande inférieure au kit : les panneaux DIMENSIONNÉS, main-d’œuvre réduite d’autant', () => {
+  it('demande inférieure au kit : les panneaux DIMENSIONNÉS, main-d’œuvre du kit GARDÉE', () => {
     // 5 panneaux : une chaîne valide sur le 8 kVA (tension MPPT minimale tenue).
     const q = devis(KIT_8K, 5, [OND_8K]);
     expect(q.panelsIncluded).toBe(5);
     expect(q.ajustements.panneaux).toMatchObject({ base: 8, demande: 5, final: 5, ajoutes: 0, retires: 3, cas: 'inferieur' });
     expect(q.inverterSuggested).toBeNull();
-    // Main-d'œuvre : base 100 000 − 3 × 10 000.
-    expect(q.installationCost).toBe(70000);
+    // Main-d'œuvre : celle du kit, jamais réduite.
+    expect(q.installationCost).toBe(100000);
+    expect(q.ajustements.mainOeuvre.panneaux.montant).toBe(0);
     expect(ligne(q, /^Panneaux/).quantity).toBe(5);
-    // Prix : 3 panneaux et 3 structures en moins, et 30 000 F de main-d'œuvre.
+    // Prix : seulement 3 panneaux et 3 structures en moins.
     const base = devis(KIT_8K, 8, [OND_8K]);
-    expect(base.total - q.total).toBe(3 * ligne(base, /^Panneaux/).unitPrice + 3 * 10000 + 30000);
+    expect(base.total - q.total).toBe(3 * ligne(base, /^Panneaux/).unitPrice + 3 * 10000);
     expect(q.ajustements.impact.ecart).toBe(q.total - base.total);
   });
 

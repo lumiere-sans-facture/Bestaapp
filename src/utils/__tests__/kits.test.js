@@ -196,8 +196,8 @@ describe('buildKitQuotation', () => {
     expect(q.panelsIncluded).toBe(5);
     expect(q.components.find((c) => /^Panneaux/i.test(c.name)).quantity).toBe(5);
     expect(q.components.find((c) => /structure de montage/i.test(c.name)).quantity).toBe(5);
-    // Main-d'œuvre : 120 000 − 7 × 10 000.
-    expect(q.installationCost).toBe(50000);
+    // Main-d'œuvre : celle du kit, gardée telle quelle.
+    expect(q.installationCost).toBe(120000);
   });
 
   it('la complétion des panneaux fait aussi grandir la structure de montage (au panneau)', () => {

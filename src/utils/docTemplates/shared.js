@@ -358,7 +358,7 @@ export function pageAjustements(data) {
     ligne(`${esc(m.designation.replace(/ — extension$/, ''))} × ${m.qty}${m.unit === 'm' ? ' m' : ''}${m.motif ? ` <span class="note">(${esc(m.motif)})</span>` : ''}`, `${nf(m.qty * m.pu)} F`)).join('')}</table>` : ''}
   ${mo ? `<h3>Main-d'œuvre</h3><table>
     ${ligne('Main-d’œuvre initiale du kit', `${nf(mo.base)} F`)}
-    ${mo.panneaux.montant ? ligne(`${mo.panneaux.montant > 0 ? 'Supplément panneaux' : 'Panneaux en moins'} (${Math.abs(mo.panneaux.nombre)} × ${nf(mo.panneaux.tarif)} F)`, `${nf(mo.panneaux.montant)} F`) : ''}
+    ${mo.panneaux.montant ? ligne(`Supplément panneaux (${mo.panneaux.nombre} × ${nf(mo.panneaux.tarif)} F)`, `${nf(mo.panneaux.montant)} F`) : ''}
     ${mo.batterie.montant ? ligne(`Supplément batterie (${kwhFr(mo.batterie.kwh)} × ${nf(mo.batterie.tarif)} F)`, `${nf(mo.batterie.montant)} F`) : ''}
     ${mo.coef > 1 ? ligne(`Chantier au Togo (× ${mo.coef})`, `${nf((mo.totalFinal || 0) - mo.total)} F`) : ''}
     <tr class="total"><td>Main-d’œuvre finale</td><td class="num">${nf(mo.totalFinal ?? mo.total)} F</td></tr>

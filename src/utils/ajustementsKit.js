@@ -30,12 +30,12 @@ const partager = (n, q) => Array.from({ length: q }, (_, i) => Math.floor(n / q)
  *   batterie:{kwh:number,tarif:number,montant:number}, total:number}}
  */
 export const mainOeuvreEtendue = (base, panneauxAjoutes, kwhAjoutes, tarifs = MAIN_OEUVRE_EXTENSION) => {
-  // Négatif = panneaux RETIRÉS (dimensionnement sous le kit) : la
-  // main-d'œuvre baisse du même tarif par panneau, sans passer sous zéro.
-  const nombre = Math.trunc(Number(panneauxAjoutes) || 0);
+  // Panneaux EN MOINS que le kit : aucune réduction — la main-d'œuvre du
+  // kit de base est gardée (règle du gérant).
+  const nombre = Math.max(0, Math.floor(Number(panneauxAjoutes) || 0));
   const kwh = Math.max(0, Number(kwhAjoutes) || 0);
   const baseArrondie = Math.round(Number(base) || 0);
-  const montantPanneaux = Math.max(nombre * tarifs.parPanneau, -baseArrondie);
+  const montantPanneaux = nombre * tarifs.parPanneau;
   const montantBatterie = Math.round(kwh * tarifs.parKwhBatterie);
   return {
     base: baseArrondie,
@@ -197,21 +197,20 @@ export const ajusterKit = ({
   }
 
   const baseMo = lignesKit.filter((l) => l.labor).reduce((s, l) => s + (Number(l.qty) || 0) * resolveLignePrice(l, products), 0);
-  const mainOeuvre = mainOeuvreEtendue(baseMo, ajoutes - retires, batterie.ajoutes, tarifs);
+  // Main-d'œuvre (règle du gérant) : celle du kit, plus les suppléments
+  // des panneaux et kWh de batterie AJOUTÉS ; jamais réduite quand le
+  // dimensionnement pose moins de panneaux que le kit.
+  const mainOeuvre = mainOeuvreEtendue(baseMo, ajoutes, batterie.ajoutes, tarifs);
   const lignesMo = [
     {
       designation: `Main d'œuvre — supplément ${ajoutes} panneau${ajoutes > 1 ? 'x' : ''} ajouté${ajoutes > 1 ? 's' : ''}`,
       qty: ajoutes, unit: 'pcs', pu: tarifs.parPanneau, labor: true, ajustement: 'main-oeuvre',
     },
     {
-      designation: `Main d'œuvre — ${retires} panneau${retires > 1 ? 'x' : ''} en moins`,
-      qty: 1, unit: 'forfait', pu: retires > 0 ? mainOeuvre.panneaux.montant : 0, labor: true, ajustement: 'main-oeuvre',
-    },
-    {
       designation: `Main d'œuvre — supplément batterie (+${fmtKwh(batterie.ajoutes)} kWh)`,
       qty: 1, unit: 'forfait', pu: mainOeuvre.batterie.montant, labor: true, ajustement: 'main-oeuvre',
     },
-  ].filter((l) => l.pu !== 0 && l.qty > 0);
+  ].filter((l) => l.pu > 0 && l.qty > 0);
 
   // Aucun panneau ajouté (batterie seule étendue, ou panneaux EN MOINS) :
   // l'onduleur du kit reste ; seules les chaînes (recalculées sur lui) et la
