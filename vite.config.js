@@ -2,6 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 
+// Vercel et GitHub Actions n'exposent pas les mêmes noms de variables Git.
+// Garder une seule résolution évite qu'un APK de production soit étiqueté
+// « dev · test » alors qu'il a bien été construit depuis main.
+const gitCommitSha = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || ''
+const gitCommitRef = process.env.VERCEL_GIT_COMMIT_REF || process.env.GITHUB_REF_NAME || ''
+const appVersion = gitCommitSha.slice(0, 7) || 'dev'
+const appEnvironment = gitCommitRef === 'main' ? 'production' : 'test'
+
 // Envoi des source maps à Sentry. SANS ELLES, une pile d'appel reste
 // minifiée — « a.b is not a function at index-a3f9.js:1:4821 » — et Sentry
 // perd l'essentiel de son intérêt.
@@ -13,7 +21,7 @@ const sentry = process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && proces
       authToken: process.env.SENTRY_AUTH_TOKEN,
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
-      release: { name: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || 'dev' },
+      release: { name: appVersion },
       // Les source maps sont téléversées puis SUPPRIMÉES du bundle livré :
       // les laisser publierait le code source de l'app à qui la visite.
       sourcemaps: { filesToDeleteAfterUpload: ['dist/assets/*.map'] },
@@ -33,16 +41,12 @@ export default defineConfig({
     // mesure de performance, dont nous n'utilisons rien.
     __SENTRY_DEBUG__: false,
     __SENTRY_TRACING__: false,
-    __APP_VERSION__: JSON.stringify(
-      (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || 'dev'
-    ),
+    __APP_VERSION__: JSON.stringify(appVersion),
     // Environnement affiché à côté de la version : « production » seulement
     // pour un build de la branche main, « test » partout ailleurs (projet
     // Vercel de test, previews, développement local). Lève toute ambiguïté
     // quand les deux versions cohabitent.
-    __APP_ENV__: JSON.stringify(
-      process.env.VERCEL_GIT_COMMIT_REF === 'main' ? 'production' : 'test'
-    ),
+    __APP_ENV__: JSON.stringify(appEnvironment),
   },
   // Expose aussi les variables NEXT_PUBLIC_* (créées par l'intégration
   // Vercel ↔ Supabase) en plus de nos VITE_*. Les clés secrètes
@@ -53,3 +57,4 @@ export default defineConfig({
     port: 3000
   }
 })
+

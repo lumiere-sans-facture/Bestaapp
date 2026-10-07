@@ -53,11 +53,26 @@ jobs:
           echo "VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
           echo "Version ${VERSION}, build ${GITHUB_RUN_NUMBER}"
 
+      # Ne jamais publier un APK partiellement configuré : sans ces valeurs,
+      # il pourrait pointer vers le bon serveur tout en perdant la connexion
+      # Google ou en affichant une identité de build trompeuse.
+      - name: Vérifier la configuration de production
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          [ -n "$VITE_SUPABASE_URL" ] || { echo "::error::Secret VITE_SUPABASE_URL absent"; exit 1; }
+          [ -n "$VITE_SUPABASE_ANON_KEY" ] || { echo "::error::Secret VITE_SUPABASE_ANON_KEY absent"; exit 1; }
+          [ -n "$VITE_GOOGLE_CLIENT_ID" ] || { echo "::error::Secret VITE_GOOGLE_CLIENT_ID absent"; exit 1; }
+
       - name: Build web assets
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ENABLE_GOOGLE_AUTH: 'true'
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           # Sans elles, l'app installée ne remonterait ni ses plantages
           # (Sentry) ni son usage (PostHog) : ce sont des valeurs PUBLIQUES,
           # à recopier depuis Vercel dans les secrets GitHub.
@@ -128,3 +143,4 @@ jobs:
           gh release list --limit 100 --json tagName --jq '.[].tagName' \
             | grep '^android-' | tail -n +6 \
             | while read -r t; do gh release delete "$t" --yes --cleanup-tag; done
+

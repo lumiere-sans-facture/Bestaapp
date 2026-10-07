@@ -6,6 +6,11 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-07
+- **APK Android réellement identifié comme production.** Le build GitHub Actions
+  reconnaît désormais le commit et la branche `main`, comme le build Vercel :
+  l'écran de connexion n'affiche plus `version dev · test`. La configuration
+  Google OAuth est transmise explicitement à l'APK et le workflow refuse de
+  publier une Release si Supabase ou le Client ID Google manquent.
 - **Application Android téléchargeable depuis la page d'accueil (APK, sans Play Store), avec mises à jour.** Le workflow « Build Android APK » ne produisait qu'un artefact GitHub (compte requis, expiré au bout de 30 jours, signé par une clé de débogage neuve à chaque build — Android aurait refusé toute mise à jour). À chaque mise en production, il publie désormais l'APK dans une Release GitHub du dépôt public, sous un nom fixe (`BestaSolar.apk`), avec un numéro de build croissant (versionCode et `VITE_ANDROID_BUILD`) ; signé avec la clé permanente (secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`), sinon avec une clé de débogage et un avertissement. Les 5 dernières Releases sont gardées. Page d'accueil : section « BestaSolar Pro sur Android » (logo Android, pas de badge Play Store), bouton de téléchargement direct vers la dernière Release, version / taille / date lues sur GitHub, installation en trois étapes, lien « Application » dans le menu. Dans l'application installée : bandeau « Nouvelle version disponible — Mettre à jour » dès qu'une Release plus récente existe (vérifié à l'ouverture et à chaque retour dans l'app). Nouveau parcours navigateur : `e2e/application-android.mjs`.
 - **Statut de synchronisation réservé au gérant.** Dans « Plus » (sous la carte « Passer en mode Pro ») et dans les paramètres, la ligne « Données partagées en temps réel », le nombre d'éléments en attente d'envoi et le bouton « Synchroniser maintenant » ne s'affichent plus que pour les gérants. Nouveau parcours navigateur : `e2e/synchro-gerant.mjs`.
 - **Écran fixe en largeur sur mobile, cinq onglets toujours visibles.** Sur le tableau de bord, le graphique « Catalogue par catégorie » était plus large que l'écran (ses libellés ne rétrécissaient pas) : toute la page s'élargissait, glissait à gauche et à droite, et l'onglet « Tableau » sortait de l'écran. Même chose sur la boutique en 360 px (liste de tri). Libellés du graphique coupés proprement (nom complet dans l'info-bulle), liste de tri rétrécissable, et garde-fou général : la page ne peut plus défiler horizontalement (`overflow-x: clip`), les zones prévues pour défiler (suivi en colonnes, puces) gardent leur défilement. Nouveau parcours navigateur : `e2e/largeur-mobile.mjs`.
@@ -391,3 +396,4 @@ pull requests correspondantes sur GitHub.
 - Devis/Factures Pro : 2 modèles (Couleur / N&B) + aperçu + « Mon entreprise » réorganisée (#66)
 - Dimensionnement Pro : étape « Matériel » unifiée (onduleur + batteries) (#65)
 - Dimensionnement Pro : géolocalisation + mise en avant de l'outil (#64)
+
