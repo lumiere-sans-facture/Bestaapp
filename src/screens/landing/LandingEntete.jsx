@@ -22,6 +22,7 @@ export default function LandingEntete() {
               <a className="lp-h1" href="#avantages" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>Avantages</a>
               <a className="lp-h1" href="#conseiller" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>Conseiller</a>
               <a className="lp-h1" href="#schemas" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>Schémas</a>
+              <a className="lp-h1" href="#application" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>Application</a>
               <a className="lp-h1" href="#tarifs" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>Tarifs</a>
               <a className="lp-h1" href="#carriere" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>Carrière</a>
               <a className="lp-h1" href="#faq" style={{ fontSize: '0.9375rem', fontWeight: '500', color: '#697386' }}>FAQ</a>

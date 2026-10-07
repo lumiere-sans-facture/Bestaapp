@@ -15,7 +15,9 @@ android {
         applicationId "com.bestasolar.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode partiesVersion[0] * 10000 + partiesVersion[1] * 100 + partiesVersion[2]
+        // APK hors Play Store : le CI impose un versionCode croissant à chaque
+        // build (VERSION_CODE), pour qu'Android accepte la mise à jour.
+        versionCode System.getenv("VERSION_CODE") ? System.getenv("VERSION_CODE").toInteger() : partiesVersion[0] * 10000 + partiesVersion[1] * 100 + partiesVersion[2]
         versionName versionApp
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

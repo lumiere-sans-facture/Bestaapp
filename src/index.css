@@ -695,6 +695,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 /* Rappel d'abonnement : information, pas erreur — ton neutre puis orangé. */
 .abo-alert { background: var(--bg); border-color: var(--border); border-left-color: var(--primary); color: var(--text-primary); align-items: center; }
 .abo-alert.is-warning { background: #fffbeb; border-color: #fde68a; border-left-color: var(--warning, #f59e0b); color: #78350f; }
+.abo-alert.is-info { background: var(--info-light); border-color: var(--border); border-left-color: var(--info); color: var(--text-primary); }
 
 /* Encart d'information contextuelle : .callout (fond teinté). */
 .validation-bar { margin: 0 16px 14px; padding: 12px 14px; background: var(--warning-light); border-radius: var(--radius); }

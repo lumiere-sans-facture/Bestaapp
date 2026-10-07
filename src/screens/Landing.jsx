@@ -8,6 +8,7 @@ import LandingChiffres from './landing/LandingChiffres';
 import LandingConseiller from './landing/LandingConseiller';
 import LandingAvantages from './landing/LandingAvantages';
 import LandingEtapes from './landing/LandingEtapes';
+import LandingApplication from './landing/LandingApplication';
 import LandingTarifs from './landing/LandingTarifs';
 import LandingCarriere from './landing/LandingCarriere';
 import LandingTemoignages from './landing/LandingTemoignages';
@@ -61,6 +62,7 @@ export default function Landing() {
       <LandingConseiller />
       <LandingAvantages />
       <LandingEtapes />
+      <LandingApplication />
       <LandingTarifs />
       <LandingCarriere />
       <LandingTemoignages />

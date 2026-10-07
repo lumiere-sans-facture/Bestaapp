@@ -1,9 +1,23 @@
 name: Build Android APK
 
+# À chaque mise en production (fusion dans main) : construit l'APK et le
+# PUBLIE dans une Release GitHub du dépôt public, sous un nom fixe
+# (BestaSolar.apk). La dernière Release est servie à une adresse stable,
+#   https://github.com/<dépôt>/releases/latest/download/BestaSolar.apk
+# que la page d'accueil propose au téléchargement et que le bandeau de mise à
+# jour de l'application installée ouvre (voir src/config/android.js).
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write   # créer les Releases
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -27,28 +41,90 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Numéro de BUILD toujours croissant (numéro d'exécution du workflow) :
+      # gravé dans l'app (VITE_ANDROID_BUILD, comparé à la dernière Release
+      # pour proposer la mise à jour) et dans le versionCode Android (qui doit
+      # augmenter pour qu'Android accepte d'installer par-dessus).
+      - name: Numéro de version et de build
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION_NAME=${VERSION}" >> "$GITHUB_ENV"
+          echo "ANDROID_BUILD=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "Version ${VERSION}, build ${GITHUB_RUN_NUMBER}"
+
       - name: Build web assets
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          # Sans elles, l'app installée depuis le store ne remonterait ni ses
-          # plantages (Sentry) ni son usage (PostHog) : ce sont des valeurs
-          # PUBLIQUES, à recopier depuis Vercel dans les secrets GitHub.
+          # Sans elles, l'app installée ne remonterait ni ses plantages
+          # (Sentry) ni son usage (PostHog) : ce sont des valeurs PUBLIQUES,
+          # à recopier depuis Vercel dans les secrets GitHub.
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
+          VITE_ANDROID_BUILD: ${{ env.ANDROID_BUILD }}
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      # Clé de signature PERMANENTE (secrets KEYSTORE_BASE64, KEYSTORE_PASSWORD,
+      # KEY_ALIAS, KEY_PASSWORD — les mêmes que pour le Play Store). Sans elle,
+      # chaque build serait signé par une clé de débogage NEUVE, et Android
+      # refuserait d'installer la mise à jour par-dessus la version précédente.
+      - name: Clé de signature
+        id: cle
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "${RUNNER_TEMP}/upload.keystore"
+            echo "signee=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Secret KEYSTORE_BASE64 absent : APK signé avec une clé de débogage. Les mises à jour ne s'installeront pas par-dessus — configurez la clé de signature."
+            echo "signee=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build APK signé (clé permanente)
+        if: steps.cle.outputs.signee == 'true'
+        run: ./gradlew assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../BestaSolar.apk
+        working-directory: android
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/upload.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Build APK de débogage (sans clé configurée)
+        if: steps.cle.outputs.signee != 'true'
+        run: ./gradlew assembleDebug && cp app/build/outputs/apk/debug/app-debug.apk ../BestaSolar.apk
         working-directory: android
 
-      - name: Upload APK
+      - name: Upload APK (artefact)
         uses: actions/upload-artifact@v4
         with:
-          name: bestasolar-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: bestasolar-apk
+          path: BestaSolar.apk
           retention-days: 30
+
+      - name: Publier la Release (téléchargement public)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNEE: ${{ steps.cle.outputs.signee }}
+        run: |
+          NOTE="Application Android BestaSolar Pro, version ${VERSION_NAME} (build ${ANDROID_BUILD}). Installation : ouvrir BestaSolar.apk sur le téléphone (Android 7 ou plus récent)."
+          if [ "$SIGNEE" != "true" ]; then NOTE="${NOTE} Build de test signé avec une clé de débogage."; fi
+          gh release create "android-${ANDROID_BUILD}" BestaSolar.apk \
+            --title "BestaSolar Android ${VERSION_NAME} (build ${ANDROID_BUILD})" \
+            --notes "$NOTE" --target "$GITHUB_SHA" --latest
+
+      # Seules les 5 dernières Releases Android sont gardées : l'adresse
+      # « latest » sert toujours la plus récente.
+      - name: Ménage des anciennes Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName --jq '.[].tagName' \
+            | grep '^android-' | tail -n +6 \
+            | while read -r t; do gh release delete "$t" --yes --cleanup-tag; done

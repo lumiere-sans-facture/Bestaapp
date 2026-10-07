@@ -2,6 +2,7 @@ import { Suspense, useCallback, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
+import MiseAJourAndroid from './MiseAJourAndroid';
 import SkeletonPageContent, { EnteteSquelette } from './SkeletonPageContent';
 import { ShoppingCart, LogOut, Crown, ArrowLeft, Users, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets, ChevronLeft, ChevronRight, Calculator, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -230,6 +231,7 @@ export default function AppLayout() {
           </div>
         )}
         <AbonnementAlert />
+        <MiseAJourAndroid />
         <ChunkErrorBoundary>
           {/* Écran en cours de chargement : en-tête et contenu à la forme de
               la page demandée (utils/squelette.js), comme au rafraîchissement. */}
