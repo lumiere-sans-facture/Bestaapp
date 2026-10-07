@@ -1,0 +1,24 @@
+// Onglets de l'application, partagés par la mise en page (AppLayout) et
+// par l'écran de chargement (LoadingShell) : au rafraîchissement, la barre
+// d'onglets affichée pendant le chargement est exactement la vraie.
+import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, Users, Building2, CreditCard } from 'lucide-react';
+
+export const publicNavItems = [
+  { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
+  { path: '/pipeline', label: 'Suivi clients', shortLabel: 'Suivi', icon: FolderKanban },
+  { path: '/boutique', label: 'Boutique', shortLabel: 'Boutique', icon: ShoppingCart },
+  { path: '/devis', label: 'Devis', shortLabel: 'Devis', icon: FileText },
+  { path: '/plus', label: 'Plus', shortLabel: 'Plus', icon: MoreHorizontal },
+];
+
+// Répertoire clients (ajout + carnet d'adresses) : dans la barre latérale
+// après le suivi ; sur mobile, accessible depuis le menu « Plus ».
+export const clientsItem = { path: '/clients', label: 'Clients', icon: Users };
+
+export const proNavItems = [
+  { path: '/pro', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
+  { path: '/pro/documents', label: 'Devis & Factures', shortLabel: 'Devis', icon: FileText },
+  { path: '/pro/clients', label: 'Clients', shortLabel: 'Clients', icon: Users },
+  { path: '/pro/entreprise', label: 'Mon entreprise', shortLabel: 'Entreprise', icon: Building2 },
+  { path: '/pro/abonnement', label: 'Mon abonnement', shortLabel: 'Abonnement', icon: CreditCard },
+];

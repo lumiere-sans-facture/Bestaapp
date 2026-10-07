@@ -2,8 +2,8 @@ import { Suspense, useCallback, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ChunkErrorBoundary from './ChunkErrorBoundary';
 import AbonnementAlert from './AbonnementAlert';
-import SkeletonPageContent from './SkeletonPageContent';
-import { LayoutDashboard, FolderKanban, ShoppingCart, FileText, MoreHorizontal, LogOut, Crown, ArrowLeft, Users, Building2, CreditCard, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets, ChevronLeft, ChevronRight, Calculator, Bot } from 'lucide-react';
+import SkeletonPageContent, { EnteteSquelette } from './SkeletonPageContent';
+import { ShoppingCart, LogOut, Crown, ArrowLeft, Users, DollarSign, GraduationCap, Share2, Settings, AlertTriangle, Package, Cpu, Droplets, ChevronLeft, ChevronRight, Calculator, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -12,25 +12,7 @@ import { SyncDot } from './SyncStatus';
 import NotificationBell from './NotificationBell';
 import GuideNouveauUtilisateur from './GuideNouveauUtilisateur';
 
-const publicNavItems = [
-  { path: '/dashboard', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
-  { path: '/pipeline', label: 'Suivi clients', shortLabel: 'Suivi', icon: FolderKanban },
-  { path: '/boutique', label: 'Boutique', shortLabel: 'Boutique', icon: ShoppingCart },
-  { path: '/devis', label: 'Devis', shortLabel: 'Devis', icon: FileText },
-  { path: '/plus', label: 'Plus', shortLabel: 'Plus', icon: MoreHorizontal },
-];
-
-// Répertoire clients (ajout + carnet d'adresses) : dans la barre latérale
-// après le suivi ; sur mobile, accessible depuis le menu « Plus ».
-const clientsItem = { path: '/clients', label: 'Clients', icon: Users };
-
-const proNavItems = [
-  { path: '/pro', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
-  { path: '/pro/documents', label: 'Devis & Factures', shortLabel: 'Devis', icon: FileText },
-  { path: '/pro/clients', label: 'Clients', shortLabel: 'Clients', icon: Users },
-  { path: '/pro/entreprise', label: 'Mon entreprise', shortLabel: 'Entreprise', icon: Building2 },
-  { path: '/pro/abonnement', label: 'Mon abonnement', shortLabel: 'Abonnement', icon: CreditCard },
-];
+import { publicNavItems, proNavItems, clientsItem } from './navigation';
 
 // Sous-sections de « Plus » remontées dans la barre latérale (desktop), par rôle.
 // « Mon profil » est rendu à part, en dernier, après le bouton « Passer en mode Pro ».
@@ -249,7 +231,9 @@ export default function AppLayout() {
         )}
         <AbonnementAlert />
         <ChunkErrorBoundary>
-          <Suspense fallback={<SkeletonPageContent />}>
+          {/* Écran en cours de chargement : en-tête et contenu à la forme de
+              la page demandée (utils/squelette.js), comme au rafraîchissement. */}
+          <Suspense fallback={<><EnteteSquelette chemin={pathname} /><SkeletonPageContent chemin={pathname} /></>}>
             <Outlet />
           </Suspense>
         </ChunkErrorBoundary>
