@@ -11,7 +11,7 @@ import {
   MAIN_OEUVRE_EXTENSION, CONDITIONS_SITE, SECTIONS_CABLE_PV, COEF_COURANT_CABLE,
   MATERIEL_PAR_CHAINE, MATERIEL_PAR_MPPT, COFFRET_JONCTION, PROTECTION_AC,
 } from '../config/extensionKit';
-import { specPanneau, lireElectrique, configurerChaines, libelleChaines } from './chainesPv';
+import { specPanneau, lireElectrique, configurerChaines, libelleChaines, limitesChaine } from './chainesPv';
 import { maxEnParallele } from './inverters';
 import { resolveLignePrice } from './kits';
 import { prixPublic } from './price';
@@ -43,6 +43,18 @@ export const mainOeuvreEtendue = (base, panneauxAjoutes, kwhAjoutes, tarifs = MA
     batterie: { kwh, tarif: tarifs.parKwhBatterie, montant: montantBatterie },
     total: baseArrondie + montantPanneaux + montantBatterie,
   };
+};
+
+/**
+ * Panneaux en série qu'il faut AU MINIMUM pour démarrer cet onduleur
+ * (tension MPPT minimale), 0 si ses caractéristiques sont inconnues.
+ */
+export const panneauxMinimumOnduleur = (panelW, onduleur, site = CONDITIONS_SITE) => {
+  const panneau = specPanneau(panelW);
+  const elec = lireElectrique(onduleur);
+  if (!panneau || !elec) return 0;
+  const { nMin, nMax } = limitesChaine(panneau, elec, site);
+  return nMin <= nMax ? nMin : 0;
 };
 
 /**

@@ -89,6 +89,9 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   const [autonomyNights, setAutonomyNights] = useState(reprise.autonomyNights);
   // Type de support des panneaux : tôle par défaut (cas le plus courant).
   const [mountingType, setMountingType] = useState(reprise.mountingType);
+  // Réseau du chantier : monophasé (par défaut) ou triphasé — en triphasé,
+  // l'onduleur du kit est remplacé par un triphasé s'il ne l'est pas déjà.
+  const [phases, setPhases] = useState(reprise.phases === 3 ? 3 : 1);
   // Inclure ou non la structure de montage au devis (client qui a déjà le sien).
   const [includeMounting, setIncludeMounting] = useState(reprise.includeMounting);
   // Parmi les variantes de même capacité suggérée, le premier kit est sélectionné
@@ -220,8 +223,8 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     telephone: selectedLead?.phone || '',
   });
   const displayQuotation = useMemo(
-    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre) : null),
-    [selectedKit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre]
+    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre, { phases }) : null),
+    [selectedKit, mountingType, includeMounting, phases, sizing, INVERTERS, products, coefMainOeuvre]
   );
   // Panneaux réellement inclus au devis : ceux du dimensionnement (plus ou moins que le kit) ;
   // calculé en exige plus (kit choisi sur sa batterie, pas ses panneaux).
@@ -302,7 +305,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     // climatiseur sans tout ressaisir de mémoire.
     const dimensionnement = capturerDimensionnement({
       consoMode, rows, manual, facture, systemType, autonomyNights,
-      mountingType, includeMounting, sunHours: psh, location, solar,
+      mountingType, includeMounting, phases, sunHours: psh, location, solar,
     });
     const contenu = {
       consumption,
@@ -620,7 +623,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                   const isSelected = kit.id === selectedKit.id;
                   const quotation = isSelected
                     ? displayQuotation
-                    : buildKitQuotation(kit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre);
+                    : buildKitQuotation(kit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre, { phases });
                   return (
                     <button
                       key={kit.id}
@@ -657,7 +660,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
             {displayQuotation.inverterSuggested && (
               <div className="field-hint" role="status" style={{ marginTop: -6, marginBottom: 12 }}>
                 <Cpu size={13} style={{ verticalAlign: -2 }} /> Onduleur adapté automatiquement : celui du kit
-                ({selectedKit.inverter} kVA) ne suffit pas pour ce besoin —{' '}
+                ({selectedKit.inverter} kVA) {displayQuotation.remplacePourTriphase ? 'n’est pas triphasé' : 'ne suffit pas pour ce besoin'} —{' '}
                 {displayQuotation.inverterSuggested.quantite > 1 && `${displayQuotation.inverterSuggested.quantite} × `}
                 {designationOnduleur(displayQuotation.inverterSuggested)}
                 {displayQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
@@ -756,6 +759,29 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                 Client a son propre soudeur — ne pas inclure la structure au devis
               </label>
             </div>
+
+            {/* Réseau du chantier : en triphasé, l'onduleur proposé est triphasé
+                (celui du kit s'il l'est déjà, sinon un triphasé de « Mes onduleurs »). */}
+            <div className="chip-selector">
+              <span className="chip-selector-label"><Zap size={13} /> Réseau électrique</span>
+              <div className="categories-scroll" style={{ marginBottom: 0 }}>
+                {[[1, 'Monophasé'], [3, 'Triphasé']].map(([n, libelle]) => (
+                  <button key={n} type="button" className={`category-chip ${phases === n ? 'active' : ''}`}
+                    aria-pressed={phases === n} onClick={() => setPhases(n)}>
+                    {libelle}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {displayQuotation?.triphaseIndisponible && (
+              <div className="storage-alert abo-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
+                <div>
+                  <Cpu size={13} style={{ verticalAlign: -2 }} /> Aucun onduleur triphasé{displayQuotation.tension ? ` ${displayQuotation.tension} V` : ''} d’au moins
+                  {selectedKit.inverter} kVA dans <strong>Plus › Onduleurs</strong> : l’onduleur du kit est gardé. Ajoutez un modèle
+                  triphasé (réglage « Phases ») ou choisissez un autre kit.
+                </div>
+              </div>
+            )}
 
             <div className="bom">
               <div className="bom-title">Équipements</div>

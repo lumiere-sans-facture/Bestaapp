@@ -23,6 +23,24 @@ export const maxEnParallele = (onduleur) => {
   return Math.min(n, PARALLELE_MAX_SAISIE);
 };
 
+// ---- Phases : monophasé ou triphasé ----
+// Le réglage « Phases » de Plus › Onduleurs fait foi ; à défaut, la
+// désignation : « triphasé », un onduleur PCS, ou le suffixe Deye « P3 »
+// (SUN-30K-SG02HP3, SUN-12K-SG04LP3…). Sans indice : inconnu (null), traité
+// comme monophasé — on ne propose jamais en triphasé un modèle non confirmé.
+const RE_TRIPHASE = /triphas|\bPCS\b|[a-z]P3\b/i;
+
+/** 3 (triphasé), 1 (monophasé) ou null (non renseigné). */
+export const phasesOnduleur = (onduleur) => {
+  if (!onduleur) return null;
+  if (Number(onduleur.electrique?.phases) === 3) return 3;
+  if (RE_TRIPHASE.test(`${onduleur.brand || ''} ${onduleur.model || ''} ${onduleur.designation || ''}`)) return 3;
+  return onduleur.electrique ? 1 : null;
+};
+
+/** Onduleur triphasé confirmé ? */
+export const estTriphase = (onduleur) => phasesOnduleur(onduleur) === 3;
+
 // ---- Caractéristiques électriques de l'entrée PV ----
 // Facultatives : elles permettent de calculer les chaînes d'un kit étendu
 // (utils/chainesPv.js). Sans elles, l'assistant le signale au lieu de
@@ -49,7 +67,9 @@ const normaliserElectrique = (e) => {
     sortie[cle] = nombre(v);
   }
   sortie.phases = Number(e.phases) === 3 ? 3 : 1;
-  return saisi ? sortie : null;
+  // « Triphasé » choisi seul compte comme une saisie : sinon le réglage se
+  // perdait faute d'autre valeur électrique renseignée.
+  return saisi || sortie.phases === 3 ? sortie : null;
 };
 
 /**

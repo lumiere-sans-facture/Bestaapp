@@ -91,6 +91,8 @@ export function capturerDimensionnement(etat = {}) {
     autonomyNights: nombre(etat.autonomyNights, DEFAULT_AUTONOMY_NIGHTS),
     mountingType: parmi(etat.mountingType, MOUNTING_TYPES.map((m) => m.id), DEFAULT_MOUNTING_TYPE),
     includeMounting: etat.includeMounting !== false,
+    // Réseau du chantier : 1 (monophasé, par défaut) ou 3 (triphasé).
+    phases: Number(etat.phases) === 3 ? 3 : 1,
     sunHours: nombre(etat.sunHours, DEFAULT_PEAK_SUN_HOURS),
     // La localisation sert à réafficher d'où vient l'ensoleillement, sans
     // relancer un appel réseau à la réouverture : l'étude doit se rouvrir
@@ -143,6 +145,7 @@ export function restaurerDimensionnement(devis) {
       autonomyNights: d.autonomyNights,
       mountingType: d.mountingType,
       includeMounting: d.includeMounting,
+      phases: d.phases,
       sunHours: d.sunHours,
       location: d.location,
       solar: d.solarSource ? { source: d.solarSource } : null,

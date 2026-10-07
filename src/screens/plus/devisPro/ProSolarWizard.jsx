@@ -94,6 +94,9 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   // Autonomie batterie : nombre de nuits sans soleil couvertes (1 par défaut).
   const [autonomyNights, setAutonomyNights] = useState(reprise.autonomyNights);
   const [mountingType, setMountingType] = useState(reprise.mountingType);
+  // Réseau du chantier : monophasé (par défaut) ou triphasé — en triphasé,
+  // l'onduleur du kit est remplacé par un triphasé s'il ne l'est pas déjà.
+  const [phases, setPhases] = useState(reprise.phases === 3 ? 3 : 1);
   const [includeMounting, setIncludeMounting] = useState(reprise.includeMounting);
 
   // --- Localisation / ensoleillement (PVGIS / NASA) ---
@@ -290,13 +293,13 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   const selectedKit = (kits || []).find((kit) => kit.id === effectiveKitId) || null;
   const kitQuotation = useMemo(
     () => (selectedKit
-      ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, onduleursConfigures || [], products, coefMainOeuvre)
+      ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, onduleursConfigures || [], products, coefMainOeuvre, { phases })
       : null),
-    [selectedKit, mountingType, includeMounting, sizing, onduleursConfigures, products, coefMainOeuvre]
+    [selectedKit, mountingType, includeMounting, phases, sizing, onduleursConfigures, products, coefMainOeuvre]
   );
 
   const proposalKey = proposalMode === 'kit'
-    ? `kit:${effectiveKitId}:${mountingType}:${includeMounting}:${sizing?.requiredPanelPower || 0}`
+    ? `kit:${effectiveKitId}:${mountingType}:${includeMounting}:${phases}:${sizing?.requiredPanelPower || 0}`
     : `custom:${inverter?.id || ''}:${JSON.stringify(batteryQty)}:${sizing?.numberOfPanels || 0}`;
   useEffect(() => {
     if (step !== 4) return;
@@ -399,7 +402,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
       : inverter;
     const dimensionnement = capturerDimensionnement({
       consoMode, rows, manual, facture, systemType, autonomyNights,
-      mountingType, includeMounting, sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+      mountingType, includeMounting, phases, sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
       location, solar,
     });
     const contenu = {
@@ -681,7 +684,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                         const isSelected = kit.id === selectedKit?.id;
                         const quotation = isSelected
                           ? kitQuotation
-                          : buildKitQuotation(kit, mountingType, includeMounting, sizing, onduleursConfigures || [], products, coefMainOeuvre);
+                          : buildKitQuotation(kit, mountingType, includeMounting, sizing, onduleursConfigures || [], products, coefMainOeuvre, { phases });
                         return (
                           <button key={kit.id} type="button" className={`kit-option ${isSelected ? 'selected' : ''}`}
                             onClick={() => setSelectedKitId(kit.id)} aria-pressed={isSelected}>
@@ -718,7 +721,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                 {kitQuotation?.inverterSuggested && (
                   <div className="field-hint" role="status" style={{ marginTop: -6, marginBottom: 12 }}>
                     <Cpu size={13} style={{ verticalAlign: -2 }} /> Onduleur adapté automatiquement : celui du kit
-                    ({selectedKit.inverter} kVA) ne suffit pas pour ce besoin —{' '}
+                    ({selectedKit.inverter} kVA) {kitQuotation.remplacePourTriphase ? 'n’est pas triphasé' : 'ne suffit pas pour ce besoin'} —{' '}
                     {kitQuotation.inverterSuggested.quantite > 1 && `${kitQuotation.inverterSuggested.quantite} × `}
                     {designationOnduleur(kitQuotation.inverterSuggested)}
                     {kitQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
@@ -777,6 +780,29 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                     Ne pas inclure la structure de montage
                   </label>
                 </div>
+
+                {/* Réseau du chantier : en triphasé, l'onduleur proposé est triphasé
+                    (celui du kit s'il l'est déjà, sinon un triphasé de « Mes onduleurs »). */}
+                <div className="chip-selector">
+                  <span className="chip-selector-label"><Zap size={13} /> Réseau électrique</span>
+                  <div className="categories-scroll" style={{ marginBottom: 0 }}>
+                    {[[1, 'Monophasé'], [3, 'Triphasé']].map(([n, libelle]) => (
+                      <button key={n} type="button" className={`category-chip ${phases === n ? 'active' : ''}`}
+                        aria-pressed={phases === n} onClick={() => setPhases(n)}>
+                        {libelle}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {kitQuotation?.triphaseIndisponible && (
+                  <div className="storage-alert abo-alert is-warning" role="alert" style={{ marginBottom: 12 }}>
+                    <div>
+                      <Cpu size={13} style={{ verticalAlign: -2 }} /> Aucun onduleur triphasé{kitQuotation.tension ? ` ${kitQuotation.tension} V` : ''} d’au moins
+                      {selectedKit.inverter} kVA dans <strong>Plus › Onduleurs</strong> : l’onduleur du kit est gardé. Ajoutez un modèle
+                      triphasé (réglage « Phases ») ou choisissez un autre kit.
+                    </div>
+                  </div>
+                )}
               </>
             )}
 

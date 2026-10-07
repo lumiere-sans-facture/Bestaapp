@@ -1,7 +1,7 @@
 // Dimensionnement et chiffrage d'une installation solaire.
 // Logique portée depuis l'application besta-solar (calculations + pricing).
 // Toutes les valeurs monétaires sont en F CFA (XOF).
-import { maxEnParallele, PARALLELE_PAR_DEFAUT } from './inverters';
+import { maxEnParallele, PARALLELE_PAR_DEFAUT, estTriphase } from './inverters';
 import { prixPublic } from './price';
 import { resolveLignePrice } from './kits';
 
@@ -469,7 +469,7 @@ export const calculateSystemSize = (
 import { TVA_RATE } from '../config/company';
 import { tensionKit, onduleursCompatibles, estKitHauteTension } from './tension';
 import { capacitePourBesoin, capaciteMaxKit, etendreBatterie } from './extensionBatterie';
-import { ajusterKit, ordreEscalade, panneauxPourKit } from './ajustementsKit';
+import { ajusterKit, ordreEscalade, panneauxPourKit, panneauxMinimumOnduleur } from './ajustementsKit';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
 // Retourne le prix PUBLIC du premier panneau trouvé (jamais le prix technicien
@@ -746,7 +746,7 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
  *   — sauf kit haute tension, au même tarif dans les deux pays.
  *   Le matériel n'est jamais touché — même fournisseur des deux côtés.
  */
-export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = [], coefMainOeuvre = 1) => {
+export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = [], coefMainOeuvre = 1, options = {}) => {
   const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
   // Onduleur : celui du kit ne convient peut-être pas — soit il ne tient pas
   // le pic de consommation du client, soit il n'accepte pas les panneaux
@@ -775,7 +775,36 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const panneauxDemandes = sizing?.requiredPanelPower && kit.panelW
     ? Math.ceil(sizing.requiredPanelPower / kit.panelW)
     : kit.panels;
-  const neededPanels = panneauxPourKit(kit, panneauxDemandes, currentSpec || null);
+  // TRIPHASÉ demandé (choix « Monophasé / Triphasé » de l'assistant) : un
+  // onduleur de kit déjà triphasé est gardé ; sinon on retient le plus petit
+  // onduleur triphasé de « Mes onduleurs » — même tension batterie, puissance
+  // au moins égale à celle du kit — qui prend les panneaux. Il devient
+  // l'onduleur de référence pour la suite (chaînes, parallèle). Aucun
+  // modèle triphasé configuré : l'onduleur du kit reste, et l'écran le dit.
+  // Monophasé (par défaut) : rien ne change.
+  const triphase = Number(options?.phases) === 3;
+  const kitTriphase = estTriphase(currentSpec) || estKitHauteTension(kit)
+    || estTriphase({ model: ligneOnduleurKit?.designation }) || /triphas/i.test(kit.name || '');
+  const candidatsRetenus = triphase ? candidats.filter(estTriphase) : candidats;
+  let onduleurBase = currentSpec || null;
+  let triphaseIndisponible = false;
+  if (triphase && !kitTriphase) {
+    const tri = candidatsRetenus
+      .filter((o) => Number(o.capacity) >= Number(kit.inverter))
+      .sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
+    // PV visée : celle du dimensionnement (les panneaux ne sont pas encore
+    // fixés — leur minimum dépend justement de l'onduleur retenu ici).
+    const pvVisee = Math.max(panneauxDemandes * (Number(kit.panelW) || 0), Number(sizing?.installedPvPower) || 0);
+    if (tri.length) onduleurBase = onduleurPourPanneaux(tri[0], tri, { pvPower: pvVisee, configures: inverters }).modele;
+    else triphaseIndisponible = true;
+  }
+  const remplacePourTri = !!onduleurBase && onduleurBase !== currentSpec;
+  // Onduleur triphasé substitué : le kit a été composé pour SON onduleur ;
+  // le nouveau peut exiger plus de panneaux en série pour démarrer.
+  const neededPanels = Math.max(
+    panneauxPourKit(kit, panneauxDemandes, onduleurBase),
+    remplacePourTri ? panneauxMinimumOnduleur(kit.panelW, onduleurBase) : 0,
+  );
   // Kit extensible : modules batterie ajoutés jusqu'à couvrir le besoin.
   const batterie = etendreBatterie(kit, kit.lines, sizing?.batteryCapacity);
   const withPanels = batterie.lignes.map((l) => (
@@ -805,8 +834,8 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     panneauxDemandes,
     panneauxRetenus: neededPanels,
     batterieFinale: batterie.capacite,
-    onduleurKit: currentSpec || null,
-    candidats,
+    onduleurKit: onduleurBase,
+    candidats: candidatsRetenus,
     products,
     outils: {
       limitePv: (modele) => limitePv(modele, inverters),
@@ -819,18 +848,35 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   if (verifie) {
     const nouveau = ajustements.onduleur.nouveau;
     retenu = {
-      modele: nouveau ? candidats.find((o) => o.id === nouveau.id) || { ...currentSpec, ...nouveau } : currentSpec,
+      modele: nouveau ? candidatsRetenus.find((o) => o.id === nouveau.id) || { ...onduleurBase, ...nouveau } : onduleurBase,
       quantite: ajustements.onduleur.quantite,
       suffisant: true,
     };
-  } else if (!impossible && currentSpec) {
-    retenu = onduleurPourPanneaux(currentSpec, candidats, critere);
+  } else if (!impossible && onduleurBase) {
+    retenu = onduleurPourPanneaux(onduleurBase, candidatsRetenus, critere);
   }
   // Vérifié : le statut fait foi (un remplacement à calibre égal, autre
   // marque, reste un remplacement) ; sinon, l'ancienne règle du calibre.
-  const change = retenu && (verifie
+  // Un onduleur triphasé substitué à celui du kit est toujours un changement.
+  const change = retenu && (remplacePourTri || (verifie
     ? ajustements.onduleur.statut !== 'conserve'
-    : retenu.modele.capacity !== kit.inverter || retenu.quantite > 1);
+    : retenu.modele.capacity !== kit.inverter || retenu.quantite > 1));
+  // Section « Ajustements du kit » : l'onduleur d'origine reste celui du kit,
+  // et la raison du remplacement est donnée.
+  if (remplacePourTri && ajustements.onduleur) {
+    const o = ajustements.onduleur;
+    ajustements.onduleur = {
+      ...o,
+      statut: o.statut === 'double' || o.statut === 'impossible' ? o.statut : 'remplace',
+      ancien: {
+        id: currentSpec?.id || null,
+        designation: currentSpec ? [currentSpec.brand, currentSpec.model].filter(Boolean).join(' ') : `Onduleur du kit (${kit.inverter} kVA)`,
+        capacity: kit.inverter,
+      },
+      nouveau: o.nouveau || { id: onduleurBase.id, brand: onduleurBase.brand, model: onduleurBase.model, capacity: onduleurBase.capacity, price: onduleurBase.price },
+      raisons: ['triphasé demandé, l’onduleur du kit est monophasé', ...(o.raisons || [])],
+    };
+  }
   const inverterSuggested = change ? { ...retenu.modele, quantite: retenu.quantite } : null;
   // Pic de consommation MESURÉ (appareils listés) que l'onduleur retenu ne
   // tient pas : signalé au vendeur, sans changer l'onduleur.
@@ -942,6 +988,12 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     inverterInsuffisant: retenu ? !retenu.suffisant : false,
     // Pic mesuré au-delà de la sortie de l'onduleur du devis (null sinon).
     picNonCouvert,
+    // Réseau du chantier demandé (1 ou 3 phases) ; triphasé demandé mais
+    // aucun onduleur triphasé configuré pour ce kit : l'écran le signale.
+    phases: triphase ? 3 : 1,
+    triphaseIndisponible,
+    // L'onduleur du kit a été remplacé PARCE QU'il n'est pas triphasé.
+    remplacePourTriphase: remplacePourTri && !!inverterSuggested,
     // Kit étendu dont AUCUN onduleur (même doublé) ne tient les limites
     // électriques : le devis ne doit pas partir en l'état.
     configurationImpossible: impossible,
