@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { isNativeGoogleAuth } from '../lib/nativeGoogleAuth';
 
 const GOOGLE_IDENTITY_SCRIPT = 'https://accounts.google.com/gsi/client';
 let googleIdentityPromise = null;
@@ -37,11 +38,13 @@ export default function GoogleSignInButton({ clientId, disabled = false, onCrede
   const containerRef = useRef(null);
   const onCredentialRef = useRef(onCredential);
   const onErrorRef = useRef(onError);
+  const native = isNativeGoogleAuth();
 
   useEffect(() => { onCredentialRef.current = onCredential; }, [onCredential]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
   useEffect(() => {
+    if (native) return undefined;
     let cancelled = false;
     const container = containerRef.current;
 
@@ -84,7 +87,22 @@ export default function GoogleSignInButton({ clientId, disabled = false, onCrede
       cancelled = true;
       container?.replaceChildren();
     };
-  }, [clientId]);
+  }, [clientId, native]);
+
+  if (native) {
+    return (
+      <button
+        type="button"
+        className="google-native-button"
+        disabled={disabled}
+        onClick={() => Promise.resolve(onCredential?.({ credential: null }))
+          .catch(() => onError?.('Connexion avec Google impossible.'))}
+      >
+        <span className="google-native-logo" aria-hidden="true">G</span>
+        Continuer avec Google
+      </button>
+    );
+  }
 
   return (
     <div

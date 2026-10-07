@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
 
 // Récupère une valeur de configuration en tolérant plusieurs conventions de nommage :
 // - nos variables VITE_SUPABASE_* (config manuelle)
@@ -23,4 +24,10 @@ const anonKey = pickEnv(['ANON_KEY', 'PUBLISHABLE_KEY']);
 
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
-export const supabase = isSupabaseConfigured ? createClient(url, anonKey) : null;
+export const supabase = isSupabaseConfigured
+  ? createClient(url, anonKey, {
+      // Le deep link Android est un client public : PKCE empêche une autre
+      // application enregistrant le même scheme d'échanger le code OAuth.
+      auth: { flowType: Capacitor.isNativePlatform() ? 'pkce' : 'implicit' },
+    })
+  : null;

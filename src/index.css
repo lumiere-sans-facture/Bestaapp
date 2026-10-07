@@ -458,6 +458,17 @@ textarea.input { resize: vertical; }
 .google-signin-button { width: 100%; min-height: 44px; }
 .google-signin-button > div { display: block !important; }
 .google-signin-button iframe { display: block; max-width: 100%; }
+.google-native-button {
+  width: 100%; min-height: 44px; display: flex; align-items: center;
+  justify-content: center; gap: 12px; border: 1px solid #747775;
+  border-radius: 4px; background: #fff; color: #1f1f1f;
+  font: 500 0.875rem/1.2 Arial, sans-serif; cursor: pointer;
+}
+.google-native-button:disabled { opacity: .65; cursor: wait; }
+.google-native-logo {
+  display: grid; place-items: center; width: 20px; height: 20px;
+  color: #4285f4; font: 700 18px/1 Arial, sans-serif;
+}
 /* Volet de marque : masqué sur mobile — une deuxième colonne n'a pas la
    place d'exister sous 900px, mieux vaut l'omettre que la tasser. */
 .login-right {
