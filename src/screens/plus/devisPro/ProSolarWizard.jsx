@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, FileText, Package } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
@@ -7,7 +7,7 @@ import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAp
 import {
   calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
   batteryOptionsFromCatalog, brandsOf, suggestInverterFor, onduleurSuffisant, critereDeChoix, suggestBatteryCombo,
-  AUTONOMY_OPTIONS, MOUNTING_TYPES,
+  AUTONOMY_OPTIONS, MOUNTING_TYPES, phasesDuKit,
 } from '../../../utils/solarSizing';
 import { factureVersConsommation } from '../../../utils/factureConso';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
@@ -291,6 +291,16 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     ? selectedKitId
     : suggestedKits[0]?.id || null;
   const selectedKit = (kits || []).find((kit) => kit.id === effectiveKitId) || null;
+  // Réseau électrique calé sur l'onduleur du kit retenu : triphasé pour un
+  // kit à onduleur triphasé, monophasé sinon — à chaque changement de kit.
+  // Le technicien peut ensuite le modifier ; une étude rouverte garde le
+  // choix enregistré tant que son kit reste celui du devis.
+  const kitDuReseau = useRef(reprise.restaure ? devisAModifier?.kitId || null : null);
+  useEffect(() => {
+    if (!selectedKit || kitDuReseau.current === selectedKit.id) return;
+    kitDuReseau.current = selectedKit.id;
+    setPhases(phasesDuKit(selectedKit, onduleursConfigures));
+  }, [selectedKit, onduleursConfigures]);
   const kitQuotation = useMemo(
     () => (selectedKit
       ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, onduleursConfigures || [], products, coefMainOeuvre, { phases })

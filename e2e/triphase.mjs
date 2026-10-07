@@ -31,7 +31,7 @@ const assistant = async (jour, nuit, kit) => {
 await assistant('8', '3', 'Kit 5 kWh — Deye');
 let t = await texte();
 ok(/Type de support/.test(t) && /Réseau électrique Monophasé Triphasé/.test(t), 'le choix Monophasé / Triphasé est à côté du type de support');
-ok(await page.locator('.category-chip.active', { hasText: 'Monophasé' }).count() === 1, 'monophasé par défaut');
+ok(await page.locator('.category-chip.active', { hasText: 'Monophasé' }).count() === 1, 'kit à onduleur monophasé : « Monophasé » sélectionné tout seul');
 ok(/6kVA Deye/i.test(equipements(t)) && !/12kVA/.test(equipements(t)), `monophasé : le Deye 6 kVA du kit [${(/Onduleur[^F]*F/.exec(equipements(t)) || [''])[0]}]`);
 await page.locator('.category-chip', { hasText: 'Triphasé' }).click(); await page.waitForTimeout(800);
 t = await texte();
@@ -41,6 +41,12 @@ await page.locator('.chip-selector', { hasText: 'Réseau électrique' }).screens
 await page.locator('button:has-text("Créer le devis")').first().click(); await page.waitForTimeout(1200);
 const d = await page.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).devis.at(-1));
 ok(d?.dimensionnement?.phases === 3 && (d.quotation?.components || []).some((c) => /12kVA/.test(c.name)), 'le devis enregistré garde le triphasé et l’onduleur triphasé');
+
+// ---- 1 bis. Kit à onduleur triphasé (48 kWh, Deye 12 kVA) : « Triphasé » tout seul ----
+await assistant('27', '27', 'Kit 48 kWh');
+ok(await page.locator('.category-chip.active', { hasText: 'Triphasé' }).count() === 1, 'kit à onduleur triphasé : « Triphasé » sélectionné tout seul');
+t = await texte();
+ok(/Onduleur hybride Deye 12kva/i.test(equipements(t)) && !/n’est pas triphasé/.test(t), `son onduleur triphasé est gardé, sans remplacement [${(/Onduleur[^F]*F/.exec(equipements(t)) || [''])[0]}]`);
 
 // ---- 2. Kit 24 V : aucun triphasé de cette tension ----
 await assistant('2', '1', 'Kit 2,5 kWh — Essentiel');

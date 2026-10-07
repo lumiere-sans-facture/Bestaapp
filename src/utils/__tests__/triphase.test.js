@@ -1,7 +1,7 @@
 // Choix « Monophasé / Triphasé » : en triphasé, un onduleur triphasé de
 // « Mes onduleurs » remplace celui du kit s'il ne l'est pas déjà.
 import { describe, it, expect } from 'vitest';
-import { buildKitQuotation } from '../solarSizing';
+import { buildKitQuotation, phasesDuKit } from '../solarSizing';
 import { phasesOnduleur, estTriphase, normaliserOnduleur } from '../inverters';
 import { SOLAR_KITS } from '../../data/kits';
 import { INVERTER_MODELS } from '../../data/inverters';
@@ -24,6 +24,19 @@ describe('phases d’un onduleur', () => {
   it('« Triphasé » choisi seul dans le formulaire n’est plus perdu', () => {
     expect(normaliserOnduleur({ model: 'X', capacity: '10', electrique: { phases: 3 } }).electrique).toMatchObject({ phases: 3 });
     expect(normaliserOnduleur({ model: 'X', capacity: '10', electrique: { phases: 1 } }).electrique).toBeNull();
+  });
+});
+
+describe('réseau reconnu d’après l’onduleur du kit', () => {
+  it('triphasé pour un kit à onduleur triphasé, monophasé sinon', () => {
+    expect(phasesDuKit(kit('kit-48kwh'), INVERTER_MODELS)).toBe(3); // Deye 12 kVA triphasé
+    expect(phasesDuKit(kit('kit-60kwh-deye-hv'), INVERTER_MODELS)).toBe(3); // HV
+    expect(phasesDuKit(kit('kit-5kwh-deye'), INVERTER_MODELS)).toBe(1); // Deye 6 kVA
+    expect(phasesDuKit(kit('kit-2.5kwh-eco'), INVERTER_MODELS)).toBe(1);
+    // Réglé triphasé dans « Mes onduleurs » : reconnu comme tel.
+    const tri6 = INVERTER_MODELS.map((o) => (o.id === 'deye-6kva' ? { ...o, electrique: { ...o.electrique, phases: 3 } } : o));
+    expect(phasesDuKit(kit('kit-5kwh-deye'), tri6)).toBe(3);
+    expect(phasesDuKit(null)).toBe(1);
   });
 });
 

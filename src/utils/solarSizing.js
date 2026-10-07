@@ -650,6 +650,34 @@ const PANEL_LINE_RE = /^\s*(\d+\s*)?panneaux?\b/i;
 const ONDULEUR_LINE_RE = /onduleur/i;
 
 /**
+ * Onduleur du kit dans « Mes onduleurs » : même calibre et même tension
+ * batterie, de préférence la MARQUE écrite sur sa ligne (« Onduleur hybride
+ * Deye 6kva » → le Deye 6 kVA, pas le premier 6 kVA venu) — ses limites
+ * électriques en dépendent. `spec` est null si aucun ne correspond.
+ */
+export const onduleurDuKit = (kit, inverters = []) => {
+  const ligne = (kit?.lines || []).find((l) => ONDULEUR_LINE_RE.test(l.designation || '')) || null;
+  const memeCalibre = onduleursCompatibles(inverters, tensionKit(kit)).filter((o) => o.capacity === kit?.inverter);
+  const spec = memeCalibre.find((o) => o.brand
+    && new RegExp(`\\b${String(o.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(ligne?.designation || ''))
+    || memeCalibre[0] || null;
+  return { spec, ligne };
+};
+
+/**
+ * Réseau de l'onduleur d'un kit : 3 (triphasé) ou 1 (monophasé). Triphasé
+ * s'il l'est dans « Mes onduleurs » (réglage « Phases »), si sa ligne le dit
+ * (« triphasé », PCS, suffixe Deye « P3 ») ou pour un kit haute tension.
+ * L'assistant s'en sert pour régler tout seul le choix « Réseau électrique ».
+ */
+export const phasesDuKit = (kit, inverters = []) => {
+  if (!kit) return 1;
+  const { spec, ligne } = onduleurDuKit(kit, inverters);
+  return estTriphase(spec) || estKitHauteTension(kit)
+    || estTriphase({ model: ligne?.designation }) || /triphas/i.test(kit.name || '') ? 3 : 1;
+};
+
+/**
  * Onduleur(s) d'un kit quand ses caractéristiques électriques manquent :
  * seule la puissance PV admise départage, dans l'ordre de la règle du
  * gérant — celui du kit, le même en parallèle, puis un autre modèle.
@@ -759,14 +787,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // rien — impossible de la contredire (voir utils/tension.js).
   const tension = tensionKit(kit);
   const candidats = onduleursCompatibles(inverters, tension);
-  // Spec de l'onduleur du kit : même calibre, et de préférence la MARQUE
-  // écrite sur sa ligne (« Onduleur hybride Deye 6kva » → le Deye 6 kVA, pas
-  // le premier 6 kVA venu) — ses limites électriques en dépendent.
-  const ligneOnduleurKit = kit.lines.find((l) => ONDULEUR_LINE_RE.test(l.designation || ''));
-  const memeCalibre = candidats.filter((o) => o.capacity === kit.inverter);
-  const currentSpec = memeCalibre.find((o) => o.brand
-    && new RegExp(`\\b${String(o.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(ligneOnduleurKit?.designation || ''))
-    || memeCalibre[0];
+  const { spec: currentSpec } = onduleurDuKit(kit, inverters);
   // Nombre de panneaux POSÉS, à la puissance crête DU KIT : TOUJOURS celui du
   // dimensionnement (règle du gérant) — au-dessus du kit (besoin 16, kit
   // composé pour 12) comme en dessous (besoin 7, kit de 10). Sous le kit, on
@@ -783,8 +804,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // modèle triphasé configuré : l'onduleur du kit reste, et l'écran le dit.
   // Monophasé (par défaut) : rien ne change.
   const triphase = Number(options?.phases) === 3;
-  const kitTriphase = estTriphase(currentSpec) || estKitHauteTension(kit)
-    || estTriphase({ model: ligneOnduleurKit?.designation }) || /triphas/i.test(kit.name || '');
+  const kitTriphase = phasesDuKit(kit, inverters) === 3;
   const candidatsRetenus = triphase ? candidats.filter(estTriphase) : candidats;
   let onduleurBase = currentSpec || null;
   let triphaseIndisponible = false;

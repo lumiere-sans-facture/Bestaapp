@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, Package, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
 import { factureVersConsommation } from '../../utils/factureConso';
-import { calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
+import { calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, phasesDuKit, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
 import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
 import { provisionOnduleurDuDevis } from '../../utils/sizingSheet/compute';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
@@ -208,6 +208,16 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     ? selectedSuggestedKitId
     : suggestedKits[0]?.id) || SOLAR_KITS[0]?.id || null;
   const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0] || null;
+  // Réseau électrique calé sur l'onduleur du kit retenu : triphasé pour un
+  // kit à onduleur triphasé, monophasé sinon — à chaque changement de kit.
+  // Le technicien peut ensuite le modifier ; une étude rouverte garde le
+  // choix enregistré tant que son kit reste celui du devis.
+  const kitDuReseau = useRef(reprise.restaure ? devisAModifier?.kit?.id || null : null);
+  useEffect(() => {
+    if (!selectedKit || kitDuReseau.current === selectedKit.id) return;
+    kitDuReseau.current = selectedKit.id;
+    setPhases(phasesDuKit(selectedKit, INVERTERS));
+  }, [selectedKit, INVERTERS]);
   // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
   // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit
   // — dont le nombre de panneaux est ensuite complété si le besoin réel en
