@@ -260,12 +260,12 @@ describe('buildKitQuotation — remplacement automatique de l’onduleur', () =>
     const cinq24 = { id: 'x-5kva-24', brand: 'Must', model: 'Onduleur hybride 5kVA', capacity: 5, maxPvPower: 6500, price: 420000, tension: 24 };
     // 5 000 Wc de panneaux : au-delà de l'entrée PV du 3 kVA (3 900 Wc).
     const sizing = { requiredPanelPower: 5000, installedPvPower: 5000, peakLoad: 2000 };
-    // Règle du gérant : deux 3 kVA du kit en parallèle (7 800 Wc) passent
-    // avant un modèle plus grand…
+    // Règle du gérant : la solution la MOINS CHÈRE — deux 3 kVA du kit en
+    // parallèle (2 × 160 000 F, 7 800 Wc) plutôt qu'un 5 kVA à 420 000 F…
     const double = buildKitQuotation(kit, 'tole', true, sizing, [...INVERTER_MODELS, cinq24]);
     expect(double.inverterSuggested).toMatchObject({ id: 'hz-3kva', quantite: 2 });
-    // … le 5 kVA n'arrive que si celui du kit ne se met pas en parallèle.
-    const sansParallele = INVERTER_MODELS.map((o) => (o.id === 'hz-3kva' ? { ...o, parallele: false } : o));
+    // … le 5 kVA n'arrive que si aucun 3 kVA 24 V ne se met en parallèle.
+    const sansParallele = INVERTER_MODELS.map((o) => (o.capacity === 3 ? { ...o, parallele: false } : o));
     const q = buildKitQuotation(kit, 'tole', true, sizing, [...sansParallele, cinq24]);
     expect(q.inverterSuggested).toMatchObject({ id: 'x-5kva-24', quantite: 1 });
     const ligneOnduleur = q.components.find((c) => /onduleur/i.test(c.name));

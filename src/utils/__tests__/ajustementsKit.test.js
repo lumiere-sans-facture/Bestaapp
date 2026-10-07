@@ -185,11 +185,30 @@ describe('règle du gérant : l’onduleur du kit d’abord, puis en parallèle,
     expect(q.picNonCouvert).toMatchObject({ picW: 9000, sortieW: 5000 });
   });
 
-  it('il ne les prend pas seul : DOUBLÉ avant tout modèle plus grand', () => {
-    // 14 panneaux : impossible sur un seul 5 kVA (1 MPPT), le 8 kVA les prendrait seul.
+  it('il ne les prend pas seul : la solution la MOINS CHÈRE, doublé ou plus grand', () => {
+    // 14 panneaux : impossible sur un seul 5 kVA (1 MPPT) ; deux 5 kVA ou un 8 kVA conviennent.
+    // 2 × 300 000 F > 500 000 F : le 8 kVA, seul.
     const q = devis(KIT_5K, 14, [OND_5K, OND_8K]);
-    expect(q.ajustements.onduleur.statut).toBe('double');
-    expect(q.inverterSuggested).toMatchObject({ id: 'test-5k', quantite: 2 });
+    expect(q.ajustements.onduleur.statut).toBe('remplace');
+    expect(q.inverterSuggested).toMatchObject({ id: 'test-8k', quantite: 1 });
+    // 8 kVA plus cher que deux 5 kVA : le kit doublé.
+    const r = devis(KIT_5K, 14, [OND_5K, { ...OND_8K, price: 700000 }]);
+    expect(r.ajustements.onduleur.statut).toBe('double');
+    expect(r.inverterSuggested).toMatchObject({ id: 'test-5k', quantite: 2 });
+  });
+
+  it('l’exemple du gérant : un 16 kW à lui seul plutôt que deux 12 kW, s’il coûte moins', () => {
+    // 2 × 6 kVA et un 12 kVA trop petits ; 16 kVA (1 500 000 F) < 2 × 12 kVA (2 × 1 100 000 F).
+    const ond6 = { ...OND_5K, id: 'o6', capacity: 6, maxPvPower: 5000, price: 390000, maxParallele: 2, electrique: ELEC_2MPPT };
+    const ond12 = { ...OND_8K, id: 'o12', capacity: 12, maxPvPower: 11000, price: 1100000, maxParallele: 2 };
+    const ond16 = { ...OND_8K, id: 'o16', capacity: 16, maxPvPower: 16000, price: 1500000, electrique: { ...ELEC_2MPPT, nbMppt: 3, chainesParMppt: 2, iscMaxMppt: 40 } };
+    const k6 = kit(6, 'Onduleur hybride Test 6kVA');
+    const q = devis(k6, 22, [ond6, ond12, ond16]); // 22 × 620 = 13 640 Wc
+    expect(q.inverterSuggested).toMatchObject({ id: 'o16', quantite: 1 });
+    // Sans tension max ni MPPT renseignés, le 16 kW ne peut pas être vérifié :
+    // il est écarté, et les deux 12 kW (vérifiés) restent la solution.
+    const sansFiche = devis(k6, 22, [ond6, ond12, { ...ond16, electrique: undefined }]);
+    expect(sansFiche.inverterSuggested).toMatchObject({ id: 'o12', quantite: 2 });
   });
 
   it('pas de pic signalé quand il est couvert ou non mesuré', () => {
@@ -197,10 +216,24 @@ describe('règle du gérant : l’onduleur du kit d’abord, puis en parallèle,
     expect(devis(KIT_5K, 8, [OND_5K], { peakLoad: 0 }).picNonCouvert).toBeNull();
   });
 
+  it('kit de base (aucun panneau ajouté) : son onduleur n’est JAMAIS remplacé', () => {
+    // Puissance PV estimée (panneau de référence) au-delà de l'onduleur du
+    // kit, mais les panneaux posés sont ceux du kit : rien ne change.
+    const sansFiche = { ...OND_5K, electrique: undefined, maxPvPower: 4000 };
+    const q = buildKitQuotation(KIT_5K, 'tole', true, { requiredPanelPower: 8 * 620, installedPvPower: 9000 }, [sansFiche, OND_8K], [], 1);
+    expect(q.panelsIncluded).toBe(8);
+    expect(q.inverterSuggested).toBeNull();
+    expect(ligne(q, /^Onduleur/).name).toMatch(/Petit 5kVA/);
+  });
+
   it('ordreEscalade : kit ×1, kit ×2…, puis les autres seuls, puis en parallèle', () => {
     const autres = [{ id: 'a', maxParallele: 2 }, { id: 'b', parallele: false }];
     const ordre = ordreEscalade({ id: 'kit', maxParallele: 3 }, autres).map((e) => `${e.modele.id}×${e.quantite}`);
     expect(ordre).toEqual(['kit×1', 'kit×2', 'kit×3', 'a×1', 'b×1', 'a×2']);
+    // Prix connus : du moins cher au plus cher, le kit seul toujours en tête.
+    const prix = ordreEscalade({ id: 'kit', price: 400, maxParallele: 2 }, [{ id: 'g', price: 700, maxParallele: 2 }, { id: 'p', price: 300 }])
+      .map((e) => `${e.modele.id}×${e.quantite}`);
+    expect(prix).toEqual(['kit×1', 'p×1', 'p×2', 'g×1', 'kit×2', 'g×2']);
     expect(ordreEscalade({ id: 'kit', parallele: false }, []).map((e) => e.quantite)).toEqual([1]);
   });
 });

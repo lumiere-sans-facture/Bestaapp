@@ -791,7 +791,8 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   if (triphase && !kitTriphase) {
     const tri = candidatsRetenus
       .filter((o) => Number(o.capacity) >= Number(kit.inverter))
-      .sort((a, b) => puissanceSortie(a) - puissanceSortie(b));
+      // Le moins cher d'abord (prix inconnu en dernier), puis le plus petit.
+      .sort((a, b) => (Number(a.price) || Infinity) - (Number(b.price) || Infinity) || puissanceSortie(a) - puissanceSortie(b));
     // PV visée : celle du dimensionnement (les panneaux ne sont pas encore
     // fixés — leur minimum dépend justement de l'onduleur retenu ici).
     const pvVisee = Math.max(panneauxDemandes * (Number(kit.panelW) || 0), Number(sizing?.installedPvPower) || 0);
@@ -852,7 +853,10 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
       quantite: ajustements.onduleur.quantite,
       suffisant: true,
     };
-  } else if (!impossible && onduleurBase) {
+  } else if (!impossible && onduleurBase && (neededPanels > kit.panels || remplacePourTri)) {
+    // KIT DE BASE (aucun panneau ajouté) : son onduleur n'est jamais remplacé
+    // (règle du gérant) — il a été choisi pour ces panneaux-là. Seul le
+    // triphasé, demandé explicitement, le fait changer.
     retenu = onduleurPourPanneaux(onduleurBase, candidatsRetenus, critere);
   }
   // Vérifié : le statut fait foi (un remplacement à calibre égal, autre

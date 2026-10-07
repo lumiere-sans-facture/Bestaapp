@@ -127,8 +127,10 @@ const tarifer = ({ re, designation, prixDefaut }, lignesKit, products) => {
 const evaluer = ({ modele, quantite, panneaux, panneau, wc, equilibreSeulement, outils, site }) => {
   const elec = lireElectrique(modele);
   const raisons = [];
-  if (!elec) return { ok: false, raisons: ['caractéristiques électriques non renseignées'] };
   if (quantite > maxEnParallele(modele)) return { ok: false, raisons: ['mise en parallèle non autorisée'] };
+  // Tension max et MPPT non renseignés : chaînes incalculables, modèle
+  // écarté — on ne propose pas une configuration qu'on ne peut vérifier.
+  if (!elec) return { ok: false, raisons: ['caractéristiques électriques non renseignées'] };
   // Contrôle du pic facultatif : pour un kit, seul l'accueil des panneaux
   // décide de l'onduleur (règle du gérant, voir utils/solarSizing.js).
   const pic = outils.controlePic ? outils.controlePic(modele, quantite) : { ok: true };
@@ -150,21 +152,29 @@ const evaluer = ({ modele, quantite, panneaux, panneau, wc, equilibreSeulement, 
 
 /**
  * Ordre d'essai des onduleurs d'un kit (règle du gérant) : l'onduleur du kit
- * seul, puis le même en parallèle jusqu'à son maximum réglé ; ensuite
- * seulement les autres modèles (`autres`, déjà triés du plus petit au plus
- * grand), seuls d'abord, puis en parallèle.
+ * seul d'abord ; ensuite, toutes les autres solutions — le même en
+ * parallèle, les autres modèles (`autres`, triés du plus petit au plus
+ * grand) seuls ou en parallèle — de la MOINS CHÈRE à la plus chère (prix ×
+ * nombre d'appareils).
  * @returns {Array<{modele:object, quantite:number}>}
  */
 export const ordreEscalade = (onduleurKit, autres = []) => {
   const etapes = [];
   if (onduleurKit) {
-    for (let q = 1; q <= maxEnParallele(onduleurKit); q += 1) etapes.push({ modele: onduleurKit, quantite: q });
+    for (let q = 2; q <= maxEnParallele(onduleurKit); q += 1) etapes.push({ modele: onduleurKit, quantite: q });
   }
   const plafond = Math.max(1, ...autres.map(maxEnParallele));
   for (let q = 1; q <= plafond; q += 1) {
     for (const modele of autres) if (maxEnParallele(modele) >= q) etapes.push({ modele, quantite: q });
   }
-  return etapes;
+  // LE PRIX D'ABORD (règle du gérant) : une fois l'onduleur du kit seul
+  // écarté, la solution la moins chère passe devant — un 16 kW à lui seul
+  // plutôt que deux 12 kW s'il coûte moins. Prix inconnu : après les prix
+  // connus. À coût égal, l'ordre ci-dessus (celui du kit, puis le moins
+  // d'appareils, puis le plus petit) départage — le tri est stable.
+  const cout = (e) => (Number(e.modele.price) > 0 ? Number(e.modele.price) * e.quantite : Infinity);
+  etapes.sort((a, b) => (cout(a) === cout(b) ? 0 : cout(a) - cout(b)));
+  return onduleurKit ? [{ modele: onduleurKit, quantite: 1 }, ...etapes] : etapes;
 };
 
 /**
@@ -353,9 +363,10 @@ export const ajusterKit = ({
   // Protections AC : une par onduleur remplacé ou ajouté, au calibre du modèle.
   const nbAc = statut === 'remplace' ? retenu.quantite : statut === 'double' ? retenu.quantite - 1 : 0;
   if (nbAc > 0) {
-    const cal = protectionAc(retenu.modele, retenu.elec.phases);
+    const phasesRetenu = retenu.elec.phases;
+    const cal = protectionAc(retenu.modele, phasesRetenu);
     ajouter(
-      { re: null, designation: `Disjoncteur AC ${cal.a} A${retenu.elec.phases === 3 ? ' tétrapolaire' : ''}`, prixDefaut: cal.prix, unit: 'pcs' },
+      { re: null, designation: `Disjoncteur AC ${cal.a} A${phasesRetenu === 3 ? ' tétrapolaire' : ''}`, prixDefaut: cal.prix, unit: 'pcs' },
       nbAc,
       `sortie de l'onduleur ${retenu.modele.capacity} kVA`,
     );

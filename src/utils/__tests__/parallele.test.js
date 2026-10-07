@@ -57,7 +57,7 @@ describe('devis de kit', () => {
   it('le kit 24 V reçoit trois 3 kVA quand le modèle l’autorise, sans alerte', () => {
     const kit = SOLAR_KITS.find((k) => k.id === 'kit-2.5kwh-eco');
     const onduleurs = [trois({ id: 'hz-3kva', parallele: true, maxParallele: 4 })];
-    const q = buildKitQuotation({ ...kit, panels: 20 }, 'tole', true, { requiredPanelPower: 10000, peakLoad: 2000 }, onduleurs);
+    const q = buildKitQuotation(kit, 'tole', true, { requiredPanelPower: 10000, peakLoad: 2000 }, onduleurs);
     expect(q.inverterSuggested).toMatchObject({ quantite: 3 });
     expect(q.inverterInsuffisant).toBe(false);
     expect(q.components.find((c) => /onduleur/i.test(c.name)).quantity).toBe(3);
