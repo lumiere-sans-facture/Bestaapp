@@ -120,6 +120,14 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+/* Écran FIXE en largeur : aucune page ne défile à gauche ou à droite. Un
+   élément trop large (un graphique, une liste déroulante) élargissait toute
+   la page sur mobile — elle glissait sur le côté et la barre d'onglets
+   sortait de l'écran. `clip` coupe sans créer de zone de défilement (les en-
+   têtes collants restent collants) ; `hidden` pour les navigateurs anciens.
+   Les zones conçues pour défiler (suivi en colonnes, puces de catégories)
+   gardent leur propre défilement horizontal. */
+html, body { overflow-x: hidden; overflow-x: clip; max-width: 100%; }
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
@@ -172,6 +180,7 @@ img { max-width: 100%; }
 
 .app-main {
   display: flex; flex-direction: column;
+  min-width: 0; overflow-x: clip;
   min-height: 100vh; min-height: 100dvh;
   padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px));
 }
@@ -544,12 +553,14 @@ form .login-link { width: 100%; margin-top: 4px; }
 /* ============ Tableau de bord ============ */
 
 .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 160px; }
-.bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; }
+.bar-group { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; }
 .bar-wrapper { flex: 1; display: flex; gap: 4px; align-items: flex-end; width: 100%; justify-content: center; }
 .bar { width: 14px; max-width: 22%; border-radius: 4px 4px 0 0; min-height: 4px; }
 .bar-leads { background: var(--primary-light); }
 .bar-won { background: var(--success); }
-.bar-label { font-size: 0.6875rem; color: var(--text-muted); }
+/* Libellés coupés plutôt qu'élargis : un nom de catégorie long poussait le
+   graphique hors de l'écran (le libellé complet reste dans l'info-bulle). */
+.bar-label { font-size: 0.6875rem; color: var(--text-muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-sublabel { font-size: 0.625rem; color: var(--text-secondary); font-weight: 600; }
 .legend-revenue { margin-left: auto; color: var(--text-secondary); }
 .legend-revenue strong { color: var(--primary-ink); }
@@ -1130,7 +1141,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 
 /* Fiche produit détaillée + filtres boutique */
 .boutique-filters { margin-bottom: 14px; }
-.boutique-filters .sort-select { flex: 1; }
+.boutique-filters .sort-select { flex: 1; min-width: 0; }
 .product-open { display: block; width: 100%; text-align: left; cursor: pointer; }
 .product-image-btn { padding: 0; }
 .detail-image {
