@@ -689,7 +689,9 @@ export default function Plus() {
         </div>
       )}
 
-      <div className="sync-inline"><SyncStatusRow /></div>
+      {/* Statut de synchronisation (partage des données, éléments en
+          attente, « Synchroniser maintenant ») : réservé au gérant. */}
+      {user.role === 'gerant' && <div className="sync-inline"><SyncStatusRow /></div>}
 
       {/* Réservé au gérant : lui seul peut agir sur la configuration du
           suivi, et lui seul a besoin de savoir s'il est actif. */}
@@ -715,7 +717,9 @@ export default function Plus() {
           </div>
           <ChevronRight size={20} className="pro-cta-arrow" />
         </button>
-      <div className="sync-inline"><SyncStatusRow /></div>
+      {/* Statut de synchronisation : réservé au gérant (les autres profils
+          n'ont rien à y faire et ne doivent pas s'en inquiéter). */}
+      {user.role === 'gerant' && <div className="sync-inline"><SyncStatusRow /></div>}
 
       {/* Parrainage de l'entreprise. Trois états, et c'est le drapeau
           `referral_par_defaut` qui les sépare : un code CHOISI est définitif,
