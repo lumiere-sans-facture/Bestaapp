@@ -57,9 +57,21 @@ export const estKitHauteTension = (kit) =>
 /** Même tension — ou l'une des deux inconnue, donc invérifiable. */
 export const tensionsCompatibles = (a, b) => !a || !b || a === b;
 
-/** Onduleurs utilisables avec une batterie de cette tension. */
-export const onduleursCompatibles = (onduleurs = [], tension = null) =>
-  (onduleurs || []).filter((o) => tensionsCompatibles(tensionOnduleur(o), tension));
+/**
+ * Onduleurs utilisables avec une batterie de cette tension.
+ * Règle du gérant : un onduleur SANS tension batterie (ni saisie, ni écrite
+ * dans sa désignation) est un onduleur HAUTE TENSION (HV). Il n'est donc
+ * jamais proposé pour un kit 12, 24 ou 48 V, et c'est lui — et lui seul —
+ * qui convient à un kit HV. Kit de tension inconnue (ni 12/24/48 V, ni HV) :
+ * rien ne peut être contredit, tous restent candidats.
+ */
+export const onduleursCompatibles = (onduleurs = [], tension = null, { hauteTension = false } = {}) =>
+  (onduleurs || []).filter((o) => {
+    const t = tensionOnduleur(o);
+    if (lireTension(tension)) return t === lireTension(tension);
+    if (hauteTension) return !t;
+    return true;
+  });
 
 /** « 24 V », ou chaîne vide si inconnue. */
 export const libelleTension = (tension) => (lireTension(tension) ? `${lireTension(tension)} V` : '');

@@ -149,7 +149,8 @@ export const onduleurEstValide = (onduleur) => {
 /** Libellé technique court, affiché sous le nom dans les listes. */
 export const resumeOnduleur = (o) => [
   o.capacity ? `${o.capacity} kVA` : null,
-  libelleTension(tensionOnduleur(o)) || null,
+  // Sans tension batterie : onduleur haute tension (règle du gérant).
+  libelleTension(tensionOnduleur(o)) || 'haute tension (HV)',
   o.maxPvPower ? `PV max ${o.maxPvPower} Wc` : null,
   maxEnParallele(o) > 1 ? `parallèle ×${maxEnParallele(o)} max` : 'sans parallèle',
   lireElectrique(o) ? `${lireElectrique(o).nbMppt} MPPT · ${lireElectrique(o).vocMax} V DC max` : null,

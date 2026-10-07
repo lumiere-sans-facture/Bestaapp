@@ -13,13 +13,13 @@ await page.evaluate(() => localStorage.setItem('bestasolar_user', JSON.stringify
 
 // ---- 1. ONDULEURS : tension affichée et modifiable ----
 await page.goto(B + '/plus/inverters');
-await page.waitForTimeout(1500);
+await page.locator('.kit-card').first().waitFor({ timeout: 15000 }).catch(() => {});
 const listeOnd = await page.evaluate(() => document.querySelector('.page-content')?.innerText || '');
 ok(/3 kVA · 24 V/.test(listeOnd) && /6 kVA · 48 V/.test(listeOnd), 'Onduleurs : la tension figure dans la liste (3 kVA · 24 V, 6 kVA · 48 V)');
 await page.locator('button:has-text("Modifier")').first().click();
 await page.waitForTimeout(400);
 const choix = await page.locator('.sheet select').first().evaluate((s) => [...s.options].map((o) => o.text));
-ok(choix.join('|') === 'Non renseignée|12 V|24 V|48 V', `formulaire onduleur : ${choix.join(' / ')}`);
+ok(choix.join('|') === 'Non renseignée — haute tension (HV)|12 V|24 V|48 V', `formulaire onduleur : ${choix.join(' / ')}`);
 await page.keyboard.press('Escape');
 
 // ---- 2. MES KITS : tension affichée dans la liste et le formulaire ----

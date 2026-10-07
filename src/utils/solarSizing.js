@@ -657,7 +657,8 @@ const ONDULEUR_LINE_RE = /onduleur/i;
  */
 export const onduleurDuKit = (kit, inverters = []) => {
   const ligne = (kit?.lines || []).find((l) => ONDULEUR_LINE_RE.test(l.designation || '')) || null;
-  const memeCalibre = onduleursCompatibles(inverters, tensionKit(kit)).filter((o) => o.capacity === kit?.inverter);
+  const memeCalibre = onduleursCompatibles(inverters, tensionKit(kit), { hauteTension: estKitHauteTension(kit) })
+    .filter((o) => o.capacity === kit?.inverter);
   const spec = memeCalibre.find((o) => o.brand
     && new RegExp(`\\b${String(o.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(ligne?.designation || ''))
     || memeCalibre[0] || null;
@@ -786,7 +787,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // soit-il. Une tension inconnue (kit ou onduleur non renseigné) ne bloque
   // rien — impossible de la contredire (voir utils/tension.js).
   const tension = tensionKit(kit);
-  const candidats = onduleursCompatibles(inverters, tension);
+  const candidats = onduleursCompatibles(inverters, tension, { hauteTension: estKitHauteTension(kit) });
   const { spec: currentSpec } = onduleurDuKit(kit, inverters);
   // Nombre de panneaux POSÉS, à la puissance crête DU KIT : TOUJOURS celui du
   // dimensionnement (règle du gérant) — au-dessus du kit (besoin 16, kit

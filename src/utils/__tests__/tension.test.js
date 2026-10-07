@@ -50,12 +50,15 @@ describe('onduleurs et kits', () => {
     expect(INVERTER_MODELS.find((o) => o.id === 'hz-3kva').tension).toBe(24);
     expect(INVERTER_MODELS.find((o) => o.id === 'deye-6kva').tension).toBe(48);
   });
-  it('une tension inconnue ne bloque rien', () => {
+  it('onduleur sans tension = haute tension (HV) : jamais pour un kit 12/24/48 V', () => {
     expect(tensionsCompatibles(24, 48)).toBe(false);
     expect(tensionsCompatibles(24, 24)).toBe(true);
-    expect(tensionsCompatibles(null, 48)).toBe(true);
     const liste = [{ id: 'a', tension: 24 }, { id: 'b', tension: 48 }, { id: 'c' }];
-    expect(onduleursCompatibles(liste, 24).map((o) => o.id)).toEqual(['a', 'c']);
+    expect(onduleursCompatibles(liste, 24).map((o) => o.id)).toEqual(['a']);
+    expect(onduleursCompatibles(liste, 48).map((o) => o.id)).toEqual(['b']);
+    // Kit HV : seuls les onduleurs sans tension batterie (haute tension).
+    expect(onduleursCompatibles(liste, null, { hauteTension: true }).map((o) => o.id)).toEqual(['c']);
+    // Kit de tension inconnue (ni basse tension, ni HV) : rien n'est contredit.
     expect(onduleursCompatibles(liste, null)).toHaveLength(3);
   });
 });
@@ -140,5 +143,16 @@ describe('main d’œuvre des kits haute tension', () => {
     expect(estKitHauteTension({ lines: [{ designation: 'Batterie Pylontech H2 HV 10 kWh' }] })).toBe(true);
     expect(estKitHauteTension({ lines: [{ designation: 'Batterie lithium 48V 16 kWh' }, { designation: 'Disjoncteur HV' }] })).toBe(false);
     expect(estKitHauteTension({ lines: [{ designation: 'Batterie HVAC' }] })).toBe(false);
+  });
+});
+
+describe('devis de kit : onduleur HV jamais proposé sur un kit 48 V', () => {
+  it('un 16 kVA moins cher mais sans tension batterie est écarté', () => {
+    const k = SOLAR_KITS.find((x) => x.id === 'kit-32kwh'); // 48 V, Deye 6 kVA
+    const hv = { id: 'hv-16', brand: 'HV', model: 'Onduleur 16kVA', capacity: 16, maxPvPower: 30000, price: 100000,
+      electrique: { vocMax: 1000, mpptMin: 150, mpptMax: 850, nbMppt: 2, chainesParMppt: 2, iscMaxMppt: 40, phases: 3 } };
+    const q = buildKitQuotation(k, 'tole', true, { requiredPanelPower: 30 * k.panelW }, [...INVERTER_MODELS, hv], [], 1);
+    expect(q.inverterSuggested?.id).not.toBe('hv-16');
+    expect(q.components.some((c) => /16kVA/.test(c.name))).toBe(false);
   });
 });

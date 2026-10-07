@@ -150,7 +150,7 @@ export default function InvertersSection({ onBack }) {
               <Field label="Tension batterie">
                 <select className="input" value={edition.onduleur.tension ?? ''}
                   onChange={(e) => majOnduleur({ tension: e.target.value })}>
-                  <option value="">Non renseignée</option>
+                  <option value="">Non renseignée — haute tension (HV)</option>
                   {TENSIONS_BATTERIE.map((t) => <option key={t} value={t}>{t} V</option>)}
                 </select>
               </Field>

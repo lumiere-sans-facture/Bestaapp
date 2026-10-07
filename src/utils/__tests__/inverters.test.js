@@ -23,7 +23,9 @@ describe('normaliserOnduleur / onduleurEstValide', () => {
   });
 
   it('resumeOnduleur assemble capacité, puissance PV max et rendement', () => {
-    expect(resumeOnduleur({ capacity: 5, maxPvPower: 6500, efficiency: 96 })).toBe('5 kVA · PV max 6500 Wc · parallèle ×2 max · rendement 96%');
+    expect(resumeOnduleur({ capacity: 5, tension: 48, maxPvPower: 6500, efficiency: 96 })).toBe('5 kVA · 48 V · PV max 6500 Wc · parallèle ×2 max · rendement 96%');
+    // Sans tension batterie : onduleur haute tension (règle du gérant).
+    expect(resumeOnduleur({ capacity: 30, maxPvPower: 39000 })).toMatch(/30 kVA · haute tension \(HV\)/);
   });
 
   it('dupliquerOnduleur change l’id et suffixe le modèle', () => {
