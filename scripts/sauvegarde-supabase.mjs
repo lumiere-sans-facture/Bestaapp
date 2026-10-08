@@ -66,9 +66,12 @@ const tableAbsente = (reponse, corps) =>
  */
 async function lireTable(table) {
   const base = `${adresse()}/rest/v1/${encodeURIComponent(table)}`;
+  const cle = cleService();
   const entetes = {
-    apikey: cleService(),
-    Authorization: `Bearer ${cleService()}`,
+    apikey: cle,
+    // Une clé moderne `sb_secret_…` n'est pas un JWT et Supabase la refuse
+    // dans Authorization. Les anciennes clés service_role restent compatibles.
+    ...(cle.startsWith('sb_secret_') ? {} : { Authorization: `Bearer ${cle}` }),
     Accept: 'application/json',
     Prefer: 'count=exact',
   };
