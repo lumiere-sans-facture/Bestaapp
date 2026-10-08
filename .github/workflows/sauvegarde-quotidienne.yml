@@ -1,0 +1,66 @@
+name: Sauvegarde quotidienne
+
+on:
+  # GitHub utilise UTC. 01:17 UTC = 02:17 au Bénin et au Togo (UTC+1).
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sauvegarde-production
+  cancel-in-progress: false
+
+jobs:
+  sauvegarder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Configurer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Vérifier les secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SAUVEGARDES_TOKEN: ${{ secrets.SAUVEGARDES_TOKEN }}
+        run: |
+          [ -n "$SUPABASE_URL" ] || { echo "::error::Secret SUPABASE_URL absent"; exit 1; }
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::Secret SUPABASE_SERVICE_ROLE_KEY absent"; exit 1; }
+          [ -n "$SAUVEGARDES_TOKEN" ] || { echo "::error::Secret SAUVEGARDES_TOKEN absent"; exit 1; }
+
+      - name: Exporter la base de production
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/sauvegarde-supabase.mjs --output sauvegarde-sortie
+
+      - name: Copier dans le dépôt privé
+        env:
+          GH_TOKEN: ${{ secrets.SAUVEGARDES_TOKEN }}
+          DEPOT_SAUVEGARDES: ${{ github.repository_owner }}/bestasolar-sauvegardes
+        run: |
+          gh repo clone "$DEPOT_SAUVEGARDES" depot-sauvegardes -- --depth 1
+          DOSSIER="sauvegardes/$(date -u +'%Y/%m')"
+          mkdir -p "depot-sauvegardes/$DOSSIER"
+          cp sauvegarde-sortie/* "depot-sauvegardes/$DOSSIER/"
+          cd depot-sauvegardes
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- sauvegardes
+          git commit -m "Sauvegarde production $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git push
+
+      - name: Conserver aussi une copie temporaire dans l’exécution
+        uses: actions/upload-artifact@v4
+        with:
+          name: sauvegarde-production-${{ github.run_number }}
+          path: sauvegarde-sortie/
+          retention-days: 7
