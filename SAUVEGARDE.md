@@ -1,98 +1,123 @@
-# Sauvegarde automatique de la production
+# Sauvegarde automatique quotidienne
 
-Le workflow **Sauvegarde quotidienne** exporte chaque nuit les données métier de
-Supabase, les compresse, calcule leur empreinte SHA-256 puis les pousse dans un
-dépôt GitHub privé séparé. Il peut aussi être lancé manuellement.
+Chaque nuit à **02h17** (heure de Lomé), la base Supabase de **production** est
+exportée dans un fichier JSON déposé sur un dépôt GitHub **privé**. Sept
+sauvegardes sont conservées : la plus ancienne est supprimée à chaque dépôt.
 
-## Mise en service (une seule fois)
+| | |
+|---|---|
+| Tâche planifiée | `.github/workflows/sauvegarde-quotidienne.yml` |
+| Script | `scripts/sauvegarde-supabase.mjs` |
+| Logique pure + tests | `src/utils/sauvegardeAuto.js`, `src/utils/__tests__/sauvegardeAuto.test.js` |
+| Dépôt de dépôt | `lumiere-sans-facture/bestasolar-sauvegardes` (privé) |
+| Fichier produit | `bestasolar-sauvegarde-AAAA-MM-JJ.json` |
 
-### 1. Créer le dépôt privé
+Le fichier a **exactement la forme de l'export manuel** (`Plus › Sauvegarde des
+données`). La sauvegarde de cette nuit se restaure donc par le bouton existant,
+sans outil à installer.
 
-Dans l’organisation ou le compte qui possède `Bestaapp`, créer le dépôt :
+> **Pourquoi un second dépôt, privé ?** `Bestaapp` est public. Déposer l'export
+> des clients sur une de ses branches publierait chaque nuit leurs noms,
+> téléphones, adresses, devis et factures sur Internet. Les artefacts d'un dépôt
+> public sont également téléchargeables par n'importe qui : ils ne conviennent
+> pas davantage.
 
-- nom : `bestasolar-sauvegardes` ;
-- visibilité : **Private** ;
-- cocher **Add a README file** afin que la branche `main` existe.
+## Mise en route (une seule fois)
 
-Ne jamais rendre ce dépôt public : il contient les données métier des clients.
+### 1. Créer le dépôt de sauvegardes
 
-### 2. Créer le jeton restreint
+Sur GitHub : **New repository** → nom `bestasolar-sauvegardes`, visibilité
+**Private**, et **coche « Add a README file »**. Un dépôt complètement vide n'a
+pas de branche, et la tâche échouerait à le récupérer.
 
-Dans GitHub, ouvrir **Settings → Developer settings → Personal access tokens →
-Fine-grained tokens**, puis créer un jeton :
+### 2. Créer un jeton d'accès
 
-- accès au propriétaire de `bestasolar-sauvegardes` ;
-- accès uniquement au dépôt `bestasolar-sauvegardes` ;
-- permission **Contents: Read and write** ;
-- aucune autre permission ;
-- expiration la plus longue autorisée, avec un rappel avant expiration.
+Settings du compte → **Developer settings** → **Personal access tokens** →
+**Fine-grained tokens** → *Generate new token* :
 
-Copier le jeton directement dans le secret GitHub décrit ci-dessous. Ne jamais
-le placer dans un fichier, une issue, un message ou le dépôt.
+- **Repository access** : *Only select repositories* → `bestasolar-sauvegardes`
+- **Permissions** → *Repository permissions* → **Contents : Read and write**
+- **Expiration** : le plus long possible, ou *No expiration*
 
-### 3. Ajouter les secrets à `Bestaapp`
+⚠️ **Un jeton expiré arrête les sauvegardes.** La tâche passera au rouge et
+GitHub t'enverra un e-mail, mais personne ne surveille une tâche qui réussit
+depuis six mois : note la date d'expiration dans ton agenda.
 
-Dans **Bestaapp → Settings → Secrets and variables → Actions**, créer :
+### 3. Renseigner les trois secrets
+
+Dans `Bestaapp` → **Settings › Secrets and variables › Actions** → *New
+repository secret* :
 
 | Secret | Valeur |
 |---|---|
-| `SUPABASE_URL` | URL du projet Supabase de production (`https://…supabase.co`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | clé `service_role` du projet de production |
-| `SAUVEGARDES_TOKEN` | jeton GitHub restreint créé à l’étape 2 |
+| `SUPABASE_URL` | adresse du projet Supabase de **production** (`https://xxxx.supabase.co`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | clé `service_role` du projet de production (Settings › API) |
+| `SAUVEGARDES_TOKEN` | le jeton créé à l'étape 2 |
 
-La clé `service_role` contourne toutes les règles RLS. Elle ne doit jamais être
-utilisée côté navigateur, préfixée par `VITE_`, écrite dans `.env` suivi par Git
-ou copiée dans une conversation.
+La clé `service_role` contourne les règles de sécurité (RLS) : c'est ce qui
+permet de lire les lignes de **toutes** les entreprises. Elle ne doit jamais
+sortir des secrets du dépôt — ni dans un fichier, ni dans un commit.
 
-### 4. Faire la recette
+### 4. Essayer la tâche à la main
 
-Ouvrir **Bestaapp → Actions → Sauvegarde quotidienne → Run workflow**.
-L’exécution doit finir en vert. Vérifier ensuite dans le dépôt privé :
+Onglet **Actions** → *Sauvegarde quotidienne* → **Run workflow**. Au bout d'une
+minute, le dépôt privé doit contenir le fichier du jour et un
+`DERNIERE-SAUVEGARDE.md` récapitulant les lignes par table.
 
-`sauvegardes/AAAA/MM/`
+> **GitHub ne déclenche les tâches planifiées que depuis la branche par
+> défaut.** Le réveil automatique de 02h17 n'existera donc **qu'après la fusion
+> en `main`**. Avant cela, seul « Run workflow » fonctionne.
 
-Chaque sauvegarde comprend :
+## Vérifier que ça tourne encore
 
-- l’archive `*.json.gz` ;
-- son empreinte `*.sha256` ;
-- le manifeste `*.manifest.json` (nombre de lignes par table).
+Une sauvegarde qu'on croit faite et qui ne l'est plus est le piège classique.
+Trois réflexes :
 
-La planification ne s’exécute que lorsque le workflow est sur la branche par
-défaut `main`. L’horaire est 02 h 17 au Bénin et au Togo.
+- **`DERNIERE-SAUVEGARDE.md`** dans le dépôt privé : sa date doit être celle
+  d'hier ou d'aujourd'hui. C'est le coup d'œil le plus rapide.
+- **Un échec est signalé** : GitHub envoie un e-mail au propriétaire du dépôt
+  dès qu'une tâche planifiée échoue.
+- **GitHub suspend les tâches planifiées d'un dépôt inactif pendant 60 jours.**
+  Tant qu'on développe, le cas ne se présente pas ; après une longue pause, il
+  faut les réactiver depuis l'onglet Actions.
 
-## Données incluses
+## Restaurer
 
-L’export couvre les organisations, profils métier, catalogue, kits, onduleurs,
-clients, partenaires, commissions, devis, commandes, formations, abonnements,
-paiements métier, sociétés, factures, clients Pro, demandes de retrait,
-tombstones, codes promotionnels, paiements vérifiés et file de synchronisation
-Google Contacts. Les tables absentes d’une ancienne installation sont indiquées
-dans le manifeste sans rendre la sauvegarde inutilisable.
+### Les données métier — par l'application
 
-## Exclusions volontaires
+1. Télécharger le fichier `bestasolar-sauvegarde-AAAA-MM-JJ.json` du dépôt privé.
+2. Dans l'app, en gérant : `Plus › Sauvegarde des données › Restaurer`.
+3. Confirmer. **La restauration remplace les données de toute l'équipe** : tout
+   ce qui a été créé depuis cette sauvegarde est perdu. L'écran le rappelle.
 
-- **Comptes Supabase Auth (`auth.users`)** : ils devront être réinvités après
-  une reconstruction. Les profils métier de la table `profiles` sont sauvegardés.
-- **Jetons Google Contacts** : `google_contacts_configs`, états OAuth et verrous
-  sont exclus. Le compte Google devra être reconnecté après restauration.
-- **Secrets d’environnement** (Vercel, Supabase, GitHub) : à conserver dans un
-  coffre-fort séparé.
-- **Base de recette/staging** : seul le projet indiqué par `SUPABASE_URL` est
-  exporté.
+### Les tables de structure — par SQL
 
-## Vérification et restauration
+Le fichier contient aussi `orgs`, `profiles`, `codes_promo`,
+`codes_promo_utilisations`, `paiements_verifies` et `tombstones`. L'application
+ne les réplique pas : le bouton de restauration les **ignore**. Pour reconstruire
+une base de zéro, il faut rejouer les scripts de `supabase/`, puis réinjecter ces
+tables à la main depuis le JSON (SQL Editor).
 
-Avant toute restauration, travailler sur un nouveau projet Supabase de test :
+## Ce qui n'est PAS sauvegardé
 
-1. télécharger l’archive et le fichier `.sha256` ;
-2. vérifier l’empreinte avec `sha256sum -c <fichier>.sha256` ;
-3. décompresser le JSON ;
-4. recréer d’abord le schéma avec les scripts du dossier `supabase/` ;
-5. réimporter les tables en respectant les dépendances (`orgs`, puis `profiles`,
-   puis les collections métier) ;
-6. contrôler les nombres de lignes avec le manifeste ;
-7. seulement après validation, planifier la restauration de production.
+Il faut le savoir avant d'en avoir besoin :
 
-Une restauration de production ne doit jamais être automatisée depuis ce
-workflow : elle nécessite une validation humaine, une fenêtre de maintenance et
-une sauvegarde supplémentaire de l’état à remplacer.
+- **Les comptes de connexion** (`auth.users` de Supabase). Après une
+  reconstruction, les membres doivent être réinvités et refaire un mot de passe.
+  Leurs profils métier, eux, sont dans la sauvegarde.
+- **Les jetons Google Contacts** (`google_contacts_*`), volontairement exclus :
+  un secret n'a rien à faire dans une sauvegarde qu'on recopie. La connexion
+  Google est à refaire.
+- **Le journal d'erreurs** (`erreurs`), sans valeur métier.
+- **Les compteurs de numérotation du navigateur** (`devisCounter`,
+  `orderCounter`) : ils vivent dans le `localStorage`, pas en base. Ce n'est pas
+  une perte — à la restauration, une clé absente est laissée telle quelle, donc
+  la numérotation en cours n'est pas écrasée.
+- **La base de recette.** Seule la production est sauvegardée.
+- **Le code**, déjà sur GitHub.
+
+## Changer la rétention
+
+`JOURS_GARDES` en tête de `.github/workflows/sauvegarde-quotidienne.yml`. Les
+fichiers excédentaires sont supprimés au dépôt suivant. Un fichier qui n'est pas
+une sauvegarde (README, résumé) n'est jamais touché.

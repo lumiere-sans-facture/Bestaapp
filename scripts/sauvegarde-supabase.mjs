@@ -1,147 +1,191 @@
-import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { gzipSync } from 'node:zlib';
-import path from 'node:path';
+// Sauvegarde quotidienne de la base Supabase — exécuté par la tâche planifiée
+// .github/workflows/sauvegarde-quotidienne.yml, jamais par le navigateur.
+//
+//   node scripts/sauvegarde-supabase.mjs --dossier <dossier> [--garder 7]
+//
+// Variables d'environnement attendues :
+//   SUPABASE_URL                 adresse du projet
+//   SUPABASE_SERVICE_ROLE_KEY    clé service_role (contourne RLS : indispensable
+//                                pour lire les lignes de TOUTES les entreprises)
+//
+// Deux principes tiennent ce script :
+//
+//   1. Une sauvegarde PARTIELLE ne doit jamais être déposée en silence. Une
+//      table illisible (réseau, clé refusée) fait échouer tout le script : mieux
+//      vaut une tâche en rouge qu'un fichier incomplet qu'on croira valide le
+//      jour où on en aura besoin. Seule exception : une table qui n'existe pas
+//      encore dans ce projet (script SQL pas encore passé) est consignée dans
+//      `tablesAbsentes` et n'empêche pas la sauvegarde du reste.
+//
+//   2. Aucune donnée client dans les messages. Les journaux d'une tâche GitHub
+//      sont lisibles par tous les collaborateurs : on cite la table et le
+//      nombre de lignes, jamais un nom, un téléphone ou une adresse.
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  TABLES_SAUVEGARDE,
+  TABLES_METIER,
+  SAUVEGARDES_GARDEES,
+  ordreDeTri,
+  nomFichierSauvegarde,
+  sauvegardesAPurger,
+  construireSauvegarde,
+  compterLignes,
+  resumeMarkdown,
+  versionDepuisSeed,
+} from '../src/utils/sauvegardeAuto.js';
 
-const PAGE_SIZE = 1000;
+const RACINE = join(dirname(fileURLToPath(import.meta.url)), '..');
+const PAGE = 1000; // lignes par requête
+const RESUME = 'DERNIERE-SAUVEGARDE.md';
 
-// Tables métier restaurables. Les tables OAuth Google contenant les jetons,
-// les états OAuth éphémères et les verrous ne doivent jamais être exportés.
-const TABLES = [
-  'orgs',
-  'profiles',
-  'products',
-  'kits',
-  'inverters',
-  'pompeKits',
-  'leads',
-  'partners',
-  'commissions',
-  'devis',
-  'referrals',
-  'orders',
-  'formations',
-  'formationProgress',
-  'subscriptions',
-  'subscriptionPayments',
-  'companies',
-  'paiementConfigs',
-  'factures',
-  'proClients',
-  'payoutRequests',
-  'tombstones',
-  'codes_promo',
-  'codes_promo_utilisations',
-  'codes_promo_echecs',
-  'paiements_verifies',
-  'google_contact_sync_jobs',
-];
-
-const url = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
-const outputArg = process.argv.indexOf('--output');
-const outputDir = path.resolve(
-  outputArg >= 0 ? process.argv[outputArg + 1] : (process.env.BACKUP_OUTPUT_DIR || 'sauvegarde-sortie'),
-);
-
-if (!/^https:\/\/[^/]+\.supabase\.co$/i.test(url)) {
-  throw new Error('SUPABASE_URL absente ou invalide.');
-}
-if (!serviceRoleKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY absente.');
-if (outputArg >= 0 && !process.argv[outputArg + 1]) throw new Error('Valeur manquante après --output.');
-
-const headers = {
-  apikey: serviceRoleKey,
-  Authorization: `Bearer ${serviceRoleKey}`,
-  Accept: 'application/json',
-  Prefer: 'count=exact',
+/** Lit un argument `--nom valeur` sur la ligne de commande. */
+const argument = (nom, defaut) => {
+  const i = process.argv.indexOf(`--${nom}`);
+  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : defaut;
 };
 
-async function exportTable(table) {
-  const rows = [];
-  for (let start = 0; ; start += PAGE_SIZE) {
-    const response = await fetch(`${url}/rest/v1/${encodeURIComponent(table)}?select=*`, {
-      headers: {
-        ...headers,
-        'Range-Unit': 'items',
-        Range: `${start}-${start + PAGE_SIZE - 1}`,
-      },
-    });
+const adresse = () => (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+const cleService = () => process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-    if (response.status === 416) break;
-    if (response.status === 404) {
-      return { table, rows: null, absent: true };
+/** Total de lignes annoncé par PostgREST dans l'en-tête `content-range` (« 0-99/1234 »). */
+const totalAnnonce = (contentRange) => {
+  const brut = (contentRange || '').split('/')[1];
+  const n = Number.parseInt(brut, 10);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** Vrai si la réponse signale une table inexistante (script SQL pas encore passé). */
+const tableAbsente = (reponse, corps) =>
+  reponse.status === 404 || corps?.code === '42P01' || corps?.code === 'PGRST205';
+
+/**
+ * Lit TOUTES les lignes d'une table, page par page.
+ * @returns {Promise<{lignes: object[]}|{absente: true}>}
+ */
+async function lireTable(table) {
+  const base = `${adresse()}/rest/v1/${encodeURIComponent(table)}`;
+  const entetes = {
+    apikey: cleService(),
+    Authorization: `Bearer ${cleService()}`,
+    Accept: 'application/json',
+    Prefer: 'count=exact',
+  };
+
+  const lignes = [];
+  let total = null;
+
+  for (let offset = 0; ; offset += PAGE) {
+    const url = `${base}?select=*&order=${ordreDeTri(table)}&limit=${PAGE}&offset=${offset}`;
+    let reponse;
+    try {
+      reponse = await fetch(url, { headers: entetes });
+    } catch (erreur) {
+      // L'adresse du projet n'est pas journalisée : elle peut porter la
+      // référence du projet, et le diagnostic tient dans la cause.
+      throw new Error(`Base injoignable à la lecture de « ${table} » (${erreur.cause?.code || erreur.message}).`);
     }
-    if (!response.ok) {
-      const message = (await response.text()).slice(0, 500);
-      throw new Error(`${table} : réponse Supabase ${response.status} — ${message}`);
+    const texte = await reponse.text();
+    let corps = null;
+    try { corps = texte ? JSON.parse(texte) : null; } catch { /* corps non JSON : traité plus bas */ }
+
+    if (!reponse.ok) {
+      if (tableAbsente(reponse, corps)) return { absente: true };
+      // Ni la clé ni le corps de la réponse ne sont journalisés : le corps peut
+      // contenir une ligne de données, la clé est un secret.
+      throw new Error(
+        `Lecture de « ${table} » refusée (HTTP ${reponse.status}${corps?.code ? `, code ${corps.code}` : ''}).`,
+      );
     }
+    if (!Array.isArray(corps)) throw new Error(`Réponse inattendue pour « ${table} » (tableau attendu).`);
 
-    const page = await response.json();
-    if (!Array.isArray(page)) throw new Error(`${table} : réponse Supabase inattendue.`);
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
+    if (total === null) total = totalAnnonce(reponse.headers.get('content-range'));
+    lignes.push(...corps);
+
+    if (corps.length < PAGE) break;
+    if (total !== null && lignes.length >= total) break;
+    if (offset > 5_000_000) throw new Error(`Parcours de « ${table} » interrompu : trop de pages.`);
   }
-  return { table, rows, absent: false };
-}
 
-const exportedAt = new Date();
-const data = {};
-const missingTables = [];
-
-for (const table of TABLES) {
-  const result = await exportTable(table);
-  if (result.absent) {
-    missingTables.push(table);
-    console.warn(`Table absente, ignorée : ${table}`);
-  } else {
-    data[table] = result.rows;
-    console.log(`${table} : ${result.rows.length} ligne(s)`);
+  // Garde-fou contre une pagination qui sauterait des lignes : le compte exact
+  // annoncé par la base doit correspondre à ce qu'on a ramené.
+  if (total !== null && lignes.length !== total) {
+    throw new Error(`Sauvegarde de « ${table} » incomplète : ${lignes.length} lignes sur ${total} annoncées.`);
   }
+  return { lignes };
 }
 
-if (!Object.prototype.hasOwnProperty.call(data, 'profiles')) {
-  throw new Error('La table profiles n’a pas pu être exportée : sauvegarde annulée.');
-}
-
-const iso = exportedAt.toISOString();
-const stamp = iso.replace(/[:.]/g, '-');
-const baseName = `bestasolar-production-${stamp}`;
-const backup = {
-  format: 'bestasolar-supabase-backup',
-  version: 1,
-  exportedAt: iso,
-  source: new URL(url).hostname,
-  excluded: [
-    'auth.users',
-    'google_contacts_configs',
-    'google_contacts_oauth_states',
-    'google_contact_sync_locks',
-  ],
-  missingTables,
-  tables: data,
+/** Version du schéma local, lue dans le fichier de référence (jamais importée :
+ *  `src/data/seed.js` s'appuie sur la résolution de Vite, pas sur celle de Node). */
+const versionSeed = () => {
+  try {
+    return versionDepuisSeed(readFileSync(join(RACINE, 'src/data/seed.js'), 'utf8'));
+  } catch {
+    return null;
+  }
 };
 
-const compressed = gzipSync(Buffer.from(JSON.stringify(backup)), { level: 9 });
-const checksum = createHash('sha256').update(compressed).digest('hex');
-const counts = Object.fromEntries(Object.entries(data).map(([table, rows]) => [table, rows.length]));
-const manifest = {
-  format: backup.format,
-  version: backup.version,
-  exportedAt: iso,
-  source: backup.source,
-  archive: `${baseName}.json.gz`,
-  sha256: checksum,
-  counts,
-  missingTables,
-  excluded: backup.excluded,
-};
+async function principal() {
+  const dossier = argument('dossier');
+  const garder = Number.parseInt(argument('garder', String(SAUVEGARDES_GARDEES)), 10);
 
-await mkdir(outputDir, { recursive: true });
-await Promise.all([
-  writeFile(path.join(outputDir, `${baseName}.json.gz`), compressed),
-  writeFile(path.join(outputDir, `${baseName}.sha256`), `${checksum}  ${baseName}.json.gz\n`, 'utf8'),
-  writeFile(path.join(outputDir, `${baseName}.manifest.json`), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8'),
-]);
+  if (!dossier) throw new Error('Dossier de destination manquant (--dossier <dossier>).');
+  if (!Number.isFinite(garder) || garder < 1) throw new Error('Nombre de sauvegardes à garder invalide (--garder).');
+  if (!adresse()) throw new Error('SUPABASE_URL absent : secret non configuré sur le dépôt.');
+  if (!cleService()) throw new Error('SUPABASE_SERVICE_ROLE_KEY absent : secret non configuré sur le dépôt.');
 
-console.log(`Sauvegarde créée : ${baseName}.json.gz (${compressed.length} octets)`);
+  const maintenant = new Date();
+  const tables = {};
+  const tablesAbsentes = [];
+
+  for (const table of TABLES_SAUVEGARDE) {
+    const resultat = await lireTable(table);
+    if (resultat.absente) {
+      tablesAbsentes.push(table);
+      console.log(`· ${table} : absente de la base, ignorée`);
+      continue;
+    }
+    tables[table] = resultat.lignes;
+    console.log(`· ${table} : ${resultat.lignes.length} ligne(s)`);
+  }
+
+  // Une table MÉTIER absente est tolérée (base en retard sur le code), mais
+  // qu'elles le soient TOUTES veut dire qu'on ne lit pas la bonne base.
+  if (TABLES_METIER.every((t) => tablesAbsentes.includes(t))) {
+    throw new Error('Aucune table métier trouvée : adresse de projet ou clé incorrecte.');
+  }
+
+  const exportedAt = maintenant.toISOString();
+  const fichier = nomFichierSauvegarde(maintenant);
+  const sauvegarde = construireSauvegarde({
+    tables,
+    version: versionSeed(),
+    exportedAt,
+    tablesAbsentes,
+  });
+
+  mkdirSync(dossier, { recursive: true });
+  writeFileSync(join(dossier, fichier), `${JSON.stringify(sauvegarde, null, 2)}\n`, 'utf8');
+  writeFileSync(
+    join(dossier, RESUME),
+    resumeMarkdown({ exportedAt, tables, tablesAbsentes, fichier, gardees: garder }),
+    'utf8',
+  );
+
+  // Purge seulement après une écriture réussie : on ne supprime jamais une
+  // ancienne sauvegarde avant d'avoir la nouvelle sur le disque.
+  for (const vieille of sauvegardesAPurger(readdirSync(dossier), garder)) {
+    rmSync(join(dossier, vieille));
+    console.log(`· purge : ${vieille}`);
+  }
+
+  const total = Object.values(compterLignes(tables)).reduce((s, n) => s + n, 0);
+  console.log(`\nSauvegarde écrite : ${fichier} — ${total} ligne(s), ${Object.keys(tables).length} table(s).`);
+  if (tablesAbsentes.length) console.log(`Tables absentes de la base : ${tablesAbsentes.join(', ')}.`);
+}
+
+principal().catch((erreur) => {
+  console.error(`Échec de la sauvegarde : ${erreur.message}`);
+  process.exit(1);
+});

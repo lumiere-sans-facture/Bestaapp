@@ -1,66 +1,103 @@
 name: Sauvegarde quotidienne
 
+# Sauvegarde automatique de la base Supabase de PRODUCTION, chaque nuit, dans un
+# dépôt PRIVÉ dédié. Sept jours glissants : la sauvegarde du jour est ajoutée, la
+# huitième plus ancienne est supprimée.
+#
+# Pourquoi un dépôt séparé : `Bestaapp` est public. Déposer ici un export des
+# clients publierait leurs noms, téléphones et adresses sur Internet.
+#
+# Mise en route : voir SAUVEGARDE.md (dépôt à créer, trois secrets à renseigner).
+#
+# ⚠️ GitHub ne déclenche les tâches planifiées que depuis la branche par défaut
+# (`main`) : ce calendrier ne tourne qu'une fois la branche de travail fusionnée
+# en production. Avant cela, « Run workflow » permet de l'essayer à la main.
+
 on:
-  # GitHub utilise UTC. 01:17 UTC = 02:17 au Bénin et au Togo (UTC+1).
   schedule:
-    - cron: '17 1 * * *'
+    # 02h17 UTC, soit 02h17 à Lomé (Togo = UTC+0). Un horaire décalé de l'heure
+    # pile : GitHub repousse les tâches planifiées quand tout le monde demande 0.
+    - cron: '17 2 * * *'
   workflow_dispatch:
 
-permissions:
-  contents: read
-
+# Jamais deux sauvegardes en même temps : elles pousseraient sur la même branche.
 concurrency:
-  group: sauvegarde-production
+  group: sauvegarde-quotidienne
   cancel-in-progress: false
 
+permissions:
+  contents: read # ce dépôt est seulement LU ; l'écriture se fait dans le dépôt privé
+
+env:
+  DEPOT_SAUVEGARDES: lumiere-sans-facture/bestasolar-sauvegardes
+  JOURS_GARDES: 7
+
 jobs:
-  sauvegarder:
+  sauvegarde:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Configurer Node.js
+      - name: Installer Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
+        # Pas de `npm ci` : le script n'utilise que Node et `fetch`.
 
-      - name: Vérifier les secrets
+      - name: Vérifier que les secrets sont renseignés
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SAUVEGARDES_TOKEN: ${{ secrets.SAUVEGARDES_TOKEN }}
+          URL_PRESENTE: ${{ secrets.SUPABASE_URL != '' }}
+          CLE_PRESENTE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+          JETON_PRESENT: ${{ secrets.SAUVEGARDES_TOKEN != '' }}
         run: |
-          [ -n "$SUPABASE_URL" ] || { echo "::error::Secret SUPABASE_URL absent"; exit 1; }
-          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::Secret SUPABASE_SERVICE_ROLE_KEY absent"; exit 1; }
-          [ -n "$SAUVEGARDES_TOKEN" ] || { echo "::error::Secret SAUVEGARDES_TOKEN absent"; exit 1; }
+          manquants=""
+          [ "$URL_PRESENTE" = "true" ]   || manquants="$manquants SUPABASE_URL"
+          [ "$CLE_PRESENTE" = "true" ]   || manquants="$manquants SUPABASE_SERVICE_ROLE_KEY"
+          [ "$JETON_PRESENT" = "true" ]  || manquants="$manquants SAUVEGARDES_TOKEN"
+          if [ -n "$manquants" ]; then
+            echo "Secrets manquants :$manquants"
+            echo "Les renseigner dans Settings › Secrets and variables › Actions (voir SAUVEGARDE.md)."
+            exit 1
+          fi
 
-      - name: Exporter la base de production
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/sauvegarde-supabase.mjs --output sauvegarde-sortie
-
-      - name: Copier dans le dépôt privé
-        env:
-          GH_TOKEN: ${{ secrets.SAUVEGARDES_TOKEN }}
-          DEPOT_SAUVEGARDES: ${{ github.repository_owner }}/bestasolar-sauvegardes
-        run: |
-          gh repo clone "$DEPOT_SAUVEGARDES" depot-sauvegardes -- --depth 1
-          DOSSIER="sauvegardes/$(date -u +'%Y/%m')"
-          mkdir -p "depot-sauvegardes/$DOSSIER"
-          cp sauvegarde-sortie/* "depot-sauvegardes/$DOSSIER/"
-          cd depot-sauvegardes
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- sauvegardes
-          git commit -m "Sauvegarde production $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          git push
-
-      - name: Conserver aussi une copie temporaire dans l’exécution
-        uses: actions/upload-artifact@v4
+      - name: Récupérer le dépôt privé de sauvegardes
+        uses: actions/checkout@v4
         with:
-          name: sauvegarde-production-${{ github.run_number }}
-          path: sauvegarde-sortie/
-          retention-days: 7
+          repository: ${{ env.DEPOT_SAUVEGARDES }}
+          token: ${{ secrets.SAUVEGARDES_TOKEN }}
+          path: depot-sauvegardes
+
+      - name: Produire la sauvegarde du jour et purger les anciennes
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/sauvegarde-supabase.mjs --dossier depot-sauvegardes --garder "$JOURS_GARDES"
+        # Une table illisible fait échouer cette étape : rien n'est poussé.
+        # Mieux vaut une tâche en rouge qu'un fichier incomplet qu'on croira bon.
+
+      - name: Déposer dans le dépôt privé
+        working-directory: depot-sauvegardes
+        run: |
+          git config user.name "Sauvegarde BestaSolar"
+          git config user.email "actions@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Rien à déposer (sauvegarde identique)."
+            exit 0
+          fi
+          git commit -m "Sauvegarde du $(date -u +%Y-%m-%d)"
+          # Une autre exécution a pu pousser entre-temps : on se replace dessus.
+          git pull --rebase --autostash origin "$(git rev-parse --abbrev-ref HEAD)" || true
+          git push origin HEAD
+
+      - name: Résumé
+        if: always()
+        working-directory: depot-sauvegardes
+        run: |
+          echo "### Sauvegarde quotidienne" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f DERNIERE-SAUVEGARDE.md ]; then
+            cat DERNIERE-SAUVEGARDE.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Aucune sauvegarde produite — voir les étapes en échec." >> "$GITHUB_STEP_SUMMARY"
+          fi

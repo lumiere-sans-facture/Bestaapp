@@ -83,7 +83,12 @@ ok(/15 000 F/.test(await page.locator('.retrait-total').innerText()),
 await page.locator('.retrait-ligne').nth(1).locator('input').check();
 await page.waitForTimeout(300);
 
-const champTel = page.locator('.sheet input[placeholder="+229 ..."]');
+// Le champ se désigne par la FORME de son placeholder — un indicatif — et non
+// par l'indicatif lui-même : il est passé de « +229 » à « +228 » à la
+// togolisation, et ce parcours attendait toujours l'ancien, bloquant la suite
+// entière depuis. La VALEUR attendue, elle, reste béninoise : c'est le numéro
+// du partenaire témoin, et un partenaire béninois doit rester servi.
+const champTel = page.locator('.sheet input[placeholder^="+"]');
 ok(await champTel.inputValue() === '+229 97 55 44 33', 'demande : le numéro Mobile Money du profil est pré-rempli');
 await page.locator('.sheet button:has-text("Envoyer la demande")').click();
 await page.waitForTimeout(1200);
