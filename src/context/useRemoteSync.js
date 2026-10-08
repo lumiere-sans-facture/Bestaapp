@@ -94,7 +94,15 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
 
     // Pull fusionné : les modifications locales en attente et les items créés
     // hors-ligne survivent à la réception (voir utils/fileSync.js).
-    const applyRemote = (collections, tombstones = new Map()) => {
+    const applyRemote = (collectionsBrutes, tombstones = new Map()) => {
+      // Kits reçus sans leurs champs de référence (copie partagée ancienne) :
+      // recomplétés comme au chargement, sinon l'extension batterie se perd.
+      // Recomplétés DANS la réception elle-même, qui devient la référence
+      // « déjà sur le serveur » : complétés après coup, ils passaient pour
+      // modifiés ici, partaient en file d'envoi — et un compte non gérant,
+      // à qui le serveur refuse d'écrire les kits, les gardait « en attente »
+      // pour toujours (des dizaines d'éléments affichés dans « Plus »).
+      const collections = { ...collectionsBrutes, kits: completerKits(collectionsBrutes.kits || []) };
       const merged = { ...stateRef.current };
       for (const table of SYNCED_COLLECTIONS) {
         merged[table] = fusionnerCollection(
@@ -104,9 +112,6 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
           enAttentePourTable(fileRef.current, table)
         );
       }
-      // Kits reçus sans leurs champs de référence (copie partagée ancienne) :
-      // recomplétés comme au chargement, sinon l'extension batterie se perd.
-      merged.kits = completerKits(merged.kits);
       syncedRef.current = collections;
       setState(merged);
       // La file se recalcule maintenant depuis le serveur : ce qui vient d'en

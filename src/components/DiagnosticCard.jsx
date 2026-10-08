@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Stethoscope, CheckCircle2, AlertTriangle, Send, ShieldCheck, ClipboardCopy } from 'lucide-react';
 import { signalerErreur } from '../lib/rapportErreur';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -7,7 +7,8 @@ import { clientsNonDetenus, reparationUtile, verdictReplication } from '../utils
 import { sqlReparationPour } from '../data/sqlReparationClients';
 import { useData } from '../context/DataContext';
 import { sentryConfigure } from '../lib/sentry';
-import { analytiqueConfiguree, hoteAnalytique, problemeAnalytique, testerAnalytique } from '../lib/analytique';
+import { analytiqueConfiguree, hoteAnalytique, problemeAnalytique, testerAnalytique, plateformeAnalytique } from '../lib/analytique';
+import { telechargementsAndroid } from '../lib/releaseAndroid';
 import { useToast } from './Toast';
 
 const verdictReplicationEtat = (etat) => ({ etat, verdict: verdictReplication(etat) });
@@ -32,6 +33,14 @@ const ENVIRONNEMENT = typeof __APP_ENV__ === 'string' ? __APP_ENV__ : 'test';
 export default function DiagnosticCard() {
   const [dernier, setDernier] = useState(null);
   const [verdictAnalytique, setVerdictAnalytique] = useState(null);
+  // Téléchargements de l'APK Android (compteurs GitHub, toutes versions).
+  const [telechargements, setTelechargements] = useState(undefined);
+  useEffect(() => {
+    let actif = true;
+    telechargementsAndroid().then((t) => { if (actif) setTelechargements(t); });
+    return () => { actif = false; };
+  }, []);
+  const { plateforme: plateformeActuelle, build: buildActuel } = plateformeAnalytique();
   const [identite, setIdentite] = useState(null);
   const [identiteEnCours, setIdentiteEnCours] = useState(false);
   const [sqlCopie, setSqlCopie] = useState(false);
@@ -131,6 +140,23 @@ export default function DiagnosticCard() {
             <span className="sheet-value paiement-mono">{hoteAnalytique().replace('https://', '')}</span>
           </div>
         )}
+        <div className="sheet-row">
+          <span className="sheet-label">Cet appareil</span>
+          <span className="sheet-value">{plateformeActuelle === 'web' ? 'Navigateur web' : `Application ${plateformeActuelle === 'android' ? 'Android' : plateformeActuelle}${buildActuel ? `, build ${buildActuel}` : ''}`}</span>
+        </div>
+        <div className="sheet-row">
+          <span className="sheet-label">App Android</span>
+          <span className="sheet-value">
+            {telechargements === undefined && '…'}
+            {telechargements === null && 'compteur indisponible'}
+            {telechargements && `${telechargements.total.toLocaleString('fr-FR')} téléchargement${telechargements.total > 1 ? 's' : ''} de l’APK`}
+          </span>
+        </div>
+        <div className="field-hint" style={{ margin: '4px 0 8px' }}>
+          Un téléchargement n’est pas une installation. Les installations réelles se lisent dans
+          PostHog : événement <strong>app_installee</strong> (appareils uniques), <strong>app_ouverte</strong> pour
+          l’usage, propriétés <strong>plateforme</strong> et <strong>build</strong> pour la version utilisée.
+        </div>
         {problemeConfig && (
           <div className="callout callout-danger" role="status" style={{ marginTop: 8 }}>
             <div className="callout-title"><AlertTriangle size={13} /> Analytique à corriger dans Vercel</div>

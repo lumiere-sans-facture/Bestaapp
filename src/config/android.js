@@ -18,3 +18,6 @@ export const URL_DERNIERE_RELEASE = `https://api.github.com/repos/${DEPOT_GITHUB
 
 /** Étiquette des Releases Android : « android-<numéro de build> ». */
 export const PREFIXE_ETIQUETTE = 'android-';
+
+/** Toutes les Releases (compteurs de téléchargement), page par page. */
+export const URL_RELEASES = `https://api.github.com/repos/${DEPOT_GITHUB}/releases`;

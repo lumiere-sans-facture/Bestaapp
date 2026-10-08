@@ -70,7 +70,11 @@ export const enAttentePourTable = (file, table) => new Set(file?.[table] || []);
  * Trois règles, dans cet ordre :
  *  1. Un élément local encore EN ATTENTE d'envoi gagne contre la version
  *     reçue : c'est une modification faite ici que le serveur ne connaît pas
- *     encore. Sans cette règle, la réception l'efface.
+ *     encore. Sans cette règle, la réception l'efface. SAUF s'il est
+ *     identique, champ pour champ, à la version reçue : le serveur l'a déjà,
+ *     il n'attend plus rien. Sans cette exception, un élément qu'un compte
+ *     ne peut pas renvoyer (le serveur le lui refuse) restait « en attente »
+ *     pour toujours, même devenu identique.
  *  2. Un élément local absent de la réception est conservé — créé hors-ligne —
  *     sauf si un tombstone le déclare supprimé ailleurs, et sauf s'il est
  *     `partage` (actif de l'organisation interne retiré à la source : le
@@ -82,6 +86,17 @@ export const enAttentePourTable = (file, table) => new Set(file?.[table] || []);
  * modification locale, et l'app renverrait l'intégralité des collections au
  * serveur à chaque réception (plusieurs mégaoctets avec les photos produits).
  */
+// Contenu canonique (clés triées) : deux objets égaux champ pour champ
+// donnent la même chaîne, quel que soit l'ordre de leurs clés.
+const canonique = (v) => JSON.stringify(v, (_, x) => (
+  x && typeof x === 'object' && !Array.isArray(x)
+    ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]]))
+    : x
+));
+
+/** Deux versions d'un élément portent-elles exactement le même contenu ? */
+export const memeContenu = (a, b) => a === b || canonique(a) === canonique(b);
+
 export const fusionnerCollection = (locaux = [], distants = [], supprimes = new Set(), enAttente = new Set()) => {
   const distantsIds = new Set(distants.map((i) => i.id));
   const locauxSeuls = locaux.filter(
@@ -93,6 +108,8 @@ export const fusionnerCollection = (locaux = [], distants = [], supprimes = new 
     const local = parId.get(distant.id);
     // `partage` : ne nous appartient pas, jamais poussé — donc jamais en attente.
     if (!local || distant.partage || !enAttente.has(distant.id)) return distant;
+    // Identique à la version reçue : plus rien à envoyer, le serveur fait foi.
+    if (memeContenu(local, distant)) return distant;
     substitue = true;
     return local;
   });

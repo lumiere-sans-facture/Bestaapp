@@ -133,14 +133,7 @@ jobs:
           gh release create "android-${ANDROID_BUILD}" BestaSolar.apk \
             --title "BestaSolar Android ${VERSION_NAME} (build ${ANDROID_BUILD})" \
             --notes "$NOTE" --target "$GITHUB_SHA" --latest
-
-      # Seules les 5 dernières Releases Android sont gardées : l'adresse
-      # « latest » sert toujours la plus récente.
-      - name: Ménage des anciennes Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release list --limit 100 --json tagName --jq '.[].tagName' \
-            | grep '^android-' | tail -n +6 \
-            | while read -r t; do gh release delete "$t" --yes --cleanup-tag; done
-
+      # Pas de ménage des anciennes Releases : chacune porte le compteur de
+      # téléchargements de SA version, et le total affiché au gérant (Plus ›
+      # Diagnostic) les additionne. L'adresse « latest » sert toujours la
+      # plus récente.

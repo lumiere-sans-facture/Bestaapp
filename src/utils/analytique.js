@@ -23,6 +23,10 @@ export const EVENEMENTS = {
   PAIEMENT_VERIFIE: 'paiement_verifie',
   LECON_TERMINEE: 'lecon_terminee',
   ECRAN_PLANTE: 'ecran_plante',
+  // Application Android (APK) : installations, mises à jour, ouvertures.
+  APP_INSTALLEE: 'app_installee',
+  APP_MISE_A_JOUR: 'app_mise_a_jour',
+  APP_OUVERTE: 'app_ouverte',
 };
 
 const NOMS = new Set(Object.values(EVENEMENTS));
@@ -129,7 +133,7 @@ export const proprietesSures = (props = {}) => {
  * Événement prêt pour l'envoi, ou null si le nom n'est pas déclaré.
  * @param {string} nom
  * @param {object} props
- * @param {{distinctId?: string, version?: string, date?: string}} contexte
+ * @param {{distinctId?: string, appareil?: string, plateforme?: string, build?: number, version?: string, date?: string}} contexte
  */
 export const construireEvenement = (nom, props = {}, contexte = {}) => {
   if (!evenementValide(nom)) return null;
@@ -137,13 +141,41 @@ export const construireEvenement = (nom, props = {}, contexte = {}) => {
     event: nom,
     // Identifiant interne du compte, jamais un nom ni un e-mail. « anonyme »
     // avant connexion : un événement sans personne reste comptable.
-    distinct_id: contexte.distinctId || 'anonyme',
+    // Avant connexion : l'identifiant ANONYME de l'appareil (tiré au hasard,
+    // ni nom ni numéro) — sans lui, chaque téléphone se confondait sous
+    // « anonyme » et les installations de l'app n'étaient pas comptables.
+    distinct_id: contexte.distinctId || contexte.appareil || 'anonyme',
     timestamp: contexte.date || new Date().toISOString(),
     properties: {
       ...proprietesSures(props),
       version: contexte.version || '',
+      // Web ou application Android, et numéro de build de l'APK : de quoi
+      // compter les installations et voir qui n'a pas fait la mise à jour.
+      plateforme: contexte.plateforme || 'web',
+      ...(contexte.build ? { build: contexte.build } : {}),
+      ...(contexte.appareil ? { $device_id: contexte.appareil } : {}),
       // Repère PostHog : distingue nos envois de ceux d'un SDK.
       $lib: 'bestasolar-pro',
     },
   };
+};
+
+/**
+ * Événements d'ouverture de l'application Android, d'après le build mémorisé
+ * sur l'appareil lors de la précédente ouverture :
+ *   - aucun build mémorisé → « app_installee » (première ouverture) ;
+ *   - build mémorisé plus ancien → « app_mise_a_jour » ;
+ *   - toujours « app_ouverte ».
+ * Sur le web (pas de build), rien.
+ * @returns {Array<{nom: string, props: object}>}
+ */
+export const evenementsOuvertureApp = (buildActuel, buildMemorise) => {
+  const actuel = Number(buildActuel) || 0;
+  if (!actuel) return [];
+  const avant = Number(buildMemorise) || 0;
+  const liste = [];
+  if (!avant) liste.push({ nom: EVENEMENTS.APP_INSTALLEE, props: {} });
+  else if (avant < actuel) liste.push({ nom: EVENEMENTS.APP_MISE_A_JOUR, props: { depuis_build: avant } });
+  liste.push({ nom: EVENEMENTS.APP_OUVERTE, props: {} });
+  return liste;
 };

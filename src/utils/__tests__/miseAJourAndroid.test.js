@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDeEtiquette, lireRelease, miseAJourDisponible, tailleLisible } from '../miseAJourAndroid';
+import { buildDeEtiquette, lireRelease, miseAJourDisponible, tailleLisible, totalTelechargements } from '../miseAJourAndroid';
 import { URL_APK } from '../../config/android';
 
 const RELEASE = {
@@ -32,5 +32,17 @@ describe('APK Android : versions et mises à jour', () => {
     expect(tailleLisible(8_808_038)).toBe('8,4 Mo');
     expect(tailleLisible(0)).toBe('');
     expect(URL_APK).toBe('https://github.com/lumiere-sans-facture/Bestaapp/releases/latest/download/BestaSolar.apk');
+  });
+});
+
+describe('téléchargements de l’APK', () => {
+  it('additionne toutes les versions Android, et seulement l’APK', () => {
+    const releases = [
+      { tag_name: 'android-192', assets: [{ name: 'BestaSolar.apk', download_count: 5 }] },
+      { tag_name: 'android-191', assets: [{ name: 'BestaSolar.apk', download_count: 1 }, { name: 'notes.txt', download_count: 40 }] },
+      { tag_name: 'v1.0.0', assets: [{ name: 'BestaSolar.apk', download_count: 99 }] },
+    ];
+    expect(totalTelechargements(releases)).toBe(6);
+    expect(totalTelechargements([])).toBe(0);
   });
 });

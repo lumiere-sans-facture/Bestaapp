@@ -33,7 +33,9 @@ await ctx.close();
 // Bandeau de mise à jour (seulement si l'app a un numéro de build).
 const ctx2 = await nav.newContext({ viewport: { width: 390, height: 844 } });
 await simulerGithub(ctx2);
-await ctx2.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true }; });
+await ctx2.addInitScript(() => { // Téléphone simulé par le mécanisme officiel de Capacitor : @capacitor/core
+  // y lit la plateforme (« android ») au lieu de la détecter.
+  window.CapacitorCustomPlatform = { name: 'android', plugins: {} }; });
 const p2 = await ctx2.newPage();
 await p2.goto(B + '/privacy.html');
 await p2.evaluate(() => localStorage.setItem('bestasolar_user', JSON.stringify({ id: 'u1', email: 'adam@bestasolar.tg', name: 'Adam', role: 'gerant', phone: '+228', avatar: 'A' })));

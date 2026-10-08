@@ -43,3 +43,14 @@ export const tailleLisible = (octets) => {
   const mo = (Number(octets) || 0) / (1024 * 1024);
   return mo > 0 ? `${mo.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo` : '';
 };
+
+/**
+ * Téléchargements de l'APK, toutes versions publiées confondues (compteurs
+ * GitHub). Un téléchargement n'est pas une installation : les installations
+ * réelles se lisent dans l'analytique (événement « app_installee »).
+ */
+export const totalTelechargements = (releases = []) => (releases || [])
+  .filter((r) => buildDeEtiquette(r?.tag_name))
+  .reduce((total, r) => total + (r.assets || [])
+    .filter((a) => a?.name === NOM_APK)
+    .reduce((n, a) => n + (Number(a.download_count) || 0), 0), 0);

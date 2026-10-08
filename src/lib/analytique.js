@@ -16,8 +16,10 @@ import {
   construireEvenement,
   cheminNormalise,
   EVENEMENTS,
+  evenementsOuvertureApp,
   problemeAnalytique as evaluerConfig,
 } from '../utils/analytique';
+import { estAppNative } from '../utils/liensLegaux';
 
 const CLE = String(import.meta.env.VITE_POSTHOG_KEY || '').trim();
 // RÉGION DU PROJET. PostHog héberge en « eu » ou en « us », et un projet créé
@@ -50,8 +52,40 @@ const DELAI_LOT = 15000;   // regroupement : un envoi toutes les 15 s au plus
 /** Vraiment opérationnelle : clé présente ET configuration cohérente. */
 export const analytiqueConfiguree = () => !!CLE && !PROBLEME;
 
+// Identifiant ANONYME de l'appareil : tiré au hasard une fois, gardé sur le
+// téléphone. Ni nom, ni numéro, ni rien qui désigne une personne — il sert
+// seulement à compter les appareils (installations de l'app, visiteurs).
+const CLE_APPAREIL = 'bestasolar_appareil';
+const identifiantAppareil = () => {
+  try {
+    let id = localStorage.getItem(CLE_APPAREIL);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(CLE_APPAREIL, id);
+    }
+    return id;
+  } catch { return null; }
+};
+
+// Web, ou l'application installée (Android via l'APK).
+const plateforme = () => {
+  if (typeof window === 'undefined' || !estAppNative()) return 'web';
+  try { return window.Capacitor?.getPlatform?.() || 'android'; } catch { return 'android'; }
+};
+
+// Numéro de build gravé à la construction de l'APK (CI) ; absent sur le web.
+const BUILD_APP = Number(import.meta.env.VITE_ANDROID_BUILD) || null;
+
+// Plateforme et build, lus AU MOMENT de l'envoi : Capacitor peut n'être
+// prêt qu'après le chargement de ce module.
+const infosPlateforme = () => {
+  const p = plateforme();
+  return { plateforme: p, build: p === 'web' ? null : BUILD_APP };
+};
+
 let contexte = {
   distinctId: null,
+  appareil: identifiantAppareil(),
   version: `${typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev'}`,
 };
 let minuteur = null;
@@ -119,7 +153,7 @@ const programmerEnvoi = () => {
  */
 export function suivre(nom, props = {}) {
   if (!CLE || PROBLEME) return;
-  const evenement = construireEvenement(nom, props, contexte);
+  const evenement = construireEvenement(nom, props, { ...contexte, ...infosPlateforme() });
   if (!evenement) return;
   ecrireFile([...lireFile(), evenement]);
   programmerEnvoi();
@@ -148,7 +182,7 @@ export async function testerAnalytique() {
   // On n'envoie pas une requête vouée à partir au mauvais endroit : sans hôte
   // absolu, elle atterrirait sur notre propre serveur (réponse « 405 »).
   if (PROBLEME) return { ok: false, statut: 'configuration invalide', hote: HOTE, probleme: PROBLEME };
-  const evenement = construireEvenement(EVENEMENTS.PAGE_VUE, { chemin: '/test-diagnostic' }, contexte);
+  const evenement = construireEvenement(EVENEMENTS.PAGE_VUE, { chemin: '/test-diagnostic' }, { ...contexte, ...infosPlateforme() });
   try {
     const res = await fetch(`${HOTE}/e/`, {
       method: 'POST',
@@ -160,6 +194,27 @@ export async function testerAnalytique() {
     return { ok: false, statut: e.message || 'réseau injoignable', hote: HOTE };
   }
 }
+
+/**
+ * Ouverture de l'application installée : « app_installee » à la toute
+ * première, « app_mise_a_jour » après une nouvelle version, et
+ * « app_ouverte » à chaque lancement (voir evenementsOuvertureApp). Le build
+ * est mémorisé sur l'appareil pour la fois suivante. Sur le web : rien.
+ */
+const CLE_BUILD_VU = 'bestasolar_app_build';
+export function signalerOuvertureApp() {
+  // Sans analytique configurée, on ne mémorise rien : l'installation sera
+  // comptée le jour où l'envoi fonctionne, au lieu d'être perdue.
+  const { plateforme: p, build } = infosPlateforme();
+  if (!CLE || PROBLEME || p === 'web' || !build) return;
+  let memorise = null;
+  try { memorise = localStorage.getItem(CLE_BUILD_VU); } catch { /* stockage indisponible */ }
+  for (const { nom, props } of evenementsOuvertureApp(build, memorise)) suivre(nom, props);
+  try { localStorage.setItem(CLE_BUILD_VU, String(build)); } catch { /* sans gravité */ }
+}
+
+/** Plateforme et build vus par l'analytique — affichés dans le diagnostic. */
+export const plateformeAnalytique = () => infosPlateforme();
 
 /** Filets d'envoi : retour du réseau, et fermeture de l'onglet. */
 export function installerAnalytique() {

@@ -2,7 +2,7 @@
 // que la liste des pages vues devienne l'annuaire des clients d'un installateur.
 import { describe, it, expect } from 'vitest';
 import {
-  EVENEMENTS, evenementValide, cheminNormalise, proprietesSures, construireEvenement,
+  EVENEMENTS, evenementValide, cheminNormalise, proprietesSures, construireEvenement, evenementsOuvertureApp,
   hoteAnalytiqueValide, cleProjetValide, estClePersonnelle, problemeAnalytique,
 } from '../analytique';
 
@@ -86,6 +86,22 @@ describe('construireEvenement', () => {
     expect(construireEvenement(EVENEMENTS.PAGE_VUE, {}, {}).distinct_id).toBe('anonyme');
   });
 
+  it('avant connexion : l’identifiant anonyme de l’appareil, pour compter les téléphones', () => {
+    const e = construireEvenement(EVENEMENTS.APP_OUVERTE, {}, { appareil: 'app-123' });
+    expect(e.distinct_id).toBe('app-123');
+    expect(e.properties.$device_id).toBe('app-123');
+    // Connecté : le compte prime, l'appareil reste en propriété.
+    expect(construireEvenement(EVENEMENTS.APP_OUVERTE, {}, { distinctId: 'u1', appareil: 'app-123' }).distinct_id).toBe('u1');
+  });
+
+  it('plateforme et build sur chaque événement', () => {
+    const app = construireEvenement(EVENEMENTS.PAGE_VUE, { chemin: '/devis' }, { plateforme: 'android', build: 195 });
+    expect(app.properties).toMatchObject({ plateforme: 'android', build: 195 });
+    const web = construireEvenement(EVENEMENTS.PAGE_VUE, {}, {});
+    expect(web.properties.plateforme).toBe('web');
+    expect('build' in web.properties).toBe(false);
+  });
+
   it('nettoie les propriétés au passage', () => {
     const e = construireEvenement(EVENEMENTS.DEVIS_CREE, { note: 'client kossi@exemple.tg' }, {});
     expect(e.properties.note).toBe('client [email]');
@@ -146,5 +162,21 @@ describe('validation des valeurs analytiques', () => {
     expect(cleProjetValide('phc_court')).toBe(false);
     expect(estClePersonnelle('phx_abcdef')).toBe(true);
     expect(estClePersonnelle('phc_abcdef')).toBe(false);
+  });
+});
+
+describe('ouverture de l’application Android', () => {
+  const noms = (l) => l.map((e) => e.nom);
+  it('première ouverture : installée, puis ouverte', () => {
+    expect(noms(evenementsOuvertureApp(195, null))).toEqual(['app_installee', 'app_ouverte']);
+  });
+  it('nouvelle version : mise à jour, depuis quel build', () => {
+    const l = evenementsOuvertureApp(195, '192');
+    expect(noms(l)).toEqual(['app_mise_a_jour', 'app_ouverte']);
+    expect(l[0].props).toEqual({ depuis_build: 192 });
+  });
+  it('même version : seulement ouverte ; sur le web : rien', () => {
+    expect(noms(evenementsOuvertureApp(195, '195'))).toEqual(['app_ouverte']);
+    expect(evenementsOuvertureApp(null, null)).toEqual([]);
   });
 });
