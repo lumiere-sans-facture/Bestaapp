@@ -8,6 +8,7 @@ import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
 import { getActiveRef } from '../utils/referral';
 import { isSessionExpired, touchSession, clearSessionLifetime } from '../utils/sessionLifetime';
 import { lireProfilCache, ecrireProfilCache, oublierProfilCache } from '../utils/profilCache';
+import { isNativeGoogleAuth, signInWithGoogleNative, signOutGoogleNative } from '../lib/nativeGoogleAuth';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
@@ -129,6 +130,8 @@ export function AuthProvider({ children }) {
       // Session Supabase persistée : restaurer le profil de l'équipe — sauf
       // au-delà de la durée de vie ou de l'inactivité tolérées (palliatif à
       // « Authentication → Sessions », payant, voir utils/sessionLifetime.js).
+      // La connexion Google Android est native : le jeton est remis directement
+      // à Supabase, sans navigateur ni callback à reprendre au démarrage.
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         const email = session?.user?.email;
         if (!email) { setIsLoading(false); return; }
@@ -197,16 +200,19 @@ export function AuthProvider({ children }) {
   // session, les règles RLS et les comptes existants.
   const signInWithGoogle = async ({ credential, inviteCode, refCode } = {}) => {
     if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
-    if (!credential) return { ok: false, error: 'Jeton Google absent. Réessayez.' };
+    const native = isNativeGoogleAuth();
+    if (!native && !credential) return { ok: false, error: 'Jeton Google absent. Réessayez.' };
     localStorage.setItem(OAUTH_CONTEXT_KEY, JSON.stringify({
       inviteCode: inviteCode || null,
       refCode: refCode || null,
     }));
 
-    const { data, error } = await supabase.auth.signInWithIdToken({
-      provider: 'google',
-      token: credential,
-    });
+    const { data, error } = native
+      ? await signInWithGoogleNative()
+      : await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: credential,
+        });
     if (error) localStorage.removeItem(OAUTH_CONTEXT_KEY);
     if (error) return { ok: false, error: error.message };
 
@@ -375,9 +381,10 @@ export function AuthProvider({ children }) {
   // Renvoie la promesse de déconnexion serveur : qui recharge la page juste
   // après (suppression de compte) doit l'attendre, sinon la session survit.
   const logout = () => {
-    const deconnexion = isSupabaseConfigured
-      ? supabase.auth.signOut().catch(() => {})
-      : Promise.resolve();
+    const deconnexion = Promise.all([
+      isSupabaseConfigured ? supabase.auth.signOut().catch(() => {}) : Promise.resolve(),
+      signOutGoogleNative(),
+    ]).then(() => {});
     // Le profil mémorisé pour l'ouverture hors-ligne part avec la session :
     // le laisser rouvrirait l'app sur le compte précédent.
     oublierProfilCache();

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider } from './context/CartContext';
@@ -8,7 +9,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
 import { captureRefFromUrl } from './utils/referral';
 import { capturerFormuleUrl, lireFormuleChoisie } from './utils/formuleChoisie';
-import { ecranDentree } from './utils/entree';
+import { ecranDentree, vueRacine } from './utils/entree';
 import AppLayout from './components/AppLayout';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import LoadingShell from './components/LoadingShell';
@@ -33,6 +34,7 @@ capturerFormuleUrl();
 const VENU_PAR_LIEN = Boolean(REF_DU_LIEN) || (() => {
   try { return Boolean(new URLSearchParams(window.location.search).get('equipe')); } catch { return false; }
 })();
+const APP_NATIVE = Capacitor.isNativePlatform();
 
 // Erreurs hors React (minuteurs, gestionnaires d'événements) et promesses
 // rejetées sans `catch` : installées au chargement, avant tout rendu.
@@ -109,6 +111,7 @@ function AppRoutes() {
   // retour de Google — qui atterrit sur la racine — tombait sur la page
   // d'accueil et l'inscription se perdait là, sans un mot.
   const ecran = ecranDentree({ isLoading, recovery, pendingAuthUser, user });
+  const racine = vueRacine({ estNative: APP_NATIVE, user, venuParLien: VENU_PAR_LIEN });
 
   if (ecran === 'chargement') {
     return <LoadingShell />;
@@ -123,7 +126,7 @@ function AppRoutes() {
   // Cette règle vient APRÈS `ecran === 'connexion'` : un retour de Google
   // atterrit sur la racine, et doit trouver son formulaire à terminer, pas la
   // vitrine.
-  if (pathname === '/' && (user || !VENU_PAR_LIEN)) {
+  if (pathname === '/' && racine === 'vitrine') {
     return <Suspense fallback={<LoadingShell />}><Landing /></Suspense>;
   }
 
@@ -133,7 +136,14 @@ function AppRoutes() {
     return (
       <Suspense fallback={<LoadingShell />}>
         <Routes>
-          <Route path="/" element={VENU_PAR_LIEN ? <Login vueInitiale="signup" /> : <Landing />} />
+          <Route
+            path="/"
+            element={racine === 'inscription'
+              ? <Login vueInitiale="signup" />
+              : racine === 'connexion'
+                ? <Login vueInitiale="login" />
+                : <Landing />}
+          />
           <Route path="/inscription" element={<Login vueInitiale="signup" />} />
           <Route path="/connexion" element={<Login vueInitiale="login" />} />
           <Route path="*" element={<Login />} />

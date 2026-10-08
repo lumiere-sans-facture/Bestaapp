@@ -23,4 +23,10 @@ const anonKey = pickEnv(['ANON_KEY', 'PUBLISHABLE_KEY']);
 
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
-export const supabase = isSupabaseConfigured ? createClient(url, anonKey) : null;
+export const supabase = isSupabaseConfigured
+  ? createClient(url, anonKey, {
+      // Android échange désormais un ID token Google natif ; aucun code OAuth
+      // n'est renvoyé par deep link. Le flux implicite reste celui du site.
+      auth: { flowType: 'implicit' },
+    })
+  : null;
