@@ -25,10 +25,9 @@ import { GoogleSignIn } from '@capawesome/capacitor-google-sign-in';
 import { supabase } from '../supabase';
 import { creerNonceGoogle, signInWithGoogleNative } from '../nativeGoogleAuth';
 
-const base64Url = (bytes) => btoa(String.fromCharCode(...bytes))
-  .replace(/\+/g, '-')
-  .replace(/\//g, '_')
-  .replace(/=+$/g, '');
+const hexadecimal = (bytes) => Array.from(bytes)
+  .map((byte) => byte.toString(16).padStart(2, '0'))
+  .join('');
 
 describe('creerNonceGoogle', () => {
   beforeEach(() => {
@@ -37,13 +36,13 @@ describe('creerNonceGoogle', () => {
     GoogleSignIn.initialize.mockResolvedValue();
   });
 
-  it('produit un nonce brut et son SHA-256 au format base64url', async () => {
+  it('produit un nonce brut et son SHA-256 au format hexadécimal attendu par Supabase', async () => {
     const { nonce, nonceGoogle } = await creerNonceGoogle();
     const empreinte = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(nonce));
 
     expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(nonceGoogle).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(nonceGoogle).toBe(base64Url(new Uint8Array(empreinte)));
+    expect(nonceGoogle).toMatch(/^[a-f0-9]{64}$/);
+    expect(nonceGoogle).toBe(hexadecimal(new Uint8Array(empreinte)));
   });
 
   it('échange le jeton natif contre une session Supabase avec le nonce brut', async () => {
@@ -61,7 +60,7 @@ describe('creerNonceGoogle', () => {
       'SHA-256',
       new TextEncoder().encode(demandeSupabase.nonce),
     );
-    expect(nonceGoogle).toBe(base64Url(new Uint8Array(empreinte)));
+    expect(nonceGoogle).toBe(hexadecimal(new Uint8Array(empreinte)));
     expect(demandeSupabase).toMatchObject({ provider: 'google', token: 'jeton-google' });
     expect(resultat.error).toBeNull();
   });

@@ -4,6 +4,20 @@ import { isNativeGoogleAuth } from '../lib/nativeGoogleAuth';
 const GOOGLE_IDENTITY_SCRIPT = 'https://accounts.google.com/gsi/client';
 let googleIdentityPromise = null;
 
+const GoogleLogo = () => (
+  <svg
+    className="google-native-logo"
+    viewBox="0 0 18 18"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.909c1.702-1.567 2.683-3.874 2.683-6.615Z" />
+    <path fill="#34A853" d="M9 18c2.43 0 4.468-.806 5.957-2.18l-2.909-2.259c-.806.54-1.835.859-3.048.859-2.344 0-4.328-1.584-5.037-3.71H.956v2.332A9 9 0 0 0 9 18Z" />
+    <path fill="#FBBC05" d="M3.963 10.71A5.41 5.41 0 0 1 3.681 9c0-.593.102-1.17.282-1.71V4.958H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.042l3.007-2.332Z" />
+    <path fill="#EA4335" d="M9 3.58c1.321 0 2.507.454 3.441 1.346l2.582-2.582C13.463.892 11.426 0 9 0A9 9 0 0 0 .956 4.958L3.963 7.29C4.672 5.164 6.656 3.58 9 3.58Z" />
+  </svg>
+);
+
 // Charge le SDK officiel au premier affichage seulement. Le Client ID est
 // public par nature : il identifie l'application auprès de Google, mais ne
 // permet pas de se connecter ou d'administrer le projet Google Cloud.
@@ -98,7 +112,7 @@ export default function GoogleSignInButton({ clientId, disabled = false, onCrede
         onClick={() => Promise.resolve(onCredential?.({ credential: null }))
           .catch(() => onError?.('Connexion avec Google impossible.'))}
       >
-        <span className="google-native-logo" aria-hidden="true">G</span>
+        <GoogleLogo />
         Continuer avec Google
       </button>
     );

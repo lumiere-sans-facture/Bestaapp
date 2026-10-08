@@ -466,8 +466,7 @@ textarea.input { resize: vertical; }
 }
 .google-native-button:disabled { opacity: .65; cursor: wait; }
 .google-native-logo {
-  display: grid; place-items: center; width: 20px; height: 20px;
-  color: #4285f4; font: 700 18px/1 Arial, sans-serif;
+  display: block; width: 18px; height: 18px; flex: 0 0 18px;
 }
 /* Volet de marque : masqué sur mobile — une deuxième colonne n'a pas la
    place d'exister sous 900px, mieux vaut l'omettre que la tasser. */

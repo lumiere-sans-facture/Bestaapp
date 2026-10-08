@@ -11,6 +11,10 @@ const base64Url = (bytes) => btoa(String.fromCharCode(...bytes))
   .replace(/\//g, '_')
   .replace(/=+$/g, '');
 
+const hexadecimal = (bytes) => Array.from(bytes)
+  .map((byte) => byte.toString(16).padStart(2, '0'))
+  .join('');
+
 /**
  * Supabase attend le nonce brut et vérifie que son SHA-256 correspond au
  * nonce contenu dans le jeton Google. Garder les deux valeurs évite les
@@ -20,7 +24,9 @@ export const creerNonceGoogle = async () => {
   const aleatoire = crypto.getRandomValues(new Uint8Array(32));
   const nonce = base64Url(aleatoire);
   const empreinte = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(nonce));
-  return { nonce, nonceGoogle: base64Url(new Uint8Array(empreinte)) };
+  // GoTrue compare au nonce Google l'empreinte SHA-256 en hexadécimal.
+  // Une base64url est valide pour un JWT mais ne correspond pas à ce format.
+  return { nonce, nonceGoogle: hexadecimal(new Uint8Array(empreinte)) };
 };
 
 const initialiserGoogle = () => {
