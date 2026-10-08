@@ -1,90 +1,83 @@
 import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
-import { Browser } from '@capacitor/browser';
+import { ErrorCode, GoogleSignIn } from '@capawesome/capacitor-google-sign-in';
 import { supabase } from './supabase';
-import { NATIVE_OAUTH_CALLBACK, parseNativeOAuthCallback } from '../utils/nativeOAuth';
 
 export const isNativeGoogleAuth = () => Capacitor.isNativePlatform();
 
-const fermerNavigateur = () => Browser.close().catch(() => {});
+let initialisationGoogle;
 
-const etablirSessionDepuisUrl = async (url) => {
-  const retour = parseNativeOAuthCallback(url);
-  if (!retour) return null;
-  if (retour.error) return { data: null, error: new Error(retour.error) };
+const base64Url = (bytes) => btoa(String.fromCharCode(...bytes))
+  .replace(/\+/g, '-')
+  .replace(/\//g, '_')
+  .replace(/=+$/g, '');
 
-  return retour.code
-    ? supabase.auth.exchangeCodeForSession(retour.code)
-    : supabase.auth.setSession({
-        access_token: retour.accessToken,
-        refresh_token: retour.refreshToken,
-      });
+/**
+ * Supabase attend le nonce brut et vérifie que son SHA-256 correspond au
+ * nonce contenu dans le jeton Google. Garder les deux valeurs évite les
+ * erreurs « Nonces mismatch » tout en empêchant la réutilisation du jeton.
+ */
+export const creerNonceGoogle = async () => {
+  const aleatoire = crypto.getRandomValues(new Uint8Array(32));
+  const nonce = base64Url(aleatoire);
+  const empreinte = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(nonce));
+  return { nonce, nonceGoogle: base64Url(new Uint8Array(empreinte)) };
 };
 
-/** Récupère aussi un callback ayant relancé l'app après arrêt par Android. */
-export const reprendreGoogleNatifAuDemarrage = async () => {
-  if (!isNativeGoogleAuth()) return null;
-  const lancement = await App.getLaunchUrl();
-  if (!lancement?.url) return null;
-  const result = await etablirSessionDepuisUrl(lancement.url);
-  if (result) await fermerNavigateur();
-  return result;
+const initialiserGoogle = () => {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    return Promise.reject(new Error('Connexion Google non configurée.'));
+  }
+  if (!initialisationGoogle) {
+    // Sur Android, Google exige ici l'ID du client Web. Le client Android
+    // séparé sert uniquement à autoriser le package et la signature de l'APK.
+    initialisationGoogle = GoogleSignIn.initialize({ clientId }).catch((error) => {
+      initialisationGoogle = null;
+      throw error;
+    });
+  }
+  return initialisationGoogle;
+};
+
+const messageErreurGoogle = (error) => {
+  if (error?.code === ErrorCode.SignInCanceled) return 'Connexion Google annulée.';
+  if (error?.code === ErrorCode.NoCredentialAvailable) return 'Aucun compte Google disponible sur cet appareil.';
+  if (error?.code === ErrorCode.ProviderConfigurationError) {
+    return 'Google Play Services est indisponible ou doit être mis à jour.';
+  }
+  return error?.message || 'Connexion avec Google impossible.';
 };
 
 /**
- * Google Identity Services refuse officiellement les WebView Android. Dans
- * l'APK, l'autorisation passe donc par Chrome Custom Tabs puis revient dans
- * BestaSolar par un deep link. Le site web conserve le bouton GIS habituel.
+ * Ouvre le sélecteur de compte natif Android. Le jeton Google est ensuite
+ * échangé directement contre une session Supabase : aucun navigateur et
+ * aucune adresse *.supabase.co ne sont affichés à l'utilisateur.
  */
 export const signInWithGoogleNative = async () => {
-  const { data: oauth, error: startError } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: NATIVE_OAUTH_CALLBACK,
-      skipBrowserRedirect: true,
-      queryParams: { prompt: 'select_account' },
-    },
-  });
-
-  if (startError || !oauth?.url) {
-    return { data: null, error: startError || new Error('Adresse de connexion Google absente.') };
-  }
-
-  let listener;
-  let timer;
-  let termine = false;
-  let resolveCallback;
-  const callback = new Promise((resolve) => {
-    resolveCallback = resolve;
-  });
-
-  const finir = async (result) => {
-    if (termine) return;
-    termine = true;
-    clearTimeout(timer);
-    await listener?.remove();
-    await fermerNavigateur();
-    resolveCallback(result);
-  };
-
-  listener = await App.addListener('appUrlOpen', async ({ url }) => {
-    try {
-      const result = await etablirSessionDepuisUrl(url);
-      if (result) await finir(result);
-    } catch (error) {
-      await finir({ data: null, error });
-    }
-  });
-
-  timer = setTimeout(() => {
-    finir({ data: null, error: new Error('Connexion Google expirée. Réessayez.') });
-  }, 5 * 60 * 1000);
-
   try {
-    await Browser.open({ url: oauth.url, presentationStyle: 'popover' });
-  } catch (error) {
-    await finir({ data: null, error });
-  }
+    await initialiserGoogle();
+    const { nonce, nonceGoogle } = await creerNonceGoogle();
+    const resultatGoogle = await GoogleSignIn.signIn({ nonce: nonceGoogle });
+    if (!resultatGoogle?.idToken) throw new Error('Google n’a pas renvoyé de jeton de connexion.');
 
-  return callback;
+    return supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: resultatGoogle.idToken,
+      nonce,
+    });
+  } catch (error) {
+    return { data: null, error: new Error(messageErreurGoogle(error)) };
+  }
+};
+
+/** Efface le compte retenu par Android sans faire échouer la déconnexion. */
+export const signOutGoogleNative = async () => {
+  if (!isNativeGoogleAuth()) return;
+  try {
+    await initialiserGoogle();
+    await GoogleSignIn.signOut();
+  } catch {
+    // Supabase reste la source de vérité de la session : sa déconnexion ne
+    // doit jamais être bloquée par Google Play Services.
+  }
 };

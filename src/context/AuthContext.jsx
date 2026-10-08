@@ -8,7 +8,7 @@ import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
 import { getActiveRef } from '../utils/referral';
 import { isSessionExpired, touchSession, clearSessionLifetime } from '../utils/sessionLifetime';
 import { lireProfilCache, ecrireProfilCache, oublierProfilCache } from '../utils/profilCache';
-import { isNativeGoogleAuth, reprendreGoogleNatifAuDemarrage, signInWithGoogleNative } from '../lib/nativeGoogleAuth';
+import { isNativeGoogleAuth, signInWithGoogleNative, signOutGoogleNative } from '../lib/nativeGoogleAuth';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
@@ -130,10 +130,9 @@ export function AuthProvider({ children }) {
       // Session Supabase persistée : restaurer le profil de l'équipe — sauf
       // au-delà de la durée de vie ou de l'inactivité tolérées (palliatif à
       // « Authentication → Sessions », payant, voir utils/sessionLifetime.js).
-      // Si Android a arrêté l'activité pendant que Chrome affichait Google,
-      // le deep link relance l'app : on échange alors son code avant de lire
-      // la session. Sur le web cette étape est un no-op.
-      reprendreGoogleNatifAuDemarrage().catch(() => null).then(() => supabase.auth.getSession()).then(async ({ data: { session } }) => {
+      // La connexion Google Android est native : le jeton est remis directement
+      // à Supabase, sans navigateur ni callback à reprendre au démarrage.
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
         const email = session?.user?.email;
         if (!email) { setIsLoading(false); return; }
         if (isSessionExpired()) {
@@ -382,9 +381,10 @@ export function AuthProvider({ children }) {
   // Renvoie la promesse de déconnexion serveur : qui recharge la page juste
   // après (suppression de compte) doit l'attendre, sinon la session survit.
   const logout = () => {
-    const deconnexion = isSupabaseConfigured
-      ? supabase.auth.signOut().catch(() => {})
-      : Promise.resolve();
+    const deconnexion = Promise.all([
+      isSupabaseConfigured ? supabase.auth.signOut().catch(() => {}) : Promise.resolve(),
+      signOutGoogleNative(),
+    ]).then(() => {});
     // Le profil mémorisé pour l'ouverture hors-ligne part avec la session :
     // le laisser rouvrirait l'app sur le compte précédent.
     oublierProfilCache();

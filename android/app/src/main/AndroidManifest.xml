@@ -22,16 +22,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Retour du navigateur système après Google OAuth/Supabase. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="com.bestasolar.app"
-                    android:host="login-callback" />
-            </intent-filter>
-
         </activity>
 
         <provider
