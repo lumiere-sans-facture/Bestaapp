@@ -27,6 +27,22 @@ export const ecranDentree = ({ isLoading, recovery, pendingAuthUser, user } = {}
 };
 
 /**
+ * Contenu de la racine `/` une fois la session résolue.
+ *
+ * Le site conserve sa vitrine commerciale. L'APK, lui, est déjà installé par
+ * quelqu'un qui veut utiliser l'application : sans session il ouvre donc la
+ * connexion, et avec une session il entre directement dans l'espace métier.
+ * Les liens de parrainage gardent partout leur priorité vers l'inscription.
+ *
+ * @returns {'vitrine'|'connexion'|'inscription'|'application'}
+ */
+export const vueRacine = ({ estNative = false, user = null, venuParLien = false } = {}) => {
+  if (venuParLien) return 'inscription';
+  if (estNative) return user ? 'application' : 'connexion';
+  return 'vitrine';
+};
+
+/**
  * Quel formulaire ouvrir sur l'écran d'entrée.
  *
  * Une attribution de parrainage vit TRENTE JOURS sur l'appareil. Tant que

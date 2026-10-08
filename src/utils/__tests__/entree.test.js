@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ecranDentree, vueLogin } from '../entree';
+import { ecranDentree, vueLogin, vueRacine } from '../entree';
 
 const etat = (extra) => ({ isLoading: false, recovery: false, pendingAuthUser: null, user: null, ...extra });
 
@@ -70,5 +70,23 @@ describe('vueLogin — quel formulaire sur l’écran d’entrée', () => {
 
   it('un code vide ne compte pas pour un code', () => {
     expect(vueLogin({ refCode: '', teamCode: '' })).toBe('login');
+  });
+});
+
+describe('vueRacine — différence entre le site et l’application installée', () => {
+  it('le site public conserve sa vitrine', () => {
+    expect(vueRacine()).toBe('vitrine');
+  });
+
+  it('l’application mobile ouvre directement la connexion sans session', () => {
+    expect(vueRacine({ estNative: true })).toBe('connexion');
+  });
+
+  it('l’application mobile entre dans l’espace métier avec une session', () => {
+    expect(vueRacine({ estNative: true, user: { id: 'u1' } })).toBe('application');
+  });
+
+  it('un lien de parrainage ouvre toujours l’inscription', () => {
+    expect(vueRacine({ estNative: true, venuParLien: true })).toBe('inscription');
   });
 });
