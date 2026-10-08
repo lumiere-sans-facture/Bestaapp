@@ -66,22 +66,37 @@ ok(!!part, 'clients : le client particulier est bien créé');
 ok(part?.contact === 'Fatou Aina', `clients : son contact reprend automatiquement son nom [${part?.contact}]`);
 
 // ---- Fiche du particulier : pas de ligne « Contact » redondante avec le titre ----
-await page.goto('http://localhost:3000/clients');
-await page.waitForTimeout(600);
-await page.locator('.client-list-row:has-text("Fatou Aina")').click();
-await page.waitForTimeout(500);
-const fiche = await page.locator('.sheet').innerText();
-ok(/Fatou Aina/.test(fiche), 'clients : la fiche s’ouvre bien sur ce client');
-ok((fiche.match(/Fatou Aina/g) || []).length === 1,
-   'clients : son nom n’apparaît qu’une fois dans la fiche (pas de ligne Contact redondante)');
-await page.keyboard.press('Escape');
-await page.waitForTimeout(300);
+// La fiche n'est plus un panneau qu'on referme avec Échap : c'est une route
+// (/clients/:id) à onglets, et les clients sont des CARTES. On y désigne donc
+// le client par sa carte puis les coordonnées par leur onglet. Et on vérifie
+// la RÈGLE (« la ligne Contact n'existe que pour une entreprise ») plutôt que
+// de compter les apparitions du nom : l'en-tête de page le répète déjà.
+const ouvrirFiche = async (nom) => {
+  await page.goto('http://localhost:3000/clients');
+  await page.waitForTimeout(600);
+  await page.locator(`.client-card:has-text("${nom}")`).click();
+  await page.waitForTimeout(500);
+  await page.locator('.client-detail-tabs button:has-text("Contact")').click();
+  await page.waitForTimeout(300);
+};
+// Comparaison EXACTE du libellé : « Contact » est un sous-mot de
+// « Google Contacts », qui a sa propre ligne dans ce même onglet.
+const aLigneContact = async () => {
+  const libelles = await page.locator('.sheet-row .sheet-label').allInnerTexts();
+  return libelles.some((t) => t.trim() === 'Contact');
+};
+
+await ouvrirFiche('Fatou Aina');
+ok(await page.locator('.client-detail-name:has-text("Fatou Aina")').count() === 1,
+   'clients : la fiche s’ouvre bien sur ce client');
+ok(!(await aLigneContact()),
+   'clients : pas de ligne Contact pour un particulier (elle répéterait le titre)');
 
 // ---- Fiche de l'entreprise : la ligne Contact, elle, reste utile ----
-await page.locator('.client-list-row:has-text("Hôtel Central")').click();
-await page.waitForTimeout(500);
-const ficheEnt = await page.locator('.sheet').innerText();
-ok(/Mme Adjovi/.test(ficheEnt), 'clients : la fiche entreprise garde la ligne Contact (personne différente du nom)');
+await ouvrirFiche('Hôtel Central');
+ok(await aLigneContact(), 'clients : la fiche entreprise garde sa ligne Contact');
+const ficheEnt = await page.locator('.page-content').innerText();
+ok(/Mme Adjovi/.test(ficheEnt), 'clients : la fiche entreprise nomme le contact (personne différente du nom)');
 
 // ============ ÉCRAN SUIVI CLIENTS (Pipeline) — même formulaire, même règle ============
 await page.goto('http://localhost:3000/pipeline');
