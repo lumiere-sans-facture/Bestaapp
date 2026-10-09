@@ -29,6 +29,22 @@ def digest(file):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def private_failure_category(output):
+    """Renvoie un diagnostic fixe, jamais le message brut qui peut contenir l'URL."""
+    message = output.decode("utf-8", errors="replace").lower()
+    if any(word in message for word in ("password authentication failed", "invalid password", "authentication failed")):
+        return "authentification PostgreSQL refusée"
+    if any(word in message for word in ("could not translate host name", "no such host", "name resolution")):
+        return "résolution DNS impossible"
+    if any(word in message for word in ("connection refused", "connection timed out", "i/o timeout", "timeout expired")):
+        return "connexion PostgreSQL indisponible"
+    if "server version mismatch" in message or "server version:" in message and "pg_dump version:" in message:
+        return "versions PostgreSQL incompatibles"
+    if "failed to pull" in message or "cannot connect to the docker daemon" in message:
+        return "Docker indisponible"
+    return "cause non classée"
+
+
 def run_private(args, *, env=None, input_bytes=None):
     # Aucun argument, stderr ou stdout de ces outils n'est renvoyé dans les logs.
     # Ils peuvent contenir une URL PostgreSQL, un mot de passe ou des lignes SQL.
@@ -38,7 +54,8 @@ def run_private(args, *, env=None, input_bytes=None):
     except (OSError, subprocess.TimeoutExpired):
         raise RuntimeError(f"Outil {Path(args[0]).name} indisponible ou délai dépassé") from None
     if result.returncode:
-        raise RuntimeError(f"Échec de {Path(args[0]).name} (code {result.returncode}); vérifier les accès et versions")
+        category = private_failure_category(result.stderr + b"\n" + result.stdout)
+        raise RuntimeError(f"Échec de {Path(args[0]).name} (code {result.returncode}; {category})")
 
 
 def auth_counts(data_file):

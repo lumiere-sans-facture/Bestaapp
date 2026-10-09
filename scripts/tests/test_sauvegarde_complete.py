@@ -29,6 +29,11 @@ class BackupTests(unittest.TestCase):
                 backup.run_private(["supabase", "--db-url", "secret-fictif"])
             self.assertNotIn("secret-fictif", str(error.exception))
             self.assertNotIn("mot-de-passe", str(error.exception))
+        self.assertEqual(backup.private_failure_category(
+            b'pg_dump: connection to server failed: password authentication failed for user "postgres.secret"'),
+            "authentification PostgreSQL refusée")
+        self.assertEqual(backup.private_failure_category(b"could not translate host name secret.example"),
+            "résolution DNS impossible")
 
     def test_rejects_weak_phrase_before_creating_archive(self):
         with tempfile.TemporaryDirectory() as folder:
