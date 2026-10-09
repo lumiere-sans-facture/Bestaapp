@@ -185,9 +185,14 @@ for (const premierRefus of [false, true]) {
   await c.close();
 }
 
-// ---- 4. Assistant Pro, proposition par kit : la fiche présente le calcul ----
-{
+// ---- 4. Fiche de dimensionnement : depuis l'assistant, puis depuis la liste ----
+// En proposition par kit, la fiche présente le matériel du CALCUL (le kit
+// n'apparaît que sur le devis) ; en composition pro, le matériel choisi. Dans
+// les deux cas, la fiche redemandée depuis la liste des devis est IDENTIQUE à
+// celle de l'assistant — rentabilité saisie comprise.
+for (const mode of ['kit', 'composition']) {
   const c = await nav.newContext({ viewport: { width: 1280, height: 950 }, acceptDownloads: true });
+  let ongletsFiche = 0; c.on('page', () => { ongletsFiche += 1; });
   // Les données remises au moteur de la fiche sont relevées au passage (le
   // PDF, lui, est une image).
   await c.route(/\/src\/utils\/sizingSheet\/pdf\.js/, async (route) => {
@@ -201,9 +206,10 @@ for (const premierRefus of [false, true]) {
   const p = await c.newPage();
   p.on('pageerror', (e) => R.push('❌ ERREUR JS : ' + e));
   await ouvrirPro(p);
+  const client = mode === 'kit' ? 'Client Kit Pro' : 'Client Composition Pro';
   await p.locator('button:has-text("Nouveau devis")').first().click(); await p.waitForTimeout(600);
   await p.locator('.devis-mode-card.featured').click(); await p.waitForTimeout(800);
-  await p.getByLabel('Nom complet *').fill('Client Kit Pro');
+  await p.getByLabel('Nom complet *').fill(client);
   const etape = () => p.locator('.wizard-actions .btn-primary').first();
   await etape().click(); await p.waitForTimeout(600);
   await p.locator('button:has-text("Saisie directe")').click();
@@ -211,20 +217,44 @@ for (const premierRefus of [false, true]) {
   await p.locator('.manual-consumption-grid input').nth(1).fill('4');
   await etape().click(); await p.waitForTimeout(800);
   await etape().click(); await p.waitForTimeout(1500);
-  const modeKit = await p.locator('.client-type-btn.active', { hasText: /kit/i }).count();
-  const kitAffiche = await p.locator('.kit-option.selected, .kit-option.active').first().innerText().catch(() => '');
+  if (mode === 'composition') {
+    await p.locator('.client-type-btn', { hasText: 'Composition pro' }).click(); await p.waitForTimeout(800);
+    await p.locator('summary', { hasText: 'Paramètres de rentabilité' }).click();
+    await p.getByLabel(/Tarif électricité/).fill('150');
+  }
+  const libelleMode = (await p.locator('.client-type-btn.active').first().innerText().catch(() => '')).trim();
   const [fiche] = await Promise.all([p.waitForEvent('download', { timeout: 30000 }), p.locator('button:has-text("Fiche de dimensionnement")').first().click()]);
   const fp = await lirePdf(fiche);
-  const [donnees] = await p.evaluate(() => window.__fiches || []);
-  const calcul = donnees && {
-    inverter: donnees.sizing.inverter ? { capacity: donnees.sizing.inverter.capacity, maxPvPower: donnees.sizing.inverter.maxPvPower || null, quantite: donnees.sizing.inverterQuantite } : null,
-    batteries: donnees.sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
-  };
-  ok(modeKit > 0, `assistant en proposition par kit [${kitAffiche.split('\n')[0] || 'kit retenu'}]`);
-  ok(fp.pdf && fp.pages === 3, `fiche téléchargée [${fp.nom}, ${fp.pages} pages]`);
-  ok(!!donnees && JSON.stringify(donnees.inverter) === JSON.stringify(calcul.inverter) && JSON.stringify(donnees.batteries) === JSON.stringify(calcul.batteries),
-    `fiche : onduleur et batteries du calcul [${donnees?.inverter?.capacity} kVA ; ${(donnees?.batteries || []).map((b) => `${b.qty} × ${b.capacity} kWh`).join(' + ')}]`);
-  ok(!!donnees && !/du kit|kit /i.test(JSON.stringify({ i: donnees.inverter, b: donnees.batteries, p: donnees.panelName })), `aucune mention du kit dans le matériel de la fiche [${donnees?.panelName}]`);
+  const [assistant] = await p.evaluate(() => window.__fiches || []);
+  ok(fp.pdf && fp.pages === 3 && !!assistant, `${mode} [${libelleMode}] : fiche de l’assistant téléchargée [${fp.nom}, ${fp.pages} pages]`);
+  if (mode === 'kit') {
+    const calcul = assistant && {
+      inverter: assistant.sizing.inverter ? { capacity: assistant.sizing.inverter.capacity, maxPvPower: assistant.sizing.inverter.maxPvPower || null, quantite: assistant.sizing.inverterQuantite } : null,
+      batteries: assistant.sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
+    };
+    ok(!!assistant && JSON.stringify(assistant.inverter) === JSON.stringify(calcul.inverter) && JSON.stringify(assistant.batteries) === JSON.stringify(calcul.batteries),
+      `kit : onduleur et batteries du calcul [${assistant?.inverter?.capacity} kVA ; ${(assistant?.batteries || []).map((b) => `${b.qty} × ${b.capacity} kWh`).join(' + ')}]`);
+    ok(!!assistant && !/du kit|kit /i.test(JSON.stringify({ i: assistant.inverter, b: assistant.batteries, p: assistant.panelName })), `kit : aucune mention du kit dans le matériel de la fiche [${assistant?.panelName}]`);
+  } else {
+    ok(assistant?.rentabilite?.tarifElec === 150, `composition : tarif saisi repris par la fiche [${assistant?.rentabilite?.tarifElec} F/kWh]`);
+  }
+
+  // Le devis est créé ; sa fiche se retélécharge depuis la liste.
+  await p.locator('button:has-text("Créer le devis")').first().click(); await p.waitForTimeout(1500);
+  const ligne = p.locator('.flat-row', { hasText: client });
+  await ligne.waitFor({ timeout: 15000 });
+  await ligne.click(); await p.locator('.doc-actions-list').waitFor();
+  const bouton = p.locator('.doc-actions-list button', { hasText: 'Fiche de dimensionnement (PDF)' });
+  ok(await bouton.isVisible(), `${mode} : bouton « Fiche de dimensionnement (PDF) » dans la fiche du devis`);
+  if (mode === 'kit') await p.locator('.doc-actions-list').screenshot({ path: '/tmp/claude-0/documents-pro-devis-fiche.png' });
+  const avant = ongletsFiche;
+  const [ficheListe] = await Promise.all([p.waitForEvent('download', { timeout: 30000 }), bouton.click()]);
+  const fl = await lirePdf(ficheListe);
+  const liste = (await p.evaluate(() => window.__fiches || []))[1];
+  const toast = await p.locator('.toast', { hasText: 'Fiche' }).last().innerText().catch(() => '');
+  ok(fl.pdf && fl.pages === 3 && fl.nom === fp.nom && ongletsFiche === avant, `${mode} : fiche téléchargée depuis la liste, sans onglet [${fl.nom} ; « ${toast} »]`);
+  const ecarts = assistant && liste ? Object.keys({ ...assistant, ...liste }).filter((k) => JSON.stringify(assistant[k]) !== JSON.stringify(liste[k])) : ['(absente)'];
+  ok(ecarts.length === 0, `${mode} : la fiche de la liste est identique à celle de l’assistant${ecarts.length ? ` — écarts : ${ecarts.join(', ')}` : ''}`);
   await c.close();
 }
 

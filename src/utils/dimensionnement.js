@@ -97,7 +97,12 @@ export function capturerDimensionnement(etat = {}) {
     // La localisation sert à réafficher d'où vient l'ensoleillement, sans
     // relancer un appel réseau à la réouverture : l'étude doit se rouvrir
     // hors ligne, comme tout le reste de l'application.
-    location: etat.location ? { name: String(etat.location.name || ''), lat: etat.location.lat ?? null, lon: etat.location.lon ?? null } : null,
+    // Le pays (quand le géocodage l'a donné) fixe le tarif d'électricité par
+    // défaut de la fiche : Togo ou Bénin.
+    location: etat.location ? {
+      name: String(etat.location.name || ''), lat: etat.location.lat ?? null, lon: etat.location.lon ?? null,
+      ...(etat.location.country ? { country: String(etat.location.country) } : {}),
+    } : null,
     solarSource: etat.solar?.source ? String(etat.solar.source) : null,
   };
 }

@@ -3,6 +3,8 @@
 // le fichier joint. Plus d'onglet à imprimer soi-même — inopérant dans
 // l'application Android. Même mécanique que le devis public (useEnvoiPdf).
 import { useData } from '../../../context/DataContext';
+import { useToast } from '../../../components/Toast';
+import { enregistrerFichePdf } from '../../../lib/fichiers';
 import { devisEnvoiMessage } from '../../../utils/affaires';
 import { factureEnvoiMessage } from '../../../utils/paiement';
 import { useEnvoiPdf } from '../../devis/useEnvoiPdf';
@@ -14,7 +16,8 @@ import { normalizeModele } from './constants';
  * @param {string} o.modeleDefaut  modèle réglé sur l'entreprise
  */
 export function useDocumentsPro({ company, modeleDefaut }) {
-  const { getLeadById, products, markDevisPro } = useData();
+  const { getLeadById, products, markDevisPro, inverters } = useData();
+  const toast = useToast();
   const pdf = useEnvoiPdf({ ecran: '/pro/documents', origine: 'document-pro' });
 
   /** Modèle d'un document : celui qu'il porte, sinon celui de l'entreprise. */
@@ -74,11 +77,24 @@ export function useDocumentsPro({ company, modeleDefaut }) {
     });
   }, { reference: f.numero });
 
+  // Fiche de dimensionnement d'un devis issu de l'assistant : la même que
+  // celle produite dans l'assistant (étude, choix et rentabilité rangés sur
+  // le devis), à l'identité de l'abonné.
+  const telechargerFiche = (d) => pdf.produire(d.id, 'fiche', async () => {
+    const { donneesFicheDepuisDevis } = await import('../../../utils/sizingSheet/donnees');
+    const donnees = donneesFicheDepuisDevis(d, { lead: getLeadById(d.leadId), inverters: inverters || [], products, company });
+    if (!donnees) {
+      toast('Ce devis ne contient pas d’étude de dimensionnement.', { type: 'error' });
+      return;
+    }
+    pdf.annoncer('Fiche de dimensionnement', await enregistrerFichePdf(donnees), { feminin: true });
+  }, { reference: d.devisNumber });
+
   return {
     modeleDe,
     enCours: pdf.enCours,
     occupe: (doc, action) => pdf.occupe(doc?.id, action),
-    telechargerDevis, envoyerDevis, telechargerFacture, envoyerFacture,
+    telechargerDevis, envoyerDevis, telechargerFacture, envoyerFacture, telechargerFiche,
     envoiPret: pdf.envoiPret, partagerMaintenant: pdf.partagerMaintenant, fermerEnvoi: pdf.fermerEnvoi,
   };
 }

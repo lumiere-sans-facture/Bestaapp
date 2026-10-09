@@ -21,7 +21,7 @@ import Sheet from '../../../components/Sheet';
 import ConfirmSheet from '../../../components/ConfirmSheet';
 import { useToast } from '../../../components/Toast';
 import DevisEditSheet from '../../devis/DevisEditSheet';
-import { dimensionnementProRejouable, resumeDimensionnement } from '../../../utils/dimensionnement';
+import { dimensionnementProRejouable, dimensionnementRejouable, resumeDimensionnement } from '../../../utils/dimensionnement';
 
 
 const nextStatut = (s) => (s === 'brouillon' ? 'emise' : 'payee');
@@ -474,6 +474,14 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               {docs.occupe(actions.doc, 'whatsapp') ? <Loader2 size={16} className="tourne" /> : <Send size={16} />}
               {docs.occupe(actions.doc, 'whatsapp') ? 'Préparation du PDF…' : 'Envoyer le devis sur WhatsApp'}
             </button>
+            {/* Devis issu de l'assistant : sa fiche de dimensionnement, la
+                même que celle de l'assistant. */}
+            {(dimensionnementProRejouable(actions.doc) || dimensionnementRejouable(actions.doc)) && (
+              <button className="btn btn-outline btn-block" disabled={!!docs.enCours} onClick={() => docs.telechargerFiche(actions.doc)}>
+                {docs.occupe(actions.doc, 'fiche') ? <Loader2 size={16} className="tourne" /> : <FileText size={16} />}
+                {docs.occupe(actions.doc, 'fiche') ? 'Préparation de la fiche…' : 'Fiche de dimensionnement (PDF)'}
+              </button>
+            )}
             <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions.doc); setActions(null); }}>
               <Pencil size={16} /> Modifier le devis
             </button>

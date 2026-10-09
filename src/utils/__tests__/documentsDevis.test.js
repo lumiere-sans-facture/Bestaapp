@@ -6,7 +6,10 @@ import { segmentFichier, nomFichierPdf } from '../nomFichier';
 import { devisEnvoiMessage } from '../affaires';
 import { factureEnvoiMessage } from '../paiement';
 import { capturerDimensionnement } from '../dimensionnement';
-import { consommationEtude, donneesFiche, donneesFicheDepuisDevis, picDeCharge, materielCalcule } from '../sizingSheet/donnees';
+import {
+  consommationEtude, donneesFiche, donneesFicheDepuisDevis, picDeCharge, materielCalcule,
+  materielChoisi, contexteCalculPro, parametresRentabilite, rentaSaisie,
+} from '../sizingSheet/donnees';
 import { calculateSystemSize } from '../solarSizing';
 
 describe('nom de fichier', () => {
@@ -138,5 +141,80 @@ describe('matériel de la fiche : celui du calcul, jamais celui d’un kit', () 
 
   it('sans onduleur calculé, la fiche n’en invente pas', () => {
     expect(materielCalcule({ ...sizing, inverter: null }).inverter).toBeNull();
+  });
+});
+
+describe('fiche d’un devis Pro, redemandée depuis la liste', () => {
+  const PRODUITS = [{ id: 'p1', category: 'panneaux', name: 'Panneaux Photovoltaïque 580W Jinko', basePrice: 60000 }];
+  const ONDULEURS = [
+    { id: 'o6', brand: 'Deye', capacity: 6, maxPvPower: 8000, price: 900000 },
+    { id: 'o3', brand: 'Deye', capacity: 3, maxPvPower: 4000, price: 450000 },
+    { id: 'o0', brand: 'Vide', capacity: 0 },
+  ];
+  const ENTREPRISE = { nomEntreprise: 'Lumière Sans Facture', couleurPrimaire: '#123456' };
+  const CLIENT = { name: 'Felix Sossa', phone: '+228 90 00 00 00', ville: 'Agoè' };
+  const dimensionnement = capturerDimensionnement({
+    consoMode: 'direct', manual: { day: 8, night: 4 }, systemType: 'off-grid', autonomyNights: 1, sunHours: 5.2,
+    location: { name: 'Lomé', lat: 6.13, lon: 1.22, country: 'Togo' }, solar: { source: 'pvgis' },
+  });
+  const lignes = [{ designation: 'Onduleur hybride Deye 6 kVA', qty: 1, pu: 900000 }, { designation: 'Panneaux Photovoltaïque 580W Jinko', qty: 6, pu: 60000 }];
+  const base = {
+    id: 'dp1', type: 'pro', total: 3100000, clientName: CLIENT.name, clientPhone: CLIENT.phone, clientVille: CLIENT.ville,
+    consumption: { day: 8, night: 4 }, lignes, dimensionnement,
+  };
+  const contexte = { products: PRODUITS, inverters: ONDULEURS, company: ENTREPRISE };
+  // Ce que l'assistant Pro calcule et assemble pour la même étude.
+  const calcul = contexteCalculPro({ products: PRODUITS, onduleurs: ONDULEURS });
+  const sizing = calculateSystemSize({ day: 8, night: 4 }, 'off-grid', 5.2, calcul.panelWc, 1, { peakLoad: 0, inverters: calcul.inverterOptions, configures: ONDULEURS });
+  const assistant = (extra) => donneesFiche({
+    company: ENTREPRISE, client: CLIENT, rows: [], consoMode: 'direct', consumption: { day: 8, night: 4 }, systemType: 'off-grid',
+    sunHours: 5.2, location: dimensionnement.location, solarSource: 'pvgis', sizing, panelName: calcul.panelName, ...extra,
+  });
+
+  it('contexte de calcul : panneau du catalogue, onduleurs configurés triés', () => {
+    expect(calcul.panelName).toBe('Panneaux Photovoltaïque 580W Jinko');
+    expect(calcul.panelWc).toBe(580);
+    expect(calcul.inverterOptions.map((o) => o.capacity)).toEqual([3, 6]);
+    expect(contexteCalculPro().panelWc).toBeGreaterThan(0); // catalogue vide : panneau de référence
+  });
+
+  it('proposition par kit : identique à la fiche de l’assistant, matériel du calcul', () => {
+    const fiche = donneesFicheDepuisDevis({ ...base, kitId: 'kit-10', materielFiche: materielChoisi({ capacity: 12 }, []) }, contexte);
+    expect(fiche).toEqual(assistant({ materiel: null, ...parametresRentabilite({}, { investissement: 3100000, provisionOnduleur: 900000 }) }));
+    expect({ inverter: fiche.inverter, batteries: fiche.batteries }).toEqual(materielCalcule(sizing));
+    expect(fiche.company).toBe(ENTREPRISE);
+    expect(fiche.client).toEqual(CLIENT);
+    expect(fiche.cityCountry).toBe('Togo');
+  });
+
+  it('hors kit : le matériel choisi dans l’assistant, et la rentabilité saisie', () => {
+    const choisi = materielChoisi({ capacity: 6, maxPvPower: 8000, brand: 'Deye', model: 'SUN-6K' }, [{ capacity: 5.12, qty: 2, model: 'X' }, { capacity: 2.4, qty: 0 }]);
+    expect(choisi).toEqual({ inverter: { capacity: 6, maxPvPower: 8000, quantite: 1 }, batteries: [{ capacity: 5.12, qty: 2 }] });
+    const renta = { tarifElec: '150', tauxUtilisation: '', maintenanceAnnuelle: '0', provisionOnduleur: '', investissement: '' };
+    const fiche = donneesFicheDepuisDevis({ ...base, materielFiche: choisi, rentaFiche: rentaSaisie(renta) }, contexte);
+    expect(fiche).toEqual(assistant({ materiel: choisi, ...parametresRentabilite(renta, { investissement: 3100000, provisionOnduleur: 900000 }) }));
+    expect(fiche.rentabilite).toEqual({ tarifElec: 150, maintenanceAnnuelle: 0, provisionOnduleur: 900000 });
+    expect(fiche.investissement).toBe(3100000);
+  });
+
+  it('devis hors kit antérieur au rangement du matériel : retombe sur le calcul', () => {
+    const fiche = donneesFicheDepuisDevis(base, contexte);
+    expect({ inverter: fiche.inverter, batteries: fiche.batteries }).toEqual(materielCalcule(sizing));
+  });
+
+  it('null pour un devis Pro sans étude (sélection manuelle du catalogue)', () => {
+    expect(donneesFicheDepuisDevis({ type: 'pro', total: 1, lignes }, contexte)).toBeNull();
+  });
+
+  it('paramètres de rentabilité : saisies prioritaires, défauts sinon', () => {
+    expect(parametresRentabilite({}, { investissement: 1000, provisionOnduleur: null })).toEqual({ investissement: 1000, rentabilite: {} });
+    expect(parametresRentabilite({ investissement: '2500', provisionOnduleur: '0' }, { investissement: 1000, provisionOnduleur: 5 }))
+      .toEqual({ investissement: 2500, rentabilite: { provisionOnduleur: 0 } });
+    expect(rentaSaisie({ a: '', b: ' ', c: '12', d: null })).toEqual({ c: '12' });
+  });
+
+  it('l’étude rangée garde le pays du lieu (tarif d’électricité par défaut)', () => {
+    expect(dimensionnement.location).toEqual({ name: 'Lomé', lat: 6.13, lon: 1.22, country: 'Togo' });
+    expect(capturerDimensionnement({ location: { name: 'Cotonou', lat: 1, lon: 2 } }).location).not.toHaveProperty('country');
   });
 });

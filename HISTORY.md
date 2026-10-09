@@ -6,6 +6,12 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-09
+- **Espace Pro : la fiche de dimensionnement se télécharge depuis chaque devis.** La fiche d'un devis Pro ne se produisait que dans l'assistant, au moment de la création. Un bouton « Fiche de dimensionnement (PDF) » s'ajoute dans la fiche de tout devis issu de l'assistant (onglet Devis & Factures). La fiche obtenue est **identique** à celle de l'assistant, et non une approximation :
+  - le même calcul — panneau du catalogue, onduleurs de « Mes onduleurs » (`contexteCalculPro`, commun aux deux chemins) ;
+  - le même matériel — celui du calcul en proposition par kit, celui choisi à l'étape Matériel en composition pro, désormais rangé avec le devis (`materielFiche`) ;
+  - la même rentabilité — les paramètres saisis dans l'assistant sont rangés avec le devis (`rentaFiche`) et repris quand on rouvre le dimensionnement ;
+  - le pays du lieu est gardé avec l'étude : il fixe le tarif d'électricité par défaut (Togo ou Bénin).
+  L'assistant et la liste passent par le même assemblage (`donneesFiche`). Un devis Pro hors kit antérieur à ce changement retombe sur le matériel du calcul. Nouveaux champs dans les données JSON du devis : aucun script SQL. Parcours `e2e/documents-pro.mjs` (30 vérifications, dont la comparaison champ par champ des deux fiches, en mode kit et hors kit).
 - **Espace Pro : devis et factures se téléchargent et s'envoient en PDF, directement dans l'application.** Les boutons « Devis imprimable » et « Facture imprimable » ouvraient un onglet à exporter soi-même — inopérant dans l'application Android. Comme pour le devis public :
   - **téléchargement d'un toucher**, depuis la fiche du document ou par une icône sur **chaque ligne** des listes Devis et Factures ; dans l'application Android, rangé dans `Documents/BestaSolar` ;
   - **envoi sur WhatsApp avec le PDF joint** (menu de partage), message signé du nom de l'entreprise de l'abonné ; pour une facture, il rappelle le reste dû, l'échéance et le numéro Mobile Money — rien de tout cela si elle est soldée. La « Relance par WhatsApp » (message seul) reste à part ;

@@ -5,7 +5,7 @@ import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
-  calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL, parsePanelWc,
+  calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
   batteryOptionsFromCatalog, brandsOf, suggestInverterFor, onduleurSuffisant, critereDeChoix, suggestBatteryCombo,
   AUTONOMY_OPTIONS, MOUNTING_TYPES, phasesDuKit,
 } from '../../../utils/solarSizing';
@@ -23,7 +23,7 @@ import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../compon
 import AjustementsKit from '../../../components/AjustementsKit';
 import { signalerErreur } from '../../../lib/rapportErreur';
 import { enregistrerFichePdf } from '../../../lib/fichiers';
-import { materielCalcule } from '../../../utils/sizingSheet/donnees';
+import { donneesFiche, materielChoisi, contexteCalculPro, parametresRentabilite, rentaSaisie } from '../../../utils/sizingSheet/donnees';
 import { useToast } from '../../../components/Toast';
 import {
   capturerDimensionnement, restaurerDimensionnement, prochainRowId,
@@ -71,14 +71,12 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   // Onduleurs proposés : ceux de « Mes onduleurs » (Plus › Onduleurs), jamais
   // la boutique — c'est là que l'entreprise tient ses modèles, leurs prix et
   // leurs limites électriques. Même source que le parcours « kit ».
-  const inverterOptions = useMemo(() => (onduleursConfigures || [])
-    .filter((o) => Number(o.capacity) > 0)
-    .map((o) => ({ ...o, brand: o.brand || 'Autre', model: designationOnduleur(o), price: Number(o.price) || 0 }))
-    .sort((a, b) => a.capacity - b.capacity), [onduleursConfigures]);
+  // (Même préparation que la fiche demandée depuis la liste des devis : contexteCalculPro.)
+  const { inverterOptions } = useMemo(() => contexteCalculPro({ onduleurs: onduleursConfigures }), [onduleursConfigures]);
   const batteryOptions = useMemo(() => batteryOptionsFromCatalog(products), [products]);
   const brands = useMemo(() => brandsOf(inverterOptions), [inverterOptions]);
   const panelProduct = useMemo(() => products.find((p) => p.category === 'panneaux'), [products]);
-  const panelName = panelProduct?.name || `Panneau ${PANEL_SPEC.brand} ${PANEL_SPEC.model} ${PANEL_SPEC.power}W ${PANEL_SPEC.type}`;
+  const { panelName, panelWc: panelWcCatalogue } = useMemo(() => contexteCalculPro({ products }), [products]);
   // Prix PUBLIC, jamais le prix technicien sur un devis remis au client.
   const panelPrice = panelProduct ? prixPublic(panelProduct.basePrice) : PANEL_SPEC.price;
 
@@ -88,7 +86,6 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   const [rows, setRows] = useState(reprise.appareils);
   const [pickerId, setPickerId] = useState('');
   const [consoMode, setConsoMode] = useState(reprise.consoMode);
-  const manualMode = consoMode !== 'appareils';
   const [manual, setManual] = useState(reprise.manuel);
   const [facture, setFacture] = useState(reprise.facture);
 
@@ -193,7 +190,6 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   // Le devis Pro livre le panneau du catalogue : le nombre de panneaux est
   // calculé sur SA puissance crête réelle, pour que la puissance installée
   // corresponde bien au besoin (la référence 620 Wc ne sert qu'à l'étude).
-  const panelWcCatalogue = useMemo(() => parsePanelWc(panelName) || PANEL_SPEC.power, [panelName]);
   const sizing = useMemo(
     () => (totalConsumption > 0
       ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, panelWcCatalogue, autonomyNights, { peakLoad, inverters: inverterOptions, configures: onduleursConfigures || [] })
@@ -338,7 +334,11 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
 
   // Paramètres de rentabilité de la fiche (page 3) — vides = défauts.
   // Le tarif est automatique : 114 F/kWh au Togo, 145 F/kWh au Bénin.
-  const [renta, setRenta] = useState({ tarifElec: '', tauxUtilisation: '', maintenanceAnnuelle: '', provisionOnduleur: '', investissement: '' });
+  // Rangés sur le devis (rentaFiche) : la fiche redemandée depuis la liste les reprend.
+  const [renta, setRenta] = useState(() => ({
+    tarifElec: '', tauxUtilisation: '', maintenanceAnnuelle: '', provisionOnduleur: '', investissement: '',
+    ...(devisAModifier?.rentaFiche || {}),
+  }));
   // Production de la fiche PDF : quelques secondes sur un téléphone d'entrée
   // de gamme. Sans cet état, on appuie deux fois et deux onglets s'ouvrent.
   const [ficheEnCours, setFicheEnCours] = useState(false);
@@ -350,42 +350,30 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     // Produite et enregistrée DANS l'application (plus d'onglet à imprimer).
     setFicheEnCours(true);
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
-    const villeFiche = location?.name || client.ville || null;
-    // La fiche présente le DIMENSIONNEMENT : en proposition par kit, elle
-    // donne le matériel que le calcul prescrit, pas celui du kit — le kit
-    // n'apparaît que sur le devis. Hors kit, c'est le matériel choisi à
-    // l'étape Matériel de ce même dimensionnement.
-    const materiel = proposalMode === 'kit'
-      ? materielCalcule(sizing)
-      : { inverter, batteries: batteryList };
-    await enregistrerFichePdf({
+    // Même assemblage que la fiche redemandée plus tard depuis la liste des
+    // devis (donneesFicheDepuisDevis) : elles ne peuvent pas diverger.
+    await enregistrerFichePdf(donneesFiche({
       // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
       // coordonnées), comme ses devis et ses factures.
       company,
-      client: { name: client.name || '', phone: client.phone || '', ville: client.ville || '' },
-      appliances: rows,
-      manualMode,
+      client,
+      rows,
+      consoMode,
       consumption,
       systemType,
       sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
-      cityName: villeFiche,
-      cityCountry: location?.country || '',
+      location,
       solarSource: solar?.source || null,
       sizing,
-      ...materiel,
       panelName,
+      // La fiche présente le DIMENSIONNEMENT : en proposition par kit, le
+      // matériel que le calcul prescrit — le kit n'apparaît que sur le devis.
+      // Hors kit, le matériel choisi à l'étape Matériel de ce dimensionnement.
+      materiel: proposalMode === 'kit' ? null : materielChoisi(inverter, batteryList),
       // Rentabilité (page 3) : total du devis par défaut, surchargeable
       // champ par champ dans « Paramètres de rentabilité » ci-dessous.
-      investissement: Number(renta.investissement) > 0 ? Number(renta.investissement) : (totals.totalTTC || null),
-      rentabilite: {
-        ...(Number(renta.tarifElec) > 0 ? { tarifElec: Number(renta.tarifElec) } : {}),
-        ...(Number(renta.tauxUtilisation) > 0 ? { tauxUtilisation: Number(renta.tauxUtilisation) } : {}),
-        ...(Number(renta.maintenanceAnnuelle) >= 0 && renta.maintenanceAnnuelle !== '' ? { maintenanceAnnuelle: Number(renta.maintenanceAnnuelle) } : {}),
-        ...(Number(renta.provisionOnduleur) >= 0 && renta.provisionOnduleur !== ''
-          ? { provisionOnduleur: Number(renta.provisionOnduleur) }
-          : (provisionOnduleurDefaut != null ? { provisionOnduleur: provisionOnduleurDefaut } : {})),
-      },
-    }).then(({ emplacement }) => {
+      ...parametresRentabilite(renta, { investissement: totals.totalTTC, provisionOnduleur: provisionOnduleurDefaut }),
+    })).then(({ emplacement }) => {
       toast(emplacement ? `Fiche de dimensionnement enregistrée dans ${emplacement}.` : 'Fiche de dimensionnement téléchargée.');
     }).catch((e) => {
       signalerErreur(e, { origine: 'fiche-dimensionnement', ecran: '/plus/devis-pro' });
@@ -437,6 +425,10 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
       ajustements: proposalMode === 'kit' ? kitQuotation?.ajustements || null : null,
       consumption,
       dimensionnement,
+      // Pour la fiche redemandée depuis la liste : matériel choisi hors kit,
+      // et paramètres de rentabilité saisis (vides = défauts).
+      materielFiche: proposalMode === 'kit' ? null : materielChoisi(inverter, batteryList),
+      rentaFiche: rentaSaisie(renta),
       sizing: {
         numberOfPanels: proposalMode === 'kit' ? kitQuotation?.panelsIncluded || sizing.numberOfPanels : sizing.numberOfPanels,
         panelCapacity: sizing.panelCapacity,
