@@ -86,6 +86,13 @@ describe('construireEvenement', () => {
     expect(construireEvenement(EVENEMENTS.PAGE_VUE, {}, {}).distinct_id).toBe('anonyme');
   });
 
+  it('porte la session d’utilisation ($session_id) quand elle existe', () => {
+    const e = construireEvenement(EVENEMENTS.TEMPS_UTILISATION, { duree_secondes: 90 }, { session: '0192-s' });
+    expect(e.properties.$session_id).toBe('0192-s');
+    expect(e.properties.duree_secondes).toBe(90);
+    expect('$session_id' in construireEvenement(EVENEMENTS.PAGE_VUE, {}, {}).properties).toBe(false);
+  });
+
   it('avant connexion : l’identifiant anonyme de l’appareil, pour compter les téléphones', () => {
     const e = construireEvenement(EVENEMENTS.APP_OUVERTE, {}, { appareil: 'app-123' });
     expect(e.distinct_id).toBe('app-123');

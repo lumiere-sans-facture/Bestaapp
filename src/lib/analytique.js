@@ -20,6 +20,9 @@ import {
   problemeAnalytique as evaluerConfig,
 } from '../utils/analytique';
 import { estAppNative } from '../utils/liensLegaux';
+import {
+  demarrerPeriode, noterActivite, proprietesTemps, sessionPour, uuidV7,
+} from '../utils/tempsUtilisation';
 
 const CLE = String(import.meta.env.VITE_POSTHOG_KEY || '').trim();
 // RÉGION DU PROJET. PostHog héberge en « eu » ou en « us », et un projet créé
@@ -151,9 +154,9 @@ const programmerEnvoi = () => {
  * Enregistre un événement. Le nom doit figurer dans EVENEMENTS ; sinon il est
  * ignoré sans bruit (utils/analytique.js explique pourquoi).
  */
-export function suivre(nom, props = {}) {
+export function suivre(nom, props = {}, { date } = {}) {
   if (!CLE || PROBLEME) return;
-  const evenement = construireEvenement(nom, props, { ...contexte, ...infosPlateforme() });
+  const evenement = construireEvenement(nom, props, { ...contexte, ...infosPlateforme(), ...(date ? { date } : {}) });
   if (!evenement) return;
   ecrireFile([...lireFile(), evenement]);
   programmerEnvoi();
@@ -216,15 +219,116 @@ export function signalerOuvertureApp() {
 /** Plateforme et build vus par l'analytique — affichés dans le diagnostic. */
 export const plateformeAnalytique = () => infosPlateforme();
 
-/** Filets d'envoi : retour du réseau, et fermeture de l'onglet. */
+// ---------------------------------------------------------------------------
+// TEMPS D'UTILISATION — web et application (règles : utils/tempsUtilisation.js)
+//
+// Une période s'ouvre quand l'app passe au premier plan et se ferme quand
+// elle le quitte : son événement « temps_utilisation » entre aussitôt dans la
+// file, AVANT l'envoi de fermeture. La file étant gardée sur l'appareil, il
+// part au plus tard à la prochaine ouverture.
+//
+// Si l'app est tuée sans prévenir (Android à court de mémoire, plantage), la
+// période en cours a été recopiée toutes les 30 s sur l'appareil : elle est
+// comptée à l'ouverture suivante. Une copie par ONGLET, pour qu'un second
+// onglet ouvert ne « récupère » pas la période d'un onglet encore vivant.
+// ---------------------------------------------------------------------------
+const PREFIXE_PERIODE = 'bestasolar_periode_';
+const CLE_SESSION = 'bestasolar_session';
+const BATTEMENT_MS = 30000;
+// Une copie plus vieille que ça n'a plus d'onglet vivant pour la rafraîchir.
+const COPIE_ORPHELINE_MS = 3 * BATTEMENT_MS;
+
+const ONGLET = (() => { try { return crypto.randomUUID(); } catch { return String(Math.random()).slice(2); } })();
+let periode = null;
+let battement = null;
+let session = (() => { try { return JSON.parse(localStorage.getItem(CLE_SESSION)); } catch { return null; } })();
+
+// Appelé au démarrage de l'app : ne doit jamais lever, quel que soit le
+// navigateur — un repli sur Math.random vaut mieux qu'un écran blanc.
+const nouvelleSession = () => {
+  const aleatoire = new Uint8Array(10);
+  try { crypto.getRandomValues(aleatoire); } catch { aleatoire.forEach((_, i) => { aleatoire[i] = Math.floor(Math.random() * 256); }); }
+  return uuidV7(Date.now(), aleatoire);
+};
+
+const copierPeriode = () => {
+  try {
+    if (periode) localStorage.setItem(PREFIXE_PERIODE + ONGLET, JSON.stringify({ ...periode, vu: Date.now(), session: session?.id }));
+    else localStorage.removeItem(PREFIXE_PERIODE + ONGLET);
+  } catch { /* stockage indisponible : seule la reprise après plantage est perdue */ }
+};
+
+const ouvrirPeriode = () => {
+  if (periode || typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+  const maintenant = Date.now();
+  session = sessionPour(session, maintenant, nouvelleSession);
+  contexte = { ...contexte, session: session.id };
+  periode = demarrerPeriode(maintenant);
+  copierPeriode();
+  battement = setInterval(copierPeriode, BATTEMENT_MS);
+};
+
+const fermerPeriode = () => {
+  if (!periode) return;
+  const fin = Date.now();
+  const props = proprietesTemps(periode, fin);
+  periode = null;
+  clearInterval(battement);
+  copierPeriode();
+  session = { ...session, fin };
+  try { localStorage.setItem(CLE_SESSION, JSON.stringify(session)); } catch { /* sans gravité */ }
+  if (props) suivre(EVENEMENTS.TEMPS_UTILISATION, props);
+};
+
+// Les gestes de l'utilisateur. Le défilement d'une liste ne remonte pas
+// jusqu'à window : on l'écoute en phase de capture.
+const noterGeste = () => {
+  if (!periode) return;
+  const maintenant = Date.now();
+  if (maintenant - periode.derniere >= 1000) periode = noterActivite(periode, maintenant);
+};
+
+/** Périodes laissées par un onglet ou une app fermés sans prévenir. */
+const recupererPeriodesOrphelines = () => {
+  let cles = [];
+  try { cles = Object.keys(localStorage).filter((c) => c.startsWith(PREFIXE_PERIODE)); } catch { return; }
+  for (const cle of cles) {
+    let copie = null;
+    try { copie = JSON.parse(localStorage.getItem(cle)); } catch { /* illisible : effacée */ }
+    const vu = Number(copie?.vu);
+    if (Number.isFinite(vu) && Date.now() - vu < COPIE_ORPHELINE_MS) continue; // onglet encore vivant
+    try { localStorage.removeItem(cle); } catch { /* sans gravité */ }
+    const props = Number.isFinite(vu) && proprietesTemps(copie, vu);
+    if (!props) continue;
+    const enCours = contexte.session;
+    contexte = { ...contexte, session: copie.session || enCours };
+    suivre(EVENEMENTS.TEMPS_UTILISATION, { ...props, recupere: true }, { date: new Date(vu).toISOString() });
+    contexte = { ...contexte, session: enCours };
+  }
+};
+
+/** Filets d'envoi (retour du réseau, fermeture de l'onglet) et temps d'utilisation. */
 export function installerAnalytique() {
   if (!CLE || PROBLEME || typeof window === 'undefined') return;
   window.addEventListener('online', viderFileAnalytique);
+  recupererPeriodesOrphelines();
+  ouvrirPeriode();
+  for (const geste of ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll']) {
+    window.addEventListener(geste, noterGeste, { capture: true, passive: true });
+  }
   // `pagehide` est le seul événement fiable sur mobile pour capter une
-  // fermeture : `beforeunload` ne se déclenche pas sur iOS.
-  window.addEventListener('pagehide', () => { viderFileAnalytique({ beacon: true }); });
+  // fermeture : `beforeunload` ne se déclenche pas sur iOS. La période est
+  // close AVANT l'envoi, pour partir dans le même lot.
+  window.addEventListener('pagehide', () => { fermerPeriode(); viderFileAnalytique({ beacon: true }); });
+  // Retour d'une page gardée en cache par le navigateur (bouton « retour »).
+  window.addEventListener('pageshow', ouvrirPeriode);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') viderFileAnalytique({ beacon: true });
+    if (document.visibilityState === 'hidden') {
+      fermerPeriode();
+      viderFileAnalytique({ beacon: true });
+    } else {
+      ouvrirPeriode();
+    }
   });
 }
 

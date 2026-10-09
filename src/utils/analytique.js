@@ -27,6 +27,9 @@ export const EVENEMENTS = {
   APP_INSTALLEE: 'app_installee',
   APP_MISE_A_JOUR: 'app_mise_a_jour',
   APP_OUVERTE: 'app_ouverte',
+  // Durée d'utilisation, web et app : une période au premier plan (voir
+  // utils/tempsUtilisation.js).
+  TEMPS_UTILISATION: 'temps_utilisation',
 };
 
 const NOMS = new Set(Object.values(EVENEMENTS));
@@ -133,7 +136,7 @@ export const proprietesSures = (props = {}) => {
  * Événement prêt pour l'envoi, ou null si le nom n'est pas déclaré.
  * @param {string} nom
  * @param {object} props
- * @param {{distinctId?: string, appareil?: string, plateforme?: string, build?: number, version?: string, date?: string}} contexte
+ * @param {{distinctId?: string, appareil?: string, session?: string, plateforme?: string, build?: number, version?: string, date?: string}} contexte
  */
 export const construireEvenement = (nom, props = {}, contexte = {}) => {
   if (!evenementValide(nom)) return null;
@@ -154,6 +157,9 @@ export const construireEvenement = (nom, props = {}, contexte = {}) => {
       plateforme: contexte.plateforme || 'web',
       ...(contexte.build ? { build: contexte.build } : {}),
       ...(contexte.appareil ? { $device_id: contexte.appareil } : {}),
+      // Session d'utilisation (UUID v7, tiré au hasard) : PostHog en déduit
+      // le nombre et la durée des sessions.
+      ...(contexte.session ? { $session_id: contexte.session } : {}),
       // Repère PostHog : distingue nos envois de ceux d'un SDK.
       $lib: 'bestasolar-pro',
     },
