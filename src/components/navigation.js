@@ -18,10 +18,11 @@ export const publicNavItems = [
 // après le suivi ; sur mobile, accessible depuis le menu « Plus ».
 export const clientsItem = { path: '/clients', label: 'Clients', icon: Users };
 
+// Même disposition en Pro : « Devis » au centre, avec son « + ».
 export const proNavItems = [
   { path: '/pro', label: 'Tableau de bord', shortLabel: 'Tableau', icon: LayoutDashboard },
-  { path: '/pro/documents', label: 'Devis & Factures', shortLabel: 'Devis', icon: FileText },
   { path: '/pro/clients', label: 'Clients', shortLabel: 'Clients', icon: Users },
+  { path: '/pro/documents', label: 'Devis & Factures', shortLabel: 'Devis', icon: FileText, iconeOnglet: Plus, central: true },
   { path: '/pro/entreprise', label: 'Mon entreprise', shortLabel: 'Entreprise', icon: Building2 },
   { path: '/pro/abonnement', label: 'Mon abonnement', shortLabel: 'Abonnement', icon: CreditCard },
 ];

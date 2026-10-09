@@ -1,7 +1,9 @@
 /* Barre d'onglets mobile : Tableau, Suivi, DEVIS AU CENTRE (un « + » sur
    pastille pleine), Boutique, Plus. Les libellés restent alignés, le « + »
    mène aux devis et s'entoure d'un anneau quand l'onglet est actif ; pendant
-   le chargement d'un écran, la barre est la même. Serveur : npm run dev */
+   le chargement d'un écran, la barre est la même. Espace Pro : même
+   disposition (Tableau, Clients, Devis, Entreprise, Abonnement).
+   Serveur : npm run dev */
 import { chromium } from '@playwright/test';
 const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const R = []; const ok = (c, m) => { R.push(`${c ? '✓ ' : '❌'} ${m}`); return c; };
@@ -45,6 +47,26 @@ await page.goto(B + '/boutique', { waitUntil: 'domcontentloaded' });
 await page.locator('[data-squelette]').first().waitFor({ timeout: 15000 }).catch(() => {});
 const charge = await page.evaluate(() => [...document.querySelectorAll('.tab-bar .tab-item')].map((t) => (t.querySelector('.tab-pastille') ? '+' : '') + t.textContent));
 ok(charge.join(',') === 'Tableau,Suivi,+Devis,Boutique,Plus', `barre pendant le chargement [${charge.join(', ')}]`);
+await page.unroute(/\/src\/screens\/Boutique\.jsx/);
+
+// Espace Pro : même disposition. L'abonnement se prépare depuis une page
+// statique : l'app, absente, ne peut pas réécrire le stockage en partant.
+await page.goto(B + '/privacy.html');
+await page.evaluate(() => {
+  const s = JSON.parse(localStorage.getItem('bestasolar_data'));
+  s.subscriptions = [{ id: 'sub-e2e', userId: 'u1', status: 'actif', formule: 'essentiel', dateDebut: new Date().toISOString(), dateFin: new Date(Date.now() + 30 * 864e5).toISOString() }];
+  localStorage.setItem('bestasolar_data', JSON.stringify(s));
+  localStorage.setItem('bestasolar_mode_u1', 'pro');
+});
+await page.goto(B + '/pro'); await page.locator('.tab-bar').waitFor(); await page.waitForTimeout(1200);
+o = await barre();
+ok(o.map((t) => t.texte).join(',') === 'Tableau,Clients,Devis,Entreprise,Abonnement' && o[2].pastille && o.filter((t) => t.pastille).length === 1,
+  `Pro : Devis au centre avec son « + » [${o.map((t) => (t.pastille ? '+' : '') + t.texte).join(', ')}]`);
+ok(new Set(o.map((t) => t.basLibelle)).size === 1, 'Pro : libellés alignés');
+await page.locator('.tab-bar .tab-central').click(); await page.waitForTimeout(1200);
+ok(new URL(page.url()).pathname === '/pro/documents' && (await barre())[2].actif, `Pro : le « + » mène aux devis et factures [${new URL(page.url()).pathname}]`);
+const bb = await page.locator('.tab-bar').boundingBox();
+await page.screenshot({ path: '/tmp/claude-0/onglets-pro.png', clip: { x: 0, y: bb.y - 40, width: 412, height: bb.height + 40 } });
 await ctx.close();
 
 console.log('\n' + R.join('\n'));
