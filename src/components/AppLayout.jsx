@@ -14,6 +14,7 @@ import NotificationBell from './NotificationBell';
 import GuideNouveauUtilisateur from './GuideNouveauUtilisateur';
 
 import { publicNavItems, proNavItems, clientsItem } from './navigation';
+import IconeOnglet from './IconeOnglet';
 
 // Sous-sections de « Plus » remontées dans la barre latérale (desktop), par rôle.
 // « Mon profil » est rendu à part, en dernier, après le bouton « Passer en mode Pro ».
@@ -250,10 +251,10 @@ export default function AppLayout() {
             // `end` seulement sur la racine Pro : « Plus » doit rester allumé
             // sur toutes ses sous-pages /plus/:section (sinon aucun onglet actif).
             end={item.path === '/pro'}
-            className={({ isActive }) => `tab-item ${isActive ? 'active' : ''}`}
+            className={({ isActive }) => `tab-item ${item.central ? 'tab-central' : ''} ${isActive ? 'active' : ''}`}
             data-guide={item.path === '/pipeline' ? 'suivi' : item.path === '/devis' ? 'devis' : item.path === '/plus' ? 'formation' : undefined}
           >
-            <item.icon size={22} strokeWidth={2} />
+            <IconeOnglet item={item} />
             <span>{item.shortLabel}</span>
           </NavLink>
         ))}

@@ -1,5 +1,6 @@
 import SkeletonPageContent, { EnteteSquelette } from './SkeletonPageContent';
 import { publicNavItems, proNavItems, clientsItem } from './navigation';
+import IconeOnglet from './IconeOnglet';
 import { formeSquelette, estAdressePro, ongletActif } from '../utils/squelette';
 
 /**
@@ -88,8 +89,8 @@ export default function LoadingShell() {
 
       <nav className="tab-bar" aria-hidden="true">
         {onglets.map((item) => (
-          <div key={item.path} className={`tab-item ${ongletActif(item.path, chemin) ? 'active' : ''}`}>
-            <item.icon size={22} strokeWidth={2} />
+          <div key={item.path} className={`tab-item ${item.central ? 'tab-central' : ''} ${ongletActif(item.path, chemin) ? 'active' : ''}`}>
+            <IconeOnglet item={item} />
             <span>{item.shortLabel}</span>
           </div>
         ))}

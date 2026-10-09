@@ -347,6 +347,19 @@ img { max-width: 100%; }
 }
 .tab-item.active span { font-weight: 700; }
 .tab-item span { font-size: 0.6875rem; font-weight: 500; }
+/* Onglet central « Devis » : un « + » blanc sur pastille pleine, légèrement
+   surélevée. La marge négative compense sa hauteur : son libellé reste
+   aligné sur ceux des autres onglets. Actif : un anneau orange à la place
+   du trait du haut, que la pastille recouvrirait. */
+.tab-pastille {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 44px; height: 44px; margin-top: -22px;
+  border-radius: 50%; background: var(--primary); color: #fff;
+  box-shadow: 0 4px 12px rgba(10, 36, 114, 0.3);
+  transition: box-shadow 0.2s ease;
+}
+.tab-item.tab-central.active::before { display: none; }
+.tab-item.tab-central.active .tab-pastille { box-shadow: 0 0 0 3px var(--accent), 0 4px 12px rgba(10, 36, 114, 0.3); }
 
 /* ============ Composants de base ============ */
 
