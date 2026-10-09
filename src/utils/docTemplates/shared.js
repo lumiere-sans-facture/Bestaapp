@@ -114,17 +114,52 @@ export function emetteurDe(source = {}) {
 }
 
 /**
+ * Catégorie d'une ligne (colonne « Cat. » du modèle Sobre) : celle portée par
+ * la ligne si elle existe, sinon déduite de son type de composant ou, à
+ * défaut, de sa désignation. Vide quand rien ne correspond — mieux qu'une
+ * catégorie fausse. L'ordre des motifs compte : « Câble de mise à la terre »
+ * est de la mise à la terre, « Coffret de protection DC/AC » une protection.
+ */
+const CATEGORIES_PAR_TYPE = {
+  batterie: 'Batterie', panneau: 'Panneau', onduleur: 'Onduleur', protection: 'Protection',
+  structure: 'Structure', cablage: 'Câblage', terre: 'Mise à la terre', service: 'Service', prestation: 'Service',
+};
+const CATEGORIES_PAR_MOTIF = [
+  [/\bterre\b|piquet/i, 'Mise à la terre'],
+  [/protection|disjoncteur|parafoudre|fusible|sectionneur|coffret/i, 'Protection'],
+  [/structure|support|\brails?\b|fixation|montage/i, 'Structure'],
+  [/c[âa]bl|connecteur|\bmc4\b|gaine/i, 'Câblage'],
+  [/batter/i, 'Batterie'],
+  [/onduleur|inverter|convertisseur/i, 'Onduleur'],
+  [/panneau|photovolta|module\s+pv/i, 'Panneau'],
+  [/main[\s-]*d.?(?:œ|oe)uvre|installation|\bpose\b|transport|service|maintenance|formation|[ée]tude/i, 'Service'],
+];
+export function categorieLigne({ categorie, type, designation } = {}) {
+  if (categorie) return String(categorie);
+  const parType = CATEGORIES_PAR_TYPE[String(type || '').toLowerCase()];
+  if (parType) return parType;
+  const texte = String(designation || '');
+  return CATEGORIES_PAR_MOTIF.find(([motif]) => motif.test(texte))?.[1] || '';
+}
+
+/**
  * Lignes d'un devis, quelle que soit son origine : lignes déjà saisies (devis
  * Pro ou devis édité), chiffrage solaire (composants + prestations), ou panier
  * de produits. Même normalisation que l'export PDF historique.
  */
 export function lignesDeDevis(devis = {}, products = []) {
   if (Array.isArray(devis.lignes) && devis.lignes.length) {
-    return devis.lignes.map((l) => ({ designation: l.designation, qty: Number(l.qty) || 0, pu: Number(l.pu) || 0 }));
+    return devis.lignes.map((l) => ({
+      designation: l.designation, qty: Number(l.qty) || 0, pu: Number(l.pu) || 0, categorie: categorieLigne(l),
+    }));
   }
   if (devis.quotation) {
-    return [...(devis.quotation.components || []), ...(devis.quotation.prestations || [])].map((c) => ({
+    return [
+      ...(devis.quotation.components || []),
+      ...(devis.quotation.prestations || []).map((c) => ({ type: 'prestation', ...c })),
+    ].map((c) => ({
       designation: c.name, qty: Number(c.quantity) || 0, pu: Number(c.unitPrice) || 0,
+      categorie: categorieLigne({ categorie: c.categorie, type: c.type, designation: c.name }),
     }));
   }
   return (devis.items || []).map(({ productId, qty }) => {
@@ -133,6 +168,7 @@ export function lignesDeDevis(devis = {}, products = []) {
       designation: produit?.name || 'Article',
       qty: Number(qty) || 0,
       pu: Number((devis.unitPrices || {})[productId] ?? (produit ? prixPublic(produit.basePrice) : 0)),
+      categorie: categorieLigne({ designation: produit?.name }),
     };
   });
 }
@@ -149,15 +185,23 @@ export function donneesDeDevis({ devis, company, lead, partner, products = [] })
   const lignes = lignesDeDevis(devis, products);
   const tva = devis.type === 'pro' ? (devis.tva || 0) : (devis.quotation?.tva || 0);
   const client = devis.clientName
-    ? { name: devis.clientName, societe: '', phone: devis.clientPhone || '', adresse: devis.clientVille || '' }
+    ? {
+        name: devis.clientName, societe: '', phone: devis.clientPhone || '', adresse: devis.clientVille || '',
+        email: devis.clientEmail || '', ifu: devis.clientIfu || '', ref: devis.clientId || '',
+      }
     : {
         name: lead?.contact || lead?.name || 'Client',
         societe: lead?.contact && lead?.name !== lead?.contact ? lead.name : '',
         phone: lead?.phone || '',
         adresse: lead?.address || '',
+        email: lead?.email || '', ifu: lead?.ifu || '', ref: lead?.id || devis.leadId || '',
       };
   return {
     numero: devis.devisNumber || '',
+    // Objet du document : saisi, sinon le kit proposé.
+    objet: devis.objet || (devis.kit?.name ? `Installation solaire — ${devis.kit.name}` : ''),
+    livraison: devis.livraison || '',
+    paiement: devis.paiement || '',
     // Date d'émission (modifiable), pas la date de saisie ; la validité en part.
     date: dateEmissionDevis(devis),
     dateSecondaire: dateplusJours(dateEmissionDevis(devis), Number(devis.validiteJours) > 0 ? Number(devis.validiteJours) : 30),
@@ -204,13 +248,21 @@ export const piedApporteur = (data) => {
 
 /** Données de document depuis une facture Pro. */
 export function donneesDeFacture({ facture, company }) {
-  const lignes = (facture.lignes || []).map((l) => ({ designation: l.designation, qty: Number(l.qty) || 0, pu: Number(l.pu) || 0 }));
+  const lignes = (facture.lignes || []).map((l) => ({
+    designation: l.designation, qty: Number(l.qty) || 0, pu: Number(l.pu) || 0, categorie: categorieLigne(l),
+  }));
   return {
     numero: facture.numero || '',
+    objet: facture.objet || '',
+    livraison: facture.livraison || '',
+    paiement: facture.paiement || '',
     date: facture.createdAt,
     dateSecondaire: facture.echeance || null,
     emetteur: emetteurDe(facture.companySnapshot || company || {}),
-    client: { name: facture.clientName || 'Client', societe: '', phone: facture.clientPhone || '', adresse: facture.clientVille || '' },
+    client: {
+      name: facture.clientName || 'Client', societe: '', phone: facture.clientPhone || '', adresse: facture.clientVille || '',
+      email: facture.clientEmail || '', ifu: facture.clientIfu || '', ref: facture.clientId || '',
+    },
     lignes,
     totaux: totauxDe(lignes, { tva: facture.tva || 0, tvaActive: !!facture.tvaActive }),
     apporteur: null,
@@ -294,7 +346,7 @@ const CSS_BASE = `
   .push { margin-top: auto; }
   .print-bar { width: 794px; margin: 32px auto 0; display: flex; justify-content: flex-end; }
   /* Chrome de la page, hors document : gris neutre, pour qu'aucune couleur de
-     marque ne s'invite dans un modèle qui n'en emploie pas (Classique). */
+     marque ne s'invite dans un modèle qui n'en emploie pas (Sobre). */
   .print-btn {
     font-family: inherit; font-size: 13px; font-weight: 600; color: #fff;
     background: #212529; border: none; border-radius: 4px; padding: 12px 24px; cursor: pointer;

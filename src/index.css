@@ -2732,6 +2732,18 @@ form .login-link { width: 100%; margin-top: 4px; }
 .fp-total { display: flex; justify-content: space-between; color: white; font-weight: 700; margin: 10px 14px; padding: 7px 10px; border-radius: 5px; }
 .fp-footer { text-align: center; font-weight: 700; color: var(--text-secondary); padding: 4px 0 10px; font-size: 0.625rem; }
 .fp-bar { height: 8px; }
+/* Modèle Sobre : la palette du document (noir, blanc, gris), sans logo ni aplat. */
+.fp-sheet.fp-sobre { color: #222222; }
+.fp-sobre .fp-head-sobre { border-bottom-color: #111111; }
+.fp-sobre .fp-name { color: #111111; text-transform: uppercase; letter-spacing: 2px; }
+.fp-sobre .fp-title { color: #111111; letter-spacing: 1px; font-weight: 600; }
+.fp-sobre .fp-slogan { color: #444444; opacity: 1; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; font-size: 0.5625rem; }
+.fp-sobre .fp-coord { color: #333333; border-bottom-color: #e3e3e3; }
+.fp-sobre .fp-label, .fp-sobre .fp-muted { color: #666666; }
+.fp-sobre .fp-thead { background: #e3e3e3; color: #111111; border: 2px solid #111111; border-radius: 0; }
+.fp-sobre .fp-trow { border-bottom: 1px dashed #555555; }
+.fp-sobre .fp-total { background: #ffffff; color: #111111; border: 2px solid #111111; border-radius: 0; }
+.fp-sobre .fp-footer { color: #333333; font-weight: 400; }
 
 /* Mise en avant de l'option de dimensionnement (choix du type de devis) */
 .devis-mode-card { position: relative; }

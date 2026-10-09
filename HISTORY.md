@@ -6,6 +6,13 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-09
+- **Espace Pro : le modèle « Sobre » remplace « Classique ».** Le troisième modèle de devis et de facture devient un document noir, blanc et gris, sans logo, qui s'imprime à l'identique en noir et blanc. Les espaces Pro gardent trois modèles — Studio, Vague, Sobre — et une entreprise ou une facture restée sur « Classique » s'ouvre d'elle-même en Sobre (sélecteurs, formulaire et document compris). Le document :
+  - en-tête : nom de l'entreprise en capitales et slogan à gauche ; à droite le titre, puis en italique le numéro, la validité du devis (« Valable jusqu'au … ») ou l'échéance de la facture (« Payable au … », ou « à réception »), et la date ;
+  - bloc client sur deux colonnes : Client, IFU, Adresse, Objet, Tél, Email (« — » quand l'information manque) ; Client ID, Livraison, Paiement, Devise « Franc CFA » ;
+  - tableau `#` · **Cat.** · Désignation · Qté · Prix unitaire · Prix total : en-tête gris encadré, répété sur chaque page ; lignes de 40 px séparées en pointillés ; la catégorie (Panneau, Onduleur, Batterie, Protection, Structure, Câblage, Mise à la terre, Service) se déduit de l'article ;
+  - cadre Conditions / Sous-total HT · TVA · TOTAL (F CFA), signature, pied de trois lignes : sur la dernière page seulement. Un seul numéro, pas de montant en toutes lettres ;
+  - le dossier type (9 lignes, 1 200 000 F CFA) tient sur une page, sans débordement ni désignation coupée.
+  L'aperçu en direct de « Mon entreprise » et l'annexe « Ajustements du kit » suivent la même palette. Tests : couleurs autorisées seulement, somme des lignes = total affiché, pagination à 20 lignes, colonne Cat. remplie. Parcours `e2e/modele-sobre.mjs` (17 vérifications).
 - **Devis : télécharger le PDF, l'envoyer sur WhatsApp, et sa fiche de dimensionnement — directement dans l'application.** Le « Devis imprimable » ouvrait un onglet à exporter soi-même par « Imprimer », et la fiche un nouvel onglet : impossible à envoyer tel quel, et inopérant dans l'application Android. Le PDF est désormais composé dans l'app (mêmes pages A4 que le document) et :
   - **téléchargé d'un toucher**, depuis la fiche du devis ou par une icône sur **chaque ligne** de la liste ; dans l'application Android, il est rangé dans `Documents/BestaSolar` ;
   - **envoyé sur WhatsApp avec le PDF joint** : le menu de partage s'ouvre (WhatsApp, puis le client), message de présentation compris ; sur ordinateur, le PDF est téléchargé et WhatsApp s'ouvre sur la conversation du client, prête à recevoir le fichier ;

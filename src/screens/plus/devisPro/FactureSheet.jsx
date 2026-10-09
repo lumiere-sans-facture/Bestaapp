@@ -9,7 +9,7 @@ import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
 import LigneEditor from '../../../components/LigneEditor';
 import TvaToggle from '../../../components/TvaToggle';
-import { MODELES, EMPTY_LIGNE } from './constants';
+import { MODELES, EMPTY_LIGNE, normalizeModele } from './constants';
 
 const emptyForm = (tvaActive, modele) => ({
   clientName: '', clientPhone: '', clientVille: '', echeance: '',
@@ -18,7 +18,9 @@ const emptyForm = (tvaActive, modele) => ({
 const formFromFacture = (f, modeleDefaut) => ({
   clientName: f.clientName || '', clientPhone: f.clientPhone || '', clientVille: f.clientVille || '',
   echeance: f.echeance ? f.echeance.slice(0, 10) : '',
-  tvaActive: !!f.tvaActive, modele: f.modele || modeleDefaut,
+  // Une facture réglée sur un modèle retiré (« classique » → Sobre) s'ouvre
+  // sur son remplaçant : sinon le menu, sans option correspondante, afficherait Studio.
+  tvaActive: !!f.tvaActive, modele: f.modele ? normalizeModele(f.modele) : modeleDefaut,
   lignes: (f.lignes || []).length ? f.lignes.map((l) => ({ designation: l.designation, qty: l.qty, pu: l.pu })) : [{ ...EMPTY_LIGNE }],
 });
 
