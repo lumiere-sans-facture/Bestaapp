@@ -23,6 +23,7 @@ import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../compon
 import AjustementsKit from '../../../components/AjustementsKit';
 import { signalerErreur } from '../../../lib/rapportErreur';
 import { enregistrerFichePdf } from '../../../lib/fichiers';
+import { materielCalcule } from '../../../utils/sizingSheet/donnees';
 import { useToast } from '../../../components/Toast';
 import {
   capturerDimensionnement, restaurerDimensionnement, prochainRowId,
@@ -350,12 +351,13 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     setFicheEnCours(true);
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
     const villeFiche = location?.name || client.ville || null;
-    const ficheInverter = proposalMode === 'kit'
-      ? (kitQuotation?.inverterSuggested || (selectedKit ? { model: `Onduleur du kit ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter } : null))
-      : inverter;
-    const ficheBatteries = proposalMode === 'kit' && selectedKit
-      ? [{ model: `Batterie du kit ${selectedKit.name}`, capacity: kitQuotation?.batteryCapacity ?? selectedKit.battery, qty: 1 }]
-      : batteryList;
+    // La fiche présente le DIMENSIONNEMENT : en proposition par kit, elle
+    // donne le matériel que le calcul prescrit, pas celui du kit — le kit
+    // n'apparaît que sur le devis. Hors kit, c'est le matériel choisi à
+    // l'étape Matériel de ce même dimensionnement.
+    const materiel = proposalMode === 'kit'
+      ? materielCalcule(sizing)
+      : { inverter, batteries: batteryList };
     await enregistrerFichePdf({
       // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
       // coordonnées), comme ses devis et ses factures.
@@ -370,9 +372,8 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
       cityCountry: location?.country || '',
       solarSource: solar?.source || null,
       sizing,
-      inverter: ficheInverter,
-      batteries: ficheBatteries,
-      panelName: proposalMode === 'kit' && selectedKit ? `Panneau ${selectedKit.panelW} Wc` : panelName,
+      ...materiel,
+      panelName,
       // Rentabilité (page 3) : total du devis par défaut, surchargeable
       // champ par champ dans « Paramètres de rentabilité » ci-dessous.
       investissement: Number(renta.investissement) > 0 ? Number(renta.investissement) : (totals.totalTTC || null),

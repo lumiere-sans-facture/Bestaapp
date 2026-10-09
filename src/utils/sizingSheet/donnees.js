@@ -26,6 +26,18 @@ export function consommationEtude({ consoMode, rows = [], manual = {}, facture =
 export const picDeCharge = (rows = []) => rows.reduce((s, r) => s + r.power * r.quantity, 0);
 
 /**
+ * Matériel de la fiche : celui que le CALCUL prescrit (calibre d'onduleur,
+ * parc batterie), jamais celui d'un kit. La fiche présente le dimensionnement ;
+ * le kit, lui, n'apparaît que sur le devis.
+ */
+export const materielCalcule = (sizing) => ({
+  inverter: sizing.inverter
+    ? { capacity: sizing.inverter.capacity, maxPvPower: sizing.inverter.maxPvPower || null, quantite: sizing.inverterQuantite }
+    : null,
+  batteries: (sizing.batteries || []).map((b) => ({ capacity: b.capacity, qty: b.quantity })),
+});
+
+/**
  * Données de la fiche (contrat de buildSizingSheetHtml / construireFichePdf).
  * Seules les grandeurs techniques du calcul sont transmises : les marques du
  * catalogue interne (onduleur, batteries) n'apparaissent jamais.
@@ -46,8 +58,7 @@ export function donneesFiche({
     cityCountry: location?.country || '',
     solarSource,
     sizing,
-    inverter: { capacity: sizing.inverter.capacity, maxPvPower: sizing.inverter.maxPvPower || null, quantite: sizing.inverterQuantite },
-    batteries: sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
+    ...materielCalcule(sizing),
     panelName: `Panneau photovoltaïque ${sizing.panelWc}W`,
     // Rentabilité (page 3) : l'investissement estimé = total du devis.
     investissement: investissement || null,

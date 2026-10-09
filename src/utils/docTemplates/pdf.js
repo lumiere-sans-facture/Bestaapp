@@ -6,7 +6,7 @@
 // 794 × 1123 px (A4) : le moteur de la fiche de dimensionnement (pdfDepuisHtml)
 // les convertit telles quelles, une page HTML donnant une page PDF.
 import { buildDocHtml, MODEL_DEFAUT } from './index';
-import { donneesDeDevis } from './shared';
+import { donneesDeDevis, donneesDeFacture } from './shared';
 import { pdfDepuisHtml } from '../sizingSheet/pdf';
 import { nomFichierPdf } from '../nomFichier';
 
@@ -29,5 +29,24 @@ export async function construireDevisPdf({ devis, company, lead = null, partner 
     auteur: company?.nomEntreprise || company?.name || 'BestaSolar',
     // Nom de fichier : c'est ce que le client verra dans WhatsApp.
     nom: nomFichierPdf('Devis', data.numero, client),
+  });
+}
+
+/**
+ * Facture Pro en vrai PDF, au modèle choisi.
+ * @param {object} o
+ * @param {object} o.facture
+ * @param {object} o.company   entreprise de l'abonné
+ * @param {string} [o.model]
+ * @returns {Promise<{blob: Blob, url: string, nom: string, pages: number}>}
+ */
+export async function construireFacturePdf({ facture, company, model = MODEL_DEFAUT }) {
+  const data = donneesDeFacture({ facture, company });
+  const client = data.client?.name && data.client.name !== 'Client' ? data.client.name : '';
+  return pdfDepuisHtml(buildDocHtml({ kind: 'facture', model, data }), {
+    titre: `Facture ${data.numero}${client ? ` — ${client}` : ''}`.trim(),
+    sujet: 'Facture',
+    auteur: company?.nomEntreprise || 'BestaSolar',
+    nom: nomFichierPdf('Facture', data.numero, client),
   });
 }

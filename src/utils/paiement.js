@@ -100,6 +100,26 @@ export const relanceMessage = (f, company) => {
   return lines.join('\n');
 };
 
+/**
+ * Message qui accompagne la facture envoyée en PDF (fichier joint) : il la
+ * présente ; ce qui reste dû et comment régler, seulement s'il reste à payer.
+ */
+export const factureEnvoiMessage = (f, company) => {
+  const reste = resteAPayer(f);
+  const lines = [
+    f?.clientName ? `Bonjour ${f.clientName},` : 'Bonjour,',
+    `Veuillez trouver ci-joint votre facture ${f?.numero || ''} d'un montant de ${nf(f?.totalTTC || 0)} F CFA.`.replace(/\s+d'un/, " d'un"),
+  ];
+  if (f?.statut === 'payee' || (reste <= 0 && f?.statut !== 'brouillon')) lines.push('Elle est intégralement réglée.');
+  else {
+    if (reste < (Number(f?.totalTTC) || 0)) lines.push(`Reste à régler : ${nf(reste)} F CFA.`);
+    if (f?.echeance) lines.push(`À régler avant le ${new Date(f.echeance).toLocaleDateString('fr-FR')}.`);
+    if (company?.momo) lines.push(`Règlement Mobile Money : ${company.momo}${company.momoNom ? ` (${company.momoNom})` : ''}.`);
+  }
+  lines.push('Merci de votre confiance.', company?.nomEntreprise || 'BestaSolar');
+  return lines.join('\n');
+};
+
 /** Lien WhatsApp pré-rempli (numéro normalisé en chiffres, indicatif compris). */
 export const whatsappLink = (phone, text) => {
   const num = String(phone || '').replace(/\D/g, '');

@@ -1,35 +1,6 @@
-// Ouverture des documents Pro (devis / facture) à l'identité de l'abonné.
-// Les documents sont des pages HTML autonomes imprimables (export PDF par
-// Ctrl+P) construites par src/utils/docTemplates ; le modèle est celui choisi
-// pour le document, à défaut celui réglé sur l'entreprise.
-
-/** Devis à l'identité Pro. */
-export async function exportDevisProPdf(d, modele, { company, lead, products, markDevisPro }) {
-  const [{ openDoc, normaliserModel }, { donneesDeDevis }] = await Promise.all([
-    import('../../../utils/docTemplates'),
-    import('../../../utils/docTemplates/shared'),
-  ]);
-  const model = normaliserModel(modele);
-  markDevisPro(d.id, { modele: model, companySnapshot: company });
-  openDoc({
-    kind: 'devis',
-    model,
-    data: donneesDeDevis({ devis: d, company, lead, products }),
-  });
-}
-
-/** Facture à l'identité Pro (snapshot d'entreprise figé à la création). */
-export async function exportFacturePdf(f, modele, { company, modeleDefaut }) {
-  const [{ openDoc, normaliserModel }, { donneesDeFacture }] = await Promise.all([
-    import('../../../utils/docTemplates'),
-    import('../../../utils/docTemplates/shared'),
-  ]);
-  openDoc({
-    kind: 'facture',
-    model: normaliserModel(modele || f.modele || modeleDefaut),
-    data: donneesDeFacture({ facture: f, company }),
-  });
-}
+// Aperçu imprimable d'un modèle de document Pro (réglages de « Mon
+// entreprise »). Les devis et factures eux-mêmes se produisent en PDF dans
+// l'application : voir useDocumentsPro.
 
 /** Aperçu d'un modèle avec un jeu d'exemple (réglages de l'entreprise). */
 export async function previewDocument(company, modele, lignes, kind = 'facture') {

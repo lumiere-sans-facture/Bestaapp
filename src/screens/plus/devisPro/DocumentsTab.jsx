@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, ChevronRight, Search, CheckCircle, Pencil, Wallet, Send, SlidersHorizontal } from 'lucide-react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, ChevronRight, Search, CheckCircle, Pencil, Wallet, Send, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { dateEmissionDevis } from '../../../utils/dateEmission';
@@ -10,7 +10,8 @@ import {
   resteAPayer, montantPaye, isEnRetard, joursRetard, joursAvantEcheance,
   relanceMessage, whatsappLink,
 } from '../../../utils/paiement';
-import { exportDevisProPdf, exportFacturePdf } from './proPdf';
+import { useDocumentsPro } from './useDocumentsPro';
+import EnvoiPdfSheet from '../../../components/EnvoiPdfSheet';
 import { MODELES } from './constants';
 import FactureSheet from './FactureSheet';
 import PaiementSheet from './PaiementSheet';
@@ -34,7 +35,10 @@ const DEVIS_FILTERS = [['all', 'Tous'], ['brouillon', 'Brouillons'], ['tofacture
  *  cartes cliquables ouvrant un menu d'actions. */
 export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const { user } = useAuth();
-  const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, addPaiement, addRelance, markDevisPro, updateDevis, deleteDevis } = useData();
+  const { devis, products, factures, getLeadById, addFacture, updateFacture, deleteFacture, addPaiement, addRelance, updateDevis, deleteDevis } = useData();
+  // PDF des devis et factures, produits dans l'application (téléchargés ou
+  // envoyés sur WhatsApp, fichier joint).
+  const docs = useDocumentsPro({ company, modeleDefaut });
 
   const [tab, setTab] = useState('devis'); // devis | factures — ouvre sur les devis
   const [view, setView] = useState('list'); // list | create
@@ -44,9 +48,10 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
   const [actions, setActions] = useState(null); // { kind:'facture'|'devis', doc }
-  // Modèle retenu pour le document qu'on s'apprête à ouvrir (défaut : réglage entreprise).
+  // Modèle retenu pour le document ouvert : choisi ici, sinon celui qu'il
+  // porte (formulaire de facture, dernier envoi du devis), sinon celui de l'entreprise.
   const [modeleChoisi, setModeleChoisi] = useState(null);
-  const modeleActif = modeleChoisi || modeleDefaut;
+  const modeleActif = modeleChoisi || docs.modeleDe(actions?.doc);
   const [editDevis, setEditDevis] = useState(null);
   const [devisAModifier, setDevisAModifier] = useState(null);
   const [factureEdit, setFactureEdit] = useState(null);
@@ -313,6 +318,14 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                     </div>
                   </div>
                   <div className="flat-row-amount">{formatCFA(f.totalTTC)}</div>
+                  {/* Téléchargement direct, sans ouvrir la facture. */}
+                  <button type="button" className="flat-row-action"
+                    aria-label={`Télécharger la facture ${f.numero || ''} en PDF`} title="Télécharger le PDF"
+                    disabled={!!docs.enCours}
+                    onClick={(e) => { e.stopPropagation(); docs.telechargerFacture(f); }}
+                    onKeyDown={(e) => e.stopPropagation()}>
+                    {docs.occupe(f, 'facture') ? <Loader2 size={18} className="tourne" /> : <Download size={18} />}
+                  </button>
                 </div>
               );
             })}
@@ -347,6 +360,13 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
                     </div>
                   </div>
                   <div className="flat-row-amount">{formatCFA(d.total)}</div>
+                  <button type="button" className="flat-row-action"
+                    aria-label={`Télécharger le devis ${d.devisNumber || ''} en PDF`} title="Télécharger le PDF"
+                    disabled={!company?.nomEntreprise || !!docs.enCours}
+                    onClick={(e) => { e.stopPropagation(); docs.telechargerDevis(d); }}
+                    onKeyDown={(e) => e.stopPropagation()}>
+                    {docs.occupe(d, 'devis') ? <Loader2 size={18} className="tourne" /> : <Download size={18} />}
+                  </button>
                 </div>
               );
             })}
@@ -361,7 +381,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       )}
 
       {/* Menu d'actions (facture ou devis) */}
-      <Sheet open={!!actions} onClose={() => setActions(null)} title={actions ? (actions.kind === 'facture' ? actions.doc.numero : actions.doc.devisNumber) : ''}>
+      <Sheet open={!!actions} onClose={() => { setActions(null); setModeleChoisi(null); }} title={actions ? (actions.kind === 'facture' ? actions.doc.numero : actions.doc.devisNumber) : ''}>
         {actionFacture && (() => {
           const eff = statutEffectif(actionFacture);
           const reste = resteAPayer(actionFacture);
@@ -391,8 +411,15 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               <div className="sheet-row"><span className="sheet-label">Dernière relance</span><span className="sheet-value">{formatDate(actionFacture.derniereRelance)}</span></div>
             )}
             <SelecteurModele />
-            <button className="btn btn-primary btn-block" onClick={() => runAction(() => exportFacturePdf(actionFacture, modeleActif, { company, modeleDefaut }))}>
-              <Download size={16} /> Facture imprimable (PDF)
+            <button className="btn btn-primary btn-block" disabled={!!docs.enCours} onClick={() => docs.telechargerFacture(actionFacture, modeleActif)}>
+              {docs.occupe(actionFacture, 'facture') ? <Loader2 size={16} className="tourne" /> : <Download size={16} />}
+              {docs.occupe(actionFacture, 'facture') ? 'Préparation du PDF…' : 'Télécharger la facture (PDF)'}
+            </button>
+            {/* Le PDF part JOINT : le menu de partage s'ouvre, on choisit
+                WhatsApp puis le client. (La relance, plus bas, n'est qu'un message.) */}
+            <button className="btn btn-whatsapp btn-block" disabled={!!docs.enCours} onClick={() => docs.envoyerFacture(actionFacture, modeleActif)}>
+              {docs.occupe(actionFacture, 'whatsapp') ? <Loader2 size={16} className="tourne" /> : <Send size={16} />}
+              {docs.occupe(actionFacture, 'whatsapp') ? 'Préparation du PDF…' : 'Envoyer la facture sur WhatsApp'}
             </button>
             {actionFacture.statut !== 'payee' && reste > 0 && (
               <button className="btn btn-won btn-block" onClick={() => { setPayFacture(actionFacture); setActions(null); }}>
@@ -439,8 +466,13 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               <div className="sheet-row"><span className="sheet-label">Facturé</span><span className="sheet-value">{factureByDevis.get(actions.doc.id).numero}</span></div>
             )}
             <SelecteurModele />
-            <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise} onClick={() => runAction(() => exportDevisProPdf(actions.doc, modeleActif, { company, lead: getLeadById(actions.doc.leadId), products, markDevisPro }))}>
-              <Download size={16} /> Devis imprimable (PDF)
+            <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise || !!docs.enCours} onClick={() => docs.telechargerDevis(actions.doc, modeleActif)}>
+              {docs.occupe(actions.doc, 'devis') ? <Loader2 size={16} className="tourne" /> : <Download size={16} />}
+              {docs.occupe(actions.doc, 'devis') ? 'Préparation du PDF…' : 'Télécharger le devis (PDF)'}
+            </button>
+            <button className="btn btn-whatsapp btn-block" disabled={!company?.nomEntreprise || !!docs.enCours} onClick={() => docs.envoyerDevis(actions.doc, modeleActif)}>
+              {docs.occupe(actions.doc, 'whatsapp') ? <Loader2 size={16} className="tourne" /> : <Send size={16} />}
+              {docs.occupe(actions.doc, 'whatsapp') ? 'Préparation du PDF…' : 'Envoyer le devis sur WhatsApp'}
             </button>
             <button className="btn btn-outline btn-block" onClick={() => { setEditDevis(actions.doc); setActions(null); }}>
               <Pencil size={16} /> Modifier le devis
@@ -488,6 +520,11 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         initial={factureEdit}
         onSubmit={submitFacture}
       />
+
+      <EnvoiPdfSheet envoi={docs.envoiPret}
+        titre={docs.envoiPret?.nature === 'facture' ? 'Envoyer la facture' : 'Envoyer le devis'}
+        libelle={docs.envoiPret?.nature === 'facture' ? 'de la facture' : 'du devis'}
+        onPartager={docs.partagerMaintenant} onFermer={docs.fermerEnvoi} />
 
       <PaiementSheet open={!!payFacture} onClose={() => setPayFacture(null)} facture={payFactureLive} onSubmit={submitPaiement} />
 

@@ -2,17 +2,18 @@
    Une entreprise et une facture restées réglées sur « classique » s'ouvrent
    en Sobre : sélecteurs Studio / Vague / Sobre (Sobre actif) dans Mon
    entreprise, dans la fiche d'une facture et dans son formulaire ; la
-   facture imprimable du dossier Felix Sossa (9 lignes, 1 200 000 F CFA)
+   facture du dossier Felix Sossa (9 lignes, 1 200 000 F CFA), téléchargée en PDF,
    tient sur UNE page, sans débordement, sans désignation sur deux lignes,
    avec de l'air au-dessus du pied, en noir, blanc et gris seulement.
    Serveur : npm run dev */
 import { chromium } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const R = []; const ok = (c, m) => { R.push(`${c ? '✓ ' : '❌'} ${m}`); return c; };
 const B = 'http://localhost:3000';
 const GERANT = { id: 'u1', email: 'adam@bestasolar.tg', name: 'Adam', role: 'gerant', phone: '+228', avatar: 'A' };
 
-const ctx = await nav.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2 });
+const ctx = await nav.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2, acceptDownloads: true });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => R.push('❌ ERREUR JS : ' + e));
 await page.goto(B + '/');
@@ -71,9 +72,24 @@ await page.locator('[aria-labelledby="doc-modele-label"]').waitFor();
 s = await segments('[aria-labelledby="doc-modele-label"]');
 ok(s === 'Studio Vague [Sobre]', `fiche de la facture : ${s}`);
 
-const [doc] = await Promise.all([ctx.waitForEvent('page'), page.getByRole('button', { name: /Facture imprimable/ }).click()]);
-await doc.waitForLoadState('load'); await doc.evaluate(() => document.fonts.ready); await doc.waitForTimeout(500);
+// La facture se télécharge en PDF (une page = une page du document) ; sa
+// mise en page se mesure sur le document dont ce PDF est la copie (même HTML).
+const [pdf] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('button', { name: /Télécharger la facture \(PDF\)/ }).click()]);
+const octets = readFileSync(await pdf.path()).toString('latin1');
+ok(octets.startsWith('%PDF') && (octets.match(/\/Type\s*\/Page[^s]/g) || []).length === 1, `facture téléchargée en PDF d'une page [${pdf.suggestedFilename()}]`);
+const html = await page.evaluate(async () => {
+  const s = JSON.parse(localStorage.getItem('bestasolar_data'));
+  const f = s.factures.find((x) => x.numero === 'FAC-2026-014');
+  const company = s.companies.find((c) => c.userId === 'u1');
+  const [{ buildDocHtml, normaliserModel }, { donneesDeFacture }] = await Promise.all([
+    import('/src/utils/docTemplates/index.js'), import('/src/utils/docTemplates/shared.js'),
+  ]);
+  return buildDocHtml({ kind: 'facture', model: normaliserModel(f.modele), data: donneesDeFacture({ facture: f, company }) });
+});
+const doc = await ctx.newPage();
 await doc.setViewportSize({ width: 900, height: 1250 });
+await doc.goto(B + '/privacy.html'); // même origine : la police du document se charge
+await doc.setContent(html, { waitUntil: 'load' }); await doc.evaluate(() => document.fonts.ready); await doc.waitForTimeout(500);
 const m = await doc.evaluate(() => {
   const pages = [...document.querySelectorAll('.page')];
   const pg = pages[0];
@@ -119,7 +135,7 @@ await doc.pdf({ path: '/tmp/claude-0/modele-sobre-facture.pdf', format: 'A4', pr
 await doc.close();
 
 // 3. Formulaire de la facture : le menu montre Sobre, pas Studio par défaut.
-// (L'export a refermé la fiche : on la rouvre.)
+// (Rouverte si besoin.)
 if (!(await page.getByRole('button', { name: /Modifier la facture/ }).isVisible())) await page.getByText('FAC-2026-014 - Felix Sossa').click();
 await page.getByRole('button', { name: /Modifier la facture/ }).click();
 const menu = page.locator('select').filter({ has: page.locator('option[value="sobre"]') }).first();

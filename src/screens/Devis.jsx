@@ -18,6 +18,7 @@ import { useToast } from '../components/Toast';
 import DevisCreator from './devis/DevisCreator';
 import DevisEditSheet from './devis/DevisEditSheet';
 import { useDocumentsDevis } from './devis/useDocumentsDevis';
+import EnvoiPdfSheet from '../components/EnvoiPdfSheet';
 
 
 
@@ -319,32 +320,8 @@ export default function Devis() {
             </div>
           )}
         </Sheet>
-        {/* PDF prêt : le navigateur réclame un nouveau toucher pour partager,
-            ou (ordinateur) ne sait pas joindre un fichier — il vient alors
-            d'être téléchargé, et WhatsApp s'ouvre sur la conversation. */}
-        <Sheet open={!!docs.envoiPret} onClose={docs.fermerEnvoi} title="Envoyer le devis">
-          {docs.envoiPret && (
-            <div className="doc-actions-list">
-              {docs.envoiPret.mode === 'partage' ? (
-                <>
-                  <p className="field-hint">Le PDF du devis est prêt.</p>
-                  <button className="btn btn-whatsapp btn-block" onClick={docs.partagerMaintenant}><Send size={16} /> Envoyer sur WhatsApp</button>
-                </>
-              ) : (
-                <>
-                  <p className="field-hint">
-                    Le PDF « {docs.envoiPret.nom} » vient d’être téléchargé. Ouvrez la conversation,
-                    puis joignez-y le fichier (trombone ou glisser-déposer).
-                  </p>
-                  <a className="btn btn-whatsapp btn-block" href={whatsappLink(docs.envoiPret.telephone, docs.envoiPret.texte)}
-                    target="_blank" rel="noopener noreferrer" onClick={docs.fermerEnvoi}>
-                    <Send size={16} /> Ouvrir WhatsApp
-                  </a>
-                </>
-              )}
-            </div>
-          )}
-        </Sheet>
+        <EnvoiPdfSheet envoi={docs.envoiPret} titre="Envoyer le devis" libelle="du devis"
+          onPartager={docs.partagerMaintenant} onFermer={docs.fermerEnvoi} />
         <ConfirmSheet
           open={!!confirmVente}
           onClose={() => setConfirmVente(null)}

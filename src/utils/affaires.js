@@ -252,8 +252,10 @@ export function devisRelanceMessage(devis, lead = null) {
 /**
  * Message qui accompagne le devis envoyé en PDF sur WhatsApp. Le fichier est
  * joint : le message le présente au lieu de le résumer.
+ * @param {string} [signature] entreprise émettrice — celle de l'abonné Pro ;
+ *   BestaSolar par défaut.
  */
-export function devisEnvoiMessage(devis, lead = null) {
+export function devisEnvoiMessage(devis, lead = null, signature = COMPANY.name) {
   const nom = lead?.contact || lead?.name || devis?.clientName || '';
   const fin = dateExpiration(devis);
   const lines = [
@@ -261,7 +263,7 @@ export function devisEnvoiMessage(devis, lead = null) {
     `Veuillez trouver ci-joint votre devis ${devis?.devisNumber || ''} d'un montant de ${formatCFA(devis?.total)}.`.replace(/\s+d'un/, " d'un"),
   ];
   if (fin) lines.push(`Il est valable jusqu'au ${new Date(`${fin}T00:00:00`).toLocaleDateString('fr-FR')}.`);
-  lines.push('Nous restons à votre disposition pour toute question.', COMPANY.name);
+  lines.push('Nous restons à votre disposition pour toute question.', signature || COMPANY.name);
   return lines.join('\n');
 }
 
