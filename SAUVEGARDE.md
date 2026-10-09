@@ -1,5 +1,9 @@
 # Sauvegarde automatique quotidienne
 
+Une deuxième sauvegarde SQL + Auth + Storage chiffrée est décrite dans
+[SAUVEGARDE-COMPLETE.md](SAUVEGARDE-COMPLETE.md). Sa mise en service et sa recette
+sont distinctes. Les exclusions ci-dessous concernent cet export JSON métier.
+
 Chaque nuit à **02h17** (heure de Lomé), la base Supabase de **production** est
 exportée dans un fichier JSON déposé sur un dépôt GitHub **privé**. Sept
 sauvegardes sont conservées : la plus ancienne est supprimée à chaque dépôt.
