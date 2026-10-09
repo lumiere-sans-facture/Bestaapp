@@ -44,6 +44,8 @@ self.addEventListener('fetch', (e) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // Supabase & co : jamais interceptés
+  // Lien de l'APK : une redirection vers GitHub, que le navigateur suit seul.
+  if (url.pathname === '/telecharger') return;
 
   // Page de l'app : réseau d'abord (fraîcheur), cache en secours (hors-ligne).
   if (request.mode === 'navigate') {

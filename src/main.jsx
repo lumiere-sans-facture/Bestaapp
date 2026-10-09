@@ -4,7 +4,13 @@ import './purgeDemarrage'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { CHEMIN_TELECHARGEMENT, URL_APK } from './config/android'
 import './index.css'
+
+// Lien de téléchargement de l'APK sur notre domaine. En production, Vercel
+// le redirige avant même de servir l'app (vercel.json) ; ici, le renvoi de
+// secours, pour un serveur qui servirait l'app à sa place.
+if (location.pathname === CHEMIN_TELECHARGEMENT) location.replace(URL_APK)
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

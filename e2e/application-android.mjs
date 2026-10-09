@@ -1,6 +1,6 @@
 /* Page d'accueil : section « Application Android » — logo Android (pas le
-   Play Store), téléchargement direct de l'APK à l'adresse fixe de la
-   dernière Release, version / taille / date lues sur GitHub (simulé ici).
+   Play Store), téléchargement par notre domaine (/telecharger, redirigé vers
+   la dernière Release), version / taille / date lues sur GitHub (simulé ici).
    Si le serveur a été lancé avec VITE_ANDROID_BUILD (ex. 5), vérifie aussi
    le bandeau « Nouvelle version » de l'app installée (Capacitor simulé).
    Lancer `npm run dev` à côté. */
@@ -9,6 +9,7 @@ const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1
 const R = []; const ok = (c, m) => { R.push(`${c ? '✓ ' : '❌'} ${m}`); return c; };
 const B = 'http://localhost:3000';
 const URL_APK = 'https://github.com/lumiere-sans-facture/Bestaapp/releases/latest/download/BestaSolar.apk';
+const LIEN = '/telecharger'; // sur notre domaine ; Vercel le redirige vers URL_APK
 const RELEASE = { tag_name: 'android-245', name: 'BestaSolar Android 1.1.0 (build 245)', published_at: '2026-10-07T16:00:00Z', assets: [{ name: 'BestaSolar.apk', size: 8808038 }] };
 const simulerGithub = (ctx) => ctx.route('https://api.github.com/repos/lumiere-sans-facture/Bestaapp/releases/latest', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(RELEASE) }));
 
@@ -23,11 +24,17 @@ await section.scrollIntoViewIfNeeded(); await page.waitForTimeout(800);
 const texte = (await section.innerText()).replace(/\s+/g, ' ');
 ok(await section.locator('svg[aria-label="Android"]').count() === 1, 'logo Android affiché');
 ok(/sans passer par le Play Store/.test(texte) && !/Disponible sur Google Play|Google Play Store/.test(texte), 'APK direct, sans badge Play Store');
-ok(await section.locator(`a[href="${URL_APK}"]`).count() === 1, 'bouton « Télécharger l’APK » vers la dernière Release');
+ok(await section.locator(`a[href="${LIEN}"]`).count() === 1, 'bouton « Télécharger l’APK » sur notre domaine (/telecharger)');
 ok(/Version 1\.1\.0 · build 245 · 8,4 Mo · mise à jour le 7 octobre 2026/.test(texte), `version, taille et date lues sur GitHub [${/Version[^·]*·[^·]*·[^·]*·[^·]*/.exec(texte)?.[0]}]`);
 ok(await page.locator('a[href="#application"]').count() >= 1, 'lien « Application » dans le menu de la page d’accueil');
 ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'section lisible sur mobile, sans débordement');
 await section.screenshot({ path: '/tmp/claude-0/application-android.png' });
+
+// Le lien lui-même : sans Vercel (serveur de développement), l'app fait le
+// même renvoi vers le dernier APK. GitHub est simulé.
+await ctx.route(URL_APK, (r) => r.fulfill({ status: 200, contentType: 'text/plain', body: 'apk' }));
+await page.goto(B + LIEN); await page.waitForURL(URL_APK, { timeout: 10000 }).catch(() => {});
+ok(page.url() === URL_APK, `/telecharger mène au dernier APK [${page.url()}]`);
 await ctx.close();
 
 // Bandeau de mise à jour (seulement si l'app a un numéro de build).

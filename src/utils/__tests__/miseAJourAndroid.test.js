@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildDeEtiquette, lireRelease, miseAJourDisponible, tailleLisible, totalTelechargements } from '../miseAJourAndroid';
-import { URL_APK } from '../../config/android';
+import { URL_APK, CHEMIN_TELECHARGEMENT, URL_TELECHARGEMENT } from '../../config/android';
+import vercel from '../../../vercel.json';
 
 const RELEASE = {
   tag_name: 'android-245', name: 'BestaSolar Android 1.1.0 (build 245)', published_at: '2026-10-07T16:00:00Z',
@@ -32,6 +33,15 @@ describe('APK Android : versions et mises à jour', () => {
     expect(tailleLisible(8_808_038)).toBe('8,4 Mo');
     expect(tailleLisible(0)).toBe('');
     expect(URL_APK).toBe('https://github.com/lumiere-sans-facture/Bestaapp/releases/latest/download/BestaSolar.apk');
+  });
+
+  it('lien public sur notre domaine, que Vercel redirige vers le dernier APK', () => {
+    expect(URL_TELECHARGEMENT).toBe('https://app.bestasolar.com/telecharger');
+    // Le lien de la page d'accueil et la règle Vercel doivent rester d'accord :
+    // un chemin renommé d'un côté seulement donnerait un bouton mort.
+    const regle = (vercel.redirects || []).find((r) => r.source === CHEMIN_TELECHARGEMENT);
+    expect(regle?.destination).toBe(URL_APK);
+    expect(regle?.permanent).toBe(false); // jamais mise en cache à vie par les navigateurs
   });
 });
 

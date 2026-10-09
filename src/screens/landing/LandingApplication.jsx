@@ -1,12 +1,13 @@
 // « Application Android » — l'APK à télécharger directement, sans Play Store.
 //
-// Le lien pointe toujours sur la DERNIÈRE version publiée (Release GitHub,
-// voir config/android.js) : rien à changer ici à chaque nouvelle version.
+// Le lien est sur NOTRE domaine (/telecharger) et mène toujours à la
+// DERNIÈRE version publiée (Release GitHub, voir config/android.js) : rien à
+// changer ici à chaque nouvelle version.
 // Version, taille et date sont lues sur GitHub ; si la lecture échoue, le
 // bouton reste — seule la ligne d'information disparaît.
 import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
-import { URL_APK } from '../../config/android';
+import { CHEMIN_TELECHARGEMENT } from '../../config/android';
 import { derniereReleaseAndroid } from '../../lib/releaseAndroid';
 import { tailleLisible } from '../../utils/miseAJourAndroid';
 
@@ -63,7 +64,7 @@ export default function LandingApplication() {
             sans passer par le Play Store. Les mêmes données qu’en ligne, utilisables même sans connexion sur
             le chantier — et l’application vous prévient d’elle-même à chaque nouvelle version.
           </p>
-          <a href={URL_APK} download="BestaSolar.apk" className="lp-h3"
+          <a href={CHEMIN_TELECHARGEMENT} download="BestaSolar.apk" className="lp-h3"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', padding: '16px 28px', borderRadius: '8px', background: '#0c3483', color: '#ffffff', fontWeight: '700', fontSize: '1.0625rem', textDecoration: 'none', boxShadow: '0 6px 16px rgba(12,52,131,.25)' }}>
             <Download size={20} /> Télécharger l’APK Android
           </a>
