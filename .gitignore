@@ -28,4 +28,7 @@ gha-creds-*.json
 # Sorties locales
 *.log
 coverage/
+.backup-work/
+.backup-output/
+__pycache__/
 .DS_Store

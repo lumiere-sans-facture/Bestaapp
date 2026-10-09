@@ -1,0 +1,93 @@
+name: Sauvegarde complète chiffrée
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 02:47 Lomé / 03:47 Cotonou. Activation après recette via la variable ci-dessous.
+    - cron: '47 2 * * *'
+
+permissions:
+  contents: read
+
+# Même verrou que la sauvegarde métier : les deux poussent dans le même dépôt.
+concurrency:
+  group: sauvegarde-quotidienne
+  cancel-in-progress: false
+
+jobs:
+  sauvegarde:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.BACKUP_COMPLETE_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Vérifier les prérequis sans afficher les secrets
+        env:
+          BACKUP_DB_PASSWORD: ${{ secrets.BACKUP_DB_PASSWORD }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SAUVEGARDES_TOKEN: ${{ secrets.SAUVEGARDES_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+          names = ('BACKUP_DB_PASSWORD', 'BACKUP_ENCRYPTION_PASSPHRASE', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SAUVEGARDES_TOKEN')
+          missing = [name for name in names if not os.environ.get(name)]
+          if missing:
+              raise SystemExit('Secrets à configurer : ' + ', '.join(missing))
+          phrase = os.environ['BACKUP_ENCRYPTION_PASSPHRASE']
+          if len(phrase) < 32 or '\n' in phrase or '\r' in phrase:
+              raise SystemExit('Phrase de chiffrement : au moins 32 caractères sur une ligne')
+          PY
+
+      - name: Confirmer la destination privée
+        env:
+          GH_TOKEN: ${{ secrets.SAUVEGARDES_TOKEN }}
+        run: |
+          test "$(gh api repos/lumiere-sans-facture/bestasolar-sauvegardes --jq .private)" = true
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Vérifier les outils et les garde-fous
+        run: |
+          docker info > /dev/null
+          gpg --version > /dev/null
+          python3 -m unittest discover -s scripts/tests -p 'test_sauvegarde_complete.py'
+
+      - name: Récupérer le dépôt privé
+        uses: actions/checkout@v4
+        with:
+          repository: lumiere-sans-facture/bestasolar-sauvegardes
+          token: ${{ secrets.SAUVEGARDES_TOKEN }}
+          path: depot-sauvegardes
+
+      - name: Exporter, chiffrer et vérifier
+        env:
+          BACKUP_DB_PASSWORD: ${{ secrets.BACKUP_DB_PASSWORD }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+          BACKUP_RECOVERY_CONFIG_JSON: ${{ secrets.BACKUP_RECOVERY_CONFIG_JSON }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 scripts/sauvegarde-complete.py --output depot-sauvegardes
+
+      - name: Publier uniquement les archives chiffrées
+        working-directory: depot-sauvegardes
+        run: |
+          git config user.name "Sauvegarde BestaSolar"
+          git config user.email "actions@github.com"
+          git add -- completes-chiffrees
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Sauvegarde complète chiffrée $(date -u +%Y-%m-%d)"
+          git push origin HEAD
+
+      - name: Résultat
+        if: success()
+        run: |
+          echo 'Sauvegarde SQL Auth + données + Storage chiffrée déposée dans le dépôt privé.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Déchiffrement vérifié. Une recette de restauration avec connexion utilisateur reste nécessaire.' >> "$GITHUB_STEP_SUMMARY"
+      # Aucun upload-artifact : le dépôt applicatif est public.
