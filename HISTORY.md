@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-09
+- **Pays de l'entreprise : identifiants fiscaux et opérateurs Mobile Money vérifiés.** Les sept sigles fiscaux sont confirmés auprès des administrations : IFU (Bénin : identifiant fiscal unique ; Burkina Faso : identifiant financier unique), NIF (Togo, Niger, Mali), NCC (Côte d'Ivoire), NINEA (Sénégal), NIU (Cameroun). Trois listes d'opérateurs suggérés sont corrigées : Togo — Flooz (Moov Africa), TMoney (Yas), Mixx by Yas ; Niger — ajout de Zamani Cash ; Burkina Faso — ajout de Wave.
 - **Espace Pro : l'entreprise choisit son pays — Bénin, Burkina Faso, Cameroun, Côte d'Ivoire, Mali, Niger, Sénégal, Togo.** Jusqu'ici, tout supposait le Togo (NIF, +228, TVA 18 %). Un sélecteur « Pays de l'entreprise » (Mon entreprise › Coordonnées) règle désormais, pour chaque pays (`src/data/pays.js`) :
   - l'**identifiant fiscal** : IFU (Bénin, Burkina Faso), NIF (Togo, Niger, Mali), NCC (Côte d'Ivoire), NINEA (Sénégal), NIU (Cameroun) — libellé du champ, exemple, et sigle imprimé sur les devis, factures (trois modèles) et fiches de dimensionnement ;
   - le **taux de TVA** des nouveaux devis et factures : 18 %, 19 % au Niger, 19,25 % au Cameroun (formulaire de facture, devis manuel, assistant, conversion devis → facture, modification des lignes) ;

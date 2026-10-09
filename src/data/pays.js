@@ -16,7 +16,12 @@
 //    la facture du client qui fait foi. Togo et Bénin gardent les valeurs que
 //    la fiche employait déjà ; les autres reprennent data/tarifsUemoa.js ;
 //    Cameroun : tranche ENEO 111-220 kWh (79 F, grille de novembre 2024).
-//  - mobileMoney : SUGGESTIONS du champ « Opérateur », qui reste libre.
+//  - mobileMoney : SUGGESTIONS du champ « Opérateur », qui reste libre
+//    (vérifiées en octobre 2026 ; les marques changent : Free Money est
+//    devenu Mixx by Yas au Sénégal).
+//  - fiscal : sigles vérifiés auprès des administrations (IFU Bénin et
+//    Burkina, NIF Togo/Niger/Mali, NCC Côte d'Ivoire, NINEA Sénégal, NIU
+//    Cameroun : une lettre P ou M, 12 chiffres, une lettre).
 //  - exemples (téléphone, identifiant, RCCM) : simples aides à la saisie.
 export const PAYS = [
   {
@@ -32,7 +37,7 @@ export const PAYS = [
     zone: 'UEMOA', devise: 'XOF', tva: 0.18,
     fiscal: { sigle: 'IFU', nom: 'Identifiant financier unique', exemple: '00012345A' },
     exempleRccm: 'BF-OUA-01-2024-B12-01234',
-    mobileMoney: ['Orange Money', 'Moov Money'],
+    mobileMoney: ['Orange Money', 'Moov Money', 'Wave'],
     operateurElec: 'SONABEL', prixKwh: 127,
   },
   {
@@ -64,7 +69,7 @@ export const PAYS = [
     zone: 'UEMOA', devise: 'XOF', tva: 0.19,
     fiscal: { sigle: 'NIF', nom: 'Numéro d’identification fiscale', exemple: '' },
     exempleRccm: 'NE-NIM-01-2024-B12-01234',
-    mobileMoney: ['Airtel Money', 'Moov Money'],
+    mobileMoney: ['Airtel Money', 'Moov Money', 'Zamani Cash'],
     operateurElec: 'NIGELEC', prixKwh: 86,
   },
   {
@@ -81,7 +86,7 @@ export const PAYS = [
     zone: 'UEMOA', devise: 'XOF', tva: 0.18,
     fiscal: { sigle: 'NIF', nom: 'Numéro d’identification fiscale', exemple: '1000123456' },
     exempleRccm: 'TG-LFW-01-2025-A10-01086',
-    mobileMoney: ['Moov Money (Flooz)', 'Mixx by Yas'],
+    mobileMoney: ['Flooz (Moov Africa)', 'TMoney (Yas)', 'Mixx by Yas'],
     operateurElec: 'CEET', prixKwh: 114,
   },
 ];
