@@ -16,6 +16,7 @@ import LoadingShell from './components/LoadingShell';
 import Login from './screens/Login';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
 import { installerAnalytique, suivrePage, signalerOuvertureApp } from './lib/analytique';
+import { installerBarreEtat } from './lib/barreEtat';
 
 // Capture l'attribution d'affiliation (?ref=AMINATA) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
@@ -43,6 +44,8 @@ installerFiletsGlobaux();
 installerAnalytique();
 // Application Android : installation, mise à jour et ouverture comptées.
 signalerOuvertureApp();
+// Application Android : icônes de la barre d'état lisibles sur la bande bleue.
+installerBarreEtat();
 
 // Découpage par route : chaque écran est un chunk chargé à la demande, pour
 // alléger le bundle initial (parse/eval plus rapide au démarrage — déterminant

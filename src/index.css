@@ -128,14 +128,29 @@ html { font-size: 16px; -webkit-text-size-adjust: 100%; }
    Les zones conçues pour défiler (suivi en colonnes, puces de catégories)
    gardent leur propre défilement horizontal. */
 html, body { overflow-x: hidden; overflow-x: clip; max-width: 100%; }
+/* BARRE D'ÉTAT DU TÉLÉPHONE (heure, réseau, batterie). Depuis Android 15,
+   l'application installée s'affiche aussi DESSOUS : sans réserve, le titre
+   des pages s'y superposait. --haut-securise vaut sa hauteur — fournie par
+   le navigateur (env) ou injectée par Capacitor (--safe-area-inset-top) —
+   et 0 sur un navigateur ordinaire : rien ne change sur le site web. */
+:root { --haut-securise: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px)); }
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  padding-top: var(--haut-securise);
 }
-#root { min-height: 100vh; min-height: 100dvh; }
+/* La bande sous la barre d'état : opaque, de la couleur de l'en-tête, et
+   FIXE — le contenu qu'on fait défiler passe dessous au lieu de se mêler
+   aux icônes. Au-dessus de tout, fenêtres et guide compris. Les icônes y
+   sont passées en clair (lib/barreEtat.js). */
+body::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
+  height: var(--haut-securise); background: var(--primary); pointer-events: none;
+}
+#root { min-height: calc(100vh - var(--haut-securise)); min-height: calc(100dvh - var(--haut-securise)); }
 input, button, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
 button { cursor: pointer; border: none; background: none; text-align: left; }
 a { text-decoration: none; color: inherit; }
@@ -148,7 +163,7 @@ img { max-width: 100%; }
 
 .splash-screen {
   display: flex; align-items: center; justify-content: center;
-  height: 100vh; background: var(--primary); color: white; font-size: 1.25rem;
+  height: calc(100vh - var(--haut-securise)); background: var(--primary); color: white; font-size: 1.25rem;
 }
 
 /* Lecteur d'écran seul — l'état de chargement (squelette) est décoratif,
@@ -176,12 +191,12 @@ img { max-width: 100%; }
 
 /* ============ Structure générale ============ */
 
-.app-shell { min-height: 100vh; min-height: 100dvh; }
+.app-shell { min-height: calc(100vh - var(--haut-securise)); min-height: calc(100dvh - var(--haut-securise)); }
 
 .app-main {
   display: flex; flex-direction: column;
   min-width: 0; overflow-x: clip;
-  min-height: 100vh; min-height: 100dvh;
+  min-height: calc(100vh - var(--haut-securise)); min-height: calc(100dvh - var(--haut-securise));
   padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px));
 }
 
@@ -427,7 +442,7 @@ textarea.input { resize: vertical; }
   --text-primary: #1a1a2e; --text-secondary: #676d7b; --text-muted: #9ca3af;
   --border: #e5e7eb;
   --shadow: 0 2px 8px rgba(10, 36, 114, 0.08); --shadow-lg: 0 8px 30px rgba(10, 36, 114, 0.16);
-  min-height: 100vh; min-height: 100dvh;
+  min-height: calc(100vh - var(--haut-securise)); min-height: calc(100dvh - var(--haut-securise));
   display: flex;
   background: var(--bg-card);
 }
@@ -1361,7 +1376,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 /* Écran d'erreur applicatif */
 .ecran-erreur {
   max-width: 420px; margin: 0 auto; padding: 40px 20px;
-  min-height: 100dvh; display: flex; flex-direction: column;
+  min-height: calc(100dvh - var(--haut-securise)); display: flex; flex-direction: column;
   align-items: center; justify-content: center; text-align: center; gap: 10px;
 }
 .ecran-erreur-icone {
@@ -2812,7 +2827,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 }
 .quote-editor-sheet .sheet-handle { display: none; }
 .quote-editor-sheet .sheet-header {
-  min-height: 68px; align-items: center; padding: max(12px, env(safe-area-inset-top, 0px)) 16px 12px;
+  min-height: 68px; align-items: center; padding: calc(12px + var(--haut-securise)) 16px 12px;
   background: #f3f5f9; border-bottom: 0;
 }
 .quote-editor-sheet .sheet-heading { text-align: center; }
@@ -2999,7 +3014,7 @@ form .login-link { width: 100%; margin-top: 4px; }
    La page est CLAIRE en toutes circonstances, comme l'écran de connexion :
    un visiteur qui découvre le produit voit la même chose que sur la plaquette,
    quel que soit le thème réglé sur son appareil. */
-.landing { background: #ffffff; color: #0c0f14; min-height: 100vh; }
+.landing { background: #ffffff; color: #0c0f14; min-height: calc(100vh - var(--haut-securise)); }
 
 /* Survols — repris tels quels de la maquette. */
 .lp-h1:hover { color: #0c3483; }
