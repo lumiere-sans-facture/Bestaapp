@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FileText, Plus, Download, Search, Check, Trash2, Pencil, BadgeCheck, SlidersHorizontal, Send } from 'lucide-react';
+import { FileText, Plus, Download, Search, Check, Trash2, Pencil, BadgeCheck, SlidersHorizontal, Send, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { dateEmissionDevis } from '../utils/dateEmission';
@@ -17,6 +17,7 @@ import ConfirmSheet from '../components/ConfirmSheet';
 import { useToast } from '../components/Toast';
 import DevisCreator from './devis/DevisCreator';
 import DevisEditSheet from './devis/DevisEditSheet';
+import { useDocumentsDevis } from './devis/useDocumentsDevis';
 
 
 
@@ -29,29 +30,13 @@ const SORT_OPTIONS = [
 
 export default function Devis() {
   const { user } = useAuth();
-  const { devis, getLeadById, getPartnerById, products, updateDevis, deleteDevis, updateDevisStage, addDevisRelance } = useData();
+  const { devis, getLeadById, getPartnerById, updateDevis, deleteDevis, updateDevisStage, addDevisRelance } = useData();
   const toast = useToast();
 
-  // Document imprimable (HTML autonome, export PDF par Ctrl+P). L'espace
-  // public n'utilise qu'un seul modèle : Studio.
-  const ouvrirDocument = async (d) => {
-    const [{ openDoc }, { donneesDeDevis }] = await Promise.all([
-      import('../utils/docTemplates'),
-      import('../utils/docTemplates/shared'),
-    ]);
-    const { COMPANY } = await import('../config/company');
-    openDoc({
-      kind: 'devis',
-      model: 'studio',
-      data: donneesDeDevis({
-        devis: d,
-        company: COMPANY,
-        lead: getLeadById(d.leadId),
-        partner: d.partnerId ? getPartnerById(d.partnerId) : null,
-        products,
-      }),
-    });
-  };
+  // Documents du devis (PDF du devis, envoi WhatsApp, fiche de
+  // dimensionnement) : produits dans l'application, sans passer par
+  // l'impression du navigateur — voir devis/useDocumentsDevis.
+  const docs = useDocumentsDevis();
 
   // Relance WhatsApp : ouvre un message pré-rempli, trace la relance et le
   // dit (de retour dans l'app, l'utilisateur sait que c'est parti) — même
@@ -221,6 +206,14 @@ export default function Devis() {
                       </div>
                     </div>
                     <div className="flat-row-amount">{formatCFA(d.total)}</div>
+                    {/* Téléchargement direct, sans ouvrir le devis. */}
+                    <button type="button" className="flat-row-action"
+                      aria-label={`Télécharger le devis ${d.devisNumber || ''} en PDF`} title="Télécharger le PDF"
+                      disabled={!!docs.enCours}
+                      onClick={(e) => { e.stopPropagation(); docs.telechargerDevis(d); }}
+                      onKeyDown={(e) => e.stopPropagation()}>
+                      {docs.occupe(d, 'devis') ? <Loader2 size={18} className="tourne" /> : <Download size={18} />}
+                    </button>
                   </div>
                 );
               })}
@@ -264,7 +257,22 @@ export default function Devis() {
               {actions.derniereRelance && (
                 <div className="sheet-row"><span className="sheet-label">Dernière relance</span><span className="sheet-value">{formatDate(actions.derniereRelance)}</span></div>
               )}
-              <button className="btn btn-primary btn-block" onClick={() => runAction(() => ouvrirDocument(actions))}><Download size={16} /> Devis imprimable (PDF)</button>
+              <button className="btn btn-primary btn-block" disabled={!!docs.enCours} onClick={() => docs.telechargerDevis(actions)}>
+                {docs.occupe(actions, 'devis') ? <Loader2 size={16} className="tourne" /> : <Download size={16} />}
+                {docs.occupe(actions, 'devis') ? 'Préparation du PDF…' : 'Télécharger le devis (PDF)'}
+              </button>
+              {/* Le PDF part JOINT : le menu de partage s'ouvre, on choisit
+                  WhatsApp puis le client. */}
+              <button className="btn btn-whatsapp btn-block" disabled={!!docs.enCours} onClick={() => docs.envoyerWhatsApp(actions)}>
+                {docs.occupe(actions, 'whatsapp') ? <Loader2 size={16} className="tourne" /> : <Send size={16} />}
+                {docs.occupe(actions, 'whatsapp') ? 'Préparation du PDF…' : 'Envoyer le devis sur WhatsApp'}
+              </button>
+              {dimensionnementRejouable(actions) && (
+                <button className="btn btn-outline btn-block" disabled={!!docs.enCours} onClick={() => docs.telechargerFiche(actions)}>
+                  {docs.occupe(actions, 'fiche') ? <Loader2 size={16} className="tourne" /> : <FileText size={16} />}
+                  {docs.occupe(actions, 'fiche') ? 'Préparation de la fiche…' : 'Fiche de dimensionnement (PDF)'}
+                </button>
+              )}
               {/* Relancer n'a de sens que pour une affaire encore ouverte, avec
                   un numéro à contacter — même logique que la relance des factures Pro. */}
               {!actions._externe
@@ -306,6 +314,32 @@ export default function Devis() {
                       <BadgeCheck size={16} /> Convertir en vente
                     </button>
                   )}
+                </>
+              )}
+            </div>
+          )}
+        </Sheet>
+        {/* PDF prêt : le navigateur réclame un nouveau toucher pour partager,
+            ou (ordinateur) ne sait pas joindre un fichier — il vient alors
+            d'être téléchargé, et WhatsApp s'ouvre sur la conversation. */}
+        <Sheet open={!!docs.envoiPret} onClose={docs.fermerEnvoi} title="Envoyer le devis">
+          {docs.envoiPret && (
+            <div className="doc-actions-list">
+              {docs.envoiPret.mode === 'partage' ? (
+                <>
+                  <p className="field-hint">Le PDF du devis est prêt.</p>
+                  <button className="btn btn-whatsapp btn-block" onClick={docs.partagerMaintenant}><Send size={16} /> Envoyer sur WhatsApp</button>
+                </>
+              ) : (
+                <>
+                  <p className="field-hint">
+                    Le PDF « {docs.envoiPret.nom} » vient d’être téléchargé. Ouvrez la conversation,
+                    puis joignez-y le fichier (trombone ou glisser-déposer).
+                  </p>
+                  <a className="btn btn-whatsapp btn-block" href={whatsappLink(docs.envoiPret.telephone, docs.envoiPret.texte)}
+                    target="_blank" rel="noopener noreferrer" onClick={docs.fermerEnvoi}>
+                    <Send size={16} /> Ouvrir WhatsApp
+                  </a>
                 </>
               )}
             </div>

@@ -18,6 +18,9 @@ import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../component
 import AjustementsKit from '../../components/AjustementsKit';
 import { TVA_PCT } from '../../config/company';
 import { signalerErreur } from '../../lib/rapportErreur';
+import { enregistrerFichePdf } from '../../lib/fichiers';
+import { donneesFiche } from '../../utils/sizingSheet/donnees';
+import { useToast } from '../../components/Toast';
 import {
   capturerDimensionnement, restaurerDimensionnement, prochainRowId,
   localisationAvecCoordonnees, donneesSolairesCompletes,
@@ -51,6 +54,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   const { addDevis, updateDevis, leadsForUser, partners, ensurePartnerForUser, kits, inverters, products } = useData();
   const SOLAR_KITS = useMemo(() => kits || [], [kits]);
   const INVERTERS = useMemo(() => inverters || [], [inverters]);
+  const toast = useToast();
   // Client déjà choisi (fiche client) : l'étape de sélection est sautée.
   const [step, setStep] = useState(initialLeadId || devisAModifier ? 2 : 1);
   const [selectedLeadId, setSelectedLeadId] = useState(devisAModifier?.leadId || initialLeadId);
@@ -80,7 +84,6 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   // au Togo, SBEE au Bénin) — pour le client qui ne connaît pas ses appareils
   // mais sait ce qu'il paie.
   const [consoMode, setConsoMode] = useState(reprise.consoMode);
-  const manualMode = consoMode !== 'appareils'; // la fiche technique n'a pas de liste d'appareils
   const [manual, setManual] = useState(reprise.manuel);
   const [facture, setFacture] = useState(reprise.facture);
   // Off-grid par défaut : cas majoritaire sur le terrain.
@@ -246,44 +249,26 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   // sur le panneau de référence (PANEL_REFERENCE_WC).
   const openSheet = async () => {
     if (!sizing || ficheEnCours) return;
-    // L'onglet est ouvert AVANT tout `await` : passé une opération
-    // asynchrone, le navigateur ne rattache plus l'ouverture au clic et la
-    // bloque — systématiquement sur iOS. Sans onglet, la fiche est
-    // téléchargée (voir ouvrirFichePdf) : elle n'est jamais perdue.
-    const onglet = window.open('', '_blank');
+    // Produite et enregistrée DANS l'application (plus d'onglet à imprimer) :
+    // même assemblage que depuis la liste des devis (sizingSheet/donnees).
     setFicheEnCours(true);
-    const { ouvrirFichePdf } = await import('../../utils/sizingSheet');
     const lead = myLeads.find((l) => l.id === selectedLeadId);
-    const psh = Number(sunHours) || DEFAULT_PEAK_SUN_HOURS;
     const apporteur = partnerId ? partners.find((p) => p.id === partnerId) : null;
-    const provisionOnduleur = provisionOnduleurDuDevis(displayQuotation?.components);
-    await ouvrirFichePdf({
-      client: { name: lead?.contact || lead?.name || '', phone: lead?.phone || '', ville: lead?.address || '' },
-      apporteur: apporteur ? { name: apporteur.name, code: apporteur.code } : null,
-      appliances: rows,
-      manualMode,
-      consumption,
-      systemType,
-      sunHours: psh,
-      cityName: location?.name || lead?.address || null,
-      cityCountry: location?.country || '',
-      solarSource: solar?.source || null,
-      sizing,
-      // Seules les grandeurs techniques sont transmises : les marques du
-      // catalogue interne (onduleur, batteries) n'apparaissent jamais.
-      inverter: { capacity: sizing.inverter.capacity, maxPvPower: sizing.inverter.maxPvPower || null, quantite: sizing.inverterQuantite },
-      batteries: sizing.batteries.map((b) => ({ capacity: b.capacity, qty: b.quantity })),
-      panelName: `Panneau photovoltaïque ${sizing.panelWc}W`,
-      // Rentabilité (page 3) : l'investissement estimé = total du devis kit.
-      investissement: displayQuotation?.total || null,
-      // ... et la provision de remplacement = le prix de L'ONDULEUR DE CE
-      // DEVIS. Sans elle, toutes les fiches provisionnaient les mêmes
-      // 320 000 F, qu'on ait posé un 3 kVA ou un 12 kVA.
-      rentabilite: provisionOnduleur != null ? { provisionOnduleur } : {},
-    }, { onglet }).catch((e) => {
-      // L'onglet affiche déjà l'échec ; le journal en garde la trace.
+    try {
+      const { emplacement } = await enregistrerFichePdf(donneesFiche({
+        lead, apporteur, rows, consoMode, consumption, systemType,
+        sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+        location, solarSource: solar?.source || null, sizing,
+        investissement: displayQuotation?.total || null,
+        provisionOnduleur: provisionOnduleurDuDevis(displayQuotation?.components),
+      }));
+      toast(emplacement ? `Fiche de dimensionnement enregistrée dans ${emplacement}.` : 'Fiche de dimensionnement téléchargée.');
+    } catch (e) {
       signalerErreur(e, { origine: 'fiche-dimensionnement', ecran: '/devis' });
-    }).finally(() => setFicheEnCours(false));
+      toast('La fiche n’a pas pu être produite. Réessayez.', { type: 'error' });
+    } finally {
+      setFicheEnCours(false);
+    }
   };
 
   const handleSubmit = (statut = 'finalise') => {

@@ -147,12 +147,13 @@ const nomDeFichier = (client) => {
  * @param {string} [options.titre]    titre affiché par le lecteur PDF
  * @param {string} [options.auteur]
  * @param {string} [options.nom]      nom du fichier
+ * @param {string} [options.sujet]    sujet inscrit dans les propriétés du PDF
  * @returns {Promise<{blob: Blob, url: string, nom: string, pages: number}>}
  */
 export async function pdfDepuisHtml(html, {
   echelle = 2, qualite = 0.92, format = 'PNG',
   titre = 'Fiche de dimensionnement', auteur = 'BestaSolar Pro',
-  nom = 'Fiche-dimensionnement.pdf',
+  nom = 'Fiche-dimensionnement.pdf', sujet = 'Étude technique de dimensionnement solaire',
 } = {}) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
     import('html2canvas'),
@@ -188,7 +189,7 @@ export async function pdfDepuisHtml(html, {
 
     pdf.setProperties({
       title: titre,
-      subject: 'Étude technique de dimensionnement solaire',
+      subject: sujet,
       creator: auteur,
     });
 

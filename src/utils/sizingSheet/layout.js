@@ -511,7 +511,14 @@ ${policeDocument()}
         <div class="stat-mois">soit ${cfa(renta.economieMensuelle)} par mois</div>
         <div class="stat-note">${u(nf(renta.kwhAnnuels), 'kWh')} × ${u(nf(renta.tarifElec), 'F CFA/kWh')}</div>
       </div>`}
-      ${stat('Retour sur investissement', libelleRoi(renta.roiMois), renta.roiMois != null ? 'investissement + provision onduleur couverts' : 'investissement à renseigner')}
+      ${stat(
+        'Retour sur investissement',
+        // Investissement connu mais non couvert sur l'horizon : le dire, au
+        // lieu de réclamer un investissement qui figure juste en dessous.
+        renta.roiMois == null && renta.investissement != null ? `Plus de ${nf(renta.horizon)} ans` : libelleRoi(renta.roiMois),
+        renta.roiMois != null ? 'investissement + provision onduleur couverts'
+          : renta.investissement != null ? 'non couvert sur la période étudiée' : 'investissement à renseigner',
+      )}
       ${stat('Gain net sur la période', renta.gainNet != null ? cfa(renta.gainNet) : '—', 'économies − investissement − coûts d’exploitation')}
     </div>
     <table>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateSystemSize, buildQuotation, PANEL_SPEC, PANEL_REFERENCE_WC, parsePanelWc, SIZING_PARAMS } from '../solarSizing';
+import { calculateSystemSize, buildQuotation, PANEL_SPEC, PANEL_REFERENCE_WC, parsePanelWc, SIZING_PARAMS, combinaisonBatteries } from '../solarSizing';
 
 describe('calculateSystemSize', () => {
   const sizing = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5);
@@ -149,3 +149,22 @@ describe('buildQuotation', () => {
     expect(panneau.unitPrice).toBe(Math.round(80000 * 1.1));
   });
 });
+
+describe('parc batterie : modules identiques', () => {
+  it('ne mélange jamais deux modèles, et couvre le besoin au plus juste', () => {
+    const parc = combinaisonBatteries(7.55);
+    expect(new Set(parc.map((b) => b.id)).size).toBe(1); // jadis 7,5 + 2,5 kWh
+    const total = parc.reduce((s, b) => s + b.capacity, 0);
+    expect(total).toBeGreaterThanOrEqual(7.55);
+    expect(total).toBeCloseTo(7.6, 5); // 2 × 3,8 kWh
+  });
+  it('à capacité égale, le moins de modules', () => {
+    const parc = combinaisonBatteries(20);
+    expect(parc.length).toBe(2); // 2 × 10 kWh plutôt que 4 × 5 kWh
+    expect(parc[0].capacity).toBe(10);
+  });
+  it('rien à stocker : aucun module', () => {
+    expect(combinaisonBatteries(0)).toEqual([]);
+  });
+});
+

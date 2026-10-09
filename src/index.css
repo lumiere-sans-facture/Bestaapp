@@ -2681,6 +2681,17 @@ form .login-link { width: 100%; margin-top: 4px; }
 .badge-cours-pro svg, .badge-cours-masque svg { vertical-align: -1.5px; margin-right: 3px; }
 .flat-row-amount { flex-shrink: 0; font-size: 1rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; text-align: right; }
 .flat-amount-unit { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-left: 4px; }
+/* Action directe sur une ligne (télécharger le PDF d'un devis), sans ouvrir
+   la fiche : une cible de 40 px, discrète, à droite du montant. */
+.flat-row-action {
+  flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; margin: -6px -6px -6px 0;
+  border-radius: 50%; color: var(--primary-ink); background: transparent; cursor: pointer;
+}
+.flat-row-action:hover { background: rgba(10, 36, 114, 0.08); }
+.flat-row-action:disabled { opacity: 0.45; cursor: default; }
+/* Icône qui tourne pendant la préparation d'un document. */
+@keyframes tourne { to { transform: rotate(360deg); } }
+.tourne { animation: tourne 0.9s linear infinite; }
 
 @media (min-width: 640px) {
   .doc-summary { grid-template-columns: repeat(3, minmax(0, 220px)); }

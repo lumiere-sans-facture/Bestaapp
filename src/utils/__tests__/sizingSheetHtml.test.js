@@ -177,6 +177,14 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(sans.match(/<section class="page">/g)).toHaveLength(3);
   });
 
+  it('investissement connu mais non amorti sur la période : « Plus de 10 ans », pas « à renseigner »', () => {
+    const lourd = buildSizingSheetHtml({ ...data, investissement: 90000000 });
+    const bloc = lourd.split('Retour sur investissement')[1].split('Gain net')[0];
+    expect(bloc).toContain('Plus de 10 ans');
+    expect(bloc).toContain('non couvert sur la période étudiée');
+    expect(bloc).not.toContain('investissement à renseigner');
+  });
+
   it('au-delà de 9 appareils, ce sont les plus gourmands qui restent détaillés', () => {
     // L'ordre de SAISIE ne doit pas décider du contenu de la fiche : un gros
     // consommateur ajouté en dernier reste détaillé, les petits sont groupés.

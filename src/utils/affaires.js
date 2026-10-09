@@ -250,6 +250,22 @@ export function devisRelanceMessage(devis, lead = null) {
 }
 
 /**
+ * Message qui accompagne le devis envoyé en PDF sur WhatsApp. Le fichier est
+ * joint : le message le présente au lieu de le résumer.
+ */
+export function devisEnvoiMessage(devis, lead = null) {
+  const nom = lead?.contact || lead?.name || devis?.clientName || '';
+  const fin = dateExpiration(devis);
+  const lines = [
+    nom ? `Bonjour ${nom},` : 'Bonjour,',
+    `Veuillez trouver ci-joint votre devis ${devis?.devisNumber || ''} d'un montant de ${formatCFA(devis?.total)}.`.replace(/\s+d'un/, " d'un"),
+  ];
+  if (fin) lines.push(`Il est valable jusqu'au ${new Date(`${fin}T00:00:00`).toLocaleDateString('fr-FR')}.`);
+  lines.push('Nous restons à votre disposition pour toute question.', COMPANY.name);
+  return lines.join('\n');
+}
+
+/**
  * Devis sans suite (voir `estDevisSansSuite`), du plus négligé au moins
  * négligé — c'est la liste qui vaut la peine d'être relancée en premier.
  */

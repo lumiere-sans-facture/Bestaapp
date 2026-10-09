@@ -333,23 +333,25 @@ export const SYSTEM_VOLTAGE = BATTERY_MODELS[0].voltage;
 
 // ---- Sélection des composants ----
 
-// Combinaison optimale de batteries (du plus grand au plus petit module)
-const findOptimalBatteryCombination = (requiredCapacity) => {
-  const batteries = [];
-  let remaining = requiredCapacity;
-  while (remaining > 0) {
-    const battery = BATTERY_MODELS
-      .filter((b) => b.capacity <= remaining)
-      .sort((a, b) => b.capacity - a.capacity)[0];
-    if (!battery) {
-      batteries.push(BATTERY_MODELS[0]);
-      break;
+// Parc batterie : N modules IDENTIQUES. On ne mélange pas des batteries
+// lithium de capacités différentes dans un même parc (BMS et courants de
+// charge propres à chaque modèle) — l'ancien choix glouton le faisait :
+// 7,55 kWh devenaient 7,5 + 2,5 kWh. Retenu : la plus petite capacité totale
+// qui couvre le besoin, puis le moins de modules à capacité égale.
+export const combinaisonBatteries = (requiredCapacity, modeles = BATTERY_MODELS) => {
+  const requis = Number(requiredCapacity) || 0;
+  if (requis <= 0 || !modeles.length) return [];
+  let meilleur = null;
+  for (const m of modeles) {
+    const n = Math.max(1, Math.ceil(requis / m.capacity - 1e-9));
+    const total = n * m.capacity;
+    if (!meilleur || total < meilleur.total - 1e-9 || (Math.abs(total - meilleur.total) < 1e-9 && n < meilleur.n)) {
+      meilleur = { m, n, total };
     }
-    batteries.push(battery);
-    remaining -= battery.capacity;
   }
-  return batteries;
+  return Array.from({ length: meilleur.n }, () => meilleur.m);
 };
+const findOptimalBatteryCombination = (requiredCapacity) => combinaisonBatteries(requiredCapacity);
 
 // Regroupe une liste de batteries identiques en { model, quantity }
 const groupBatteries = (batteries) => {

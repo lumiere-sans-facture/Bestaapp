@@ -22,6 +22,8 @@ import EditableQuotation, { lignesDepuisDevisKit, lignesModifiables } from '../.
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../components/SolarConsumptionControls';
 import AjustementsKit from '../../../components/AjustementsKit';
 import { signalerErreur } from '../../../lib/rapportErreur';
+import { enregistrerFichePdf } from '../../../lib/fichiers';
+import { useToast } from '../../../components/Toast';
 import {
   capturerDimensionnement, restaurerDimensionnement, prochainRowId,
   localisationAvecCoordonnees, donneesSolairesCompletes,
@@ -59,6 +61,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   });
   const { user } = useAuth();
   const { products, kits, proClientsForUser, addProClient, addDevis, updateDevis, getCompanyForUser, inverters: onduleursConfigures } = useData();
+  const toast = useToast();
 
   const myClients = proClientsForUser(user.id);
   const company = getCompanyForUser(user.id);
@@ -343,13 +346,8 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   // à la dernière étape avec le client et le matériel réellement retenus.
   const openSheet = async () => {
     if (!sizing || ficheEnCours) return;
-    // L'onglet est ouvert AVANT tout `await` : passé une opération
-    // asynchrone, le navigateur ne rattache plus l'ouverture au clic et la
-    // bloque — systématiquement sur iOS. Sans onglet, la fiche est
-    // téléchargée (voir ouvrirFichePdf) : elle n'est jamais perdue.
-    const onglet = window.open('', '_blank');
+    // Produite et enregistrée DANS l'application (plus d'onglet à imprimer).
     setFicheEnCours(true);
-    const { ouvrirFichePdf } = await import('../../../utils/sizingSheet');
     const client = clientMode === 'new' ? newClient : (myClients.find((c) => c.id === clientId) || {});
     const villeFiche = location?.name || client.ville || null;
     const ficheInverter = proposalMode === 'kit'
@@ -358,7 +356,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     const ficheBatteries = proposalMode === 'kit' && selectedKit
       ? [{ model: `Batterie du kit ${selectedKit.name}`, capacity: kitQuotation?.batteryCapacity ?? selectedKit.battery, qty: 1 }]
       : batteryList;
-    await ouvrirFichePdf({
+    await enregistrerFichePdf({
       // La fiche porte l'identité de l'installateur abonné (logo, couleurs,
       // coordonnées), comme ses devis et ses factures.
       company,
@@ -386,9 +384,11 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
           ? { provisionOnduleur: Number(renta.provisionOnduleur) }
           : (provisionOnduleurDefaut != null ? { provisionOnduleur: provisionOnduleurDefaut } : {})),
       },
-    }, { onglet }).catch((e) => {
-      // L'onglet affiche déjà l'échec ; le journal en garde la trace.
+    }).then(({ emplacement }) => {
+      toast(emplacement ? `Fiche de dimensionnement enregistrée dans ${emplacement}.` : 'Fiche de dimensionnement téléchargée.');
+    }).catch((e) => {
       signalerErreur(e, { origine: 'fiche-dimensionnement', ecran: '/plus/devis-pro' });
+      toast('La fiche n’a pas pu être produite. Réessayez.', { type: 'error' });
     }).finally(() => setFicheEnCours(false));
   };
 

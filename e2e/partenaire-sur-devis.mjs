@@ -4,6 +4,26 @@
 import { chromium } from '@playwright/test';
 const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const R = []; const ok = (c, m) => { R.push(`${c ? '✓ ' : '❌'} ${m}`); return c; };
+
+// Le devis n'ouvre plus d'onglet à imprimer : il se télécharge en PDF. Le
+// contenu se vérifie sur le document dont ce PDF est la copie (même HTML).
+const documentDuDevis = async (page, ctx) => {
+  const [pdf] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.locator('.sheet button', { hasText: 'Télécharger le devis (PDF)' }).click()]);
+  if (!/\.pdf$/.test(pdf.suggestedFilename())) R.push(`❌ le devis ne s’est pas téléchargé en PDF [${pdf.suggestedFilename()}]`);
+  const html = await page.evaluate(async () => {
+    const s = JSON.parse(localStorage.getItem('bestasolar_data'));
+    const d = s.devis.find((x) => x.type === 'solar') || s.devis[0];
+    const [{ buildDocHtml }, { donneesDeDevis }, { COMPANY }] = await Promise.all([
+      import('/src/utils/docTemplates/index.js'), import('/src/utils/docTemplates/shared.js'), import('/src/config/company.js'),
+    ]);
+    const lead = (s.leads || []).find((l) => l.id === d.leadId) || null;
+    const partner = (s.partners || []).find((p) => p.id === d.partnerId) || null;
+    return buildDocHtml({ kind: 'devis', model: 'studio', data: donneesDeDevis({ devis: d, company: COMPANY, lead, partner, products: s.products || [] }) });
+  });
+  const doc = await ctx.newPage();
+  await doc.setContent(html, { waitUntil: 'domcontentloaded' });
+  return doc;
+};
 const ctx = await nav.newContext({ viewport: { width: 1280, height: 950 } });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => R.push('❌ ERREUR JS : ' + e));
@@ -46,7 +66,7 @@ await page.goto(B + '/devis');
 await page.waitForTimeout(1500);
 await page.locator('.flat-row').first().click();
 await page.waitForTimeout(700);
-const [doc] = await Promise.all([ctx.waitForEvent('page'), page.locator('.sheet button', { hasText: 'Devis imprimable' }).click()]);
+const doc = await documentDuDevis(page, ctx);
 await doc.waitForLoadState(); await doc.waitForTimeout(800);
 const texte = await doc.evaluate(() => document.body.innerText);
 const attendu = `Réf. partenaire : ${partenaire?.code}`;
