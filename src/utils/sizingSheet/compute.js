@@ -2,6 +2,7 @@
 // solarSizing, jamais dupliquées), production mensuelle et rentabilité.
 // Logique pure, sans React ni DOM.
 import { SIZING_PARAMS, SYSTEM_VOLTAGE } from '../solarSizing';
+import { paysDuNom, paysDeLEntreprise } from '../../data/pays';
 
 export const JOURS_MOIS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 export const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
@@ -71,8 +72,9 @@ export const productionAnnuelle = (kwc, hspPireMois, ville) =>
   Math.round(couvertureMensuelle({ kwc, hspRetenu: hspPireMois, ville, consoJour: 0 }).production);
 
 // ---- Rentabilité ----
-// Le tarif dépend du lieu choisi pour le dimensionnement. Le Bénin reste
-// la référence par défaut, tandis qu'une ville géocodée au Togo utilise 114 F/kWh.
+// Le tarif dépend du pays du chantier : celui que donne la recherche de
+// localisation (data/pays.js, huit pays), sinon une ville connue du Togo
+// (114 F/kWh), sinon le pays de l'entreprise Pro, sinon le Bénin (145 F/kWh).
 export const TARIF_ELECTRICITE_BENIN = 145;
 export const TARIF_ELECTRICITE_TOGO = 114;
 
@@ -95,8 +97,12 @@ export const estVilleDuTogo = (ville = '', pays = '') => {
   return VILLES_TOGO.has(villeNormalisee.split(',')[0].trim());
 };
 
-export const tarifElectriciteParDefaut = (ville = '', pays = '') =>
-  (estVilleDuTogo(ville, pays) ? TARIF_ELECTRICITE_TOGO : TARIF_ELECTRICITE_BENIN);
+export const tarifElectriciteParDefaut = (ville = '', pays = '', paysEntreprise = '') => {
+  const lieu = paysDuNom(pays);
+  if (lieu) return lieu.prixKwh;
+  if (estVilleDuTogo(ville, pays)) return TARIF_ELECTRICITE_TOGO;
+  return paysDuNom(paysEntreprise)?.prixKwh ?? TARIF_ELECTRICITE_BENIN;
+};
 
 // Tous les paramètres sont surchargeables ; les montants affichés sont
 // RECALCULÉS depuis les valeurs arrondies affichées (jamais des flottants),
@@ -221,7 +227,7 @@ export const computeSheet = (d) => {
   // déterminé par la ville/pays sélectionnés pendant le dimensionnement.
   const rentabilite = { ...(d.rentabilite || {}) };
   if (!(Number(rentabilite.tarifElec) > 0)) {
-    rentabilite.tarifElec = tarifElectriciteParDefaut(d.cityName, d.cityCountry);
+    rentabilite.tarifElec = tarifElectriciteParDefaut(d.cityName, d.cityCountry, d.company ? paysDeLEntreprise(d.company).id : '');
   }
   const renta = calculerRentabilite(consoJour, d.investissement ?? null, rentabilite);
   const couverture = couvertureMensuelle({

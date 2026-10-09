@@ -1,6 +1,7 @@
 import { Minus, Plus } from 'lucide-react';
 import Field from '../Field';
 import { formatQuoteCurrency, quoteLineTotals, QUOTE_UNITS, TAX_RATES } from '../../utils/quoteLines';
+import { tvaPct } from '../../data/pays';
 
 export function QuantitySelector({ value, onChange }) {
   const qty = Math.max(1, Number(value) || 1);
@@ -32,15 +33,19 @@ export function CurrencyInput({ value, onChange, currency }) {
   );
 }
 
-export function TaxSelector({ value, onChange, disabled }) {
+/** Taux proposés : 0 et celui du pays de l'émetteur (`taux`), plus celui que
+ *  la ligne porte déjà s'il diffère (document établi avant un changement de pays). */
+export function TaxSelector({ value, onChange, disabled, taux = null }) {
+  const taux_ = taux != null ? [0, taux] : TAX_RATES;
+  const options = [...new Set([...taux_, Number(value) || 0])].sort((a, b) => a - b);
   return (
     <select className="input" value={value} onChange={(event) => onChange(Number(event.target.value))} disabled={disabled}>
-      {TAX_RATES.map((rate) => <option key={rate} value={rate}>{Math.round(rate * 100)} %</option>)}
+      {options.map((rate) => <option key={rate} value={rate}>{tvaPct(rate)} %</option>)}
     </select>
   );
 }
 
-export default function QuoteLineForm({ mode, value, onChange, onSubmit, onCancel, currency = 'XOF', allowTax = false, saving = false }) {
+export default function QuoteLineForm({ mode, value, onChange, onSubmit, onCancel, currency = 'XOF', allowTax = false, saving = false, taux = null }) {
   const totals = quoteLineTotals(value);
   const valid = value.designation.trim() && Number(value.qty) > 0 && Number(value.pu) >= 0;
   const set = (patch) => onChange({ ...value, ...patch });
@@ -72,7 +77,7 @@ export default function QuoteLineForm({ mode, value, onChange, onSubmit, onCance
       <div className="quote-form-section-label">Prix</div>
       <div className="quote-line-form-card">
         <Field label="Prix unitaire"><CurrencyInput value={value.pu} onChange={(pu) => set({ pu })} currency={currency} /></Field>
-        <Field label="TVA"><TaxSelector value={allowTax ? value.taxRate : 0} onChange={(taxRate) => set({ taxRate })} disabled={!allowTax} /></Field>
+        <Field label="TVA"><TaxSelector value={allowTax ? value.taxRate : 0} onChange={(taxRate) => set({ taxRate })} disabled={!allowTax} taux={taux} /></Field>
       </div>
 
       <div className="quote-line-form-card quote-line-total-card">

@@ -10,6 +10,7 @@ import Field from '../../../components/Field';
 import LigneEditor from '../../../components/LigneEditor';
 import TvaToggle from '../../../components/TvaToggle';
 import { MODELES, EMPTY_LIGNE, normalizeModele } from './constants';
+import { paysDeLEntreprise, indicationTva } from '../../../data/pays';
 
 const emptyForm = (tvaActive, modele) => ({
   clientName: '', clientPhone: '', clientVille: '', echeance: '',
@@ -33,8 +34,10 @@ const formFromFacture = (f, modeleDefaut) => ({
  */
 export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDefaut, onSubmit, initial = null }) {
   const { user } = useAuth();
-  const { proClientsForUser, addProClient } = useData();
+  const { proClientsForUser, addProClient, getCompanyForUser } = useData();
   const myClients = proClientsForUser(user.id);
+  // TVA au taux du pays de l'entreprise (18 %, 19 % au Niger, 19,25 % au Cameroun).
+  const pays = paysDeLEntreprise(getCompanyForUser(user.id));
 
   const [form, setForm] = useState(() => emptyForm(defaultTvaActive, modeleDefaut));
   const [clientMode, setClientMode] = useState('existing'); // existing | new (création seulement)
@@ -72,7 +75,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
       }
     }
 
-    const totals = computeFactureTotals(lignes, form.tvaActive);
+    const totals = computeFactureTotals(lignes, form.tvaActive, pays.tva);
     onSubmit({
       clientId: client.id,
       clientName: client.name,
@@ -89,7 +92,8 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
 
   const preview = computeFactureTotals(
     form.lignes.map((l) => ({ pu: Number(l.pu) || 0, qty: Number(l.qty) || 0 })),
-    form.tvaActive
+    form.tvaActive,
+    pays.tva,
   );
 
   return (
@@ -173,7 +177,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
           onAdd={() => setForm({ ...form, lignes: [...form.lignes, { ...EMPTY_LIGNE }] })}
         />
 
-        <TvaToggle value={form.tvaActive} onChange={(v) => setForm({ ...form, tvaActive: v })} />
+        <TvaToggle value={form.tvaActive} onChange={(v) => setForm({ ...form, tvaActive: v })} taux={pays.tva} indication={indicationTva(pays)} />
 
         <Field label="Modèle de document">
           <select className="input" value={form.modele || modeleDefaut} onChange={(e) => setForm({ ...form, modele: e.target.value })}>

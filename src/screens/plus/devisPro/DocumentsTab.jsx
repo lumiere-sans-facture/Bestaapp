@@ -13,6 +13,7 @@ import {
 import { useDocumentsPro } from './useDocumentsPro';
 import EnvoiPdfSheet from '../../../components/EnvoiPdfSheet';
 import { MODELES } from './constants';
+import { paysDeLEntreprise, numeroInternational } from '../../../data/pays';
 import FactureSheet from './FactureSheet';
 import PaiementSheet from './PaiementSheet';
 import ProDevisBuilder from './ProDevisBuilder';
@@ -39,6 +40,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   // PDF des devis et factures, produits dans l'application (téléchargés ou
   // envoyés sur WhatsApp, fichier joint).
   const docs = useDocumentsPro({ company, modeleDefaut });
+  // Pays de l'entreprise : taux de TVA, indicatif des numéros clients.
+  const pays = paysDeLEntreprise(company);
 
   const [tab, setTab] = useState('devis'); // devis | factures — ouvre sur les devis
   const [view, setView] = useState('list'); // list | create
@@ -120,7 +123,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       const lead = getLeadById(d.leadId);
       const lignes = devisToLignes(d, products);
       const tvaActive = d.type === 'pro' ? !!d.tvaActive : (company?.assujettieVAT || false);
-      const totals = computeFactureTotals(lignes, tvaActive);
+      const totals = computeFactureTotals(lignes, tvaActive, pays.tva);
       addFacture({
         userId: user.id,
         clientId: d.clientId,
@@ -139,7 +142,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   // Relance WhatsApp : ouvre un message pré-rempli, trace la relance et le dit
   // (de retour dans l'app, l'utilisateur sait que c'est parti).
   const relancer = (f) => {
-    const url = whatsappLink(f.clientPhone, relanceMessage(f, company));
+    // Numéro saisi en local (« 90 00 00 00 ») : l'indicatif du pays le rend joignable.
+    const url = whatsappLink(numeroInternational(f.clientPhone, pays.indicatif), relanceMessage(f, company));
     window.open(url, '_blank', 'noopener');
     addRelance(f.id, 'whatsapp');
     toast(`Relance envoyée à ${f.clientName} sur WhatsApp.`);
@@ -536,7 +540,7 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
 
       <PaiementSheet open={!!payFacture} onClose={() => setPayFacture(null)} facture={payFactureLive} onSubmit={submitPaiement} />
 
-      <DevisEditSheet open={!!editDevis} onClose={() => setEditDevis(null)} devis={editDevis} editableClient withTva />
+      <DevisEditSheet open={!!editDevis} onClose={() => setEditDevis(null)} devis={editDevis} editableClient withTva tauxTva={pays.tva} />
 
       <ConfirmSheet
         open={!!confirm}

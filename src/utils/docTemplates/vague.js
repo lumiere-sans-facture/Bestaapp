@@ -174,7 +174,7 @@ export function renderVague({ kind, data }) {
     ${ref.ligne}
     <div class="legal ${ref.push}">
       <span>${esc(e.name)}${e.slogan ? ` — ${esc(e.slogan)}` : ''}</span>
-      <span>${[e.rccm ? `RCCM ${esc(e.rccm)}` : '', e.ifu ? `NIF ${esc(e.ifu)}` : '', total > 1 ? `Page ${i + 1} / ${total}` : ''].filter(Boolean).join(' · ')}</span>
+      <span>${[e.rccm ? `RCCM ${esc(e.rccm)}` : '', e.ifu ? `${esc(e.fiscal || 'NIF')} ${esc(e.ifu)}` : '', total > 1 ? `Page ${i + 1} / ${total}` : ''].filter(Boolean).join(' · ')}</span>
     </div>
   </div>
   ${vagueBasse(e.couleurPrimaire, clair)}

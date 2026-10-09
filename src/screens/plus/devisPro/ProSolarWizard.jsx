@@ -18,6 +18,7 @@ import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
 import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
 import TvaToggle from '../../../components/TvaToggle';
+import { paysDeLEntreprise, indicationTva } from '../../../data/pays';
 import EditableQuotation, { lignesDepuisDevisKit, lignesModifiables } from '../../../components/EditableQuotation';
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../components/SolarConsumptionControls';
 import AjustementsKit from '../../../components/AjustementsKit';
@@ -66,6 +67,8 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
 
   const myClients = proClientsForUser(user.id);
   const company = getCompanyForUser(user.id);
+  // Pays de l'entreprise : taux de TVA, et prix du kWh quand le lieu du chantier ne le dit pas.
+  const pays = paysDeLEntreprise(company);
 
   // Options matériel issues de la boutique
   // Onduleurs proposés : ceux de « Mes onduleurs » (Plus › Onduleurs), jamais
@@ -258,7 +261,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     ? newClient
     : (myClients.find((c) => c.id === clientId) || {});
   const villeDimensionnement = location?.name || clientSelectionne.ville || '';
-  const tarifElecDefaut = tarifElectriciteParDefaut(villeDimensionnement, location?.country || '');
+  const tarifElecDefaut = tarifElectriciteParDefaut(villeDimensionnement, location?.country || '', pays.id);
   const coefMainOeuvre = coefficientMainOeuvre({
     ville: villeDimensionnement,
     pays: location?.country || '',
@@ -321,7 +324,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, proposalMode, proposalKey]);
 
-  const totals = useMemo(() => computeFactureTotals(proposalLines, tvaActive), [proposalLines, tvaActive]);
+  const totals = useMemo(() => computeFactureTotals(proposalLines, tvaActive, pays.tva), [proposalLines, tvaActive, pays.tva]);
   // Provision de remplacement : le prix de l'onduleur RÉELLEMENT au devis,
   // lignes modifiées comprises. Le champ « Provision onduleur » reste
   // prioritaire quand le technicien y saisit un montant.
@@ -395,7 +398,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
       if (!client) return;
     }
     const lignesFinales = proposalLines.map(({ id: _id, ...line }) => line);
-    const t = computeFactureTotals(lignesFinales, tvaActive);
+    const t = computeFactureTotals(lignesFinales, tvaActive, pays.tva);
     const inverterInfo = proposalMode === 'kit'
       ? (kitQuotation?.inverterSuggested || (selectedKit ? { brand: '', model: `Onduleur du kit ${selectedKit.inverter} kVA`, capacity: selectedKit.inverter } : null))
       : inverter;
@@ -931,7 +934,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                   <FileText size={16} /> {ficheEnCours ? 'Préparation de la fiche…' : 'Fiche de dimensionnement (PDF)'}
                 </button>
 
-                <TvaToggle value={tvaActive} onChange={setTvaActive} />
+                <TvaToggle value={tvaActive} onChange={setTvaActive} taux={pays.tva} indication={indicationTva(pays)} />
                 <div className="devis-summary">
                   <div className="devis-summary-row"><span>Total HT</span><span>{formatCFA(totals.totalHT)}</span></div>
                   <div className="devis-summary-row"><span>TVA</span><span>{tvaActive ? formatCFA(totals.tva) : 'Exonérée'}</span></div>

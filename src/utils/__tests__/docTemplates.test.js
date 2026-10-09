@@ -259,8 +259,9 @@ describe('modèle Sobre — noir, blanc et gris', () => {
   });
 
   it('bloc client : six libellés toujours présents, « — » quand la valeur manque', () => {
-    for (const lib of ['Client', 'IFU', 'Adresse', 'Objet', 'Tél', 'Email']) expect(html).toContain(`<div class="lib">${lib}</div>`);
-    expect(html).toContain('<div class="lib">IFU</div><div>—</div>');
+    // Identifiant fiscal : le sigle du pays de l'émetteur (ici BestaSolar, Togo : NIF).
+    for (const lib of ['Client', 'NIF', 'Adresse', 'Objet', 'Tél', 'Email']) expect(html).toContain(`<div class="lib">${lib}</div>`);
+    expect(html).toContain('<div class="lib">NIF</div><div>—</div>');
     expect(html).toContain('Client ID');
     expect(html).toContain('Franc CFA');
   });
@@ -403,5 +404,35 @@ describe('partenaire apporteur sur le devis', () => {
     expect(apporteurDe({ type: 'pro', partnerCode: 'BS-KODJO' }, PARTENAIRE)).toBeNull();
     const facture = donneesDeFacture({ facture: { numero: 'FAC-2026-001', lignes: [] }, company: COMPANY });
     expect(buildDocHtml({ kind: 'facture', model: 'studio', data: facture })).not.toContain('Réf. partenaire');
+  });
+});
+
+describe('documents Pro : le pays de l’entreprise', () => {
+  const ENTREPRISE = { nomEntreprise: 'Lumière d’Abidjan', ifu: '2400123A', rccm: 'CI-ABJ-03-2024-B12-01234', telephone: '+225 07 00 00 00 00' };
+  const facture = { numero: 'FAC-2026-001', createdAt: '2026-03-22', clientName: 'Awa Koné', lignes: [{ designation: 'Panneau 580 Wc', qty: 2, pu: 60000 }], totalHT: 120000, tva: 0, totalTTC: 120000 };
+
+  it('sigle de l’identifiant fiscal selon le pays, sur les trois modèles', () => {
+    const cas = [['ci', 'NCC'], ['bj', 'IFU'], ['bf', 'IFU'], ['sn', 'NINEA'], ['cm', 'NIU'], ['ne', 'NIF'], ['ml', 'NIF'], ['tg', 'NIF']];
+    for (const [pays, sigle] of cas) {
+      const data = donneesDeFacture({ facture, company: { ...ENTREPRISE, pays } });
+      expect(data.emetteur.fiscal).toBe(sigle);
+      for (const model of ['studio', 'vague', 'sobre']) {
+        expect(buildDocHtml({ kind: 'facture', model, data })).toContain(`${sigle} 2400123A`);
+      }
+      expect(buildDocHtml({ kind: 'facture', model: 'sobre', data })).toContain(`<div class="lib">${sigle}</div>`);
+    }
+  });
+
+  it('sans pays choisi, celui du téléphone ; à défaut le Togo (documents d’avant inchangés)', () => {
+    expect(emetteurDe(ENTREPRISE).fiscal).toBe('NCC');
+    expect(emetteurDe({ nomEntreprise: 'X', telephone: '90 00 00 00' }).fiscal).toBe('NIF');
+    expect(emetteurDe({ nomEntreprise: 'X', telephone: '+229 01 97 00 00 00' }).fiscal).toBe('IFU');
+  });
+
+  it('l’opérateur Mobile Money nomme le moyen de paiement', () => {
+    expect(emetteurDe({ nomEntreprise: 'X', momo: '+225 07 11 22 33 44', momoOperateur: 'Wave' }).bank.name).toBe('Wave');
+    expect(emetteurDe({ nomEntreprise: 'X', momo: '+228 90 11 22 33' }).bank.name).toBe('Mobile Money');
+    const html = buildDocHtml({ kind: 'facture', model: 'sobre', data: donneesDeFacture({ facture, company: { ...ENTREPRISE, momo: '+225 07 11 22 33 44', momoOperateur: 'Wave' } }) });
+    expect(html).toContain('<span class="lib">Paiement</span> Wave');
   });
 });

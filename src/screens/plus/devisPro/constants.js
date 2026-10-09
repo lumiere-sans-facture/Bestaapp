@@ -9,7 +9,9 @@ export const EMPTY_COMPANY = {
   nomEntreprise: '', logo: '', telephone: '', email: '', adresse: '',
   ifu: '', rccm: '', couleurPrimaire: '#0a2472', couleurSecondaire: '#f5a623',
   slogan: '', modeleDefaut: 'studio', facturePrefix: 'FAC', assujettieVAT: false,
-  momo: '', momoNom: '', conditions: '',
+  momo: '', momoNom: '', momoOperateur: '', conditions: '',
+  // Pays de l'entreprise (data/pays.js). Vide = déduit du téléphone, sinon Togo.
+  pays: '',
 };
 
 export const EMPTY_LIGNE = { designation: '', qty: 1, pu: '' };

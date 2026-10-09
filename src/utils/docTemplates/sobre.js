@@ -135,7 +135,7 @@ export function renderSobre({ kind, data }) {
   const paiement = String(data.paiement || '').trim() || (e.bank?.name || 'À convenir');
   const conditions = conditionsPour(kind, e);
   const pied = [
-    [e.name, e.rccm ? `RCCM ${e.rccm}` : '', e.ifu ? `IFU ${e.ifu}` : ''].filter(Boolean).join(' — '),
+    [e.name, e.rccm ? `RCCM ${e.rccm}` : '', e.ifu ? `${e.fiscal || 'NIF'} ${e.ifu}` : ''].filter(Boolean).join(' — '),
     e.address || '',
     [e.phone ? `Tél ${e.phone}` : '', e.email || '', e.website || ''].filter(Boolean).join(' · '),
   ];
@@ -183,7 +183,7 @@ export function renderSobre({ kind, data }) {
   <div class="client">
     <div class="champs">
       <div class="lib">Client</div><div>${val(nomClient)}</div>
-      <div class="lib">IFU</div><div>${val(c.ifu)}</div>
+      <div class="lib">${esc(e.fiscal || 'NIF')}</div><div>${val(c.ifu)}</div>
       <div class="lib">Adresse</div><div>${val(c.adresse)}</div>
       <div class="lib">Objet</div><div>${val(data.objet)}</div>
       <div class="lib">Tél</div><div>${val(c.phone)}</div>

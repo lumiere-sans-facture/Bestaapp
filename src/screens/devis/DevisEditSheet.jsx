@@ -19,7 +19,8 @@ const emptyLine = (taxRate = 0) => ({
 
 /** Éditeur mobile commun aux devis publics et Pro. L'ordre du tableau
  * `lignes` est déjà celui utilisé par les PDF : aucune migration n'est utile. */
-export default function DevisEditSheet({ open, onClose, devis, editableClient = false, withTva = false }) {
+// `tauxTva` : taux du pays de l'émetteur (espace Pro, data/pays.js).
+export default function DevisEditSheet({ open, onClose, devis, editableClient = false, withTva = false, tauxTva = TVA_RATE }) {
   const { products, updateDevis } = useData();
   const [lignes, setLignes] = useState([]);
   const lignesRef = useRef([]);
@@ -62,12 +63,12 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
     setLineForm(null);
     setChargement(true);
     import('../../utils/proDocPdf').then(({ devisToLignes }) => {
-      const taxRate = withTva && devis.tvaActive ? TVA_RATE : 0;
+      const taxRate = withTva && devis.tvaActive ? tauxTva : 0;
       const next = devisToLignes(devis, products).map((line) => normalizeQuoteLine(line, { defaultTaxRate: taxRate }));
       setLignes(next);
       lignesRef.current = next;
     }).catch(() => setSaveError('Impossible de charger les lignes du devis.')).finally(() => setChargement(false));
-  }, [open, devis, products, withTva]);
+  }, [open, devis, products, withTva, tauxTva]);
 
   const buildPatch = (nextLines, extra = {}) => {
     const cleaned = cleanQuoteLines(nextLines);
@@ -109,7 +110,7 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
   };
 
   const retry = () => pendingSave.current && persist(pendingSave.current.nextLines, pendingSave.current.extra);
-  const openCreate = () => setLineForm({ mode: 'create', index: null, value: emptyLine(hasTax ? TVA_RATE : 0) });
+  const openCreate = () => setLineForm({ mode: 'create', index: null, value: emptyLine(hasTax ? tauxTva : 0) });
   const openEdit = (index) => setLineForm({ mode: 'edit', index, value: { ...lignes[index] } });
   const submitLine = async () => {
     const next = lineForm.mode === 'edit'
@@ -206,7 +207,7 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
             </div>
             <QuoteLineForm mode={lineForm.mode} value={lineForm.value}
               onChange={(value) => setLineForm({ ...lineForm, value })} onSubmit={submitLine}
-              onCancel={() => setLineForm(null)} currency={currency} allowTax={withTva} saving={saving} />
+              onCancel={() => setLineForm(null)} currency={currency} allowTax={withTva} saving={saving} taux={withTva ? tauxTva : null} />
           </>
         ) : (
           <div className="quote-editor">

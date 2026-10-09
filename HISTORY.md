@@ -6,6 +6,14 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-09
+- **Espace Pro : l'entreprise choisit son pays — Bénin, Burkina Faso, Cameroun, Côte d'Ivoire, Mali, Niger, Sénégal, Togo.** Jusqu'ici, tout supposait le Togo (NIF, +228, TVA 18 %). Un sélecteur « Pays de l'entreprise » (Mon entreprise › Coordonnées) règle désormais, pour chaque pays (`src/data/pays.js`) :
+  - l'**identifiant fiscal** : IFU (Bénin, Burkina Faso), NIF (Togo, Niger, Mali), NCC (Côte d'Ivoire), NINEA (Sénégal), NIU (Cameroun) — libellé du champ, exemple, et sigle imprimé sur les devis, factures (trois modèles) et fiches de dimensionnement ;
+  - le **taux de TVA** des nouveaux devis et factures : 18 %, 19 % au Niger, 19,25 % au Cameroun (formulaire de facture, devis manuel, assistant, conversion devis → facture, modification des lignes) ;
+  - la **devise** affichée (franc CFA BCEAO ; BEAC au Cameroun), l'**indicatif** et des exemples de numéros et de RCCM ;
+  - les **opérateurs Mobile Money** du pays, proposés dans un nouveau champ « Opérateur » (libre) ; l'opérateur est imprimé comme moyen de paiement et repris dans les messages de facture et de relance (« Règlement Orange Money : … ») ;
+  - l'**indicatif des numéros clients** saisis en local, pour que la relance et l'envoi WhatsApp joignent le bon pays ;
+  - le **prix du kWh** par défaut de la rentabilité de la fiche (quand le lieu du chantier ne le donne pas).
+  Une entreprise enregistrée avant ce réglage prend le pays de son téléphone, sinon le Togo : ses documents ne changent pas. Une alerte signale un numéro d'un autre pays que celui choisi. Les taux et prix sont des valeurs de référence, modifiables document par document. Parcours `e2e/pays-entreprise.mjs` (18 vérifications).
 - **Espace Pro : la fiche de dimensionnement se télécharge depuis chaque devis.** La fiche d'un devis Pro ne se produisait que dans l'assistant, au moment de la création. Un bouton « Fiche de dimensionnement (PDF) » s'ajoute dans la fiche de tout devis issu de l'assistant (onglet Devis & Factures). La fiche obtenue est **identique** à celle de l'assistant, et non une approximation :
   - le même calcul — panneau du catalogue, onduleurs de « Mes onduleurs » (`contexteCalculPro`, commun aux deux chemins) ;
   - le même matériel — celui du calcul en proposition par kit, celui choisi à l'étape Matériel en composition pro, désormais rangé avec le devis (`materielFiche`) ;

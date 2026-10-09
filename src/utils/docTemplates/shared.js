@@ -6,6 +6,7 @@ import { COMPANY, TELEPHONES_DOCUMENTS, telephonesImprimes } from '../../config/
 import { dateEmissionDevis } from '../dateEmission';
 import { LOGO_BESTASOLAR } from '../../assets/logoBestaSolar';
 import { prixPublic } from '../price';
+import { paysDeLEntreprise } from '../../data/pays';
 
 // ---------------------------------------------------------------------------
 // Formatage
@@ -85,8 +86,12 @@ export function emetteurDe(source = {}) {
         addressShort: source.adresse || '',
         rccm: source.rccm || '',
         ifu: source.ifu || '',
+        // Sigle de l'identifiant fiscal du pays de l'entreprise : IFU (Bénin,
+        // Burkina), NIF (Togo, Niger, Mali), NCC (Côte d'Ivoire), NINEA
+        // (Sénégal), NIU (Cameroun).
+        fiscal: paysDeLEntreprise(source).fiscal.sigle,
         logo: source.logo || '',
-        bank: source.momo ? { name: 'Mobile Money', account: source.momo, swift: source.momoNom || '' } : null,
+        bank: source.momo ? { name: source.momoOperateur || 'Mobile Money', account: source.momo, swift: source.momoNom || '' } : null,
         conditions: source.conditions || '',
         // Couleurs de l'abonné : les documents Pro portent sa marque, pas la nôtre.
         couleurPrimaire: hexOu(source.couleurPrimaire, COULEURS_DEFAUT.primaire),
@@ -105,6 +110,7 @@ export function emetteurDe(source = {}) {
         addressShort: source.addressShort ?? COMPANY.addressShort,
         rccm: source.rccm ?? COMPANY.rccm,
         ifu: source.ifu ?? COMPANY.ifu,
+        fiscal: 'NIF', // BESTA SOLAR TOGO : numéro fiscal togolais
         logo: source.logo || LOGO_BESTASOLAR,
         bank: source.bank ?? COMPANY.bank,
         conditions: source.conditions || '',

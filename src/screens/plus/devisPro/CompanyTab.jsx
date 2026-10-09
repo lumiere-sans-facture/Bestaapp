@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Building2, Check, Camera, Palette, CreditCard, FileText, Eye, Download } from 'lucide-react';
+import { Building2, Check, Camera, Palette, CreditCard, FileText, Eye, Download, Globe } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { fileToResizedDataUrl } from '../../../utils/image';
@@ -7,7 +7,7 @@ import Field from '../../../components/Field';
 import { useToast } from '../../../components/Toast';
 import FacturePreview from './FacturePreview';
 import { MODELES, EMPTY_COMPANY, normalizeModele } from './constants';
-import { TVA_PCT } from '../../../config/company';
+import { PAYS, paysDeLEntreprise, paysDuTelephone, tvaPct, libelleDevise, indicationTva } from '../../../data/pays';
 
 // Facture d'exemple pour l'aperçu PDF.
 const SAMPLE_LIGNES = [
@@ -31,6 +31,13 @@ export default function CompanyTab({ company }) {
   const f = companyForm || { ...EMPTY_COMPANY, ...company };
   const set = (patch) => setCompanyForm({ ...f, ...patch });
   const modele = normalizeModele(f.modeleDefaut);
+  // Pays : celui choisi, sinon déduit du téléphone (entreprises d'avant ce
+  // réglage), sinon le Togo. Il règle libellés, exemples, TVA et Mobile Money.
+  const pays = paysDeLEntreprise(f);
+  // Numéro d'un autre pays que celui choisi : souvent un oubli après un changement de pays.
+  const autrePays = (tel) => { const p = paysDuTelephone(tel); return p && p.id !== pays.id ? p : null; };
+  const telAutrePays = autrePays(f.telephone);
+  const momoAutrePays = autrePays(f.momo);
   const dirty = companyForm !== null;
 
   const handleLogo = async (e) => {
@@ -60,7 +67,7 @@ export default function CompanyTab({ company }) {
       return;
     }
     setErreurNom(false);
-    saveCompany(user.id, { ...f, modeleDefaut: modele });
+    saveCompany(user.id, { ...f, pays: pays.id, modeleDefaut: modele });
     setCompanyForm(null);
     setCouleursAvant(null);
     toast('Entreprise enregistrée.');
@@ -131,9 +138,19 @@ export default function CompanyTab({ company }) {
       {/* Coordonnées */}
       <div className="card my-partner-section">
         <div className="sheet-section-title"><FileText size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Coordonnées</div>
+        <Field label="Pays de l'entreprise">
+          <select className="input" value={pays.id} onChange={(e) => set({ pays: e.target.value })}>
+            {PAYS.map((p) => <option key={p.id} value={p.id}>{p.drapeau} {p.nom}</option>)}
+          </select>
+          <div className="field-hint pays-resume">
+            <Globe size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
+            Indicatif {pays.indicatif} · TVA {tvaPct(pays.tva)} % · {libelleDevise(pays)} · identifiant fiscal : {pays.fiscal.sigle}
+          </div>
+        </Field>
         <div className="form-row-2">
           <Field label="Téléphone">
-            <input className="input" type="tel" value={f.telephone} onChange={(e) => set({ telephone: e.target.value })} placeholder="+228 ..." />
+            <input className="input" type="tel" value={f.telephone} onChange={(e) => set({ telephone: e.target.value })} placeholder={pays.exempleTel} />
+            {telAutrePays && <div className="field-hint text-warning">Numéro en {telAutrePays.indicatif} ({telAutrePays.nom}) : est-ce le bon ?</div>}
           </Field>
           <Field label="Email">
             <input className="input" type="email" value={f.email} onChange={(e) => set({ email: e.target.value })} />
@@ -143,11 +160,15 @@ export default function CompanyTab({ company }) {
           <input className="input" value={f.adresse} onChange={(e) => set({ adresse: e.target.value })} placeholder="Quartier, ville" />
         </Field>
         <div className="form-row-2">
-          <Field label="NIF (optionnel)">
-            <input className="input" value={f.ifu} onChange={(e) => set({ ifu: e.target.value })} />
+          {/* La clé reste `ifu` (données déjà enregistrées) ; le libellé suit le pays. */}
+          <Field label={`${pays.fiscal.sigle} (optionnel)`}>
+            <input className="input" value={f.ifu} onChange={(e) => set({ ifu: e.target.value })}
+              placeholder={pays.fiscal.exemple ? `Ex : ${pays.fiscal.exemple}` : pays.fiscal.sigle} />
+            <div className="field-hint">{pays.fiscal.nom}</div>
           </Field>
           <Field label="RCCM (optionnel)">
-            <input className="input" value={f.rccm} onChange={(e) => set({ rccm: e.target.value })} />
+            <input className="input" value={f.rccm} onChange={(e) => set({ rccm: e.target.value })} placeholder={`Ex : ${pays.exempleRccm}`} />
+            <div className="field-hint">Registre du commerce (OHADA)</div>
           </Field>
         </div>
       </div>
@@ -177,7 +198,7 @@ export default function CompanyTab({ company }) {
             </button>
           </div>
         ) : (
-          <div className="field-hint">Détectées automatiquement à l'import de votre logo, ajustables ici. Appliquées aux modèles Studio et Vague ; le modèle Classique reste noir et blanc.</div>
+          <div className="field-hint">Détectées automatiquement à l'import de votre logo, ajustables ici. Appliquées aux modèles Studio et Vague ; le modèle Sobre reste noir et blanc.</div>
         )}
       </div>
 
@@ -187,9 +208,18 @@ export default function CompanyTab({ company }) {
         <Field label="Préfixe des factures">
           <input className="input" value={f.facturePrefix} onChange={(e) => set({ facturePrefix: e.target.value.toUpperCase().slice(0, 6) })} placeholder="FAC" />
         </Field>
+        <Field label="Opérateur Mobile Money">
+          <input className="input" list="operateurs-mobile-money" value={f.momoOperateur || ''} onChange={(e) => set({ momoOperateur: e.target.value })}
+            placeholder={`Ex : ${pays.mobileMoney[0]}`} />
+          <datalist id="operateurs-mobile-money">
+            {pays.mobileMoney.map((o) => <option key={o} value={o} />)}
+          </datalist>
+          <div className="field-hint">{pays.dans.charAt(0).toUpperCase() + pays.dans.slice(1)} : {pays.mobileMoney.join(', ')}. Il figure sur vos factures et vos relances.</div>
+        </Field>
         <div className="form-row-2">
           <Field label="Numéro Mobile Money">
-            <input className="input" type="tel" value={f.momo} onChange={(e) => set({ momo: e.target.value })} placeholder="+228 ..." />
+            <input className="input" type="tel" value={f.momo} onChange={(e) => set({ momo: e.target.value })} placeholder={pays.exempleTel} />
+            {momoAutrePays && <div className="field-hint text-warning">Numéro en {momoAutrePays.indicatif} ({momoAutrePays.nom}) : est-ce le bon ?</div>}
           </Field>
           <Field label="Nom du compte MoMo">
             <input className="input" value={f.momoNom} onChange={(e) => set({ momoNom: e.target.value })} placeholder="Titulaire" />
@@ -205,10 +235,10 @@ export default function CompanyTab({ company }) {
               Exonérée
             </button>
             <button type="button" className={`segmented-btn ${f.assujettieVAT ? 'active' : ''}`} aria-pressed={!!f.assujettieVAT} onClick={() => set({ assujettieVAT: true })}>
-              TVA {TVA_PCT} %
+              TVA {tvaPct(pays.tva)} %
             </button>
           </div>
-          <div className="field-hint">Le solaire est exonéré de TVA par défaut au Togo ; ce choix s'applique aux nouveaux devis et factures, ajustable document par document.</div>
+          <div className="field-hint">{indicationTva(pays)} Ce choix s'applique aux nouveaux devis et factures, ajustable document par document.</div>
         </div>
       </div>
 

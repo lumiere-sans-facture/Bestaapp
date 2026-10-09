@@ -9,6 +9,7 @@ import { devisEnvoiMessage } from '../../../utils/affaires';
 import { factureEnvoiMessage } from '../../../utils/paiement';
 import { useEnvoiPdf } from '../../devis/useEnvoiPdf';
 import { normalizeModele } from './constants';
+import { paysDeLEntreprise, numeroInternational } from '../../../data/pays';
 
 /**
  * @param {object} o
@@ -19,6 +20,9 @@ export function useDocumentsPro({ company, modeleDefaut }) {
   const { getLeadById, products, markDevisPro, inverters } = useData();
   const toast = useToast();
   const pdf = useEnvoiPdf({ ecran: '/pro/documents', origine: 'document-pro' });
+  // Numéro du client saisi en local : l'indicatif du pays de l'entreprise le
+  // rend joignable par le lien WhatsApp (ordinateur).
+  const { indicatif } = paysDeLEntreprise(company);
 
   /** Modèle d'un document : celui qu'il porte, sinon celui de l'entreprise. */
   const modeleDe = (doc) => (doc?.modele ? normalizeModele(doc.modele) : modeleDefaut);
@@ -56,7 +60,7 @@ export function useDocumentsPro({ company, modeleDefaut }) {
       ...fichier,
       titre: titreDevis(d),
       texte: devisEnvoiMessage(d, lead, company?.nomEntreprise),
-      telephone: d.clientPhone || lead?.phone || '',
+      telephone: numeroInternational(d.clientPhone || lead?.phone || '', indicatif),
       confirmation: 'Devis partagé.',
       nature: 'devis',
     });
@@ -71,7 +75,7 @@ export function useDocumentsPro({ company, modeleDefaut }) {
       ...(await pdfFacture(f, modele)),
       titre: titreFacture(f),
       texte: factureEnvoiMessage(f, company),
-      telephone: f.clientPhone || '',
+      telephone: numeroInternational(f.clientPhone || '', indicatif),
       confirmation: 'Facture partagée.',
       nature: 'facture',
     });

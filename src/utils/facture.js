@@ -8,8 +8,12 @@ export const FACTURE_STATUT_BADGE = {
   brouillon: ['badge-muted', 'Brouillon'],
 };
 
-/** Totaux d'une facture : HT, TVA arrondie (si assujettie) au taux officiel, TTC. */
-export const computeFactureTotals = (lignes, tvaActive) => {
+/**
+ * Totaux d'une facture : HT, TVA arrondie (si assujettie), TTC.
+ * @param {number} [taux] taux de TVA du pays de l'émetteur (espace Pro :
+ *   data/pays.js) ; 18 % par défaut, celui de BestaSolar.
+ */
+export const computeFactureTotals = (lignes, tvaActive, taux = TVA_RATE) => {
   const totalHT = lignes.reduce((s, l) => s + (Number(l.pu) || 0) * (Number(l.qty) || 0), 0);
   // Les nouvelles lignes peuvent porter leur propre taux. Les documents plus
   // anciens n'en ont pas : ils conservent alors la TVA globale historique.
@@ -17,7 +21,7 @@ export const computeFactureTotals = (lignes, tvaActive) => {
   const tva = tvaActive
     ? Math.round(taxesParLigne
       ? lignes.reduce((s, l) => s + (Number(l.pu) || 0) * (Number(l.qty) || 0) * (Number(l.taxRate) || 0), 0)
-      : totalHT * TVA_RATE)
+      : totalHT * taux)
     : 0;
   return { totalHT, tva, totalTTC: totalHT + tva };
 };

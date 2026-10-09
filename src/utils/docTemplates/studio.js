@@ -174,7 +174,7 @@ export function renderStudio({ kind, data }) {
 
   ${ref.ligne}
   <div class="pied ${ref.push}">
-    <span>${esc(e.name)}${e.rccm ? ` · RCCM ${esc(e.rccm)}` : ''}${e.ifu ? ` · NIF ${esc(e.ifu)}` : ''}</span>
+    <span>${esc(e.name)}${e.rccm ? ` · RCCM ${esc(e.rccm)}` : ''}${e.ifu ? ` · ${esc(e.fiscal || 'NIF')} ${esc(e.ifu)}` : ''}</span>
     <span>${[esc(e.website || e.email || ''), total > 1 ? `Page ${i + 1} / ${total}` : ''].filter(Boolean).join(' · ')}</span>
   </div>
 </section>`;

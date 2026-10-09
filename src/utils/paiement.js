@@ -95,7 +95,7 @@ export const relanceMessage = (f, company) => {
   ];
   if (f?.echeance) lines.push(`Échéance : ${new Date(f.echeance).toLocaleDateString('fr-FR')}.`);
   if (company?.momo)
-    lines.push(`Règlement Mobile Money : ${company.momo}${company.momoNom ? ` (${company.momoNom})` : ''}.`);
+    lines.push(`Règlement ${company.momoOperateur || 'Mobile Money'} : ${company.momo}${company.momoNom ? ` (${company.momoNom})` : ''}.`);
   lines.push('Merci de votre confiance.', ent);
   return lines.join('\n');
 };
@@ -114,7 +114,7 @@ export const factureEnvoiMessage = (f, company) => {
   else {
     if (reste < (Number(f?.totalTTC) || 0)) lines.push(`Reste à régler : ${nf(reste)} F CFA.`);
     if (f?.echeance) lines.push(`À régler avant le ${new Date(f.echeance).toLocaleDateString('fr-FR')}.`);
-    if (company?.momo) lines.push(`Règlement Mobile Money : ${company.momo}${company.momoNom ? ` (${company.momoNom})` : ''}.`);
+    if (company?.momo) lines.push(`Règlement ${company.momoOperateur || 'Mobile Money'} : ${company.momo}${company.momoNom ? ` (${company.momoNom})` : ''}.`);
   }
   lines.push('Merci de votre confiance.', company?.nomEntreprise || 'BestaSolar');
   return lines.join('\n');

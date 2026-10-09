@@ -9,6 +9,7 @@ import Field from '../../../components/Field';
 import EmptyState from '../../../components/EmptyState';
 import LigneEditor from '../../../components/LigneEditor';
 import TvaToggle from '../../../components/TvaToggle';
+import { paysDeLEntreprise, indicationTva } from '../../../data/pays';
 import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
 
 const EMPTY_CLIENT = { name: '', contact: '', phone: '', ville: '', type: 'particulier' };
@@ -25,6 +26,8 @@ export default function ProDevisBuilder({ onDone }) {
 
   const myClients = proClientsForUser(user.id);
   const company = getCompanyForUser(user.id);
+  // TVA au taux du pays de l'entreprise.
+  const pays = paysDeLEntreprise(company);
 
   const [clientMode, setClientMode] = useState(myClients.length ? 'existing' : 'new');
   const [clientId, setClientId] = useState(myClients[0]?.id || '');
@@ -45,8 +48,8 @@ export default function ProDevisBuilder({ onDone }) {
   const addCustom = () => setLignes((ls) => [...ls, { designation: '', qty: 1, pu: '' }]);
 
   const totals = useMemo(
-    () => computeFactureTotals(lignes.map((l) => ({ pu: Number(l.pu) || 0, qty: Number(l.qty) || 0 })), tvaActive),
-    [lignes, tvaActive]
+    () => computeFactureTotals(lignes.map((l) => ({ pu: Number(l.pu) || 0, qty: Number(l.qty) || 0 })), tvaActive, pays.tva),
+    [lignes, tvaActive, pays.tva]
   );
 
   const cleanLignes = () =>
@@ -71,7 +74,7 @@ export default function ProDevisBuilder({ onDone }) {
       if (!client) return;
     }
 
-    const t = computeFactureTotals(finalLignes, tvaActive);
+    const t = computeFactureTotals(finalLignes, tvaActive, pays.tva);
     addDevis({
       type: 'pro',
       leadId: null,
@@ -163,7 +166,7 @@ export default function ProDevisBuilder({ onDone }) {
         addLabel="Ajouter un produit personnalisé"
       />
 
-      <TvaToggle value={tvaActive} onChange={setTvaActive} />
+      <TvaToggle value={tvaActive} onChange={setTvaActive} taux={pays.tva} indication={indicationTva(pays)} />
 
       <div className="devis-summary">
         <div className="devis-summary-row"><span>Total HT</span><span>{formatCFA(totals.totalHT)}</span></div>
