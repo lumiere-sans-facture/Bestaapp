@@ -1,4 +1,5 @@
 // Programme d'affiliation : codes partenaires et tracking du lien de parrainage.
+import { SITE_PUBLIC } from '../config/legal';
 
 // Alphabet sans ambiguïté pour les suffixes : pas de 0/O ni de 1/I.
 const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -74,7 +75,56 @@ export const generatePartnerCode = (name, existingCodes = [], identity = '') => 
   throw new Error('Génération du code partenaire impossible.');
 };
 
-export const partnerLink = (code) => `${window.location.origin}/?ref=${code}`;
+/**
+ * Adresse de base des liens partagés. Dans l'application Android, l'origine
+ * de la page est « https://localhost » : un lien bâti dessus ne mène nulle
+ * part. On y prend donc le site public.
+ */
+const origineLiens = () => {
+  if (typeof window === 'undefined') return SITE_PUBLIC;
+  return window.Capacitor?.isNativePlatform?.() ? SITE_PUBLIC : window.location.origin;
+};
+
+export const partnerLink = (code) => `${origineLiens()}/?ref=${code}`;
+
+/** Lien d'installation de l'application Android au nom d'un partenaire. */
+export const lienInstallationApp = (code) => `${origineLiens()}/telecharger?ref=${code}`;
+
+/** Message WhatsApp d'un partenaire : le site pour un devis, l'app à installer, le code. */
+export const messageParrainage = (code) =>
+  `Bonjour ! Découvrez les solutions solaires BestaSolar (lumière sans facture ☀️). Demandez votre devis ici : ${partnerLink(code)} — ou installez l'application Android : ${lienInstallationApp(code)} — Code partenaire : ${code}`;
+
+// ---- Code partenaire transmis à l'application installée ----
+//
+// Un APK téléchargé hors Play Store ne sait pas par quel lien il est arrivé.
+// La page /telecharger?ref=CODE (public/telecharger.html) copie donc ce texte
+// dans le presse-papiers au moment du téléchargement ; l'application le lit
+// une fois, à son premier lancement (lib/parrainageInstallation.js). La page
+// statique écrit le MÊME texte : les deux doivent rester d'accord.
+
+/** « Code partenaire BestaSolar : KODJO-K8R4MZ » */
+export const texteParrainageApp = (code) => `Code partenaire BestaSolar : ${normaliseCode(code)}`;
+
+/** Code partenaire trouvé dans un texte copié par la page de téléchargement, ou null. */
+export const codeParrainageDepuisTexte = (texte) => {
+  const m = String(texte || '').match(/code\s+partenaire\s+bestasolar\s*:\s*([A-Za-z0-9][A-Za-z0-9-]{2,39})/i);
+  return m ? normaliseCode(m[1]) : null;
+};
+
+/**
+ * Lire le presse-papiers au démarrage ? Une seule fois, sur l'APK Android, et
+ * seulement sur une installation NEUVE : ni compte, ni données, ni session —
+ * une simple mise à jour de l'application ne le lit pas. Ni quand un code
+ * partenaire est déjà retenu.
+ * @param {object} etat
+ * @param {string} etat.plateforme      'android' | 'ios' | 'web'
+ * @param {boolean} etat.dejaFait       lecture déjà tentée sur cet appareil
+ * @param {string[]} etat.clesStockage  clés présentes dans localStorage
+ * @param {boolean} etat.refActive      un code partenaire est déjà retenu
+ */
+export const doitChercherCodeInstallation = ({ plateforme, dejaFait = false, clesStockage = [], refActive = false } = {}) =>
+  plateforme === 'android' && !dejaFait && !refActive
+  && !clesStockage.some((cle) => cle === 'bestasolar_data' || cle === 'bestasolar_user' || String(cle).startsWith('sb-'));
 
 // ---- Attribution « last-click » avec expiration 30 jours ----
 
@@ -87,13 +137,7 @@ export const captureRefFromUrl = () => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (!ref) return null;
-    const code = normaliseCode(ref);
-    // last-click : un nouveau clic remplace l'attribution précédente
-    localStorage.setItem(REF_KEY, JSON.stringify({
-      code,
-      expiresAt: Date.now() + REF_TTL_DAYS * 86400000,
-      clickPending: true,
-    }));
+    const code = enregistrerRef(ref);
     const url = new URL(window.location.href);
     url.searchParams.delete('ref');
     window.history.replaceState({}, '', url);
@@ -101,6 +145,21 @@ export const captureRefFromUrl = () => {
   } catch {
     return null;
   }
+};
+
+/**
+ * Retient un code partenaire comme s'il venait d'un lien : 30 jours,
+ * dernier clic gagnant. Renvoie le code normalisé.
+ */
+export const enregistrerRef = (ref) => {
+  const code = normaliseCode(ref);
+  // last-click : un nouveau clic remplace l'attribution précédente
+  localStorage.setItem(REF_KEY, JSON.stringify({
+    code,
+    expiresAt: Date.now() + REF_TTL_DAYS * 86400000,
+    clickPending: true,
+  }));
+  return code;
 };
 
 /** Attribution active (non expirée), ou null. */

@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Check, CheckCircle, Copy, MessageCircle, MousePointerClick, Network, Users, Save, UserPlus, Crown, Wallet, Trophy, FileText, Share2, Banknote, X } from 'lucide-react';
+import { ChevronLeft, CheckCircle, MousePointerClick, Network, Users, Save, UserPlus, Crown, Wallet, Trophy, FileText, Share2, Banknote, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, formatTaux } from '../../utils/format';
 import { dateEmissionDevis } from '../../utils/dateEmission';
-import { partnerLink, REF_TTL_DAYS, memeCode } from '../../utils/referral';
+import { REF_TTL_DAYS, memeCode } from '../../utils/referral';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { fetchMyReferredOrgs } from '../../lib/remoteSync';
 import StageBadge from '../../components/StageBadge';
 import Accordion from '../../components/Accordion';
 import Sheet from '../../components/Sheet';
+import LiensParrainage from '../../components/LiensParrainage';
 import Field from '../../components/Field';
 import {
   RETRAIT_MIN, MODES_RETRAIT, STATUTS_RETRAIT, ETATS_COMMISSION,
@@ -35,7 +36,6 @@ export default function MyPartnerDashboard({ onBack }) {
   const [retraitOuvert, setRetraitOuvert] = useState(false);
   const [choisies, setChoisies] = useState([]);
   const [formRetrait, setFormRetrait] = useState({ methode: 'momo', telephone: '', note: '' });
-  const [copied, setCopied] = useState(false);
   const [momo, setMomo] = useState(null); // null = non édité
   const toast = useToast();
 
@@ -122,21 +122,6 @@ export default function MyPartnerDashboard({ onBack }) {
     toast('Demande envoyée. Le gérant la validera depuis son espace.');
   };
 
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(partnerLink(me.code));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast(`Copie impossible — lien : ${partnerLink(me.code)}`, { type: 'error' });
-    }
-  };
-
-  const shareWhatsApp = () => {
-    const text = `Bonjour ! Découvrez les solutions solaires BestaSolar (lumière sans facture ☀️). Demandez votre devis ici : ${partnerLink(me.code)} — Code partenaire : ${me.code}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  };
-
   const saveMomo = () => {
     updatePartner(me.id, { momoNumber: (momo || '').trim() });
     setMomo(null);
@@ -151,19 +136,9 @@ export default function MyPartnerDashboard({ onBack }) {
 
       {/* Code + lien */}
       <div className="card">
-        <div className="affiliate-box my-affiliate-box">
-          <div className="affiliate-code">{me.code}</div>
-          <div className="affiliate-link">{partnerLink(me.code)}</div>
-          <div className="affiliate-actions">
-            <button className="btn btn-sm btn-outline" onClick={copyLink}>
-              {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copié !' : 'Copier le lien'}
-            </button>
-            <button className="btn btn-sm btn-whatsapp" onClick={shareWhatsApp}>
-              <MessageCircle size={14} /> Partager WhatsApp
-            </button>
-          </div>
+        <LiensParrainage code={me.code} className="my-affiliate-box">
           <div className="field-hint">Partagez ce lien : toute demande qui en découle vous est attribuée pendant {REF_TTL_DAYS} jours.</div>
-        </div>
+        </LiensParrainage>
       </div>
 
       {/* KPI : icône, montant, libellé. Les tuiles .stat-pill des tableaux de

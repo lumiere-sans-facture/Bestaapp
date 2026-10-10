@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, Copy, MessageCircle, MousePointerClick, Search, Star } from 'lucide-react';
+import { ChevronLeft, Phone, Plus, Pencil, Check, Wallet, Users, Network, MousePointerClick, Search, Star } from 'lucide-react';
 import { useData, COMMISSION_RATES } from '../../context/DataContext';
 import { formatCFA, formatDate, initials, formatTaux } from '../../utils/format';
 import { dateEmissionDevis } from '../../utils/dateEmission';
-import { partnerLink, REF_TTL_DAYS, getActiveRef, memeCode } from '../../utils/referral';
+import { REF_TTL_DAYS, getActiveRef, memeCode } from '../../utils/referral';
 import PartenairesReseau from './PartenairesReseau';
 import Sheet from '../../components/Sheet';
+import LiensParrainage from '../../components/LiensParrainage';
 import ConfirmSheet from '../../components/ConfirmSheet';
-import { useToast } from '../../components/Toast';
 import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
 import StageBadge from '../../components/StageBadge';
@@ -28,29 +28,12 @@ export default function PartnersSection({ onBack }) {
   // null = fermé, 'new' = création, sinon id en édition
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [copied, setCopied] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all | actif | inactif
   const [sortBy, setSortBy] = useState('nom');
   const [payAllAsk, setPayAllAsk] = useState(null); // { partner, amount } en attente de confirmation
-  const toast = useToast();
 
   const selected = partners.find((p) => p.id === selectedId);
-
-  const copyLink = async (code) => {
-    try {
-      await navigator.clipboard.writeText(partnerLink(code));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast(`Copie impossible — lien : ${partnerLink(code)}`, { type: 'error' });
-    }
-  };
-
-  const shareWhatsApp = (partner) => {
-    const text = `Bonjour ! Découvrez les solutions solaires BestaSolar (lumière sans facture ☀️). Demandez votre devis ici : ${partnerLink(partner.code)} — Code partenaire : ${partner.code}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  };
 
   const statsFor = (partner) => {
     const l1Leads = leads.filter((l) => l.parrainL1 === partner.id);
@@ -251,19 +234,9 @@ export default function PartnersSection({ onBack }) {
 
               <div className="sheet-section">
                 <div className="sheet-section-title">Parrainages (affiliation)</div>
-                <div className="affiliate-box">
-                  <div className="affiliate-code">{selected.code}</div>
-                  <div className="affiliate-link">{partnerLink(selected.code)}</div>
-                  <div className="affiliate-actions">
-                    <button className="btn btn-sm btn-outline" onClick={() => copyLink(selected.code)}>
-                      {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copié !' : 'Copier le lien'}
-                    </button>
-                    <button className="btn btn-sm btn-whatsapp" onClick={() => shareWhatsApp(selected)}>
-                      <MessageCircle size={14} /> Partager WhatsApp
-                    </button>
-                  </div>
+                <LiensParrainage code={selected.code}>
                   <div className="field-hint">Attribution {REF_TTL_DAYS} jours, dernier clic. Les pistes et devis créés pendant cette période sont rattachés automatiquement.</div>
-                </div>
+                </LiensParrainage>
                 <div className="affiliate-stats">
                   <div className="partner-stat"><div className="partner-stat-value"><MousePointerClick size={14} /> {st.clicks}</div><div className="partner-stat-label">Clics</div></div>
                   <div className="partner-stat"><div className="partner-stat-value">{st.conversions.length}</div><div className="partner-stat-label">Conversions</div></div>

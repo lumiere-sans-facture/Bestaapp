@@ -20,7 +20,9 @@ export const URL_APK = `https://github.com/${DEPOT_GITHUB}/releases/latest/downl
  * lui que montre la page d'accueil et qu'on partage. Vercel le redirige vers
  * URL_APK (vercel.json, « redirects ») : le fichier reste servi par GitHub —
  * gratuit, rapide, et chaque téléchargement reste compté. Si un serveur
- * l'ignore (développement, cache hors-ligne), main.jsx fait le même renvoi.
+ * l'ignore (développement, cache hors-ligne), src/aiguillageTelechargement.js
+ * fait le même renvoi. Avec « ?ref=CODE » (lien d'un partenaire), la page
+ * public/telecharger.html passe d'abord : elle copie le code pour l'app.
  */
 export const CHEMIN_TELECHARGEMENT = '/telecharger';
 export const URL_TELECHARGEMENT = `${SITE_PUBLIC}${CHEMIN_TELECHARGEMENT}`;

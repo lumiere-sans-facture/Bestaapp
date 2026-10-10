@@ -3375,3 +3375,7 @@ form .login-link { width: 100%; margin-top: 4px; }
 .agent-proposition-fait { display: flex; align-items: center; gap: 6px; color: var(--success-dark, var(--success)); font-weight: 600; font-size: 0.875rem; }
 .agent-saisie { display: flex; gap: 8px; margin-top: 10px; }
 .agent-saisie .input { flex: 1; }
+
+/* Liens de parrainage : intitulé devant chaque lien (site, application). */
+.affiliate-link-titre { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; margin-right: 6px; vertical-align: middle; }
+.affiliate-link + .affiliate-link { margin-top: -6px; }

@@ -1,9 +1,15 @@
 {
   "redirects": [
-    { "source": "/telecharger", "destination": "https://github.com/lumiere-sans-facture/Bestaapp/releases/latest/download/BestaSolar.apk", "permanent": false }
+    {
+      "source": "/telecharger",
+      "missing": [{ "type": "query", "key": "ref" }],
+      "destination": "https://github.com/lumiere-sans-facture/Bestaapp/releases/latest/download/BestaSolar.apk",
+      "permanent": false
+    }
   ],
   "rewrites": [
-    { "source": "/((?!api/|privacy\\.html|suppression-compte\\.html|conditions\\.html|assets/|favicon\\.svg).*)", "destination": "/index.html" }
+    { "source": "/telecharger", "has": [{ "type": "query", "key": "ref" }], "destination": "/telecharger.html" },
+    { "source": "/((?!api/|privacy\\.html|suppression-compte\\.html|conditions\\.html|telecharger\\.(?:html|js)|assets/|favicon\\.svg).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

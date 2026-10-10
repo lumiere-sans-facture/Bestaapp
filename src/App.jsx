@@ -17,6 +17,7 @@ import Login from './screens/Login';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
 import { installerAnalytique, suivrePage, signalerOuvertureApp } from './lib/analytique';
 import { installerBarreEtat } from './lib/barreEtat';
+import { codeParrainageInstallation } from './lib/parrainageInstallation';
 
 // Capture l'attribution d'affiliation (?ref=AMINATA) dès le chargement,
 // avant même la connexion — durée 30 jours, last-click.
@@ -116,7 +117,11 @@ function AppRoutes() {
   // retour de Google — qui atterrit sur la racine — tombait sur la page
   // d'accueil et l'inscription se perdait là, sans un mot.
   const ecran = ecranDentree({ isLoading, recovery, pendingAuthUser, user });
-  const racine = vueRacine({ estNative: APP_NATIVE, user, venuParLien: VENU_PAR_LIEN });
+  // Application Android installée par un lien partenaire : le code repris du
+  // téléchargement (lib/parrainageInstallation.js) vaut un lien suivi — lu au
+  // rendu, la reprise se terminant après le chargement de ce module.
+  const venuParLien = VENU_PAR_LIEN || Boolean(codeParrainageInstallation());
+  const racine = vueRacine({ estNative: APP_NATIVE, user, venuParLien });
 
   if (ecran === 'chargement') {
     return <LoadingShell />;

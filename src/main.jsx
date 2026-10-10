@@ -1,22 +1,28 @@
 // Compte supprimé à la session précédente : ses données locales partent
 // AVANT que quoi que ce soit ne les relise — d'où ce premier import.
 import './purgeDemarrage'
+// Lien /telecharger servi par l'app (développement) : aiguillé avant qu'elle
+// ne retire le code partenaire de l'adresse.
+import './aiguillageTelechargement'
+// Application Android, premier lancement : code partenaire repris du
+// téléchargement. Constat « installation neuve » fait avant que l'app
+// n'écrive quoi que ce soit dans le stockage.
+import { attendreParrainageInstallation } from './lib/parrainageInstallation'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
-import { CHEMIN_TELECHARGEMENT, URL_APK } from './config/android'
 import './index.css'
 
-// Lien de téléchargement de l'APK sur notre domaine. En production, Vercel
-// le redirige avant même de servir l'app (vercel.json) ; ici, le renvoi de
-// secours, pour un serveur qui servirait l'app à sa place.
-if (location.pathname === CHEMIN_TELECHARGEMENT) location.replace(URL_APK)
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+// Le premier écran dépend du code éventuellement repris (inscription, code
+// prérempli) : on l'attend — une fraction de seconde, au premier lancement
+// de l'APK seulement ; ailleurs, la promesse est déjà résolue.
+attendreParrainageInstallation().finally(() => {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  )
+})
 
 // Cache applicatif : permet d'OUVRIR l'app sans réseau (voir public/sw.js).
 // Uniquement en production servie par HTTP(S) : en développement il masquerait
