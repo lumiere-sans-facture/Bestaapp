@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-10
+- **Couleurs des documents : le code couleur se tape.** Dans « Mon entreprise », chaque couleur (principale, secondaire) se règle au nuancier OU en tapant le code de la charte graphique : « #E30613 », « E30613 » sans dièse, la forme courte « #E31 », ou « rgb(227, 6, 19) ». Le code s'applique dès qu'il est complet — aperçu en direct, documents et fiche ; un code incomplet ou faux n'efface rien et est signalé ; le nuancier met le code à jour (`ChampCouleur`, `normaliserCodeCouleur`). Le code entier reste lisible sur un téléphone de 360 px. Parcours `e2e/couleurs-code.mjs` (12 vérifications).
 - **Logo des documents Pro : à sa juste taille.** Il était affiché à 32 px de haut quelle que soit sa forme : un sigle carré, ou entouré de marges, devenait un timbre-poste sur la facture. Désormais (`src/utils/logo.js`) :
   - sa taille suit ses **proportions** : chaque logo reçoit la même surface visuelle — un sigle carré 80 × 80 px, un logo en longueur environ 124 × 52 px — sans jamais descendre sous l'ancienne hauteur (le logo BestaSolar ne change pas), sur les devis et factures (Studio, Vague), la fiche de dimensionnement et l'aperçu de « Mon entreprise » ; aucune page ne déborde ;
   - à l'import, ses **marges vides** (transparentes ou blanches) sont rognées, et il reste en **PNG** : la conversion JPEG noircissait ou blanchissait le fond d'un logo détouré ;

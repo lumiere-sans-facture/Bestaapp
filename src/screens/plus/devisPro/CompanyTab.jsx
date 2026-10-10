@@ -7,6 +7,7 @@ import Field from '../../../components/Field';
 import { useToast } from '../../../components/Toast';
 import FacturePreview from './FacturePreview';
 import ApercuDocument from '../../../components/ApercuDocument';
+import ChampCouleur from '../../../components/ChampCouleur';
 import { MODELES, EMPTY_COMPANY, normalizeModele } from './constants';
 import { PAYS, paysDeLEntreprise, paysDuTelephone, tvaPct, libelleDevise, indicationTva } from '../../../data/pays';
 
@@ -200,17 +201,13 @@ export default function CompanyTab({ company }) {
       <div className="card my-partner-section">
         <div className="sheet-section-title"><Palette size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Couleurs des documents</div>
         <div className="form-pair">
+          {/* Nuancier OU code couleur tapé (#E30613…) : le code de la charte
+              graphique s'applique tel quel. */}
           <Field label="Couleur principale">
-            <div className="color-input-row">
-              <input className="input pro-color-input" type="color" value={f.couleurPrimaire} onChange={(e) => set({ couleurPrimaire: e.target.value })} aria-label="Couleur principale" />
-              <code className="color-hex">{f.couleurPrimaire?.toUpperCase()}</code>
-            </div>
+            <ChampCouleur valeur={f.couleurPrimaire} libelle="Couleur principale" onChange={(hex) => set({ couleurPrimaire: hex })} />
           </Field>
           <Field label="Couleur secondaire">
-            <div className="color-input-row">
-              <input className="input pro-color-input" type="color" value={f.couleurSecondaire} onChange={(e) => set({ couleurSecondaire: e.target.value })} aria-label="Couleur secondaire" />
-              <code className="color-hex">{f.couleurSecondaire?.toUpperCase()}</code>
-            </div>
+            <ChampCouleur valeur={f.couleurSecondaire} libelle="Couleur secondaire" onChange={(hex) => set({ couleurSecondaire: hex })} />
           </Field>
         </div>
         {couleursAvant ? (
@@ -221,7 +218,7 @@ export default function CompanyTab({ company }) {
             </button>
           </div>
         ) : (
-          <div className="field-hint">Détectées automatiquement à l'import de votre logo, ajustables ici. Appliquées aux modèles Studio et Vague ; le modèle Sobre reste noir et blanc.</div>
+          <div className="field-hint">Détectées automatiquement à l'import de votre logo, ajustables ici — au nuancier ou en tapant le code couleur de votre charte (ex. #E30613). Appliquées aux modèles Studio et Vague ; le modèle Sobre reste noir et blanc.</div>
         )}
       </div>
 

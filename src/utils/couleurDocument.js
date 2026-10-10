@@ -53,3 +53,22 @@ export const couleursLisibles = ({ primaire, secondaire }) => ({
   primaire: foncerJusqua(primaire, CONTRASTE_PRIMAIRE),
   accent: foncerJusqua(secondaire, CONTRASTE_ACCENT),
 });
+
+/**
+ * Code couleur saisi au clavier → `#rrggbb`, ou null s'il n'est pas lisible.
+ * Accepte « #1B3A8F », « 1b3a8f » (sans dièse), la forme courte « #1BA »
+ * (→ #11bbaa) et « rgb(27, 58, 143) » ; espaces et casse indifférents.
+ */
+export function normaliserCodeCouleur(texte) {
+  const t = String(texte ?? '').trim().toLowerCase().replace(/\s+/g, '');
+  const court = t.match(/^#?([0-9a-f]{3})$/);
+  if (court) return `#${[...court[1]].map((c) => c + c).join('')}`;
+  const long = t.match(/^#?([0-9a-f]{6})$/);
+  if (long) return `#${long[1]}`;
+  const rgb = t.match(/^rgb\((\d{1,3}),(\d{1,3}),(\d{1,3})\)$/);
+  if (rgb) {
+    const canaux = rgb.slice(1).map(Number);
+    return canaux.every((c) => c <= 255) ? rgb2hex(canaux) : null;
+  }
+  return null;
+}

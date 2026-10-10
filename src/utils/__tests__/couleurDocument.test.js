@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   contraste, foncerJusqua, melerVersBlanc, couleursLisibles,
-  CONTRASTE_PRIMAIRE, CONTRASTE_ACCENT,
+  CONTRASTE_PRIMAIRE, CONTRASTE_ACCENT, normaliserCodeCouleur,
 } from '../couleurDocument';
 
 describe('contraste', () => {
@@ -66,5 +66,23 @@ describe('couleursLisibles', () => {
     const { primaire, accent } = couleursLisibles({ primaire: '#7bd0ff', secondaire: '#fffbe0' });
     expect(contraste(primaire, '#ffffff')).toBeGreaterThanOrEqual(CONTRASTE_PRIMAIRE);
     expect(contraste(accent, '#ffffff')).toBeGreaterThanOrEqual(CONTRASTE_ACCENT);
+  });
+});
+
+describe('code couleur tapé au clavier', () => {
+  it('formes acceptées, ramenées à #rrggbb', () => {
+    expect(normaliserCodeCouleur('#E30613')).toBe('#e30613');
+    expect(normaliserCodeCouleur('e30613')).toBe('#e30613');
+    expect(normaliserCodeCouleur('  #1B3A8F ')).toBe('#1b3a8f');
+    expect(normaliserCodeCouleur('#1BA')).toBe('#11bbaa');
+    expect(normaliserCodeCouleur('fff')).toBe('#ffffff');
+    expect(normaliserCodeCouleur('rgb(227, 6, 19)')).toBe('#e30613');
+    expect(normaliserCodeCouleur('RGB(0,0,0)')).toBe('#000000');
+  });
+
+  it('code incomplet ou faux : null (rien n’est appliqué)', () => {
+    for (const faux of ['', '#', '#E306', '#E3061', '#E306133', '#GG0613', 'rouge', 'rgb(300, 0, 0)', null, undefined]) {
+      expect(normaliserCodeCouleur(faux)).toBeNull();
+    }
   });
 });
