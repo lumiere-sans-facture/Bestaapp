@@ -10,6 +10,14 @@ import { dateEmissionDevis } from './dateEmission';
 import { formatCFA } from './format';
 import { COMPANY } from '../config/company';
 
+/**
+ * Devis de l'espace Pro (créé par l'assistant ou le constructeur Pro). Les
+ * deux espaces sont étanches : le Pro ne montre que ceux-là, le public tous
+ * les autres. `pro: true` ne suffit pas : un devis public exporté jadis à
+ * l'identité Pro le porte aussi, il reste un devis public.
+ */
+export const estDevisPro = (devis) => devis?.type === 'pro';
+
 /** Étape d'un devis : la sienne, sinon celle de son client (devis créés avant
  *  le suivi par devis), sinon « nouveau » — jamais « proposition » par défaut :
  *  émettre un devis ne fait sauter aucune étape du parcours commercial réel

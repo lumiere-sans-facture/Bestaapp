@@ -3,9 +3,10 @@ import { Bell, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useMode } from '../context/ModeContext';
 import { ageInDays } from '../utils/date';
 import { devisSansSuite } from '../utils/affaires';
-import { buildAlertFeed, SEV_LABEL } from '../utils/alerts';
+import { buildAlertFeed, buildAlertFeedPro, SEV_LABEL } from '../utils/alerts';
 import Sheet from './Sheet';
 
 /**
@@ -16,18 +17,24 @@ import Sheet from './Sheet';
  */
 export default function NotificationBell() {
   const { user } = useAuth();
-  const { leadsForUser, devis, commissions, getSubscriptionForUser } = useData();
+  const { leadsForUser, devis, commissions, factures, getSubscriptionForUser, getCompanyForUser } = useData();
+  const { mode } = useMode();
   const [open, setOpen] = useState(false);
-
-  const myLeads = leadsForUser(user);
-  const openLeads = myLeads.filter((l) => l.stage !== 'gagne' && l.stage !== 'perdu');
-  const staleLeads = openLeads.filter((l) => ageInDays(l.lastActivity) > 7);
-  const myDevis = user.role === 'gerant' ? (devis || []) : (devis || []).filter((d) => d.createdBy === user.id);
-  const sansSuite = devisSansSuite(myDevis, myLeads);
-  const pendingComm = (commissions || []).filter((c) => c.status === 'en_attente');
   const sub = getSubscriptionForUser(user.id);
 
-  const feed = buildAlertFeed({ user, staleLeads, sansSuite, sub, pendingComm });
+  // Espace Pro : les alertes de l'abonné seulement (ses factures, son
+  // entreprise, son abonnement) — jamais les clients ni les devis publics.
+  const feed = mode === 'pro'
+    ? buildAlertFeedPro({ company: getCompanyForUser(user.id), factures: (factures || []).filter((f) => f.userId === user.id), sub })
+    : (() => {
+      const myLeads = leadsForUser(user);
+      const openLeads = myLeads.filter((l) => l.stage !== 'gagne' && l.stage !== 'perdu');
+      const staleLeads = openLeads.filter((l) => ageInDays(l.lastActivity) > 7);
+      const myDevis = user.role === 'gerant' ? (devis || []) : (devis || []).filter((d) => d.createdBy === user.id);
+      const sansSuite = devisSansSuite(myDevis, myLeads);
+      const pendingComm = (commissions || []).filter((c) => c.status === 'en_attente');
+      return buildAlertFeed({ user, staleLeads, sansSuite, sub, pendingComm });
+    })();
 
   return (
     <>

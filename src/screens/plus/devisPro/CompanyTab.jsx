@@ -1,11 +1,12 @@
-import { useRef, useState } from 'react';
-import { Building2, Check, Camera, Palette, CreditCard, FileText, Eye, Download, Globe } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Building2, Check, Camera, Palette, CreditCard, FileText, Eye, Globe } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
-import { fileToResizedDataUrl } from '../../../utils/image';
+import { logoDepuisFichier } from '../../../utils/image';
 import Field from '../../../components/Field';
 import { useToast } from '../../../components/Toast';
 import FacturePreview from './FacturePreview';
+import ApercuDocument from '../../../components/ApercuDocument';
 import { MODELES, EMPTY_COMPANY, normalizeModele } from './constants';
 import { PAYS, paysDeLEntreprise, paysDuTelephone, tvaPct, libelleDevise, indicationTva } from '../../../data/pays';
 
@@ -26,6 +27,8 @@ export default function CompanyTab({ company }) {
   // Couleurs en place avant la dernière détection automatique (pour « Annuler »).
   const [couleursAvant, setCouleursAvant] = useState(null);
   const [erreurNom, setErreurNom] = useState(false);
+  // Aperçu du modèle, dans l'application (avec retour), jamais dans un onglet.
+  const [apercu, setApercu] = useState(null);
   const logoInputRef = useRef(null);
 
   const f = companyForm || { ...EMPTY_COMPANY, ...company };
@@ -44,10 +47,12 @@ export default function CompanyTab({ company }) {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const dataUrl = await fileToResizedDataUrl(file, 360, 0.85);
+      // Rogné de ses marges vides, en PNG (transparence gardée) : il occupe
+      // ensuite tout son emplacement sur les documents (utils/logo.js).
+      const dataUrl = await logoDepuisFichier(file);
       // Détecte les couleurs de marque du logo — sans écraser silencieusement
       // un réglage manuel : l'ancien couple reste restaurable via « Annuler ».
-      const patch = { logo: dataUrl };
+      const patch = { logo: dataUrl, logoAjuste: true };
       const { couleursDuLogo } = await import('../../../utils/logoColors');
       const couleurs = await couleursDuLogo(dataUrl);
       if (couleurs) {
@@ -59,6 +64,24 @@ export default function CompanyTab({ company }) {
     } catch { toast('Impossible de lire cette image.', { type: 'error' }); }
     e.target.value = '';
   };
+
+  // Logo enregistré avant le rognage automatique : recadré une fois, à
+  // l'ouverture de l'écran (marges vides retirées, transparence gardée), et
+  // annoncé — il paraissait minuscule sur les documents.
+  useEffect(() => {
+    if (!company?.logo || company.logoAjuste || !user?.id) return undefined;
+    let annule = false;
+    (async () => {
+      try {
+        const blob = await (await fetch(company.logo)).blob();
+        const logo = await logoDepuisFichier(blob);
+        if (annule) return;
+        saveCompany(user.id, { ...company, logo, logoAjuste: true });
+        toast('Votre logo a été recadré pour remplir son emplacement sur vos documents.');
+      } catch { /* logo illisible : on le laisse tel quel */ }
+    })();
+    return () => { annule = true; };
+  }, [company?.logo, company?.logoAjuste]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveCompanyForm = (e) => {
     e.preventDefault();
@@ -73,10 +96,10 @@ export default function CompanyTab({ company }) {
     toast('Entreprise enregistrée.');
   };
 
-  // Aperçu : le vrai document imprimable, dans le modèle sélectionné.
+  // Aperçu : le vrai document, dans le modèle sélectionné, sur des lignes d'exemple.
   const previewPdf = async () => {
-    const { previewDocument } = await import('./proPdf');
-    previewDocument(f, modele, SAMPLE_LIGNES, 'facture');
+    const { htmlApercuModele } = await import('./proPdf');
+    setApercu(await htmlApercuModele(f, modele, SAMPLE_LIGNES, 'facture'));
   };
 
   return (
@@ -99,7 +122,7 @@ export default function CompanyTab({ company }) {
           <div className="field-hint">{MODELES.find((m) => m.id === modele)?.desc}</div>
         </div>
         <button type="button" className="btn btn-outline btn-block" style={{ marginTop: 12 }} onClick={previewPdf}>
-          <Download size={16} /> Ouvrir un aperçu imprimable
+          <Eye size={16} /> Voir un aperçu du document
         </button>
       </div>
 
@@ -254,6 +277,7 @@ export default function CompanyTab({ company }) {
           </button>
         )}
       </div>
+      <ApercuDocument html={apercu} titre={`Aperçu — modèle ${MODELES.find((m) => m.id === modele)?.label || ''}`} onFermer={() => setApercu(null)} />
     </form>
   );
 }

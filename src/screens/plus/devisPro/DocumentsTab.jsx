@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, ChevronRight, Search, CheckCircle, Pencil, Wallet, Send, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { Receipt, FileText, Download, Plus, Trash2, Building2, ShoppingCart, PanelTop, ChevronLeft, ChevronRight, Search, CheckCircle, Pencil, Wallet, Send, SlidersHorizontal, Loader2, Eye } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { dateEmissionDevis } from '../../../utils/dateEmission';
@@ -11,7 +11,9 @@ import {
   relanceMessage, whatsappLink,
 } from '../../../utils/paiement';
 import { useDocumentsPro } from './useDocumentsPro';
+import { estDevisPro } from '../../../utils/affaires';
 import EnvoiPdfSheet from '../../../components/EnvoiPdfSheet';
+import ApercuDocument from '../../../components/ApercuDocument';
 import { MODELES } from './constants';
 import { paysDeLEntreprise, numeroInternational } from '../../../data/pays';
 import FactureSheet from './FactureSheet';
@@ -54,6 +56,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   // Modèle retenu pour le document ouvert : choisi ici, sinon celui qu'il
   // porte (formulaire de facture, dernier envoi du devis), sinon celui de l'entreprise.
   const [modeleChoisi, setModeleChoisi] = useState(null);
+  // Aperçu ouvert DANS l'application : { kind, doc, modele, html }.
+  const [apercu, setApercu] = useState(null);
   const modeleActif = modeleChoisi || docs.modeleDe(actions?.doc);
   const [editDevis, setEditDevis] = useState(null);
   const [devisAModifier, setDevisAModifier] = useState(null);
@@ -63,7 +67,8 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   const [confirm, setConfirm] = useState(null);
   const toast = useToast();
 
-  const myDevis = useMemo(() => devis.filter((d) => d.createdBy === user.id), [devis, user.id]);
+  // Devis PRO de l'abonné seulement : ses devis publics restent dans l'espace public.
+  const myDevis = useMemo(() => devis.filter((d) => d.createdBy === user.id && estDevisPro(d)), [devis, user.id]);
   const myFactures = useMemo(() => (factures || []).filter((f) => f.userId === user.id), [factures, user.id]);
   const factureByDevis = useMemo(() => new Map(myFactures.filter((f) => f.devisId).map((f) => [f.devisId, f])), [myFactures]);
   const devisById = useMemo(() => new Map(myDevis.map((d) => [d.id, d])), [myDevis]);
@@ -156,6 +161,13 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
   };
 
   const runAction = (fn) => { fn(); setActions(null); setModeleChoisi(null); };
+
+  // Aperçu du document au modèle retenu, dans l'application, avec retour.
+  const ouvrirApercu = async (kind, doc) => {
+    const modele = modeleActif;
+    const html = kind === 'facture' ? await docs.htmlFacture(doc, modele) : await docs.htmlDevis(doc, modele);
+    setApercu({ kind, doc, modele, html });
+  };
 
   // --- Filtre + tri ---
   const q = search.trim().toLowerCase();
@@ -415,6 +427,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               <div className="sheet-row"><span className="sheet-label">Dernière relance</span><span className="sheet-value">{formatDate(actionFacture.derniereRelance)}</span></div>
             )}
             <SelecteurModele />
+            <button className="btn btn-outline btn-block" onClick={() => ouvrirApercu('facture', actionFacture)}>
+              <Eye size={16} /> Aperçu de la facture
+            </button>
             <button className="btn btn-primary btn-block" disabled={!!docs.enCours} onClick={() => docs.telechargerFacture(actionFacture, modeleActif)}>
               {docs.occupe(actionFacture, 'facture') ? <Loader2 size={16} className="tourne" /> : <Download size={16} />}
               {docs.occupe(actionFacture, 'facture') ? 'Préparation du PDF…' : 'Télécharger la facture (PDF)'}
@@ -470,6 +485,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               <div className="sheet-row"><span className="sheet-label">Facturé</span><span className="sheet-value">{factureByDevis.get(actions.doc.id).numero}</span></div>
             )}
             <SelecteurModele />
+            <button className="btn btn-outline btn-block" disabled={!company?.nomEntreprise} onClick={() => ouvrirApercu('devis', actions.doc)}>
+              <Eye size={16} /> Aperçu du devis
+            </button>
             <button className="btn btn-primary btn-block" disabled={!company?.nomEntreprise || !!docs.enCours} onClick={() => docs.telechargerDevis(actions.doc, modeleActif)}>
               {docs.occupe(actions.doc, 'devis') ? <Loader2 size={16} className="tourne" /> : <Download size={16} />}
               {docs.occupe(actions.doc, 'devis') ? 'Préparation du PDF…' : 'Télécharger le devis (PDF)'}
@@ -531,6 +549,31 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
         modeleDefaut={modeleDefaut}
         initial={factureEdit}
         onSubmit={submitFacture}
+      />
+
+      <ApercuDocument
+        html={apercu?.html || null}
+        titre={apercu ? (apercu.kind === 'facture' ? `Facture ${apercu.doc.numero || ''}` : `Devis ${apercu.doc.devisNumber || ''}`).trim() : ''}
+        onFermer={() => setApercu(null)}
+        actions={(fermer) => {
+          if (!apercu) return null;
+          const { kind, doc, modele } = apercu;
+          const facture = kind === 'facture';
+          return (
+            <>
+              <button type="button" className="btn btn-primary" disabled={!!docs.enCours}
+                onClick={() => (facture ? docs.telechargerFacture(doc, modele) : docs.telechargerDevis(doc, modele))}>
+                {docs.occupe(doc, facture ? 'facture' : 'devis') ? <Loader2 size={16} className="tourne" /> : <Download size={16} />} Télécharger
+              </button>
+              {/* L'envoi referme d'abord l'aperçu : si le téléphone réclame un
+                  second toucher, sa fenêtre doit être visible. */}
+              <button type="button" className="btn btn-whatsapp" disabled={!!docs.enCours}
+                onClick={() => { fermer(); if (facture) docs.envoyerFacture(doc, modele); else docs.envoyerDevis(doc, modele); }}>
+                <Send size={16} /> WhatsApp
+              </button>
+            </>
+          );
+        }}
       />
 
       <EnvoiPdfSheet envoi={docs.envoiPret}

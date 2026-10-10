@@ -42,9 +42,13 @@ export const libelles = (kind) => (kind === 'facture'
   : { titre: 'DEVIS', numeroLabel: 'Devis n°', destinataire: 'Devis pour', dateSecondaireLabel: 'Valide jusqu’au' });
 
 /** Conditions générales applicables : la clause de validité ne vaut que pour un devis. */
-export const conditionsPour = (kind, emetteur = {}) =>
-  emetteur.conditions
-  || (kind === 'facture' ? COMPANY.termsFacture : COMPANY.termsDevis);
+export const conditionsPour = (kind, emetteur = {}) => {
+  if (emetteur.conditions) return emetteur.conditions;
+  const conditions = kind === 'facture' ? COMPANY.termsFacture : COMPANY.termsDevis;
+  // Un abonné Pro sans conditions saisies reçoit les conditions par défaut à
+  // SON nom : jamais « BestaSolar » sur le document d'une autre entreprise.
+  return emetteur.estPro ? conditions.replace(/BestaSolar/g, emetteur.name || 'L’entreprise') : conditions;
+};
 
 // ---------------------------------------------------------------------------
 // Couleurs de marque
@@ -86,6 +90,7 @@ export function emetteurDe(source = {}) {
         addressShort: source.adresse || '',
         rccm: source.rccm || '',
         ifu: source.ifu || '',
+        estPro: true,
         // Sigle de l'identifiant fiscal du pays de l'entreprise : IFU (Bénin,
         // Burkina), NIF (Togo, Niger, Mali), NCC (Côte d'Ivoire), NINEA
         // (Sénégal), NIU (Cameroun).

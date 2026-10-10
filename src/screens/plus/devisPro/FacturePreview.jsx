@@ -1,5 +1,12 @@
 import { formatCFA } from '../../../utils/format';
 import { normalizeModele } from './constants';
+import { styleLogo, GABARITS_LOGO } from '../../../utils/logo';
+
+/** Style CSS (« width:…;height:… ») → objet de style React. */
+const styleObjet = (css) => Object.fromEntries(css.split(';').filter(Boolean).map((r) => {
+  const [k, v] = r.split(':');
+  return [k.trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase()), v.trim()];
+}));
 
 const SAMPLE = [
   { d: 'Panneau 550W monocristallin', q: 6, pu: 95000 },
@@ -26,7 +33,8 @@ export default function FacturePreview({ company = {}, modele }) {
   const totalHT = SAMPLE.reduce((s, l) => s + l.pu * l.q, 0);
 
   const logo = company.logo
-    ? <img src={company.logo} alt="" className="fp-logo" />
+    // Même règle que les documents : taille selon les proportions du logo.
+    ? <img src={company.logo} alt="" className="fp-logo" style={styleObjet(styleLogo(company.logo, GABARITS_LOGO.vignette))} />
     : <span className="fp-logo fp-logo-initials" style={{ background: secondary }}>{initials}</span>;
 
   return (

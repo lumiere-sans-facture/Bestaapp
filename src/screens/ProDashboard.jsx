@@ -4,11 +4,10 @@ import { useMode } from '../context/ModeContext';
 import { useData } from '../context/DataContext';
 import { formatCFA, formatDate } from '../utils/format';
 import { computeMonthlyRevenue } from '../utils/stats';
-import { effectiveStatus, daysLeft } from '../utils/subscription';
 import { isSameMonth } from '../utils/date';
-import { SEV_LABEL, SEV_ORDER } from '../utils/alerts';
+import { SEV_LABEL, buildAlertFeedPro } from '../utils/alerts';
 import {
-  paiementEntries, resteAPayer, montantPaye, isEnRetard, joursRetard, joursAvantEcheance,
+  paiementEntries, resteAPayer, montantPaye, isEnRetard,
   statutEffectif, STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE,
 } from '../utils/paiement';
 import PageHeader from '../components/PageHeader';
@@ -84,8 +83,6 @@ export default function ProDashboard() {
 
   // ---- Abonnement ----
   const sub = getSubscriptionForUser(user.id);
-  const subStatus = sub ? effectiveStatus(sub) : null;
-  const subDays = sub ? daysLeft(sub) : null;
 
   // ---- Bandeau de statistiques (comptages) ----
   const stats = [
@@ -97,33 +94,8 @@ export default function ProDashboard() {
     { key: 'clients', value: clientsCount, label: 'Clients facturés', tone: 'primary' },
   ];
 
-  // ---- Feed d'alertes (trié par sévérité) ----
-  const feed = [];
-  if (!company?.nomEntreprise)
-    feed.push({ id: 'company', sev: 'critique', label: 'Entreprise non configurée', entity: 'Onglet Entreprise → Mon entreprise' });
-  // Factures en retard d'échéance : priorité maximale, du plus ancien retard au plus récent.
-  retards
-    .slice()
-    .sort((a, b) => joursRetard(b) - joursRetard(a))
-    .slice(0, 4)
-    .forEach((f) => {
-      feed.push({ id: `ret-${f.id}`, sev: 'critique', label: `En retard de ${joursRetard(f)} j`, entity: `${f.numero || '—'} · reste ${formatCFA(resteAPayer(f))}` });
-    });
-  // Impayées dans les temps : signale celles dont l'échéance approche (≤ 7 j).
-  impayees
-    .filter((f) => !isEnRetard(f))
-    .map((f) => [f, joursAvantEcheance(f)])
-    .filter(([, j]) => j != null && j <= 7)
-    .sort((a, b) => a[1] - b[1])
-    .slice(0, 3)
-    .forEach(([f, j]) => {
-      feed.push({ id: `ech-${f.id}`, sev: 'alerte', label: `Échéance dans ${j} j`, entity: `${f.numero || '—'} · reste ${formatCFA(resteAPayer(f))}` });
-    });
-  if (sub && subStatus === 'actif' && subDays != null && subDays <= 7)
-    feed.push({ id: 'sub', sev: 'info', label: `Abonnement Pro expire dans ${subDays} j`, entity: 'À renouveler' });
-  if (brouillons.length)
-    feed.push({ id: 'draft', sev: 'info', label: `${brouillons.length} brouillon(s) à finaliser`, entity: 'Onglet Devis & Factures' });
-  feed.sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev]);
+  // ---- Feed d'alertes (trié par sévérité) — le même que la cloche en mode Pro ----
+  const feed = buildAlertFeedPro({ company, factures: myFactures, sub });
   const feedTop = feed.slice(0, 6);
 
   const perfBars = [

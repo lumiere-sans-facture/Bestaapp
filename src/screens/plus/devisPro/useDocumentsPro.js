@@ -81,6 +81,22 @@ export function useDocumentsPro({ company, modeleDefaut }) {
     });
   }, { reference: f.numero });
 
+  // Aperçu dans l'application : le document même que le PDF (même HTML,
+  // même modèle), sans le produire.
+  const htmlDevis = async (d, modele) => {
+    const [{ buildDocHtml }, { donneesDeDevis }] = await Promise.all([
+      import('../../../utils/docTemplates'), import('../../../utils/docTemplates/shared'),
+    ]);
+    const data = donneesDeDevis({ devis: d, company, lead: getLeadById(d.leadId), products });
+    return buildDocHtml({ kind: 'devis', model: normalizeModele(modele || modeleDe(d)), data });
+  };
+  const htmlFacture = async (f, modele) => {
+    const [{ buildDocHtml }, { donneesDeFacture }] = await Promise.all([
+      import('../../../utils/docTemplates'), import('../../../utils/docTemplates/shared'),
+    ]);
+    return buildDocHtml({ kind: 'facture', model: normalizeModele(modele || modeleDe(f)), data: donneesDeFacture({ facture: f, company }) });
+  };
+
   // Fiche de dimensionnement d'un devis issu de l'assistant : la même que
   // celle produite dans l'assistant (étude, choix et rentabilité rangés sur
   // le devis), à l'identité de l'abonné.
@@ -95,7 +111,7 @@ export function useDocumentsPro({ company, modeleDefaut }) {
   }, { reference: d.devisNumber });
 
   return {
-    modeleDe,
+    modeleDe, htmlDevis, htmlFacture,
     enCours: pdf.enCours,
     occupe: (doc, action) => pdf.occupe(doc?.id, action),
     telechargerDevis, envoyerDevis, telechargerFacture, envoyerFacture, telechargerFiche,

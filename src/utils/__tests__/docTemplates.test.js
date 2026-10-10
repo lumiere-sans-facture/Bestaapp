@@ -429,6 +429,22 @@ describe('documents Pro : le pays de l’entreprise', () => {
     expect(emetteurDe({ nomEntreprise: 'X', telephone: '+229 01 97 00 00 00' }).fiscal).toBe('IFU');
   });
 
+  it('conditions par défaut au nom de l’entreprise, jamais « BestaSolar »', () => {
+    for (const kind of ['devis', 'facture']) {
+      for (const model of ['studio', 'vague', 'sobre']) {
+        const data = kind === 'facture'
+          ? donneesDeFacture({ facture, company: ENTREPRISE })
+          : donneesDeDevis({ devis: { type: 'pro', devisNumber: 'BS-1', createdAt: '2026-03-20', clientName: 'Awa', lignes: facture.lignes }, company: ENTREPRISE });
+        const html = buildDocHtml({ kind, model, data });
+        expect(html).not.toContain('BestaSolar');
+        expect(html).toContain('Lumière d’Abidjan se réserve le droit');
+      }
+    }
+    // Conditions saisies : reprises telles quelles.
+    expect(buildDocHtml({ kind: 'facture', model: 'sobre', data: donneesDeFacture({ facture, company: { ...ENTREPRISE, conditions: 'Paiement à 30 jours.' } }) }))
+      .toContain('Paiement à 30 jours.');
+  });
+
   it('l’opérateur Mobile Money nomme le moyen de paiement', () => {
     expect(emetteurDe({ nomEntreprise: 'X', momo: '+225 07 11 22 33 44', momoOperateur: 'Wave' }).bank.name).toBe('Wave');
     expect(emetteurDe({ nomEntreprise: 'X', momo: '+228 90 11 22 33' }).bank.name).toBe('Mobile Money');

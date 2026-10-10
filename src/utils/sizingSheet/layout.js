@@ -10,6 +10,7 @@ import { SIZING_PARAMS, SYSTEM_VOLTAGE, SYSTEM_TYPES } from '../solarSizing';
 import { CUSTOM_APPLIANCE_LABEL } from '../../data/appliances';
 import { emetteurDe, policeDocument } from '../docTemplates/shared';
 import { couleursLisibles } from '../couleurDocument';
+import { styleLogo, GABARITS_LOGO } from '../logo';
 import { DUREES_VIE, libelleRoi } from './compute';
 import { renderCoverageChart } from './chart';
 
@@ -259,7 +260,7 @@ export function renderSheet(d, c) {
   // Tout est conditionnel : une entreprise abonnée qui n'a pas encore rempli
   // son adresse ou son RCCM ne doit pas voir de tiret orphelin sur sa fiche.
   const entete = e.logo
-    ? `<img src="${esc(e.logo)}" alt="${marque}">`
+    ? `<img src="${esc(e.logo)}" alt="${marque}" style="${styleLogo(e.logo, GABARITS_LOGO.fiche)}">`
     : `<div>
       <div class="head-marque">${marque}</div>
       ${e.slogan ? `<div class="head-slogan">${esc(e.slogan)}</div>` : ''}
@@ -305,7 +306,7 @@ ${policeDocument()}
   }
   .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
           padding-bottom: 16px; border-bottom: 2px solid var(--primaire); margin-bottom: 32px; }
-  .head img { height: 32px; width: auto; max-width: 260px; object-fit: contain; display: block; }
+  .head img { display: block; flex-shrink: 0; } /* taille : utils/logo.js (gabarit « fiche ») */
   .head-marque { font-size: 18px; font-weight: 600; color: var(--primaire); }
   .head-slogan { font-size: 11px; color: var(--gris); margin-top: 2px; }
   .head-right { text-align: right; }

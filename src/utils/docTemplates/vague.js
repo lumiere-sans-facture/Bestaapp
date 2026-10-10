@@ -4,6 +4,7 @@
 // montant du total. En Pro, les couleurs de l'abonné remplacent navy/orange ;
 // la vague claire est une teinte éclaircie de la primaire.
 import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, eclaircir, pageAjustements } from './shared';
+import { styleLogo } from '../logo';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 10, suite: 14, derniere: 8 };
@@ -22,7 +23,8 @@ const cssPour = (p, s) => `
   .vague-titre { position: absolute; top: 32px; left: 56px; font-size: 28px; font-weight: 600; color: #fff; letter-spacing: 4px; }
 
   .identite { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; padding-top: 8px; }
-  .identite img { height: 32px; width: auto; display: block; }
+  /* Taille selon les proportions du logo (utils/logo.js), en style en ligne. */
+  .identite img { display: block; flex-shrink: 0; }
 
   .client-rang { display: grid; grid-template-columns: 1fr 288px; gap: 32px; margin-top: 16px; }
   .meta-ligne { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
@@ -119,7 +121,7 @@ export function renderVague({ kind, data }) {
         <div>${esc(e.email || '—')}</div>
         ${e.website ? `<div>${esc(e.website)}</div>` : ''}
       </div>
-      ${e.logo ? `<img src="${e.logo}" alt="${esc(e.name)}">` : `<div class="titre-bloc">${esc(e.name)}</div>`}
+      ${e.logo ? `<img src="${e.logo}" alt="${esc(e.name)}" style="${styleLogo(e.logo)}">` : `<div class="titre-bloc">${esc(e.name)}</div>`}
     </div>
 
     <div class="client-rang">

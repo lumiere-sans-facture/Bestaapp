@@ -2814,6 +2814,25 @@ form .login-link { width: 100%; margin-top: 4px; }
 /* Zone destructive en pied de panneau. */
 .danger-zone { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
 
+/* Aperçu d'un document dans l'application (components/ApercuDocument) :
+   au-dessus des panneaux (100-101), sous les confirmations (200). */
+.apercu-doc {
+  position: fixed; inset: 0; z-index: 150;
+  display: flex; flex-direction: column; background: #eceef2;
+}
+.apercu-doc-barre {
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(var(--haut-securise) + 8px) 12px 8px;
+  background: var(--bg-card); border-bottom: 1px solid var(--border);
+}
+.apercu-doc-titre { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.apercu-doc-cadre { flex: 1; width: 100%; border: 0; background: #eceef2; }
+.apercu-doc-actions {
+  display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg-card); border-top: 1px solid var(--border);
+}
+.apercu-doc-actions .btn { flex: 1; }
+
 /* Toast : confirmation éphémère en pied d'écran (remplace window.alert). */
 .toast-region {
   position: fixed; left: 12px; right: 12px; z-index: 200;

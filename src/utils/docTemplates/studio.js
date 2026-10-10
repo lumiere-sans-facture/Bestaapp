@@ -4,6 +4,7 @@
 // couleurs de l'abonné (couleurPrimaire / couleurSecondaire) qui s'appliquent.
 // Marges 40 px, angles 8 px (blocs) / 6 px (pastilles, totaux).
 import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, pageAjustements } from './shared';
+import { styleLogo } from '../logo';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 11, suite: 16, derniere: 8 };
@@ -15,7 +16,8 @@ const cssPour = (p, s) => `
   .navy { color: ${p}; font-weight: 600; }
 
   .bandeau { display: flex; align-items: flex-end; gap: 32px; padding-bottom: 16px; border-bottom: 1px solid #e5e5e5; }
-  .bandeau img { height: 32px; width: auto; display: block; }
+  /* Taille selon les proportions du logo (utils/logo.js), en style en ligne. */
+  .bandeau img { display: block; flex-shrink: 0; }
   .bandeau-col { min-width: 160px; }
 
   .titre-rang { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-top: 16px; }
@@ -95,7 +97,7 @@ export function renderStudio({ kind, data }) {
 <section class="page">
   ${premiere ? `
   <div class="bandeau">
-    ${e.logo ? `<img src="${e.logo}" alt="${esc(e.name)}">` : `<div class="navy" style="font-size:18px">${esc(e.name)}</div>`}
+    ${e.logo ? `<img src="${e.logo}" alt="${esc(e.name)}" style="${styleLogo(e.logo)}">` : `<div class="navy" style="font-size:18px">${esc(e.name)}</div>`}
     <div class="bandeau-col"><div class="micro">Adresse</div><div class="val">${esc(e.address || '—')}</div></div>
     <div class="bandeau-col"><div class="micro">Téléphone</div><div class="val">${esc(e.phone || '—')}</div></div>
   </div>

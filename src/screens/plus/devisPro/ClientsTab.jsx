@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, User, Phone, Mail, MapPin, Check, Pencil, Send, FileText, Receipt, UserPlus } from 'lucide-react';
+import { Plus, User, Phone, Mail, MapPin, Check, Pencil, Send, FileText, Receipt } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
@@ -12,6 +12,7 @@ import Field from '../../../components/Field';
 import ClientIdentityFields, { contactEffectif } from '../../../components/ClientIdentityFields';
 import DangerZone from '../../../components/DangerZone';
 import { useToast } from '../../../components/Toast';
+import { estDevisPro } from '../../../utils/affaires';
 
 const EMPTY = { name: '', contact: '', phone: '', email: '', ville: '', type: 'particulier' };
 
@@ -20,18 +21,13 @@ const norm = (s) => (s || '').trim().toLowerCase();
 /** Onglet « Clients » : carnet du technicien + fiche client (historique, solde, relance). */
 export default function ClientsTab({ company }) {
   const { user } = useAuth();
-  const { proClientsForUser, devis, factures, addProClient, updateProClient, deleteProClient, addRelance, leadsForUser } = useData();
+  const { proClientsForUser, devis, factures, addProClient, updateProClient, deleteProClient, addRelance } = useData();
   const toast = useToast();
 
+  // Carnet Pro seulement : les clients du suivi commercial public n'y
+  // apparaissent pas, pas même à importer (espaces étanches).
   const myClients = proClientsForUser(user.id);
-  // Passerelle avec le carnet public : les clients du pipeline importables
-  // dans le carnet Pro (pas de ressaisie en changeant de mode).
-  const importables = useMemo(() => {
-    const deja = new Set(myClients.map((c) => norm(c.name)));
-    return leadsForUser(user).filter((l) => !deja.has(norm(l.name)));
-  }, [myClients, leadsForUser, user]);
-  const [importOpen, setImportOpen] = useState(false);
-  const myDevis = useMemo(() => (devis || []).filter((d) => d.createdBy === user.id), [devis, user.id]);
+  const myDevis = useMemo(() => (devis || []).filter((d) => d.createdBy === user.id && estDevisPro(d)), [devis, user.id]);
   const myFactures = useMemo(() => (factures || []).filter((f) => f.userId === user.id), [factures, user.id]);
 
   const [viewId, setViewId] = useState(null); // fiche client ouverte
@@ -97,20 +93,6 @@ export default function ClientsTab({ company }) {
     toast(`Relance envoyée pour ${cible.numero} (${formatCFA(resteAPayer(cible))}).`);
   };
 
-  // Import d'un client du carnet public (pipeline) vers le carnet Pro.
-  const importerLead = (l) => {
-    addProClient({
-      userId: user.id,
-      name: l.name,
-      contact: l.contact || '',
-      phone: l.phone || '',
-      email: l.email || '',
-      ville: l.address || '',
-      type: l.clientType === 'entreprise' ? 'entreprise' : 'particulier',
-    });
-    toast(`${l.name} ajouté à votre carnet Pro.`);
-  };
-
   const rowKey = (e, fn) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
 
   const viewed = viewId ? myClients.find((c) => c.id === viewId) : null;
@@ -123,11 +105,6 @@ export default function ClientsTab({ company }) {
         <button className="btn btn-accent" onClick={openNew}>
           <Plus size={16} /> Nouveau client
         </button>
-        {importables.length > 0 && (
-          <button className="btn btn-outline" onClick={() => setImportOpen(true)}>
-            <UserPlus size={16} /> Importer depuis mes clients
-          </button>
-        )}
       </div>
       <div className="section-title">Mes clients ({myClients.length})</div>
 
@@ -294,25 +271,6 @@ export default function ClientsTab({ company }) {
         </form>
       </Sheet>
 
-      {/* Import depuis le carnet public (pipeline) */}
-      <Sheet open={importOpen} onClose={() => setImportOpen(false)} title="Importer depuis mes clients"
-        subtitle="Clients de votre suivi commercial absents du carnet Pro">
-        {importables.length ? (
-          <div className="lead-select">
-            {importables.map((l) => (
-              <button key={l.id} type="button" className="lead-select-item" onClick={() => importerLead(l)}>
-                <div className="lead-select-name">{l.name}</div>
-                <div className="lead-select-value">
-                  {l.clientType === 'entreprise' ? 'Entreprise' : 'Particulier'}
-                  {l.phone ? ` · ${l.phone}` : ''}{l.address ? ` · ${l.address}` : ''}
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-secondary">Tous vos clients du suivi commercial sont déjà dans le carnet Pro.</p>
-        )}
-      </Sheet>
     </>
   );
 }

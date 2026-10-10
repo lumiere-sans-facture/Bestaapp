@@ -1,15 +1,15 @@
-// Aperçu imprimable d'un modèle de document Pro (réglages de « Mon
-// entreprise »). Les devis et factures eux-mêmes se produisent en PDF dans
-// l'application : voir useDocumentsPro.
+// Aperçu d'un modèle de document Pro (réglages de « Mon entreprise »), montré
+// DANS l'application (components/ApercuDocument). Les devis et factures
+// eux-mêmes : voir useDocumentsPro.
 
-/** Aperçu d'un modèle avec un jeu d'exemple (réglages de l'entreprise). */
-export async function previewDocument(company, modele, lignes, kind = 'facture') {
-  const [{ openDoc, normaliserModel }, { emetteurDe, totauxDe }] = await Promise.all([
+/** Document d'exemple dans un modèle, aux réglages de l'entreprise (HTML). */
+export async function htmlApercuModele(company, modele, lignes, kind = 'facture') {
+  const [{ buildDocHtml, normaliserModel }, { emetteurDe, totauxDe }] = await Promise.all([
     import('../../../utils/docTemplates'),
     import('../../../utils/docTemplates/shared'),
   ]);
   const maintenant = new Date();
-  openDoc({
+  return buildDocHtml({
     kind,
     model: normaliserModel(modele),
     data: {
