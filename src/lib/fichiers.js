@@ -3,14 +3,23 @@
 //
 // Deux mondes :
 //  - application Android (Capacitor) : le fichier est écrit par le module
-//    Filesystem — dans Documents/BestaSolar pour un téléchargement, dans le
-//    cache pour un partage — puis remis au menu de partage natif (WhatsApp…) ;
+//    Filesystem — dans Documents/BestaSolar pour un téléchargement, puis
+//    OUVERT aussitôt dans le lecteur PDF du téléphone ; dans le cache pour un
+//    envoi, qui part directement dans la conversation WhatsApp du client
+//    (module natif FichiersNatifs, comme la relance) ;
 //  - navigateur : téléchargement classique, et partage de FICHIER par le menu
 //    du téléphone quand il le permet (Chrome Android, Safari iOS).
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+import { numeroWhatsApp } from '../utils/phone';
 
 const natif = () => Capacitor.isNativePlatform();
 const DOSSIER = 'BestaSolar';
+
+// Module propre à l'application Android :
+// android/app/src/main/java/com/bestasolar/app/FichiersNatifsPlugin.java.
+// Absent ailleurs (iPhone, navigateur) : on garde alors le menu de partage.
+const FichiersNatifs = registerPlugin('FichiersNatifs');
+const moduleNatif = () => natif() && Capacitor.isPluginAvailable('FichiersNatifs');
 
 const enBase64 = (blob) => new Promise((resolve, reject) => {
   const lecteur = new FileReader();
@@ -20,9 +29,11 @@ const enBase64 = (blob) => new Promise((resolve, reject) => {
 });
 
 /**
- * Enregistre le fichier sur l'appareil.
- * @returns {Promise<{emplacement: string|null}>} dossier où le trouver (app),
- *   null dans un navigateur (il range lui-même ses téléchargements).
+ * Enregistre le fichier sur l'appareil — et, dans l'application Android,
+ * l'ouvre aussitôt dans le lecteur PDF du téléphone.
+ * @returns {Promise<{emplacement: string|null, ouvert?: boolean}>} dossier où
+ *   le trouver (app), null dans un navigateur (il range lui-même ses
+ *   téléchargements, et propose de les ouvrir).
  */
 export async function telechargerFichier({ blob, nom }) {
   if (natif()) {
@@ -33,10 +44,16 @@ export async function telechargerFichier({ blob, nom }) {
       const droits = await Filesystem.checkPermissions();
       if (droits.publicStorage !== 'granted') await Filesystem.requestPermissions();
     } catch { /* pas de gestion des droits sur cette version : on tente l'écriture */ }
-    await Filesystem.writeFile({
+    const { uri } = await Filesystem.writeFile({
       path: `${DOSSIER}/${nom}`, data: await enBase64(blob), directory: Directory.Documents, recursive: true,
     });
-    return { emplacement: `Documents/${DOSSIER}` };
+    // Le fichier est enregistré quoi qu'il arrive : un téléphone sans lecteur
+    // PDF le retrouve dans Documents/BestaSolar.
+    let ouvert = false;
+    if (moduleNatif()) {
+      try { await FichiersNatifs.ouvrir({ chemin: uri, type: blob.type || 'application/pdf' }); ouvert = true; } catch { /* aucun lecteur PDF */ }
+    }
+    return { emplacement: `Documents/${DOSSIER}`, ouvert };
   }
   const url = URL.createObjectURL(blob);
   const lien = document.createElement('a');
@@ -57,12 +74,15 @@ export const partageDeFichierPossible = (fichier) => {
 };
 
 /**
- * Ouvre le menu de partage avec le fichier joint (WhatsApp, e-mail…).
- * @returns {Promise<'partage'|'annule'|'geste-requis'|'non-supporte'>}
+ * Envoie le fichier. Dans l'application Android, il part directement dans la
+ * conversation WhatsApp du client (`telephone`), comme la relance — WhatsApp
+ * s'ouvre sur cette conversation, PDF et message joints, il n'y a plus qu'à
+ * envoyer. Sans WhatsApp, et ailleurs, le menu de partage (WhatsApp, e-mail…).
+ * @returns {Promise<'whatsapp'|'partage'|'annule'|'geste-requis'|'non-supporte'>}
  *   'geste-requis' : le navigateur exige un nouveau toucher (la préparation a
  *   duré trop longtemps) — l'appelant propose alors un bouton « Envoyer ».
  */
-export async function partagerFichier({ blob, nom, titre, texte }) {
+export async function partagerFichier({ blob, nom, titre, texte, telephone }) {
   if (natif()) {
     const [{ Filesystem, Directory }, { Share }] = await Promise.all([
       import('@capacitor/filesystem'),
@@ -71,6 +91,16 @@ export async function partagerFichier({ blob, nom, titre, texte }) {
     const { uri } = await Filesystem.writeFile({
       path: `partage/${nom}`, data: await enBase64(blob), directory: Directory.Cache, recursive: true,
     });
+    if (moduleNatif()) {
+      try {
+        await FichiersNatifs.envoyerWhatsApp({
+          chemin: uri, type: blob.type || 'application/pdf', texte: texte || '',
+          // Sans numéro exploitable, WhatsApp demande à qui envoyer.
+          numero: numeroWhatsApp(telephone),
+        });
+        return 'whatsapp';
+      } catch { /* WhatsApp absent : menu de partage */ }
+    }
     try {
       await Share.share({ title: titre, text: texte, files: [uri], dialogTitle: titre });
       return 'partage';

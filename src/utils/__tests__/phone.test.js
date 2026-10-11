@@ -75,3 +75,20 @@ describe('normalizePhoneNumber — Togo', () => {
     expect(samePhoneNumber('+22890123456', '+22990123456', 'TG')).toBe(false);
   });
 });
+
+describe('numeroWhatsApp — conversation directe du client', () => {
+  it('indicatif compris, chiffres seuls', async () => {
+    const { numeroWhatsApp } = await import('../phone');
+    expect(numeroWhatsApp('90 12 34 56')).toBe('22890123456'); // saisie locale : Togo
+    expect(numeroWhatsApp('+229 61 73 29 56')).toBe('2290161732956'); // Bénin, plan à 10 chiffres
+    expect(numeroWhatsApp('+225 07 08 09 10 11')).toBe('2250708091011'); // Côte d'Ivoire (espace Pro)
+    expect(numeroWhatsApp('00228 90 12 34 56')).toBe('22890123456');
+  });
+
+  it('rien d’exploitable : vide (WhatsApp demandera le contact)', async () => {
+    const { numeroWhatsApp } = await import('../phone');
+    expect(numeroWhatsApp('')).toBe('');
+    expect(numeroWhatsApp(null)).toBe('');
+    expect(numeroWhatsApp('abc')).toBe('');
+  });
+});

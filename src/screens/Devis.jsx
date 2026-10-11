@@ -262,8 +262,8 @@ export default function Devis() {
                 {docs.occupe(actions, 'devis') ? <Loader2 size={16} className="tourne" /> : <Download size={16} />}
                 {docs.occupe(actions, 'devis') ? 'Préparation du PDF…' : 'Télécharger le devis (PDF)'}
               </button>
-              {/* Le PDF part JOINT : le menu de partage s'ouvre, on choisit
-                  WhatsApp puis le client. */}
+              {/* Le PDF part JOINT, droit dans la conversation WhatsApp du
+                  client (application Android) — ailleurs, par le menu de partage. */}
               <button className="btn btn-whatsapp btn-block" disabled={!!docs.enCours} onClick={() => docs.envoyerWhatsApp(actions)}>
                 {docs.occupe(actions, 'whatsapp') ? <Loader2 size={16} className="tourne" /> : <Send size={16} />}
                 {docs.occupe(actions, 'whatsapp') ? 'Préparation du PDF…' : 'Envoyer le devis sur WhatsApp'}

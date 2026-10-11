@@ -434,8 +434,9 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
               {docs.occupe(actionFacture, 'facture') ? <Loader2 size={16} className="tourne" /> : <Download size={16} />}
               {docs.occupe(actionFacture, 'facture') ? 'Préparation du PDF…' : 'Télécharger la facture (PDF)'}
             </button>
-            {/* Le PDF part JOINT : le menu de partage s'ouvre, on choisit
-                WhatsApp puis le client. (La relance, plus bas, n'est qu'un message.) */}
+            {/* Le PDF part JOINT, droit dans la conversation WhatsApp du client
+                (application Android) — ailleurs, par le menu de partage. (La
+                relance, plus bas, n'est qu'un message.) */}
             <button className="btn btn-whatsapp btn-block" disabled={!!docs.enCours} onClick={() => docs.envoyerFacture(actionFacture, modeleActif)}>
               {docs.occupe(actionFacture, 'whatsapp') ? <Loader2 size={16} className="tourne" /> : <Send size={16} />}
               {docs.occupe(actionFacture, 'whatsapp') ? 'Préparation du PDF…' : 'Envoyer la facture sur WhatsApp'}

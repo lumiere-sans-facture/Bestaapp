@@ -233,9 +233,6 @@ export const computeSheet = (d) => {
   const couverture = couvertureMensuelle({
     kwc, hspRetenu: Number(d.sunHours) || 0, ville: d.cityName, consoJour,
   });
-  // Parc batterie réellement installé (modules du catalogue) : il dépasse
-  // toujours un peu le besoin calculé — c'est ce que le client reçoit.
-  const batterieInstallee = (d.batteries || []).reduce((s, b) => s + b.capacity * b.qty, 0);
   return {
     consoJour, energieJour, panelWc, kwc, autonomyNights,
     // La production annuelle EST la somme des barres du graphique, et la
@@ -243,8 +240,6 @@ export const computeSheet = (d) => {
     production: Math.round(couverture.production),
     productionPireMois: productionJour(kwc, Number(d.sunHours) || 0),
     batterieAh: d.sizing.batteryCapacity > 0 ? Math.round((d.sizing.batteryCapacity * 1000) / SYSTEM_VOLTAGE) : 0,
-    batterieInstallee,
-    batterieInstalleeAh: batterieInstallee > 0 ? Math.round((batterieInstallee * 1000) / SYSTEM_VOLTAGE) : 0,
     couverture, renta,
   };
 };

@@ -151,17 +151,20 @@ export function renderSheet(d, c) {
 
   // --- Matériel (page 2, deux tableaux côte à côte) ---
   const panelWc = c.panelWc;
-  const batParCapacite = new Map();
-  d.batteries.forEach((b) => batParCapacite.set(b.capacity, (batParCapacite.get(b.capacity) || 0) + b.qty));
+  // Le stockage s'exprime par la CAPACITÉ NÉCESSAIRE, jamais par des modules
+  // (« 2 × 208 Ah (10 kWh) ») : la fiche présente le besoin ; le choix des
+  // batteries, lui, appartient au devis.
+  const avecBatterie = d.systemType !== 'on-grid' && batterieKwh > 0;
   const materiel = [
     { ref: `Panneau photovoltaïque ${u(nf(panelWc), 'Wc')}`, qty: d.sizing.numberOfPanels },
     // Même calibre que le § 4 : le récapitulatif ne peut pas lister un
     // onduleur plus petit que celui que l'étude vient de prescrire.
     ...(d.inverter ? [{ ref: `Onduleur hybride ${u(nf(calibreOnduleur, calibreOnduleur % 1 ? 1 : 0), 'kVA')}`, qty: nbOnduleurs }] : []),
-    ...[...batParCapacite.entries()].map(([capacite, qty]) => ({
-      ref: `Batterie lithium ${u(SYSTEM_VOLTAGE, 'V')} ${u(nf(Math.round((capacite * 1000) / SYSTEM_VOLTAGE)), 'Ah')} (${u(nf(capacite, capacite % 1 ? 1 : 0), 'kWh')})`,
-      qty,
-    })),
+    ...(avecBatterie ? [{
+      // Même intitulé qu'au § 4 ; la tension figure au § 3.
+      ref: 'Capacité batterie nécessaire',
+      qty: u(nf(batterieKwh, 1), 'kWh'),
+    }] : []),
     { ref: 'Structure de montage', qty: Math.max(1, Math.round(d.sizing.numberOfPanels / 10)) },
     { ref: 'Kit de câblage solaire', qty: 1 },
     { ref: 'Coffret de protection DC/AC', qty: 1 },
@@ -170,7 +173,7 @@ export function renderSheet(d, c) {
   const tableMateriel = (items) => `
     <table>
       <thead><tr><th>Désignation technique</th><th class="num">Quantité</th></tr></thead>
-      <tbody>${items.map((m) => `<tr><td>${m.ref}</td><td class="num">${nf(m.qty)}</td></tr>`).join('')}</tbody>
+      <tbody>${items.map((m) => `<tr><td>${m.ref}</td><td class="num">${typeof m.qty === 'number' ? nf(m.qty) : m.qty}</td></tr>`).join('')}</tbody>
     </table>`;
 
   // --- Résultats (page 2) ---
@@ -192,15 +195,9 @@ export function renderSheet(d, c) {
     ...(d.systemType === 'on-grid' ? [] : [resultat(
       'Capacité batterie nécessaire',
       u(nf(batterieKwh, 2), 'kWh'),
-      // Les modules du catalogue ont des capacités fixes : le parc installé
-      // arrondit toujours AU-DESSUS du besoin. L'afficher à côté du besoin
-      // évite de faire chercher d'où sortent les kWh du récapitulatif
-      // matériel. L'autonomie et la tension figurent déjà au § 3 : la note
-      // reste sur UNE ligne.
-      `≈ ${u(nf(c.batterieAh), 'Ah')} sous ${u(SYSTEM_VOLTAGE, 'V')}`
-        + (c.batterieInstallee > batterieKwh + 0.01
-          ? ` · parc installé ${u(nf(c.batterieInstallee, 1), 'kWh')}`
-          : ` · autonomie ${nuitsLabel}`),
+      // Le besoin seul : la composition du parc (modules du catalogue)
+      // appartient au devis. La note reste sur UNE ligne.
+      `≈ ${u(nf(c.batterieAh), 'Ah')} sous ${u(SYSTEM_VOLTAGE, 'V')} · autonomie ${nuitsLabel}`,
       `C = (Conso. nocturne × nuits d'autonomie) ÷ rendement batterie ÷ DoD${d.systemType === 'hybrid' ? ' × ratio hybride' : ''}`,
       `C = (${u(nf(conso.night, 2), 'kWh')} × ${nf(autonomyNights, autonomyNights % 1 ? 1 : 0)}) ÷ ${nf(batteryEfficiency, 2)} ÷ ${nf(depthOfDischarge, 2)}${d.systemType === 'hybrid' ? ` × ${nf(hybridBatteryRatio, 2)}` : ''}`,
     )]),
@@ -407,12 +404,12 @@ ${policeDocument()}
       <div class="focal-note">${nf(d.sizing.numberOfPanels)} panneau${d.sizing.numberOfPanels > 1 ? 'x' : ''} de ${u(nf(panelWc), 'Wc')} · production estimée ${u(nf(c.production), 'kWh/an')}</div>
     </div>
     <div class="focal-stats">
-      ${/* Le parc RÉELLEMENT installé, pas le besoin théorique : c'est ce que
-           le client reçoit, et c'est ce que liste le récapitulatif matériel. */
+      ${/* La capacité NÉCESSAIRE, comme au récapitulatif matériel : la fiche
+           présente le besoin, pas les modules d'un parc (c'est le devis). */
         stat(
           'Stockage',
-          c.batterieInstallee > 0 ? u(nf(c.batterieInstallee, 1), 'kWh') : '—',
-          c.batterieInstallee > 0 ? `${u(nf(c.batterieInstalleeAh), 'Ah')} · ${u(SYSTEM_VOLTAGE, 'V')}` : 'Sans batterie',
+          avecBatterie ? u(nf(batterieKwh, 1), 'kWh') : '—',
+          avecBatterie ? `${u(nf(c.batterieAh), 'Ah')} · ${u(SYSTEM_VOLTAGE, 'V')}` : 'Sans batterie',
         )}
       ${stat(
         'Onduleur',

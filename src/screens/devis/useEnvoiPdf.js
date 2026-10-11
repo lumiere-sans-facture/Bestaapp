@@ -1,8 +1,10 @@
 // Mécanique commune aux documents produits DANS l'application (devis public,
 // devis et factures Pro) : une production de PDF à la fois, le
-// téléchargement, et l'envoi avec le fichier JOINT par le menu de partage
-// (WhatsApp…). Les écrans ne décrivent que QUOI produire ; le comment —
-// erreurs, second toucher, repli sur ordinateur — est ici, une seule fois.
+// téléchargement (ouvert aussitôt dans l'application Android), et l'envoi
+// avec le fichier JOINT — droit dans la conversation WhatsApp du client dans
+// l'application Android, par le menu de partage ailleurs. Les écrans ne
+// décrivent que QUOI produire ; le comment — erreurs, second toucher, repli
+// sur ordinateur — est ici, une seule fois.
 import { useState } from 'react';
 import { useToast } from '../../components/Toast';
 import { signalerErreur } from '../../lib/rapportErreur';
@@ -49,12 +51,13 @@ export function useEnvoiPdf({ ecran, origine }) {
   const telecharger = async (pdf, libelle, accord) => annoncer(libelle, await telechargerFichier(pdf), accord);
 
   /**
-   * Ouvre le menu de partage, PDF joint.
+   * Envoie le PDF : dans l'application Android, droit dans la conversation
+   * WhatsApp du client (`telephone`) ; ailleurs, par le menu de partage.
    * @param {{blob, nom, titre, texte, telephone, confirmation}} envoi
    */
   const envoyer = async (envoi) => {
     const resultat = await partagerFichier(envoi);
-    if (resultat === 'partage') toast(envoi.confirmation || 'Document partagé.');
+    if (resultat === 'whatsapp' || resultat === 'partage') toast(envoi.confirmation || 'Document partagé.');
     else if (resultat === 'geste-requis') setEnvoiPret({ ...envoi, mode: 'partage' });
     else if (resultat === 'non-supporte') {
       await telechargerFichier(envoi);
@@ -68,7 +71,7 @@ export function useEnvoiPdf({ ecran, origine }) {
     if (!envoi) return;
     try {
       const resultat = await partagerFichier(envoi);
-      if (resultat === 'partage' || resultat === 'annule') { setEnvoiPret(null); return; }
+      if (resultat === 'whatsapp' || resultat === 'partage' || resultat === 'annule') { setEnvoiPret(null); return; }
       await telechargerFichier(envoi);
       setEnvoiPret({ ...envoi, mode: 'joindre' });
     } catch (e) {

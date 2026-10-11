@@ -112,10 +112,29 @@ describe('buildSizingSheetHtml — 3 pages', () => {
     expect(html).toContain('premier calibre au-dessus');
     expect(html).toContain('entrée PV');
     expect(html).toContain(`sur 6 500\u202fWc admis`);
-    // Les modules ont des capacités fixes : le parc dépasse le besoin calculé,
-    // et la fiche affiche les deux valeurs côte à côte.
     expect(html).toContain('Capacité batterie nécessaire');
-    expect(html).toContain('parc installé');
+  });
+
+  it('batterie : la capacité nécessaire seule, jamais les modules d’un parc', () => {
+    // Deux modules de 10 kWh dans les données : la fiche n'en dit rien.
+    const deuxModules = buildSizingSheetHtml({ ...data, batteries: [{ capacity: 10, qty: 2 }] });
+    const besoin = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(sizing.batteryCapacity);
+    for (const h of [html, deuxModules]) {
+      expect(h).toContain('<td>Capacité batterie nécessaire</td>');
+      expect(h).not.toMatch(/\d\s?Ah \(\d/); // plus de « 208 Ah (10 kWh) »
+      expect(h).not.toContain('parc installé');
+      expect(h).toContain(`${besoin}\u202fkWh`);
+    }
+    // Récapitulatif matériel : une ligne de stockage, la capacité en quantité.
+    const ligne = deuxModules.split('Capacité batterie nécessaire</td>')[1].split('</td>')[0];
+    expect(ligne).toContain(`${besoin}\u202fkWh`);
+    expect(deuxModules).not.toMatch(/[^\d,]20\u202fkWh/); // le parc de 2 × 10 kWh
+  });
+
+  it('sans batterie (injection réseau) : ni ligne de stockage, ni capacité', () => {
+    const reseau = buildSizingSheetHtml({ ...data, systemType: 'on-grid', sizing: calculateSystemSize(consumption, 'on-grid', 5.2), batteries: [] });
+    expect(reseau).not.toContain('Capacité batterie nécessaire');
+    expect(reseau).toContain('Sans batterie');
   });
 
   it('page 3 : graphique de couverture (12 mois, hachures, source PVGIS)', () => {

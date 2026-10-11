@@ -36,6 +36,14 @@
         </provider>
     </application>
 
+    <!-- Envoi d'un devis ou d'une facture directement dans la conversation
+         WhatsApp du client (FichiersNatifsPlugin) : depuis Android 11, une
+         application ne voit les autres que si elle les nomme ici. -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
