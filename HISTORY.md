@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-12
+- **Menu latéral : plus de localisation.** La mention « Lomé, Togo » sous le logo (espace public, sur ordinateur) est retirée ; la cloche des notifications reste à sa place, alignée à droite.
 - **Maintenance annuelle : une seule règle, selon le nombre de panneaux.** 30 000 F CFA/an sous 10 panneaux ; à partir de 10, 50 000 F + 2 000 F par panneau au-delà de 10 (11 panneaux : 52 000 ; 20 : 70 000 ; 100 : 230 000). N = nombre total de panneaux du système dimensionné. Trois montants fixes et différents coexistaient : 50 000 sur la fiche de dimensionnement, 15 000 dans le simulateur ROI, 50 000 sur le devis sur mesure. Tous passent désormais par `calculMaintenanceAnnuelle` (`src/utils/maintenance.js`, constantes `BASE_PETIT`, `BASE`, `SEUIL`, `PAR_PANNEAU`) :
   - **fiche de dimensionnement** (page 3, rentabilité) : maintenance du système dimensionné ; un montant saisi par l'installateur dans l'espace Pro garde la main ;
   - **simulateur ROI** (Plus) : entretien calculé sur les panneaux du kit proposé ;

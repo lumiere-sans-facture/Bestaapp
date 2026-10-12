@@ -135,7 +135,6 @@ export default function AppLayout() {
           </div>
           {!isPro && !repliee && (
             <div className="sidebar-brand-public-meta">
-              <div className="sidebar-subtitle">Lomé, Togo</div>
               <NotificationBell />
             </div>
           )}
