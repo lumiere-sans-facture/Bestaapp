@@ -380,5 +380,48 @@ do $$ begin
 end $$;
 \echo '   ✓ rattrapage : aperçu sans effet, application, idempotent'
 
+\echo '13. RATTRAPAGE : une affaire copiée dans deux organisations, commission payée des deux côtés'
+-- Cas réel d'une base restée avant la réunion des organisations : un compte
+-- passé d'une entreprise à l'autre a recopié ses données dans la nouvelle.
+-- Le même devis (même identifiant) existe donc deux fois, et sa commission
+-- de niveau 1, déjà payée, aussi. Le rattrapage s'arrêtait sur la contrainte
+-- d'unicité en voulant adopter les deux copies.
+set session_replication_role = replica;
+insert into public.orgs (id, name, kind) values ('org-copie', 'Ancienne entreprise de C', 'pro') on conflict do nothing;
+insert into public.leads (org_id, id, data)
+select o, 'lead-copie', jsonb_build_object('id', 'lead-copie', 'name', 'Client recopié',
+  'registeredByUserId', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'stage', 'gagne')
+from unnest(array['org-bestasolar', 'org-copie']) o;
+insert into public.devis (org_id, id, data)
+select o, 'devis-copie', jsonb_build_object('id', 'devis-copie', 'leadId', 'lead-copie',
+  'devisNumber', 'BS-20260815-0003', 'total', 1000000, 'stage', 'gagne')
+from unnest(array['org-bestasolar', 'org-copie']) o;
+insert into public.commissions (org_id, id, data)
+select o, 'copie-n1', '{"id":"copie-n1","partnerId":"p-user-cccccccc-cccc-4ccc-8ccc-cccccccccccc","devisId":"devis-copie","leadId":"lead-copie","level":1,"amount":30000,"status":"payée"}'
+from unnest(array['org-bestasolar', 'org-copie']) o;
+set session_replication_role = origin;
+
+\echo '   aperçu :'
+select etape, objet, detail from public.rattraper_parrainage_commissions(false)
+ where objet like '%BS-20260815-0003%' order by 1, 2;
+\echo '   application :'
+select etape, objet, detail from public.rattraper_parrainage_commissions(true)
+ where objet like '%BS-20260815-0003%' order by 1, 2;
+do $$ begin
+  assert (select count(*) from public.commissions
+          where data ->> 'devisId' = 'devis-copie' and data ->> 'level' = '1' and data ->> 'status' = 'payée') = 2,
+    'une commission payée n''est jamais retirée, même recopiée';
+  assert (select count(*) from public.commissions
+          where data ->> 'devisId' = 'devis-copie' and data ->> 'level' = '1' and data ->> 'source' = 'devis') = 1,
+    'une seule copie rejoint le calcul du serveur';
+  assert (select string_agg((data ->> 'partnerId') || ':' || (data ->> 'amount'), ',')
+          from public.commissions where data ->> 'devisId' = 'devis-copie' and data ->> 'level' = '2')
+         = 'p-user-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb:15000',
+    'le niveau 2 manquant est créé une fois, pour B';
+  assert not exists (select 1 from public.rattraper_parrainage_commissions(true) where etape <> 'à vérifier'),
+    'rattrapage idempotent malgré les copies';
+end $$;
+\echo '   ✓ affaire recopiée : aucune erreur, rien de payé n''est touché, niveau 2 créé une fois'
+
 \echo ''
 \echo '✅ Scénario parrainage : tous les contrôles passent'

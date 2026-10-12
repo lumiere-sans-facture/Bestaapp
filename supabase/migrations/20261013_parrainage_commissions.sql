@@ -1092,6 +1092,7 @@ declare
   v_devis jsonb; v_lead jsonb; v_base numeric := 0; v_proprio text; v_vendeur text;
   v_objet text; c record; v_b record; v_taux numeric; v_garde record; v_niveaux integer[] := '{}';
   v_code_actuel text; v_code_attendu text; v_cree integer;
+  v_source text := case when p_devis is not null then 'devis' else 'piste' end;
 begin
   if p_devis is not null then
     select data into v_devis from public.devis where org_id = p_org and id = p_devis;
@@ -1126,6 +1127,7 @@ begin
            partition by x.data ->> 'level'
            order by (x.data ->> 'status' = 'payée') desc,
                     public.commission_engagee(x.org_id, x.id) desc,
+                    (coalesce(x.data ->> 'source', '') in ('devis', 'piste')) desc,
                     x.updated_at asc, x.id)::integer
   from public.commissions x
   where coalesce(x.data ->> 'source', '') <> 'abonnement'
@@ -1158,11 +1160,22 @@ begin
       continue when not found; -- manquante : créée plus bas
       select data ->> 'code' into v_code_attendu from public.partners where id = v_b.partenaire_id order by updated_at limit 1;
       select data ->> 'code' into v_code_actuel from public.partners where id = c.data ->> 'partnerId' order by updated_at limit 1;
+      -- Une autre ligne de ce niveau est-elle déjà comptée par le serveur ? Cas
+      -- d'une copie payée ou demandée, gardée à l'étape 1 : la marquer aussi
+      -- violerait l'unicité (affaire, niveau) — elle reste alors telle quelle,
+      -- déjà signalée « à vérifier ».
+      continue when exists (
+        select 1 from public.commissions y
+        where y.data ->> 'source' = v_source and y.data ->> 'level' = v_b.niveau::text
+          -- exactement les clés des deux index d'unicité
+          and case when p_devis is not null then y.data ->> 'devisId' = p_devis
+                   else y.data ->> 'leadId' = p_lead end
+          and not (y.org_id = c.org_id and y.id = c.id));
       if c.data ->> 'partnerId' = v_b.partenaire_id then
         -- Bonne personne : la commission rejoint le calcul du serveur.
         update public.commissions
            set data = data || jsonb_build_object(
-                 'source', case when p_devis is not null then 'devis' else 'piste' end,
+                 'source', v_source,
                  'beneficiaireId', v_b.profil_id, 'vendeurId', v_proprio, 'vendeurNom', v_vendeur,
                  'taux', coalesce(data -> 'taux', to_jsonb(v_taux)),
                  'devisNumber', coalesce(data ->> 'devisNumber', v_devis ->> 'devisNumber')),
@@ -1179,7 +1192,7 @@ begin
                  'partnerId', v_b.partenaire_id, 'beneficiaireId', v_b.profil_id,
                  'vendeurId', v_proprio, 'vendeurNom', v_vendeur,
                  'taux', v_taux, 'base', v_base, 'amount', round(v_base * v_taux),
-                 'source', case when p_devis is not null then 'devis' else 'piste' end,
+                 'source', v_source,
                  'devisNumber', coalesce(data ->> 'devisNumber', v_devis ->> 'devisNumber'),
                  'corrigeeLe', to_char(now() at time zone 'utc', 'YYYY-MM-DD')),
                updated_at = now()
@@ -1330,20 +1343,29 @@ begin
     end loop;
 
     -- B. COMMISSIONS DES AFFAIRES DÉJÀ VALIDÉES
+    -- Chaque affaire UNE fois. Sur une base antérieure à la réunion des
+    -- organisations, un compte passé d'une entreprise à l'autre y a recopié
+    -- ses données : le même devis (même identifiant) existe alors dans deux
+    -- organisations. Ses commissions sont rapprochées en une passe, d'après
+    -- la copie la plus récente.
     for r in
-      select d.org_id, d.id from public.devis d
-      where d.data ->> 'stage' = 'gagne' and coalesce(d.data ->> 'type', '') <> 'pro'
-      order by d.updated_at
+      select u.org_id, u.id from (
+        select distinct on (d.id) d.org_id, d.id, d.updated_at from public.devis d
+        where d.data ->> 'stage' = 'gagne' and coalesce(d.data ->> 'type', '') <> 'pro'
+        order by d.id, d.updated_at desc
+      ) u order by u.updated_at
     loop
       return query select * from public.rapprocher_affaire(r.org_id, null, r.id);
     end loop;
     for r in
-      select l.org_id, l.id from public.leads l
-      where l.data ->> 'stage' = 'gagne'
-        and not exists (select 1 from public.devis d
-                        where d.org_id = l.org_id and d.data ->> 'leadId' = l.id
-                          and d.data ->> 'stage' = 'gagne' and coalesce(d.data ->> 'type', '') <> 'pro')
-      order by l.updated_at
+      select u.org_id, u.id from (
+        select distinct on (l.id) l.org_id, l.id, l.updated_at from public.leads l
+        where l.data ->> 'stage' = 'gagne'
+          and not exists (select 1 from public.devis d
+                          where d.data ->> 'leadId' = l.id
+                            and d.data ->> 'stage' = 'gagne' and coalesce(d.data ->> 'type', '') <> 'pro')
+        order by l.id, l.updated_at desc
+      ) u order by u.updated_at
     loop
       return query select * from public.rapprocher_affaire(r.org_id, r.id, null);
     end loop;
