@@ -37,27 +37,85 @@
 begin;
 
 -- 0. PRÉREQUIS ---------------------------------------------------------
+-- Seul le socle est exigé : les tables de schema.sql et les fonctions
+-- d'isolation de multitenant.sql. Ce qui est venu APRÈS (fin août, début
+-- septembre) est recréé plus bas s'il manque — sans jamais remplacer une
+-- version déjà installée.
 do $$
-declare v_manque text := '';
+declare v_manque text := ''; v_table text;
 begin
   if to_regprocedure('public.auth_org_id()') is null then v_manque := v_manque || ' auth_org_id ;'; end if;
-  if to_regprocedure('public.auth_est_proprietaire_espace()') is null then v_manque := v_manque || ' auth_est_proprietaire_espace ;'; end if;
   if to_regprocedure('public.auth_is_platform_admin()') is null then v_manque := v_manque || ' auth_is_platform_admin ;'; end if;
-  if to_regprocedure('public.code_partenaire(text)') is null then v_manque := v_manque || ' code_partenaire ;'; end if;
+  foreach v_table in array array['orgs', 'profiles', 'partners', 'leads', 'devis', 'commissions',
+    'referrals', 'payoutRequests', 'subscriptions', 'subscriptionPayments', 'tombstones'] loop
+    if to_regclass(format('public.%I', v_table)) is null then v_manque := v_manque || ' table ' || v_table || ' ;'; end if;
+  end loop;
   if v_manque <> '' then
-    raise exception 'Base en retard — il manque :% Exécutez d''abord multitenant.sql (le socle). Rien n''a été modifié.', v_manque;
+    raise exception 'Base en retard — il manque :% Exécutez d''abord schema.sql puis multitenant.sql (le socle). Rien n''a été modifié.', v_manque;
   end if;
 end $$;
 
--- Profil du compte connecté. Défini aussi par la migration 20260902 (même
--- corps) ; recréé ici pour que ce fichier se suffise à lui-même, que la
--- fusion des organisations ait été passée ou non sur ce projet.
-create or replace function public.auth_profile_id()
-  returns text language sql stable security definer set search_path = public as $$
-  select id from public.profiles
-  where lower(email) = lower(auth.jwt() ->> 'email')
-  limit 1
-$$;
+-- Colonnes de la réunion des organisations (migration 20260902, reprises
+-- dans multitenant.sql) : lues par l'inscription et le rattrapage. Vides
+-- tant que la réunion n'a pas eu lieu, ce qui ne gêne rien.
+alter table public.orgs add column if not exists merged_into text references public.orgs(id);
+alter table public.orgs add column if not exists merged_at timestamptz;
+
+-- Fonctions utilitaires du socle, apparues entre le 30 août et le 3 septembre.
+-- Une base qui n'a pas reçu ces mises à jour les reçoit ici, avec le corps
+-- exact de multitenant.sql ; une base qui les a déjà les garde telles quelles.
+do $$
+begin
+  -- Profil du compte connecté (migration 20260902).
+  if to_regprocedure('public.auth_profile_id()') is null then
+    execute $f$
+      create function public.auth_profile_id()
+        returns text language sql stable security definer set search_path = public as $c$
+        select id from public.profiles
+        where lower(email) = lower(auth.jwt() ->> 'email')
+        limit 1
+      $c$ $f$;
+  end if;
+  -- Forme canonique d'un code partenaire : sans le préfixe historique BESTA-.
+  if to_regprocedure('public.code_partenaire(text)') is null then
+    execute $f$
+      create function public.code_partenaire(p_code text)
+        returns text language sql immutable set search_path = public as $c$
+        select nullif(regexp_replace(upper(trim(coalesce(p_code, ''))), '^BESTA-', ''), '')
+      $c$ $f$;
+  end if;
+  -- Code de rattachement par défaut : le plus ancien partenaire de
+  -- l'organisation interne (BestaSolar).
+  if to_regprocedure('public.code_partenaire_defaut()') is null then
+    execute $f$
+      create function public.code_partenaire_defaut()
+        returns text language sql stable security definer set search_path = public as $c$
+        select public.code_partenaire(pt.data ->> 'code')
+        from public.partners pt
+        join public.orgs o on o.id = pt.org_id and o.kind = 'interne'
+        where coalesce(pt.data ->> 'code', '') <> ''
+        order by pt.updated_at asc, pt.id asc
+        limit 1
+      $c$ $f$;
+  end if;
+  -- Propriétaire de l'espace : le gérant, l'admin plateforme, ou l'inscrit
+  -- seul dans une organisation sans gérant (même règle que utils/roles.js).
+  if to_regprocedure('public.auth_est_proprietaire_espace()') is null then
+    execute $f$
+      create function public.auth_est_proprietaire_espace()
+        returns boolean language sql stable security definer set search_path = public as $c$
+        select coalesce((
+          select p.role = 'gerant' or p.is_platform_admin
+              or not exists (
+                select 1 from public.profiles g
+                where g.org_id = p.org_id and g.role = 'gerant'
+              )
+          from public.profiles p
+          where lower(p.email) = lower(auth.jwt() ->> 'email')
+        ), false)
+      $c$ $f$;
+  end if;
+end $$;
 
 -- Montant lu dans un JSON : jamais d'erreur de conversion, 0 si illisible.
 create or replace function public.montant_json(p_texte text)

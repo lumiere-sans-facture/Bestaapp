@@ -3,6 +3,7 @@
 #
 #   supabase/tests/lancer.sh                 # scénario parrainage.sql
 #   supabase/tests/lancer.sh autre-test.sql
+#   SOCLE=fin-aout supabase/tests/lancer.sh  # base restée au socle d'août
 #
 # Il faut un serveur PostgreSQL (14 ou plus) joignable : par défaut le socket
 # local ; sinon PGHOST / PGPORT / PGUSER (superutilisateur). La base `besta_test`
@@ -29,6 +30,27 @@ SQL
 
 jouer() { "${P[@]}" -d "$BASE" -f "$1" > /dev/null; }
 jouer "$ICI/supabase-imite.sql"
+
+# Base restée en arrière : le socle tel qu'il était le 30 août (avant
+# code_partenaire), sans aucune migration de fin août ni la réunion des
+# organisations — l'état réel d'un projet qui n'a reçu depuis que les
+# scripts indépendants. Les fichiers viennent de l'historique git.
+if [ "${SOCLE:-actuel}" = fin-aout ]; then
+  VIEUX="$(mktemp -d)"; trap 'rm -rf "$VIEUX"' EXIT
+  for f in schema.sql security.sql multitenant.sql paiements.sql erreurs.sql migrations/20260829_google_contacts.sql; do
+    git -C "$SUPA" show "1825ffc^:supabase/$f" > "$VIEUX/$(basename "$f")"
+    jouer "$VIEUX/$(basename "$f")"
+  done
+  for f in codes-promo.sql suppression-compte.sql migrations/20261012_index_email_profils.sql \
+           migrations/20261013_parrainage_commissions.sql migrations/20261013_parrainage_commissions.sql; do
+    jouer "$SUPA/$f"
+  done
+  "${P[@]}" -d "$BASE" -c "insert into public.profiles (id, email, name, role, org_id, is_platform_admin)
+    values ('u-gerant', 'gerant@besta.tg', 'Gérant Besta', 'gerant', 'org-bestasolar', true) on conflict do nothing;"
+  "${P[@]}" -d "$BASE" -f "$TEST"
+  exit
+fi
+
 for f in schema.sql security.sql multitenant.sql paiements.sql erreurs.sql \
          migrations/20260829_google_contacts.sql migrations/20260830_google_contacts_leads.sql \
          migrations/20260830_partner_code_uniqueness.sql migrations/20260831_partner_code_format.sql \
