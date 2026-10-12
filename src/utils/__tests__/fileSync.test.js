@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   idsModifies, fileEnAttente, totalEnAttente, enAttentePourTable, fusionnerCollection, unionFiles,
+  rebaserSurServeur,
 } from '../fileSync';
 
 describe('idsModifies', () => {
@@ -138,5 +139,49 @@ describe('fusionnerCollection', () => {
   it('tolère des entrées absentes', () => {
     expect(fusionnerCollection()).toEqual([]);
     expect(fusionnerCollection(undefined, [{ id: 'a' }])).toEqual([{ id: 'a' }]);
+  });
+});
+
+// Le cas réel : le téléphone renomme un contact ; l'ordinateur, resté sur
+// l'ancienne copie, note seulement l'issue d'un envoi vers Google. Envoyer sa
+// copie telle quelle ramenait l'ancien nom sur le serveur, puis partout.
+describe('rebaserSurServeur — une modification d’ailleurs n’est plus effacée', () => {
+  const base = { id: 'x', name: 'Ama Mensah', phone: '+22890000001', google_contact_sync_status: 'failed' };
+
+  it('reporte nos champs sur la version du serveur, sans toucher aux siens', () => {
+    const local = { ...base, google_contact_sync_status: 'synced' };
+    const serveur = { ...base, name: 'Ama Mensah-Lawson' };
+    expect(rebaserSurServeur(base, local, serveur)).toEqual({
+      id: 'x', name: 'Ama Mensah-Lawson', phone: '+22890000001', google_contact_sync_status: 'synced',
+    });
+  });
+
+  it('un même champ modifié des deux côtés : la valeur d’ici part', () => {
+    const local = { ...base, name: 'Ama M.' };
+    const serveur = { ...base, name: 'Ama Mensah-Lawson' };
+    expect(rebaserSurServeur(base, local, serveur).name).toBe('Ama M.');
+  });
+
+  it('un champ retiré ici est retiré du résultat', () => {
+    const avecNote = { ...base, note: 'rappeler' };
+    const { note: _n, ...local } = avecNote;
+    const serveur = { ...avecNote, name: 'Ama Mensah-Lawson' };
+    const r = rebaserSurServeur(avecNote, local, serveur);
+    expect(r).not.toHaveProperty('note');
+    expect(r.name).toBe('Ama Mensah-Lawson');
+  });
+
+  it('rien à recaler : la fiche locale est rendue telle quelle (même référence)', () => {
+    const local = { ...base, name: 'Ama M.' };
+    expect(rebaserSurServeur(base, local, { ...base })).toBe(local);   // serveur inchangé
+    expect(rebaserSurServeur(undefined, local, { ...base })).toBe(local); // création locale
+    expect(rebaserSurServeur(base, local, undefined)).toBe(local);     // absente du serveur
+  });
+
+  it('déjà recalée : le second passage ne change plus rien (pas de boucle)', () => {
+    const local = { ...base, google_contact_sync_status: 'synced' };
+    const serveur = { ...base, name: 'Ama Mensah-Lawson' };
+    const recalee = rebaserSurServeur(base, local, serveur);
+    expect(rebaserSurServeur(base, recalee, serveur)).toBe(recalee);
   });
 });

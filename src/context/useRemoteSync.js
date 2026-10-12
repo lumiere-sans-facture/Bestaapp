@@ -3,11 +3,11 @@
 // et la réplication non-destructive (tombstones). Retourne le statut de sync.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { pullAll, pushCollections, pushTombstone, resynchroniserOrg, subscribeToChanges, lignesRefuseesParTable, SYNCED_COLLECTIONS } from '../lib/remoteSync';
+import { pullAll, pushCollections, pushTombstone, resynchroniserOrg, subscribeToChanges, lignesRefuseesParTable, lireVersionsServeur, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 import { estRefusRls, MESSAGE_REFUS_RLS, messageLignesRefusees } from '../utils/erreurSync';
 import { peutEnvoyer } from '../utils/etatSync';
 import { loadFileSync, persistFileSync, completerKits } from './dataState';
-import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection } from '../utils/fileSync';
+import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection, idsModifies, rebaserSurServeur } from '../utils/fileSync';
 import { signalerErreur } from '../lib/rapportErreur';
 
 // Filet de sécurité du temps réel : intervalle entre deux relectures du
@@ -35,6 +35,31 @@ const horsLigne = () => typeof navigator !== 'undefined' && navigator.onLine ===
 // tout seul — pas de quoi alerter.
 const ECHECS_AVANT_SIGNALEMENT = 3;
 
+// Relit sur le serveur les fiches modifiées ici qui y existaient déjà, et les
+// recale sur leur version actuelle (utils/fileSync.js › rebaserSurServeur).
+// `bases` : dernier état répliqué. Renvoie null s'il n'y a rien à recaler,
+// sinon { table: Map(id → { local, fiche }) }.
+async function recalerSurServeur(changed, bases) {
+  const recalees = {};
+  await Promise.all(Object.entries(changed).map(async ([table, items]) => {
+    const baseParId = new Map((bases?.[table] || []).map((i) => [i.id, i]));
+    // Créations locales : le serveur ne les connaît pas, rien à recaler.
+    const existantes = items.filter((i) => baseParId.has(i.id));
+    if (!existantes.length) return;
+    let versions = await lireVersionsServeur(table, existantes.map((i) => i.id));
+    // Les kits sont recomplétés à la réception (voir applyRemote) : la
+    // version du serveur doit l'être aussi pour se comparer à la base.
+    if (table === 'kits' && versions.size) versions = new Map(completerKits([...versions.values()]).map((k) => [k.id, k]));
+    const fiches = new Map();
+    for (const local of existantes) {
+      const fiche = rebaserSurServeur(baseParId.get(local.id), local, versions.get(local.id));
+      if (fiche !== local) fiches.set(local.id, { local, fiche });
+    }
+    if (fiches.size) recalees[table] = fiches;
+  }));
+  return Object.keys(recalees).length ? recalees : null;
+}
+
 export function useRemoteSync(state, setState, stateRef, scope = null) {
   const syncedRef = useRef(null); // dernier état RÉELLEMENT répliqué, par collection
   const lastPushAt = useRef(0);
@@ -49,6 +74,11 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
   // Motif du dernier échec, affiché dans l'app : sans lui, « Serveur
   // injoignable » n'aide personne à comprendre CE qui est refusé.
   const [syncError, setSyncError] = useState(null);
+  // Vrai dès que le serveur a été lu une première fois dans cette session.
+  // Avant, l'état local peut être périmé : ce qui le modifie automatiquement
+  // (relances Google Contacts) doit attendre, sinon la copie périmée passe
+  // pour une modification d'ici et l'emporte à la réception.
+  const [premiereReception, setPremiereReception] = useState(false);
 
   // Une fois par motif et par session : une panne qui dure ne doit pas noyer
   // le journal. Jamais pour une coupure du réseau de l'appareil — ordinaire.
@@ -179,6 +209,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
         echecsConnexion = 0;
         setSyncError(null);
         setSyncStatus('online');
+        setPremiereReception(true);
         let timer = null;
         unsubscribe = subscribeToChanges(() => {
           // Ignorer l'écho de nos propres écritures, regrouper les rafales
@@ -239,11 +270,19 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
     majFile(state);
     if (!syncedRef.current) return undefined;
     if (!peutEnvoyer(syncStatus)) return undefined;
+    // Par table : les fiches à envoyer, et l'état complet qui deviendra la
+    // référence « répliquée » une fois l'envoi confirmé.
     const changed = {};
+    const instantanes = {};
     const deletedByTable = {};
+    const acquisSansEnvoi = {};
     for (const table of SYNCED_COLLECTIONS) {
       if (state[table] === syncedRef.current[table]) continue;
-      changed[table] = state[table] || [];
+      // SEULES les fiches modifiées ici partent. Renvoyer toute la collection
+      // réécrivait sur le serveur chaque fiche avec la copie de CET appareil :
+      // la moindre modification locale — une relance Google Contacts sur un
+      // autre contact — effaçait ce que l'autre appareil venait d'enregistrer.
+      const modifies = new Set(idsModifies(syncedRef.current[table], state[table]));
       // Détection des suppressions locales. Les éléments PARTAGÉS en sont
       // exclus : ils ne nous appartiennent pas, et un tombstone porte sur un
       // id — il masquerait la ligne de l'organisation interne à la réception
@@ -251,13 +290,50 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
       const prevIds = new Set((syncedRef.current[table] || []).filter((i) => !i.partage).map((i) => i.id));
       const nextIds = new Set((state[table] || []).map((i) => i.id));
       const deleted = [...prevIds].filter((id) => !nextIds.has(id));
+      // Tableau neuf sans fiche modifiée ni supprimée (réordonné, recopié) :
+      // rien à envoyer, il devient la référence tel quel.
+      if (!modifies.size && !deleted.length) { acquisSansEnvoi[table] = state[table] || []; continue; }
+      changed[table] = (state[table] || []).filter((i) => modifies.has(i.id));
+      instantanes[table] = state[table] || [];
       if (deleted.length) deletedByTable[table] = deleted;
+    }
+    if (Object.keys(acquisSansEnvoi).length) {
+      syncedRef.current = { ...syncedRef.current, ...acquisSansEnvoi };
+      majFile(state);
     }
     if (!Object.keys(changed).length) return undefined;
 
     let annule = false;
     lastPushAt.current = Date.now();
     const doSync = async () => {
+      // Recalage : une fiche modifiée ici a pu l'être AILLEURS depuis la
+      // dernière lecture (l'autre appareil n'attend pas notre relecture d'une
+      // minute). On relit sa version actuelle sur le serveur et on y reporte
+      // nos changements, champ par champ. S'il y a eu recalage, l'état local
+      // le reçoit et l'effet repart : c'est la version recalée qui partira,
+      // et l'écran montre aussitôt ce que l'autre appareil a enregistré.
+      const recalees = await recalerSurServeur(changed, syncedRef.current);
+      if (annule) return;
+      if (recalees) {
+        setState((s) => {
+          let touche = false;
+          const suivant = { ...s };
+          for (const [table, fiches] of Object.entries(recalees)) {
+            const liste = s[table] || [];
+            const nouvelle = liste.map((item) => {
+              const r = fiches.get(item.id);
+              // Fiche retouchée ici entre-temps : on la laisse, le prochain
+              // passage la recalera à son tour.
+              if (!r || item !== r.local) return item;
+              touche = true;
+              return r.fiche;
+            });
+            suivant[table] = nouvelle;
+          }
+          return touche ? suivant : s;
+        });
+        return;
+      }
       const erreurs = [];
       let reussies = [];
       try {
@@ -292,7 +368,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
       const acquises = reussies.filter((t) => !suppressionsEchouees.has(t));
       if (acquises.length) {
         const acquis = { ...syncedRef.current };
-        for (const t of acquises) if (changed[t]) acquis[t] = changed[t];
+        for (const t of acquises) if (instantanes[t]) acquis[t] = instantanes[t];
         syncedRef.current = acquis;
         // Ce qui vient d'être confirmé quitte la file d'attente.
         majFile(stateRef.current);
@@ -360,7 +436,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
     };
     doSync();
     return () => { annule = true; };
-  }, [state, syncStatus, retryTick, majFile, stateRef, signalerSiPersistant]); // stateRef est une ref stable
+  }, [state, syncStatus, retryTick, majFile, stateRef, setState, signalerSiPersistant]); // stateRef et setState sont stables
 
   // ---- Filet de sécurité : relecture régulière et au retour de l'app ----
   // Le temps réel reste le canal principal, mais il ne garantit rien : une
@@ -432,5 +508,5 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
   // réseau est un « hors ligne », pas une erreur — le travail est en sécurité
   // localement et repartira tout seul.
   const statut = syncStatus === 'error' && reseauCoupe ? 'offline' : syncStatus;
-  return { syncStatus: statut, syncError, enAttente, synchroniserMaintenant };
+  return { syncStatus: statut, syncError, enAttente, synchroniserMaintenant, premiereReception };
 }

@@ -97,6 +97,36 @@ const canonique = (v) => JSON.stringify(v, (_, x) => (
 /** Deux versions d'un élément portent-elles exactement le même contenu ? */
 export const memeContenu = (a, b) => a === b || canonique(a) === canonique(b);
 
+/**
+ * Recale une modification locale sur la version ACTUELLE du serveur, avant
+ * de l'envoyer.
+ *
+ * Trois versions d'une même fiche : `base`, la dernière connue du serveur
+ * sur cet appareil ; `local`, la base plus ce qui a changé ici ; `serveur`,
+ * la base plus ce qui a changé AILLEURS depuis. Envoyer `local` tel quel
+ * effaçait les changements faits ailleurs : le téléphone renomme un contact,
+ * l'ordinateur ne fait que noter l'issue d'un envoi vers Google sur sa copie
+ * périmée — et l'ancien nom revient, partout.
+ *
+ * On part donc de la version du serveur et on y reporte, champ par champ, ce
+ * qui a changé ici. Un même champ modifié des deux côtés : la valeur d'ici
+ * l'emporte, c'est elle qu'on envoie.
+ *
+ * Renvoie `local` (même référence) quand il n'y a rien à recaler : création
+ * locale (pas de base), fiche absente du serveur, serveur inchangé depuis la
+ * base, ou résultat identique à `local`.
+ */
+export const rebaserSurServeur = (base, local, serveur) => {
+  if (!base || !serveur || memeContenu(base, serveur)) return local;
+  const resultat = { ...serveur };
+  for (const cle of new Set([...Object.keys(base), ...Object.keys(local)])) {
+    if (memeContenu(local[cle], base[cle])) continue;
+    if (cle in local) resultat[cle] = local[cle];
+    else delete resultat[cle];
+  }
+  return memeContenu(resultat, local) ? local : resultat;
+};
+
 export const fusionnerCollection = (locaux = [], distants = [], supprimes = new Set(), enAttente = new Set()) => {
   const distantsIds = new Set(distants.map((i) => i.id));
   const locauxSeuls = locaux.filter(

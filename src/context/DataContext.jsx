@@ -109,7 +109,7 @@ export function DataProvider({ children }) {
   }, [user.id]);
 
   // Réplication Supabase (optionnelle, auto-détectée)
-  const { syncStatus, syncError, enAttente, synchroniserMaintenant } = useRemoteSync(state, setState, stateRef, scope);
+  const { syncStatus, syncError, enAttente, synchroniserMaintenant, premiereReception } = useRemoteSync(state, setState, stateRef, scope);
 
   // Équipe : profils de MON organisation quand le backend est configuré,
   // utilisateurs du seed sinon (mode local / démo).
@@ -153,6 +153,11 @@ export function DataProvider({ children }) {
   const googleSyncInFlight = useRef(new Set());
   useEffect(() => {
     if (!isSupabaseConfigured) return undefined;
+    // Pas avant la première lecture du serveur : l'issue de l'envoi serait
+    // notée sur la copie locale, peut-être périmée (un contact modifié depuis
+    // sur un autre appareil). Cette copie passerait alors pour une
+    // modification d'ici et l'emporterait sur celle du serveur.
+    if (!premiereReception) return undefined;
     // La règle vit dans utils/contactsGoogle.js : partenaires et clients du
     // côté PUBLIC seulement. Les clients de l'espace Devis Pro n'y vont pas —
     // c'est l'entreprise personnelle de l'abonné.
@@ -200,7 +205,7 @@ export function DataProvider({ children }) {
         .finally(() => googleSyncInFlight.current.delete(key));
     });
     return () => { active = false; };
-  }, [state.partners, state.leads, state.proClients, actions, team, googleRetryTick]);
+  }, [state.partners, state.leads, state.proClients, actions, team, googleRetryTick, premiereReception]);
 
   // Réveil À L'HEURE du prochain essai : la minuterie d'une minute ci-dessus
   // ferait attendre jusqu'à 60 s un contact repris au bout de 15.
@@ -216,9 +221,16 @@ export function DataProvider({ children }) {
   // C'est lui qui porte les commissions : sans profil, une affaire gagnée
   // n'a aucun apporteur à rémunérer et la commission n'est jamais créée —
   // silencieusement. L'action est idempotente (id déterministe p-user-<id>).
+  //
+  // Avec le serveur : pas avant sa première lecture. Sur un appareil neuf,
+  // le profil n'est pas encore là ; créé trop tôt, ce profil vierge passait
+  // pour une modification d'ici, l'emportait à la réception et écrasait le
+  // vrai sur le serveur — numéro Mobile Money effacé, CODE PARTENAIRE changé
+  // (celui des liens de parrainage déjà diffusés).
   useEffect(() => {
+    if (isSupabaseConfigured && !premiereReception) return;
     if (user?.id) actions.ensurePartnerForUser(user);
-  }, [user?.id, actions]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, actions, premiereReception]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Le réseau reste une lecture serveur distincte de l'état local.
   const reseau = useReseau();

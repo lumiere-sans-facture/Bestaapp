@@ -252,6 +252,36 @@ export async function pullAll() {
   return { empty: total === 0, collections, tombstones };
 }
 
+// Identifiants par lecture ciblée : la liste voyage dans l'adresse de la
+// requête, qu'il ne faut pas laisser enfler sans limite.
+const IDS_PAR_LECTURE = 100;
+
+/**
+ * Version actuelle, sur le serveur, de quelques fiches d'une table — de quoi
+ * recaler un envoi sur ce qui a changé ailleurs entre-temps (voir
+ * utils/fileSync.js › rebaserSurServeur). Map id → fiche, limitée aux lignes
+ * de NOTRE organisation. Vide en cas d'échec : l'envoi part alors tel quel,
+ * comme avant, et s'il n'y a pas de réseau il échouera de lui-même.
+ */
+export async function lireVersionsServeur(table, ids) {
+  const versions = new Map();
+  if (!ids.length || estAbsente(table)) return versions;
+  try {
+    for (let i = 0; i < ids.length; i += IDS_PAR_LECTURE) {
+      let requete = supabase.from(table)
+        .select(currentOrgId ? 'id, data, org_id' : 'id, data')
+        .in('id', ids.slice(i, i + IDS_PAR_LECTURE));
+      if (currentOrgId) requete = requete.eq('org_id', currentOrgId);
+      const { data, error } = await requete;
+      if (error) return new Map();
+      for (const row of data || []) versions.set(row.id, { ...row.data, id: row.id });
+    }
+  } catch {
+    return new Map();
+  }
+  return versions;
+}
+
 // Suppressions enregistrées sur le serveur. Une table absente ou une lecture
 // en échec rend une liste vide : déploiement progressif du schéma, pas de
 // filtrage.
