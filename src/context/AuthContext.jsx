@@ -9,6 +9,7 @@ import { getActiveRef } from '../utils/referral';
 import { isSessionExpired, touchSession, clearSessionLifetime } from '../utils/sessionLifetime';
 import { lireProfilCache, ecrireProfilCache, oublierProfilCache } from '../utils/profilCache';
 import { isNativeGoogleAuth, signInWithGoogleNative, signOutGoogleNative } from '../lib/nativeGoogleAuth';
+import { fetchAuthProfile } from '../lib/authProfile';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'bestasolar_user';
@@ -17,27 +18,9 @@ const STORAGE_KEY = 'bestasolar_user';
 const PENDING_KEY = 'bestasolar_pending_signup';
 const OAUTH_CONTEXT_KEY = 'bestasolar_google_signup';
 
-// select('*') : tolère l'ancien schéma (sans org_id / is_platform_admin)
-// comme le schéma multi-entreprise.
-//
-// Renvoie { profile, injoignable }. La distinction est essentielle : un profil
-// RÉELLEMENT absent (PGRST116, « aucune ligne ») déclenche la création de
-// l'organisation ; un serveur injoignable, lui, ne prouve rien — il faut alors
-// se rabattre sur le profil connu de l'appareil, pas conclure à un compte sans
-// profil et renvoyer l'utilisateur à la connexion.
-const fetchProfile = async (email) => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('email', email.toLowerCase())
-      .single();
-    if (data) return { profile: data, injoignable: false };
-    return { profile: null, injoignable: error?.code !== 'PGRST116' };
-  } catch {
-    return { profile: null, injoignable: true }; // requête avortée : hors-ligne
-  }
-};
+// L'uid Auth est prioritaire ; l'email (sans sensibilité à la casse) couvre les
+// profils historiques. Une erreur RLS/réseau ne signifie pas « nouveau compte ».
+const fetchProfile = (authUser) => fetchAuthProfile(supabase, authUser);
 
 const readPending = () => {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY)); } catch { return null; }
@@ -102,22 +85,27 @@ export function AuthProvider({ children }) {
 
   // Le compte Auth existe mais pas encore le profil : crée l'organisation (ou
   // rejoint celle du code d'invitation) mémorisée à l'inscription.
-  const provisionProfile = async (email) => {
+  const provisionProfile = async (authUser) => {
+    const email = authUser?.email;
+    if (!email) return null;
     const pending = readPending();
     if (!pending || pending.email?.toLowerCase() !== email.toLowerCase()) return null;
     try {
+      let resultat;
       if (pending.inviteCode) {
-        await supabase.rpc('signup_join_org', { p_invite_code: pending.inviteCode, p_user_name: pending.name, p_phone: pending.phone || '' });
+        resultat = await supabase.rpc('signup_join_org', { p_invite_code: pending.inviteCode, p_user_name: pending.name, p_phone: pending.phone || '' });
       } else {
-        await supabase.rpc('signup_create_org', {
+        resultat = await supabase.rpc('signup_create_org', {
           p_org_name: pending.companyName,
           p_user_name: pending.name,
           p_ref_code: pending.refCode || null,
           p_phone: pending.phone || '',
         });
       }
+      if (resultat.error) return null;
+      const nouveauProfil = (await fetchProfile(authUser)).profile;
+      if (!nouveauProfil) return null;
       localStorage.removeItem(PENDING_KEY);
-      const nouveauProfil = (await fetchProfile(email)).profile;
       if (nouveauProfil?.id) marquerGuideNouveauUtilisateur(nouveauProfil.id);
       return nouveauProfil;
     } catch {
@@ -152,11 +140,11 @@ export function AuthProvider({ children }) {
         const cache = lireProfilCache(email);
         if (cache) { await adoptProfile(cache); setIsLoading(false); }
 
-        const { profile, injoignable } = await fetchProfile(email);
+        const { profile, injoignable } = await fetchProfile(session.user);
         if (profile) await adoptProfile(profile);
         else if (!injoignable) {
           // Le serveur répond clairement : ce compte n'a pas de profil.
-          const cree = await provisionProfile(email);
+          const cree = await provisionProfile(session.user);
           if (cree) await adoptProfile(cree);
           // Ouvert sur un profil mémorisé que le serveur ne reconnaît plus
           // (membre retiré de l'entreprise) : la session est refermée.
@@ -227,19 +215,24 @@ export function AuthProvider({ children }) {
     touchSession();
     // Profil et organisation lus en même temps, pas l'un après l'autre.
     const orgEnCours = fetchMyOrg();
-    const { profile, injoignable } = await fetchProfile(email);
+    const { profile, injoignable } = await fetchProfile(googleUser);
     if (profile) {
       await adoptProfile(profile, orgEnCours);
       return { ok: true };
     }
 
     if (injoignable) {
+      const cache = lireProfilCache(email);
+      if (cache) {
+        await adoptProfile(cache);
+        return { ok: true };
+      }
       return { ok: false, error: 'Google a accepté la connexion, mais Besta ne peut pas joindre le serveur. Réessayez dans un instant.' };
     }
 
     // Premier compte Google : l'utilisateur termine son profil métier sur
     // l'écran déjà prévu pour ce cas (téléphone, entreprise ou équipe).
-    const cree = await provisionProfile(email);
+    const cree = await provisionProfile(googleUser);
     if (cree) {
       await adoptProfile(cree);
       return { ok: true };
@@ -256,15 +249,24 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     if (isSupabaseConfigured) {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) return false;
       touchSession();
       // Profil et organisation lus EN MÊME TEMPS : la connexion enchaînait
       // trois allers-retours (identifiants, profil, organisation), soit une à
       // deux secondes de plus sur un réseau mobile.
       const orgEnCours = fetchMyOrg();
-      const existant = (await fetchProfile(email.trim())).profile;
-      const profile = existant || (await provisionProfile(email.trim()));
+      const authUser = data.user || data.session?.user;
+      const { profile: existant, injoignable } = await fetchProfile(authUser);
+      if (injoignable && !existant) {
+        const cache = lireProfilCache(authUser?.email || email.trim());
+        if (cache) {
+          await adoptProfile(cache, orgEnCours);
+          return true;
+        }
+        return 'unavailable';
+      }
+      const profile = existant || (await provisionProfile(authUser));
       if (!profile) {
         // Compte Auth valide mais profil jamais créé (inscription interrompue,
         // autre navigateur…) : on garde la session et on laisse l'écran de
@@ -312,7 +314,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, phone: phone || '', companyName, inviteCode, refCode: refCode || null }));
     if (!data.session) return { ok: true, needsConfirmation: true };
     touchSession();
-    const profile = await provisionProfile(email.trim());
+    const profile = await provisionProfile(data.user || data.session?.user);
     if (!profile) return { ok: false, error: 'Compte créé mais profil introuvable — reconnectez-vous.' };
     await adoptProfile(profile);
     return { ok: true };
@@ -326,10 +328,11 @@ export function AuthProvider({ children }) {
     if (!isSupabaseConfigured) return { ok: false };
     if (!inviteCode && !companyName) companyName = name;
     try {
+      let resultat;
       if (inviteCode) {
-        await supabase.rpc('signup_join_org', { p_invite_code: inviteCode, p_user_name: name, p_phone: phone || '' });
+        resultat = await supabase.rpc('signup_join_org', { p_invite_code: inviteCode, p_user_name: name, p_phone: phone || '' });
       } else {
-        await supabase.rpc('signup_create_org', {
+        resultat = await supabase.rpc('signup_create_org', {
           p_org_name: companyName,
           p_user_name: name,
           // Code saisi dans le formulaire, sinon parrainage encore actif sur
@@ -339,11 +342,12 @@ export function AuthProvider({ children }) {
           p_phone: phone || '',
         });
       }
+      if (resultat.error) return { ok: false, error: resultat.error.message };
     } catch (e) {
       return { ok: false, error: e.message };
     }
     const { data: { session } } = await supabase.auth.getSession();
-    const profile = session?.user?.email ? (await fetchProfile(session.user.email)).profile : null;
+    const profile = session?.user?.email ? (await fetchProfile(session.user)).profile : null;
     if (!profile) return { ok: false, error: 'Profil introuvable après création — réessayez.' };
     localStorage.removeItem(PENDING_KEY);
     localStorage.removeItem(OAUTH_CONTEXT_KEY);
@@ -371,7 +375,7 @@ export function AuthProvider({ children }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
         touchSession();
-        const profile = (await fetchProfile(session.user.email)).profile;
+        const profile = (await fetchProfile(session.user)).profile;
         if (profile) await adoptProfile(profile);
       }
     }

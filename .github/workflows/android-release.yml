@@ -27,11 +27,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Vérifier le backend partagé avec le web
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          [ "$VITE_SUPABASE_URL" = "https://ujllvzkhqlabxpoyidor.supabase.co" ] || { echo "::error::Le build Play Store ne pointe pas vers le projet Supabase de production utilisé par le web"; exit 1; }
+          [ -n "$VITE_SUPABASE_ANON_KEY" ] || { echo "::error::Secret VITE_SUPABASE_ANON_KEY absent"; exit 1; }
+          [ -n "$VITE_GOOGLE_CLIENT_ID" ] || { echo "::error::Secret VITE_GOOGLE_CLIENT_ID absent"; exit 1; }
+
       - name: Build web assets
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ENABLE_GOOGLE_AUTH: 'true'
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           # Sans elles, l'app installée depuis le store ne remonterait ni ses
           # plantages (Sentry) ni son usage (PostHog) : ce sont des valeurs
           # PUBLIQUES, à recopier depuis Vercel dans les secrets GitHub.
