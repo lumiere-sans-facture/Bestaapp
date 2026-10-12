@@ -7,7 +7,7 @@
 // de ce montant dans l'application : simulateur de retour sur investissement,
 // fiche de dimensionnement, devis sur mesure, rentabilité de l'espace Pro.
 // Aucun écran ne recopie ces valeurs : il appelle calculMaintenanceAnnuelle.
-import { formatNombre } from './format';
+// Les écrans et documents n'affichent que le MONTANT, jamais la règle.
 
 /** Forfait des petits systèmes (moins de SEUIL panneaux). */
 export const BASE_PETIT = 30000;
@@ -24,18 +24,4 @@ const nombrePanneaux = (n) => Math.max(0, Math.round(Number(n) || 0));
 export function calculMaintenanceAnnuelle(nbPanneaux) {
   const n = nombrePanneaux(nbPanneaux);
   return n < SEUIL ? BASE_PETIT : BASE + PAR_PANNEAU * (n - SEUIL);
-}
-
-/**
- * Détail du calcul, à partir de SEUIL panneaux (null en dessous : le forfait
- * se suffit) : « 50 000 + 2 000 × 10 panneaux supplémentaires ».
- * @param {function} format  mise en forme des montants (celle de l'écran)
- */
-export function detailMaintenanceAnnuelle(nbPanneaux, format = formatNombre) {
-  const n = nombrePanneaux(nbPanneaux);
-  if (n < SEUIL) return null;
-  const supplementaires = n - SEUIL;
-  if (supplementaires === 0) return `${format(BASE)} (forfait dès ${SEUIL} panneaux)`;
-  const s = supplementaires > 1 ? 's' : '';
-  return `${format(BASE)} + ${format(PAR_PANNEAU)} × ${supplementaires} panneau${s ? 'x' : ''} supplémentaire${s}`;
 }

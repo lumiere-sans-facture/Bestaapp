@@ -1,7 +1,7 @@
 // Maintenance annuelle : 30 000 F sous 10 panneaux, puis 50 000 F + 2 000 F
 // par panneau au-delà de 10 — une seule règle pour toute l'application.
 import { describe, it, expect } from 'vitest';
-import { calculMaintenanceAnnuelle, detailMaintenanceAnnuelle, BASE_PETIT, BASE, SEUIL, PAR_PANNEAU } from '../maintenance';
+import { calculMaintenanceAnnuelle, BASE_PETIT, BASE, SEUIL, PAR_PANNEAU } from '../maintenance';
 import { simulerRoi } from '../roi';
 import { computeSheet } from '../sizingSheet/compute';
 import { buildSizingSheetHtml } from '../sizingSheet';
@@ -33,19 +33,6 @@ describe('calculMaintenanceAnnuelle — exemples de contrôle', () => {
   });
 });
 
-describe('détail du calcul (fiche de dimensionnement)', () => {
-  it('à partir de 10 panneaux seulement', () => {
-    expect(detailMaintenanceAnnuelle(9)).toBeNull();
-    expect(detailMaintenanceAnnuelle(10)).toBe('50 000 (forfait dès 10 panneaux)');
-    expect(detailMaintenanceAnnuelle(11)).toBe('50 000 + 2 000 × 1 panneau supplémentaire');
-    expect(detailMaintenanceAnnuelle(20)).toBe('50 000 + 2 000 × 10 panneaux supplémentaires');
-  });
-
-  it('mise en forme de l’écran appelant', () => {
-    expect(detailMaintenanceAnnuelle(30, (v) => `${v}`)).toBe('50000 + 2000 × 20 panneaux supplémentaires');
-  });
-});
-
 describe('un même système, une même maintenance partout', () => {
   const dossier = (numberOfPanels) => ({
     consumption: { day: 12, night: 3 }, sizing: { autonomyNights: 1, numberOfPanels, batteryCapacity: 0 },
@@ -60,13 +47,12 @@ describe('un même système, une même maintenance partout', () => {
     expect(buildQuotation(sizing, { products: [] }).maintenanceCost).toBe(attendu);
   });
 
-  it('fiche imprimée : le montant formaté, et le détail à partir de 10 panneaux', () => {
+  it('fiche imprimée : le montant formaté, jamais la règle de calcul', () => {
     // (Espaces fines insécables de la fiche ramenées à des espaces simples.)
     const fiche = (n) => buildSizingSheetHtml({ ...dossier(n), client: { name: 'Client' }, appliances: [], consumption: { day: 12, night: 3 } })
       .replace(/[\u202f\u00a0]/g, ' ');
     expect(fiche(20)).toContain('Maintenance (70 000 F CFA/an dès la 2ᵉ année)');
-    expect(fiche(20)).toContain('<span class="muted">50 000 + 2 000 × 10 panneaux supplémentaires</span>');
     expect(fiche(9)).toContain('Maintenance (30 000 F CFA/an dès la 2ᵉ année)');
-    expect(fiche(9)).not.toContain('panneaux supplémentaires');
+    for (const n of [9, 20]) expect(fiche(n)).not.toMatch(/supplémentaire|2 000 ×|forfait/);
   });
 });

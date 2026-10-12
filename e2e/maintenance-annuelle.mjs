@@ -3,7 +3,8 @@
    Un même système donne la MÊME maintenance dans la fiche de
    dimensionnement et dans le simulateur ROI : un devis solaire est créé
    (deux climatiseurs 3 CV, plus de 10 panneaux), sa fiche est produite,
-   puis le simulateur reprend l'étude de ce devis.
+   puis le simulateur reprend l'étude de ce devis. Seul le montant
+   s'affiche : la règle de calcul n'est écrite nulle part à l'écran.
    Serveur : npm run dev */
 import { chromium } from '@playwright/test';
 const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
@@ -56,9 +57,9 @@ const fiche = await p.evaluate(async () => {
 });
 const nFiche = fiche.n;
 ok(nFiche >= 10 && fiche.renta === regle(nFiche), `fiche : ${nFiche} panneaux → ${fiche.renta} F/an (règle : ${regle(nFiche)})`);
-ok(fiche.texte.replace(/[  ]/g, ' ').includes(`Maintenance (${regle(nFiche).toLocaleString('fr-FR').replace(/[  ]/g, ' ')} F CFA/an dès la 2ᵉ année)`)
-  && fiche.texte.replace(/[\u202f\u00a0]/g, ' ').includes(`50 000 + 2 000 × ${nFiche - 10} panneau`),
-  `fiche imprimée : montant et détail du calcul [« ${fiche.texte} »]`);
+const texteFiche = fiche.texte.replace(/[\u202f\u00a0]/g, ' ');
+ok(texteFiche === `Maintenance (${regle(nFiche).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ')} F CFA/an dès la 2ᵉ année)`,
+  `fiche imprimée : le montant seul, sans la règle [« ${texteFiche} »]`);
 await p.locator('button:has-text("Créer le devis")').first().click(); await p.waitForTimeout(2000);
 const devis = await p.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).devis.find((d) => d.type === 'solar'));
 
@@ -68,14 +69,13 @@ const option = await p.locator('#roi-etude option', { hasText: devis.devisNumber
 await p.locator('#roi-etude').selectOption(option); await p.waitForTimeout(1200);
 const entretien = p.locator('.roi-ligne', { hasText: 'Entretien de l’installation' });
 const montant = chiffres(await entretien.locator('.roi-ligne-montant').innerText());
-const detail = (await entretien.locator('.roi-ligne-detail').innerText().catch(() => '')).replace(/\s+/g, ' ');
-const nSimu = Number(/(\d+) panneaux/.exec(detail)?.[1] || 0);
+const nSimu = Number(/(\d+) panneaux/.exec(await p.locator('.roi-kit-spec').innerText())?.[1] || 0);
 ok(nSimu === nFiche, `même système : ${nSimu} panneaux au simulateur, ${nFiche} sur la fiche`);
 ok(montant === fiche.renta, `même maintenance : simulateur ${montant} F/an = fiche ${fiche.renta} F/an`);
-ok(/50 000 \+ 2 000 × \d+ panneaux supplémentaires/.test(detail), `simulateur : détail du calcul [« ${detail} »]`);
 await p.locator('.roi-hypotheses summary').click(); // section repliée par défaut
-const hypotheses = (await p.locator('.roi-hypotheses').innerText().catch(() => '')).replace(/\s+/g, ' ');
-ok(/30 000 F sous 10 panneaux, puis 50 000 F \+ 2 000 F par panneau au-delà de 10/.test(hypotheses), 'simulateur : la règle est écrite dans « Ce que le calcul suppose »');
+const ecran = (await p.locator('.roi-grid').innerText()).replace(/\s+/g, ' ');
+ok(!(await entretien.locator('.roi-ligne-detail').count()) && !/supplémentaire|2 000 F par panneau|sous 10 panneaux/.test(ecran),
+  'simulateur : le montant seul — la règle de calcul n’apparaît nulle part');
 await entretien.screenshot({ path: '/tmp/claude-0/simulateur-entretien.png' });
 
 await nav.close();

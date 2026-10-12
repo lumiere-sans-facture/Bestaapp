@@ -173,13 +173,12 @@ export const DUREES_VIE = [
  */
 export const calculerRentabilite = (consoJour, investissement, surcharges = {}) => {
   const saisie = surcharges.maintenanceAnnuelle;
-  const maintenanceCalculee = !(saisie !== '' && saisie != null && Number.isFinite(Number(saisie)) && Number(saisie) >= 0);
+  const saisieValable = saisie !== '' && saisie != null && Number.isFinite(Number(saisie)) && Number(saisie) >= 0;
   const p = {
     ...RENTA_DEFAUTS,
     ...surcharges,
     nbPanneaux: Math.max(0, Math.round(Number(surcharges.nbPanneaux) || 0)),
-    maintenanceAnnuelle: maintenanceCalculee ? calculMaintenanceAnnuelle(surcharges.nbPanneaux) : Number(saisie),
-    maintenanceCalculee,
+    maintenanceAnnuelle: saisieValable ? Number(saisie) : calculMaintenanceAnnuelle(surcharges.nbPanneaux),
   };
   const inv = Number(investissement) > 0 ? Math.round(Number(investissement)) : null;
   // kWh couverts par an, arrondis AVANT le passage en francs.

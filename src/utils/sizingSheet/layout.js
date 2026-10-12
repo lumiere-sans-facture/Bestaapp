@@ -11,7 +11,6 @@ import { CUSTOM_APPLIANCE_LABEL } from '../../data/appliances';
 import { emetteurDe, policeDocument } from '../docTemplates/shared';
 import { couleursLisibles } from '../couleurDocument';
 import { styleLogo, GABARITS_LOGO } from '../logo';
-import { detailMaintenanceAnnuelle } from '../maintenance';
 import { DUREES_VIE, libelleRoi } from './compute';
 import { renderCoverageChart } from './chart';
 
@@ -237,15 +236,11 @@ export function renderSheet(d, c) {
   const chart = renderCoverageChart(c.couverture.mois, {
     kwc: c.kwc, consoJour: totalKwh, rendement: panelEfficiency, couleurs,
   });
-  // Détail de la règle (utils/maintenance.js) à partir de 10 panneaux ;
-  // jamais pour un montant saisi à la main, qui ne suit pas la règle.
-  const detailMaintenance = renta.maintenanceCalculee ? detailMaintenanceAnnuelle(renta.nbPanneaux, nf) : null;
   const rentaRows = [
     ['Consommation couverte', `${u(nf(renta.kwhAnnuels), 'kWh/an')} <span class="muted">(${u(nf(totalKwh, 2), 'kWh/j')} × ${nf(renta.tauxUtilisation, 2)} × 365)</span>`],
     ['Investissement estimé', renta.investissement != null ? cfa(renta.investissement) : 'À renseigner'],
     [`Remplacement onduleur (1 × sur ${nf(renta.horizon)} ans)`, cfa(renta.provisionOnduleur)],
-    [`Maintenance (${cfa(renta.maintenanceAnnuelle)}/an dès la 2ᵉ année)${detailMaintenance
-      ? `<br><span class="muted">${detailMaintenance}</span>` : ''}`, cfa(renta.maintenanceTotale)],
+    [`Maintenance (${cfa(renta.maintenanceAnnuelle)}/an dès la 2ᵉ année)`, cfa(renta.maintenanceTotale)],
     [`Économies cumulées sur ${nf(renta.horizon)} ans`, cfa(renta.economiesCumulees)],
   ];
 

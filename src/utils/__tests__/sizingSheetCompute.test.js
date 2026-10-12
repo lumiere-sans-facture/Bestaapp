@@ -130,10 +130,10 @@ describe('rentabilité — montants recalculés depuis les valeurs affichées', 
       consumption: { day: 12, night: 3 }, sizing: { autonomyNights: 1, numberOfPanels, batteryCapacity: 0 },
       systemType: 'off-grid', panelName: 'Panneau 620W', sunHours: 4.3, batteries: [], cityName: 'Lomé', cityCountry: 'Togo', rentabilite,
     });
-    expect(computeSheet(dossier(9)).renta).toMatchObject({ maintenanceAnnuelle: 30000, nbPanneaux: 9, maintenanceCalculee: true });
+    expect(computeSheet(dossier(9)).renta).toMatchObject({ maintenanceAnnuelle: 30000, nbPanneaux: 9 });
     expect(computeSheet(dossier(20)).renta).toMatchObject({ maintenanceAnnuelle: 70000, maintenanceTotale: 70000 * 9, nbPanneaux: 20 });
-    // Montant saisi par l'installateur (espace Pro) : il prime, sans le détail de la règle.
-    expect(computeSheet(dossier(20, { maintenanceAnnuelle: 45000 })).renta).toMatchObject({ maintenanceAnnuelle: 45000, maintenanceCalculee: false });
+    // Montant saisi par l'installateur (espace Pro) : il prime.
+    expect(computeSheet(dossier(20, { maintenanceAnnuelle: 45000 })).renta.maintenanceAnnuelle).toBe(45000);
     expect(computeSheet(dossier(20, { maintenanceAnnuelle: 0 })).renta.maintenanceAnnuelle).toBe(0);
   });
 

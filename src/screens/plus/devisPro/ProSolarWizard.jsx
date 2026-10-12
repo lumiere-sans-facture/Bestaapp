@@ -266,8 +266,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
   const tarifElecDefaut = tarifElectriciteParDefaut(villeDimensionnement, location?.country || '', pays.id);
   // Maintenance de la fiche, champ laissé vide : la règle commune sur les
   // panneaux du dimensionnement (le nombre que la fiche annonce).
-  const panneauxFiche = sizing?.numberOfPanels || 0;
-  const maintenanceDefaut = calculMaintenanceAnnuelle(panneauxFiche);
+  const maintenanceDefaut = calculMaintenanceAnnuelle(sizing?.numberOfPanels);
   const coefMainOeuvre = coefficientMainOeuvre({
     ville: villeDimensionnement,
     pays: location?.country || '',
@@ -920,7 +919,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                       <input className="input" type="number" min="0.1" max="1" step="0.05" value={renta.tauxUtilisation}
                         onChange={(e) => setRenta({ ...renta, tauxUtilisation: e.target.value })} placeholder="0,85" />
                     </Field>
-                    <Field label={`Maintenance annuelle (F CFA) — défaut : ${formatNombre(maintenanceDefaut)} F (${panneauxFiche} panneaux)`}>
+                    <Field label={`Maintenance annuelle (F CFA) — défaut : ${formatNombre(maintenanceDefaut)} F`}>
                       <input className="input" type="number" min="0" value={renta.maintenanceAnnuelle}
                         onChange={(e) => setRenta({ ...renta, maintenanceAnnuelle: e.target.value })} placeholder={String(maintenanceDefaut)} />
                     </Field>
