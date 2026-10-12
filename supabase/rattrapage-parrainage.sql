@@ -27,6 +27,8 @@
 --                         DEMANDÉE ne se réécrit pas, une inscription notée
 --                         par le seul nom ne se devine pas. À trancher à la
 --                         main (la ligne propose la commande).
+-- Trop de lignes pour être lues ? rattrapage-parrainage-resume.sql en donne
+-- le résumé (lecture seule), doublons payés chiffrés.
 select etape, objet, detail
 from public.rattraper_parrainage_commissions(false)
 order by case etape when 'à vérifier' then 0 else 1 end, etape, objet;
