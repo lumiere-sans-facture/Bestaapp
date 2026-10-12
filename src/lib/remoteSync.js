@@ -175,8 +175,18 @@ export const dedupePar = (items, cle) => {
 
 /** Récupère toutes les collections + les tombstones. { empty, collections, tombstones } */
 export async function pullAll() {
-  // Lecture des collections en parallèle (au lieu de 15 allers-retours séquentiels).
-  const fetched = await Promise.all(
+  // Sans session, la base ne refuse rien : la sécurité au niveau ligne rend
+  // simplement « aucune ligne ». Une base pleine passerait alors pour vierge.
+  // L'app s'ouvrant désormais AVANT la vérification de la session (profil
+  // mémorisé, voir AuthContext), le contrôle se fait ici.
+  // Faute de réseau pour renouveler le jeton, c'est l'erreur réseau qui
+  // remonte : une coupure ordinaire, pas une session perdue.
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (!session) throw error || new Error('Session absente — reconnectez-vous.');
+  // Collections ET suppressions lues en parallèle : un seul aller-retour
+  // avant que les données n'arrivent (au lieu de 15 séquentiels jadis, puis
+  // deux à la suite).
+  const [fetched, tbRows] = await Promise.all([Promise.all(
     SYNCED_COLLECTIONS.map(async (table) => {
       // En multi-entreprise, org_id est lu pour TOUTES les tables. Certaines
       // policies (abonnements, paiements) autorisent l'admin plateforme à lire
@@ -214,7 +224,7 @@ export async function pullAll() {
           : { ...row.data, id: row.id }
       ))];
     })
-  );
+  ), lireTombstones()]);
   const collections = {};
   let total = 0;
   for (const [table, items] of fetched) {
@@ -222,30 +232,36 @@ export async function pullAll() {
     total += items.length;
   }
 
-  // Récupérer les tombstones pour filtrer les suppressions distantes.
-  // Enveloppé dans try/catch pour tolérer un déploiement progressif du schéma.
+  // Filtrer les suppressions distantes.
   const tombstones = new Map();
-  try {
-    const { data: tbRows } = await supabase.from('tombstones').select('id, collection');
-    for (const row of (tbRows || [])) {
-      if (!tombstones.has(row.collection)) tombstones.set(row.collection, new Set());
-      tombstones.get(row.collection).add(row.id);
+  for (const row of tbRows) {
+    if (!tombstones.has(row.collection)) tombstones.set(row.collection, new Set());
+    tombstones.get(row.collection).add(row.id);
+  }
+  for (const table of SYNCED_COLLECTIONS) {
+    const deleted = tombstones.get(table);
+    if (deleted?.size) {
+      // Les éléments PARTAGÉS sont immunisés : un tombstone de NOTRE
+      // organisation (ex. : purge d'une vieille copie locale d'un cours)
+      // ne doit jamais masquer l'actif de l'organisation interne — sinon
+      // un cours partagé disparaîtrait ici définitivement.
+      collections[table] = collections[table].filter((item) => item.partage || !deleted.has(item.id));
     }
-    for (const table of SYNCED_COLLECTIONS) {
-      const deleted = tombstones.get(table);
-      if (deleted?.size) {
-        // Les éléments PARTAGÉS sont immunisés : un tombstone de NOTRE
-        // organisation (ex. : purge d'une vieille copie locale d'un cours)
-        // ne doit jamais masquer l'actif de l'organisation interne — sinon
-        // un cours partagé disparaîtrait ici définitivement.
-        collections[table] = collections[table].filter((item) => item.partage || !deleted.has(item.id));
-      }
-    }
-  } catch {
-    // Table tombstones absente : déploiement progressif, pas de filtrage
   }
 
   return { empty: total === 0, collections, tombstones };
+}
+
+// Suppressions enregistrées sur le serveur. Une table absente ou une lecture
+// en échec rend une liste vide : déploiement progressif du schéma, pas de
+// filtrage.
+async function lireTombstones() {
+  try {
+    const { data } = await supabase.from('tombstones').select('id, collection');
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 // Taille maximale d'un envoi. Le catalogue embarque les photos des produits en

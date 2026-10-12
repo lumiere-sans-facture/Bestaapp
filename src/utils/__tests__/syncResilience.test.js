@@ -3,10 +3,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Double minimal de Supabase : on choisit quelles tables échouent ou manquent.
-const state = { echoue: new Set(), absentes: new Set(), pushes: [], tentatives: [], deletes: [], rows: {}, avantUpsert: null };
+const state = { echoue: new Set(), absentes: new Set(), pushes: [], tentatives: [], deletes: [], rows: {}, avantUpsert: null, session: true, erreurSession: null };
 vi.mock('../../lib/supabase', () => ({
   isSupabaseConfigured: true,
   supabase: {
+    auth: { getSession: () => Promise.resolve({ data: { session: state.session ? { user: { email: 'moi@besta.tg' } } : null }, error: state.erreurSession }) },
     from: (table) => ({
       select: () => Promise.resolve({ data: state.rows[table] || [], error: null }),
       upsert: (rows) => {
@@ -30,6 +31,7 @@ const { pushCollections, pushTombstone, pullAll, setSyncOrg, decouperEnLots } = 
 beforeEach(() => {
   state.echoue.clear(); state.absentes.clear();
   state.pushes = []; state.tentatives = []; state.deletes = []; state.rows = {}; state.avantUpsert = null;
+  state.session = true; state.erreurSession = null;
   setSyncOrg(null); // mode mono-équipe par défaut
 });
 
@@ -187,6 +189,35 @@ describe('pullAll — les lignes des autres organisations restent dehors', () =>
     state.rows.leads = [{ id: 'l1', data: { name: 'A' } }, { id: 'l2', data: { name: 'B' } }];
     const { collections } = await pullAll();
     expect(collections.leads.map((l) => l.id)).toEqual(['l1', 'l2']);
+  });
+});
+
+// L'app s'ouvre désormais sur le profil mémorisé, AVANT que la session soit
+// vérifiée. Sans session, la base ne refuse pas : elle rend « aucune ligne ».
+// Une base pleine passerait pour vierge, et l'app tenterait de la remplir
+// avec les données de l'appareil.
+describe('pullAll — jamais sans session', () => {
+  it('session absente : échec explicite, pas une base « vide »', async () => {
+    state.session = false;
+    state.rows.leads = [{ id: 'l1', data: { name: 'A' } }];
+    await expect(pullAll()).rejects.toThrow(/session/i);
+  });
+
+  it('jeton non renouvelé faute de réseau : c’est la coupure qui remonte', async () => {
+    // Une coupure ordinaire ne doit pas se faire passer pour une session
+    // perdue (« reconnectez-vous ») : le jeton sera renouvelé au retour du réseau.
+    state.session = false;
+    state.erreurSession = Object.assign(new Error('Failed to fetch'), { name: 'AuthRetryableFetchError' });
+    await expect(pullAll()).rejects.toThrow('Failed to fetch');
+  });
+
+  it('les suppressions sont appliquées, lues en même temps que les collections', async () => {
+    state.rows.leads = [{ id: 'l1', data: { name: 'A' } }, { id: 'l2', data: { name: 'B' } }];
+    state.rows.tombstones = [{ id: 'l2', collection: 'leads' }];
+    const { collections, tombstones, empty } = await pullAll();
+    expect(collections.leads.map((l) => l.id)).toEqual(['l1']);
+    expect(tombstones.get('leads').has('l2')).toBe(true);
+    expect(empty).toBe(false);
   });
 });
 

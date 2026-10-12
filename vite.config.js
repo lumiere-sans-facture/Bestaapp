@@ -29,9 +29,30 @@ const sentry = process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && proces
     })]
   : [];
 
+// Bibliothèques du démarrage qui ne changent qu'à la mise à jour des
+// dépendances (voir `manualChunks` ci-dessous).
+const VENDOR = /node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run\/router|@supabase\/[^/]+|iceberg-js|tslib|libphonenumber-js|@capacitor\/core)\//;
+
 export default defineConfig({
   // La génération des source maps n'a de sens que si on les téléverse.
-  build: { sourcemap: sentry.length > 0 },
+  build: {
+    sourcemap: sentry.length > 0,
+    rollupOptions: {
+      output: {
+        // Bibliothèques stables (React, Supabase, téléphone…) mises à part :
+        // leur fichier garde le même nom d'une mise à jour de l'app à l'autre
+        // et reste dans le cache du navigateur. Sans ça, chaque déploiement
+        // faisait retélécharger tout le fichier principal (800 Ko), et la
+        // première ouverture du site après une mise à jour traînait.
+        // Liste FERMÉE : un `node_modules` général entraînerait ici les
+        // bibliothèques chargées à la demande (PDF, capture d'écran).
+        manualChunks(id) {
+          if (VENDOR.test(id) || id.includes('commonjsHelpers')) return 'vendor';
+          return undefined;
+        },
+      },
+    },
+  },
   plugins: [react(), ...sentry],
   // Numéro de version affiché sur l'écran de connexion : le commit court sur
   // Vercel, « dev » en local. Permet de vérifier d'un coup d'œil qu'un

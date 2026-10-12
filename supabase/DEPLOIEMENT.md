@@ -61,6 +61,8 @@ correspond à une fonctionnalité livrée après la première installation :
 
 > **Raccourci** : `a-executer-2026-09.sql` réunit les scripts 11 et 12 en un seul copier-coller, avec un tableau de contrôle final. À passer dans les deux projets.
 
+> **Vitesse** : `migrations/20261012_index_email_profils.sql` ajoute un index sur `lower(email)` dans `profiles`. Les règles de sécurité y cherchent le profil de la session pour chaque ligne lue ; sans l'index, chaque recherche parcourait toute la table, et la connexion comme la synchronisation ralentissaient à chaque nouvel inscrit. Indépendant des autres scripts, sans effet sur les droits, à passer à tout moment dans les deux projets.
+
 L'ordre 8 → 9 n'est pas indifférent : l'index unique répare d'abord les
 doublons hérités, le renommage travaille ensuite sur une base saine.
 

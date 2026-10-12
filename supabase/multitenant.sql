@@ -79,6 +79,11 @@ create or replace function public.auth_org_id()
   -- aussi les profils existants dont l'id n'est pas l'uid Auth (u1/u2/u3).
   select org_id from public.profiles where lower(email) = lower(auth.jwt() ->> 'email')
 $$;
+-- Les règles de sécurité appellent ces recherches par lower(email) pour
+-- CHAQUE ligne lue : sans cet index (l'index unique porte sur `email` brut),
+-- chacune parcourait toute la table des profils.
+-- (Aussi livré seul : migrations/20261012_index_email_profils.sql.)
+create index if not exists idx_profiles_email_lower on public.profiles (lower(email));
 
 -- 3 bis. Kits solaires : collection née après le schéma initial. Créée ici
 -- aussi, pour que ce fichier reste exécutable seul sur une base déjà en place.

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { users } from '../data/seed';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, emailSessionMemorisee, estCoupureReseauAuth } from '../lib/supabase';
 import { setContexteErreur } from '../lib/rapportErreur';
 import { setContexteAnalytique } from '../lib/analytique';
 import { marquerGuideNouveauUtilisateur } from '../utils/onboarding';
@@ -68,23 +68,16 @@ export function AuthProvider({ children }) {
   // retour de Google OAuth. L'écran de connexion termine alors l'inscription.
   const [pendingAuthUser, setPendingAuthUser] = useState(null);
 
-  // Attache l'organisation au profil (type interne/pro, nom, code d'invitation).
-  // user.org absent = ancien schéma mono-équipe ou mode local → comportement
-  // « interne » (CRM complet), comme avant.
-  // `orgEnCours` : lecture de l'organisation déjà lancée par l'appelant, EN
-  // PARALLÈLE de celle du profil — un aller-retour réseau de moins à la
-  // connexion (sur mobile, chaque aller-retour compte).
-  const adoptProfile = async (profile, orgEnCours = null) => {
+  // Adopte un profil dont l'organisation est connue (type interne/pro, nom,
+  // code d'invitation). user.org absent = ancien schéma mono-équipe ou mode
+  // local → comportement « interne » (CRM complet), comme avant.
+  const appliquerProfil = (profile, org) => {
     setPendingAuthUser(null);
     localStorage.removeItem(OAUTH_CONTEXT_KEY);
-    setSyncOrg(profile?.org_id);
-    let org = null;
-    if (profile?.org_id) org = await (orgEnCours || fetchMyOrg());
-    // Serveur injoignable : `fetchMyOrg` rend null. Reprendre l'organisation
-    // connue plutôt que de repartir sans — un type d'organisation inconnu
-    // suspend la réplication du catalogue pour toute la session.
-    if (!org && profile?.org_id) org = profile.org || lireProfilCache(profile.email || '')?.org || null;
-    // Le type (interne/pro) conditionne la sync du catalogue partagé.
+    // Le type (interne/pro) conditionne la sync du catalogue partagé. Fixés
+    // ENSEMBLE : l'app peut déjà synchroniser (ouverture sur le profil
+    // mémorisé), et un type d'organisation momentanément inconnu y
+    // suspendrait l'envoi du catalogue.
     setSyncOrg(profile?.org_id, org?.kind);
     // Les rapports d'erreur portent désormais l'identifiant du compte et de
     // l'entreprise (jamais le nom ni le téléphone) : sans eux, impossible de
@@ -98,6 +91,26 @@ export function AuthProvider({ children }) {
     const adopte = org ? { ...profile, org } : profile;
     ecrireProfilCache(adopte);
     setUser(adopte);
+  };
+
+  // Profil mémorisé sur l'appareil : adopté tel quel, organisation comprise,
+  // SANS le moindre appel réseau — c'est ce qui ouvre l'app instantanément.
+  const adopterProfilMemorise = (cache) => appliquerProfil(cache, cache.org || null);
+
+  // Lit l'organisation puis adopte le profil.
+  // `orgEnCours` : lecture de l'organisation déjà lancée par l'appelant, EN
+  // PARALLÈLE de celle du profil — un aller-retour réseau de moins à la
+  // connexion (sur mobile, chaque aller-retour compte).
+  const adoptProfile = async (profile, orgEnCours = null) => {
+    setPendingAuthUser(null);
+    localStorage.removeItem(OAUTH_CONTEXT_KEY);
+    let org = null;
+    if (profile?.org_id) org = await (orgEnCours || fetchMyOrg());
+    // Serveur injoignable : `fetchMyOrg` rend null. Reprendre l'organisation
+    // connue plutôt que de repartir sans — un type d'organisation inconnu
+    // suspend la réplication du catalogue pour toute la session.
+    if (!org && profile?.org_id) org = profile.org || lireProfilCache(profile.email || '')?.org || null;
+    appliquerProfil(profile, org);
   };
 
   // Le compte Auth existe mais pas encore le profil : crée l'organisation (ou
@@ -132,38 +145,73 @@ export function AuthProvider({ children }) {
       // « Authentication → Sessions », payant, voir utils/sessionLifetime.js).
       // La connexion Google Android est native : le jeton est remis directement
       // à Supabase, sans navigateur ni callback à reprendre au démarrage.
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
+      //
+      // Profil déjà connu de cet appareil : l'app s'ouvre IMMÉDIATEMENT, sans
+      // attendre le serveur — ni le renouvellement du jeton (expiré au-delà
+      // d'une heure, donc à presque chaque réouverture), ni la lecture de
+      // l'organisation. Ces deux allers-retours tenaient l'utilisateur devant
+      // « Chargement… » à chaque ouverture, d'autant plus longtemps que le
+      // réseau était faible. Session et profil sont vérifiés juste après, en
+      // arrière-plan ; la synchronisation attend d'elle-même la session.
+      const emailMemorise = emailSessionMemorisee();
+      // Profil mémorisé actuellement affiché, en attendant le serveur.
+      let affiche = emailMemorise && !isSessionExpired() ? lireProfilCache(emailMemorise) : null;
+      if (affiche) {
+        adopterProfilMemorise(affiche);
+        setIsLoading(false);
+      }
+      // Referme l'app ouverte sur le profil mémorisé : session disparue
+      // (refusée au renouvellement), périmée, ou compte retiré.
+      const refermer = () => {
+        if (!affiche) return;
+        affiche = null;
+        oublierProfilCache();
+        setSyncOrg(null);
+        setUser(null);
+      };
+
+      supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+        // Pas de réseau pour renouveler le jeton : la session est toujours sur
+        // l'appareil, la librairie la renouvellera au retour du réseau. L'app
+        // ouverte sur le profil mémorisé le reste — la refermer ici renvoyait
+        // un technicien en zone blanche à une connexion impossible.
+        if (!session && estCoupureReseauAuth(error)) { setIsLoading(false); return; }
         const email = session?.user?.email;
+        // La session n'est plus celle du profil affiché (disparue, ou ouverte
+        // pour un autre compte par un lien reçu par e-mail) : on referme
+        // AVANT tout, pour que les données d'un compte ne passent jamais
+        // sous l'identité d'un autre.
+        if (affiche && affiche.email.toLowerCase() !== (email || '').toLowerCase()) refermer();
         if (!email) { setIsLoading(false); return; }
         if (isSessionExpired()) {
           clearSessionLifetime();
           oublierProfilCache();
           await supabase.auth.signOut();
+          refermer();
           setIsLoading(false);
           return;
         }
         touchSession();
-        // Profil déjà connu de cet appareil : l'app s'ouvre IMMÉDIATEMENT,
-        // sans attendre le serveur. C'est ce qui la rend utilisable sur le
-        // terrain : sans réseau, la lecture du profil est réessayée quatre
-        // fois avec un délai croissant, et l'utilisateur restait sept
-        // secondes devant « Chargement… » avant d'être renvoyé à la
-        // connexion. Le profil est rafraîchi juste après, en arrière-plan.
-        const cache = lireProfilCache(email);
-        if (cache) { await adoptProfile(cache); setIsLoading(false); }
+        // Repli quand l'adresse n'a pas pu être lue sans réseau : même
+        // ouverture sur le profil mémorisé, une fois la session obtenue.
+        if (!affiche) {
+          affiche = lireProfilCache(email);
+          if (affiche) { adopterProfilMemorise(affiche); setIsLoading(false); }
+        }
 
+        // Profil et organisation relus EN MÊME TEMPS, pas l'un après l'autre.
+        const orgEnCours = fetchMyOrg();
         const { profile, injoignable } = await fetchProfile(email);
-        if (profile) await adoptProfile(profile);
+        if (profile) await adoptProfile(profile, orgEnCours);
         else if (!injoignable) {
           // Le serveur répond clairement : ce compte n'a pas de profil.
           const cree = await provisionProfile(email);
           if (cree) await adoptProfile(cree);
           // Ouvert sur un profil mémorisé que le serveur ne reconnaît plus
           // (membre retiré de l'entreprise) : la session est refermée.
-          else if (cache) {
-            oublierProfilCache();
+          else if (affiche) {
             await supabase.auth.signOut();
-            setUser(null);
+            refermer();
           } else {
             // Compte Auth sans profil (connexion Google d'un nouvel arrivant) :
             // l'inscription se termine à l'écran, elle n'est pas un échec.
@@ -192,7 +240,10 @@ export function AuthProvider({ children }) {
       localStorage.removeItem(STORAGE_KEY);
     }
     setIsLoading(false);
-  }, []);
+  // Restauration de la session : UNE FOIS, au montage. Les fonctions
+  // d'adoption sont recréées à chaque rendu mais ne lisent que des setters
+  // stables — les déclarer relancerait la restauration à chaque rendu.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Google Identity Services s'exécute sur app.bestasolar.com et transmet un
   // ID token à Supabase. On évite ainsi la redirection visible vers le domaine
