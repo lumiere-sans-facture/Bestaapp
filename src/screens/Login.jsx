@@ -65,7 +65,7 @@ function CountryFlag({ country }) {
  * /inscription, où mènent les appels à l'action de la page d'accueil publique.
  */
 export default function Login({ vueInitiale = 'login' }) {
-  const { login, signInWithGoogle, signUp, completeSignup, resetPassword, updatePassword, recovery, pendingAuthUser } = useAuth();
+  const { login, signInWithGoogle, signUp, completeSignup, resetPassword, updatePassword, logout, recovery, pendingAuthUser } = useAuth();
   // Lien de parrainage (?ref=NOM-XXXXXX) actif sur cet appareil : on ouvre
   // directement l'inscription, code partenaire prérempli.
   const [refCode, setRefCode] = useState(() => (isSupabaseConfigured ? getActiveRef()?.code || '' : ''));
@@ -162,6 +162,14 @@ export default function Login({ vueInitiale = 'login' }) {
     }
     setLoading(true);
     const ok = await login(email, password);
+    if (ok === 'unavailable') {
+      // Identifiants acceptés, mais le profil n'a pas pu être lu. Ne jamais
+      // traiter cela comme une inscription neuve ni compter un échec de mot
+      // de passe : le compte et ses données peuvent déjà exister.
+      setError('Connexion acceptée, mais votre profil est momentanément indisponible. Vérifiez la connexion Internet et réessayez. Ne créez pas un nouveau compte.');
+      setLoading(false);
+      return;
+    }
     if (ok === 'incomplete') {
       // Compte valide mais inscription jamais terminée (profil absent) :
       // on propose de la finir ici, sans repasser par la création de compte.
@@ -401,6 +409,9 @@ export default function Login({ vueInitiale = 'login' }) {
                   ? `Compte Google ${pendingAuthUser.email} — complétez votre profil :`
                   : 'Votre compte existe — une dernière étape :'}
               </p>
+              <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
+                Déjà inscrit sur le web ? Vérifiez que vous utilisez la même adresse. Sinon, choisissez un autre compte au lieu de créer un nouveau profil.
+              </p>
               {error && <div className="login-error">{error}</div>}
               <div className="input-group">
                 <label className="input-label" htmlFor="complete-name">Votre nom complet</label>
@@ -418,6 +429,10 @@ export default function Login({ vueInitiale = 'login' }) {
               <LiensLegaux variante="consentement" />
               <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
                 {loading ? 'Finalisation…' : "Terminer et entrer dans l'app"}
+              </button>
+              <button type="button" className="btn btn-ghost btn-block" disabled={loading}
+                onClick={async () => { await logout(); switchView('login'); }}>
+                Utiliser un autre compte
               </button>
             </form>
           ) : view === 'signup' && isSupabaseConfigured ? (

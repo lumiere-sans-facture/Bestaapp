@@ -65,6 +65,9 @@ jobs:
           [ -n "$VITE_SUPABASE_URL" ] || { echo "::error::Secret VITE_SUPABASE_URL absent"; exit 1; }
           [ -n "$VITE_SUPABASE_ANON_KEY" ] || { echo "::error::Secret VITE_SUPABASE_ANON_KEY absent"; exit 1; }
           [ -n "$VITE_GOOGLE_CLIENT_ID" ] || { echo "::error::Secret VITE_GOOGLE_CLIENT_ID absent"; exit 1; }
+          # Même projet que le site public app.bestasolar.com. Si le backend
+          # migre un jour, modifier ce garde-fou dans les deux workflows.
+          [ "$VITE_SUPABASE_URL" = "https://ujllvzkhqlabxpoyidor.supabase.co" ] || { echo "::error::L'APK ne pointe pas vers le projet Supabase de production utilisé par le web"; exit 1; }
 
       - name: Build web assets
         run: npm run build
