@@ -41,15 +41,23 @@ do $$
 declare v_manque text := '';
 begin
   if to_regprocedure('public.auth_org_id()') is null then v_manque := v_manque || ' auth_org_id ;'; end if;
-  if to_regprocedure('public.auth_profile_id()') is null then v_manque := v_manque || ' auth_profile_id (migration 20260902) ;'; end if;
   if to_regprocedure('public.auth_est_proprietaire_espace()') is null then v_manque := v_manque || ' auth_est_proprietaire_espace ;'; end if;
   if to_regprocedure('public.auth_is_platform_admin()') is null then v_manque := v_manque || ' auth_is_platform_admin ;'; end if;
   if to_regprocedure('public.code_partenaire(text)') is null then v_manque := v_manque || ' code_partenaire ;'; end if;
-  if to_regclass('public.partners_unique_code_ci_idx') is null then v_manque := v_manque || ' index unique des codes (migration 20260830) ;'; end if;
   if v_manque <> '' then
-    raise exception 'Base en retard — il manque :% Exécutez d''abord multitenant.sql et les migrations précédentes. Rien n''a été modifié.', v_manque;
+    raise exception 'Base en retard — il manque :% Exécutez d''abord multitenant.sql (le socle). Rien n''a été modifié.', v_manque;
   end if;
 end $$;
+
+-- Profil du compte connecté. Défini aussi par la migration 20260902 (même
+-- corps) ; recréé ici pour que ce fichier se suffise à lui-même, que la
+-- fusion des organisations ait été passée ou non sur ce projet.
+create or replace function public.auth_profile_id()
+  returns text language sql stable security definer set search_path = public as $$
+  select id from public.profiles
+  where lower(email) = lower(auth.jwt() ->> 'email')
+  limit 1
+$$;
 
 -- Montant lu dans un JSON : jamais d'erreur de conversion, 0 si illisible.
 create or replace function public.montant_json(p_texte text)
