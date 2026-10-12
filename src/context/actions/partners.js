@@ -42,6 +42,8 @@ export function createPartnerActions(setState) {
             : {}),
           ...(result.error ? { google_contact_sync_error: result.error } : {}),
           ...(result.nextRetryAt ? { google_contact_sync_next_retry_at: result.nextRetryAt } : {}),
+          // Échecs consécutifs : ils espacent les essais suivants (utils/contactsGoogle.js).
+          ...(result.attempts != null ? { google_contact_sync_attempts: result.attempts } : {}),
         } : p)),
       })),
 

@@ -9,7 +9,6 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { initials } from '../utils/format';
-import { SyncDot } from './SyncStatus';
 import NotificationBell from './NotificationBell';
 import GuideNouveauUtilisateur from './GuideNouveauUtilisateur';
 
@@ -200,12 +199,12 @@ export default function AppLayout() {
           )}
           <div className="sidebar-user">
             <div className="sidebar-user-avatar" title={repliee ? user.name : undefined}>{user.avatar || initials(user.name)}</div>
-            {/* Barre repliée : le nom et le rôle s'effacent, mais l'état de
-                synchronisation reste — c'est lui qui dit si le travail est
-                parti. Il vit d'ordinaire à côté du nom. */}
-            {repliee ? <SyncDot /> : (
+            {/* Plus de voyant de synchronisation ici (demande du gérant) : la
+                synchronisation tourne toujours, son état se lit dans « Plus »
+                (gérant) et ses échecs durables partent au journal des erreurs. */}
+            {repliee ? null : (
               <div className="sidebar-user-info">
-                <div className="sidebar-user-name">{user.name} <SyncDot /></div>
+                <div className="sidebar-user-name">{user.name}</div>
                 <div className="sidebar-user-role">{user.role === 'gerant' ? 'Gérant' : 'Utilisateur'}</div>
               </div>
             )}

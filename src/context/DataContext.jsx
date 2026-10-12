@@ -7,7 +7,7 @@ import { fetchTeamProfiles, syncGoogleContact } from '../lib/remoteSync';
 import { loadState, persist, STORAGE_KEY } from './dataState';
 import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
-import { contactsGoogleAEnvoyer } from '../utils/contactsGoogle';
+import { contactsGoogleAEnvoyer, issueSyncGoogle, prochaineRepriseGoogle } from '../utils/contactsGoogle';
 import { useReseau } from './useReseau';
 
 // Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
@@ -186,18 +186,31 @@ export function DataProvider({ children }) {
         registeredByUserId: contact.registeredByUserId || contact.assignedTo || contact.userId || null,
       } : contact;
       googleSyncInFlight.current.add(key);
+      // L'issue fixe TOUJOURS le prochain essai (15 s, 30 s, 1 min…) : jamais
+      // de renvoi en boucle, jamais 5 minutes d'attente pour un raté passager.
       syncGoogleContact(contactToSync, contactType)
-        .then((result) => { if (active) setSyncStatus(contact.id, result); })
+        .then((result) => { if (active) setSyncStatus(contact.id, issueSyncGoogle(contact, result)); })
         .catch((error) => {
-          if (active) setSyncStatus(contact.id, {
-            status: 'failed', error: error.message || 'Synchronisation Google impossible.',
-            nextRetryAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-          });
+          if (active) {
+            setSyncStatus(contact.id, issueSyncGoogle(contact, {
+              status: 'failed', error: error.message || 'Synchronisation Google impossible.',
+            }));
+          }
         })
         .finally(() => googleSyncInFlight.current.delete(key));
     });
     return () => { active = false; };
   }, [state.partners, state.leads, state.proClients, actions, team, googleRetryTick]);
+
+  // Réveil À L'HEURE du prochain essai : la minuterie d'une minute ci-dessus
+  // ferait attendre jusqu'à 60 s un contact repris au bout de 15.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+    const delai = prochaineRepriseGoogle({ partners: state.partners, leads: state.leads });
+    if (delai === null) return undefined;
+    const reveil = setTimeout(() => setGoogleRetryTick((n) => n + 1), Math.max(500, delai + 50));
+    return () => clearTimeout(reveil);
+  }, [state.partners, state.leads]);
 
   // Profil partenaire de l'utilisateur garanti dès l'ouverture de l'app.
   // C'est lui qui porte les commissions : sans profil, une affaire gagnée

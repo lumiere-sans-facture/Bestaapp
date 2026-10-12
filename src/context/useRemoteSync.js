@@ -8,6 +8,7 @@ import { estRefusRls, MESSAGE_REFUS_RLS, messageLignesRefusees } from '../utils/
 import { peutEnvoyer } from '../utils/etatSync';
 import { loadFileSync, persistFileSync, completerKits } from './dataState';
 import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection } from '../utils/fileSync';
+import { signalerErreur } from '../lib/rapportErreur';
 
 // Filet de sécurité du temps réel : intervalle entre deux relectures du
 // serveur quand l'app est visible. Le temps réel reste le canal principal
@@ -27,6 +28,13 @@ const delaiReprise = (echecs) => Math.min(60000, 5000 * 2 ** Math.max(0, echecs 
 // veut dire hors-ligne à coup sûr, « vrai » ne promet rien.
 const horsLigne = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
+// Échecs consécutifs à partir desquels un refus est signalé au journal des
+// erreurs. L'état de la synchronisation n'est plus affiché à l'écran : sans
+// ce signalement, un appareil bloqué (un technicien sur le terrain) le
+// resterait sans que personne ne le sache. Un raté isolé, lui, se rattrape
+// tout seul — pas de quoi alerter.
+const ECHECS_AVANT_SIGNALEMENT = 3;
+
 export function useRemoteSync(state, setState, stateRef, scope = null) {
   const syncedRef = useRef(null); // dernier état RÉELLEMENT répliqué, par collection
   const lastPushAt = useRef(0);
@@ -41,6 +49,16 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
   // Motif du dernier échec, affiché dans l'app : sans lui, « Serveur
   // injoignable » n'aide personne à comprendre CE qui est refusé.
   const [syncError, setSyncError] = useState(null);
+
+  // Une fois par motif et par session : une panne qui dure ne doit pas noyer
+  // le journal. Jamais pour une coupure du réseau de l'appareil — ordinaire.
+  const signales = useRef(new Set());
+  const signalerSiPersistant = useCallback((message, nbEchecs) => {
+    if (nbEchecs < ECHECS_AVANT_SIGNALEMENT || horsLigne() || !message) return;
+    if (signales.current.has(message)) return;
+    signales.current.add(message);
+    signalerErreur(new Error(`Synchronisation en échec : ${message}`), { origine: 'synchronisation' });
+  }, []);
 
   // ---- File d'attente : ce qui est modifié ici et pas encore confirmé ----
   // Elle SURVIT à la fermeture de l'app. Sans elle, une modification faite
@@ -174,6 +192,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
         setSyncError(e.message);
         setSyncStatus('error');
         echecsConnexion += 1;
+        signalerSiPersistant(`connexion — ${e.message}`, echecsConnexion);
         clearTimeout(timerConnexion);
         timerConnexion = setTimeout(connecter, delaiReprise(echecsConnexion));
       } finally {
@@ -322,6 +341,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
         // ailleurs, et le message brut de PostgreSQL n'aide personne.
         echecs.current += 1;
         const bloquees = Object.keys(changed).filter((t) => !acquises.includes(t));
+        signalerSiPersistant(`${MESSAGE_REFUS_RLS} (${bloquees.join(', ')})`, echecs.current);
         setSyncError(`${MESSAGE_REFUS_RLS}${bloquees.length ? ` (en attente : ${bloquees.join(', ')})` : ''}`);
         setSyncStatus('error');
         clearTimeout(retryTimer.current);
@@ -332,6 +352,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
       // restent marquées « à pousser » tant qu'elles ne sont pas arrivées.
       echecs.current += 1;
       const restantes = Object.keys(changed).filter((t) => !acquises.includes(t));
+      signalerSiPersistant(erreurs.join(' · '), echecs.current);
       setSyncError(`${erreurs.join(' · ')}${restantes.length ? ` (en attente : ${restantes.join(', ')})` : ''}`);
       setSyncStatus('error');
       clearTimeout(retryTimer.current);
@@ -339,7 +360,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
     };
     doSync();
     return () => { annule = true; };
-  }, [state, syncStatus, retryTick, majFile, stateRef]); // stateRef est une ref stable
+  }, [state, syncStatus, retryTick, majFile, stateRef, signalerSiPersistant]); // stateRef est une ref stable
 
   // ---- Filet de sécurité : relecture régulière et au retour de l'app ----
   // Le temps réel reste le canal principal, mais il ne garantit rien : une

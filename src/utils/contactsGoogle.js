@@ -63,3 +63,59 @@ export const contactsGoogleAEnvoyer = ({
   // créations récentes sont en tête (les actions les ajoutent par le début).
   .sort((a, b) => rang(a.contact) - rang(b.contact))
   .slice(0, limite);
+
+// ---- Reprise après un échec ----
+//
+// Un contact refusé une fois (réseau, Google momentanément indisponible,
+// numéro déjà en cours d'envoi depuis un autre appareil) repart VITE : la
+// plupart de ces échecs ne durent que quelques secondes. Attendre 5 minutes
+// d'emblée laissait le carnet Google en retard sur l'application. L'écart
+// grandit ensuite, pour ne pas solliciter Google en boucle sur un échec
+// durable (compte Google non relié, numéro invalide).
+
+/** Délais entre deux essais : 15 s, 30 s, 1 min, 2 min, 5 min, 10 min, 30 min, 1 h. */
+export const DELAIS_REPRISE_GOOGLE = [15e3, 30e3, 60e3, 120e3, 300e3, 600e3, 1800e3, 3600e3];
+
+/** Délai avant l'essai suivant, après `tentatives` échecs consécutifs (≥ 1). */
+export const delaiRepriseGoogle = (tentatives) => {
+  const rang = Math.max(1, Math.floor(Number(tentatives) || 1)) - 1;
+  return DELAIS_REPRISE_GOOGLE[Math.min(rang, DELAIS_REPRISE_GOOGLE.length - 1)];
+};
+
+/**
+ * Ce qu'on retient d'un envoi vers Google : réussi, l'essai s'arrête et le
+ * compteur repart de zéro ; sinon, l'échéance du prochain essai est TOUJOURS
+ * fixée. Sans elle, un contact laissé « en attente » (réponse « déjà en
+ * cours », réponse vide) était renvoyé aussitôt, en boucle — et chaque tour
+ * renvoyait au serveur toute la liste des partenaires ou des clients.
+ * @param {object} contact   la fiche (son compteur d'échecs)
+ * @param {object} resultat  réponse de la fonction serveur, ou { status: 'failed', error }
+ */
+export const issueSyncGoogle = (contact, resultat = {}, maintenant = Date.now()) => {
+  const statut = resultat?.status;
+  if (statut === 'synced' || statut === 'already_exists') return { ...resultat, attempts: 0 };
+  const tentatives = (Number(contact?.google_contact_sync_attempts) || 0) + 1;
+  return {
+    ...resultat,
+    status: statut === 'pending' ? 'pending' : 'failed',
+    attempts: tentatives,
+    nextRetryAt: new Date(maintenant + delaiRepriseGoogle(tentatives)).toISOString(),
+  };
+};
+
+/**
+ * Dans combien de temps (ms) le prochain contact en reprise arrive à
+ * échéance — pour réveiller l'envoi pile à l'heure. null si aucun.
+ */
+export const prochaineRepriseGoogle = ({ partners = [], leads = [], maintenant = Date.now() } = {}) => {
+  let prochaine = null;
+  for (const contact of [...partners, ...leads]) {
+    const statut = contact?.google_contact_sync_status;
+    if (statut !== 'pending' && statut !== 'failed') continue;
+    if (!canSyncClientContact(contact)) continue;
+    const quand = Date.parse(contact.google_contact_sync_next_retry_at || '');
+    if (!Number.isFinite(quand) || quand <= maintenant) continue;
+    if (prochaine === null || quand < prochaine) prochaine = quand;
+  }
+  return prochaine === null ? null : prochaine - maintenant;
+};

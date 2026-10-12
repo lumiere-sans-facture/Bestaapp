@@ -15,17 +15,6 @@ const SYNC_LABELS = {
 /** « 3 éléments en attente d'envoi », au singulier près. */
 const texteAttente = (n) => `${n} élément${n > 1 ? 's' : ''} en attente d’envoi`;
 
-export function SyncDot() {
-  const { syncStatus, syncError, enAttente } = useData();
-  const [cls, label] = SYNC_LABELS[syncStatus] || SYNC_LABELS.local;
-  // Le motif exact est porté par l'infobulle : « Serveur injoignable » seul
-  // n'a jamais permis de diagnostiquer quoi que ce soit.
-  const lignes = [label];
-  if (enAttente > 0) lignes.push(texteAttente(enAttente));
-  if (syncError) lignes.push(syncError);
-  return <span className={`sync-dot ${cls}`} title={lignes.join('\n')} aria-label={label} />;
-}
-
 export function SyncStatusRow() {
   const { syncStatus, syncError, enAttente, synchroniserMaintenant } = useData();
   const [cls, label] = SYNC_LABELS[syncStatus] || SYNC_LABELS.local;
