@@ -9,7 +9,9 @@ const fichier = readFileSync(new URL('../../../supabase/reparer-clients-publics.
 
 describe('SQL de réparation embarqué', () => {
   it('est identique au fichier exécuté dans Supabase', () => {
-    expect(SQL_REPARATION_CLIENTS).toBe(fichier);
+    // Git peut extraire le fichier SQL en CRLF sur Windows ; seules les
+    // différences de contenu, pas le format des fins de ligne, comptent.
+    expect(SQL_REPARATION_CLIENTS.replace(/\r\n/g, '\n')).toBe(fichier.replace(/\r\n/g, '\n'));
   });
 
   it('contient bien la règle qui débloque le gérant', () => {
