@@ -8,9 +8,10 @@ import { calculateSystemSize, suggestKitForBattery, buildKitQuotation, DEFAULT_P
 import { dimensionnementRejouable, restaurerDimensionnement, resumeDimensionnement } from '../../utils/dimensionnement';
 import {
   simulerRoi, consommationDepuisFacture, PART_JOUR_FACTURE, PART_NUIT_FACTURE,
-  DUREE_SYSTEME_ANS, DUREES_SYSTEME, MAINTENANCE_ANNUELLE, HAUSSE_TARIF_DEFAUT,
+  DUREE_SYSTEME_ANS, DUREES_SYSTEME, HAUSSE_TARIF_DEFAUT,
   DEGRADATION_ANNUELLE, KWH_PAR_LITRE_GAZOLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../../utils/roi';
+import { detailMaintenanceAnnuelle, BASE_PETIT, BASE, SEUIL, PAR_PANNEAU } from '../../utils/maintenance';
 
 // Client de départ : un petit commerce de Lomé, l'essentiel de ce que l'équipe
 // rencontre en visite. Il donne un écran déjà chiffré à l'ouverture, plutôt
@@ -194,7 +195,10 @@ export default function RoiSection() {
     prixCarburant: carburant,
     groupeActif,
     duree,
-  }), [rows, consoRetenue, investissement, coupures, tarif, carburant, groupeActif, duree]);
+    // Les panneaux du kit proposé fixent l'entretien annuel.
+    nbPanneaux: kit?.panneaux || 0,
+  }), [rows, consoRetenue, investissement, coupures, tarif, carburant, groupeActif, duree, kit?.panneaux]);
+  const detailEntretien = detailMaintenanceAnnuelle(sim.nbPanneaux);
 
   return (
     <div className="roi-grid">
@@ -401,7 +405,9 @@ export default function RoiSection() {
                    montant={sim.cout.groupe} />
           )}
           <Ligne label="Total payé chaque année" montant={sim.cout.total} fort />
-          <Ligne label="Entretien de l’installation" montant={sim.maintenance} negatif />
+          <Ligne label="Entretien de l’installation"
+                 detail={kit ? `${kit.panneaux} panneau${kit.panneaux > 1 ? 'x' : ''}${detailEntretien ? ` · ${detailEntretien}` : ''}` : undefined}
+                 montant={sim.maintenance} negatif />
           <Ligne label="Économie nette la 1re année" montant={sim.economieAn1} fort />
         </div>
 
@@ -419,7 +425,8 @@ export default function RoiSection() {
             <li>Un groupe électrogène tire environ {KWH_PAR_LITRE_GAZOLE} kWh d’un litre de gazole — c’est ce qui convertit les kWh en litres.</li>
             <li>Les coupures sont réparties sur la journée : {dec(coupures)} h sur 24, soit {Math.round((coupures / 24) * 100)} % des kWh produits par le groupe.</li>
             <li>Le kit étant dimensionné pour ces appareils, il les alimente : l’économie, c’est tout ce qui est payé aujourd’hui pour les faire tourner.</li>
-            <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(MAINTENANCE_ANNUELLE)}/an) suit la même hausse.</li>
+            <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(sim.maintenance)}/an) suit la même hausse.</li>
+            <li>Entretien annuel selon la taille du système : {formatCFA(BASE_PETIT)} sous {SEUIL} panneaux, puis {formatCFA(BASE)} + {formatCFA(PAR_PANNEAU)} par panneau au-delà de {SEUIL} — la même règle que la fiche de dimensionnement.</li>
             <li>Les panneaux perdent {dec(DEGRADATION_ANNUELLE * 100)} % de rendement par an (garantie constructeur : {DUREE_SYSTEME_ANS} ans).</li>
             <li>Estimation par facture : {Math.round(PART_NUIT_FACTURE * 100)} % de la consommation la nuit, {Math.round(PART_JOUR_FACTURE * 100)} % en journée — la part nocturne dimensionne la batterie, la sous-estimer donnerait un kit qui s’éteint avant le matin. Le mode « appareils », lui, garde les heures réelles de chacun.</li>
             <li>Les prix du kWh proposés par pays sont des ordres de grandeur de la tranche domestique, pas des tarifs officiels : c’est la facture du client qui fait foi.</li>

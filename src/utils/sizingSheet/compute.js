@@ -3,6 +3,7 @@
 // Logique pure, sans React ni DOM.
 import { SIZING_PARAMS, SYSTEM_VOLTAGE } from '../solarSizing';
 import { paysDuNom, paysDeLEntreprise } from '../../data/pays';
+import { calculMaintenanceAnnuelle } from '../maintenance';
 
 export const JOURS_MOIS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 export const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
@@ -111,7 +112,8 @@ export const RENTA_DEFAUTS = {
   tarifElec: TARIF_ELECTRICITE_BENIN, // F CFA / kWh
   tauxUtilisation: 0.85,     // part de la production réellement consommée
   horizon: 10,               // ans
-  maintenanceAnnuelle: 50000, // F CFA / an, À PARTIR de la 2e année
+  // Maintenance annuelle (À PARTIR de la 2e année) : pas de montant par
+  // défaut ici — elle dépend du nombre de panneaux (utils/maintenance.js).
   // F CFA — 1 remplacement (durée de vie 5 ans). REPLI seulement : quand le
   // devis est connu, c'est le prix de SON onduleur qui fait la provision
   // (provisionOnduleurDuDevis ci-dessous). Un montant fixe faisait provisionner
@@ -166,9 +168,19 @@ export const DUREES_VIE = [
  * @param {number} consoJour       kWh/jour du dossier
  * @param {number|null} investissement  F CFA (devis) — null si inconnu
  * @param {object} surcharges      tarifElec, tauxUtilisation, horizon…
+ *   `nbPanneaux` : panneaux du système, qui fixent la maintenance annuelle
+ *   (utils/maintenance.js) — sauf montant saisi (`maintenanceAnnuelle`).
  */
 export const calculerRentabilite = (consoJour, investissement, surcharges = {}) => {
-  const p = { ...RENTA_DEFAUTS, ...surcharges };
+  const saisie = surcharges.maintenanceAnnuelle;
+  const maintenanceCalculee = !(saisie !== '' && saisie != null && Number.isFinite(Number(saisie)) && Number(saisie) >= 0);
+  const p = {
+    ...RENTA_DEFAUTS,
+    ...surcharges,
+    nbPanneaux: Math.max(0, Math.round(Number(surcharges.nbPanneaux) || 0)),
+    maintenanceAnnuelle: maintenanceCalculee ? calculMaintenanceAnnuelle(surcharges.nbPanneaux) : Number(saisie),
+    maintenanceCalculee,
+  };
   const inv = Number(investissement) > 0 ? Math.round(Number(investissement)) : null;
   // kWh couverts par an, arrondis AVANT le passage en francs.
   const kwhAnnuels = Math.round(consoJour * p.tauxUtilisation * 365);
@@ -229,7 +241,9 @@ export const computeSheet = (d) => {
   if (!(Number(rentabilite.tarifElec) > 0)) {
     rentabilite.tarifElec = tarifElectriciteParDefaut(d.cityName, d.cityCountry, d.company ? paysDeLEntreprise(d.company).id : '');
   }
-  const renta = calculerRentabilite(consoJour, d.investissement ?? null, rentabilite);
+  // Maintenance : celle du système dimensionné, sur son nombre TOTAL de
+  // panneaux (le même que la fiche annonce) — sauf montant saisi.
+  const renta = calculerRentabilite(consoJour, d.investissement ?? null, { ...rentabilite, nbPanneaux: d.sizing.numberOfPanels });
   const couverture = couvertureMensuelle({
     kwc, hspRetenu: Number(d.sunHours) || 0, ville: d.cityName, consoJour,
   });

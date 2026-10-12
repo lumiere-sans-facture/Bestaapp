@@ -87,8 +87,9 @@ describe('rentabilité — montants recalculés depuis les valeurs affichées', 
     expect(computeSheet({ ...dossierTogo, rentabilite: { tarifElec: 130 } }).renta.tarifElec).toBe(130);
   });
 
-  // Cas de référence (climatiseur 3 CV) : 17,6 kWh/j, investissement 2 300 000 F.
-  const r = calculerRentabilite(17.6, 2300000);
+  // Cas de référence (climatiseur 3 CV) : 17,6 kWh/j, 8 panneaux,
+  // investissement 2 300 000 F.
+  const r = calculerRentabilite(17.6, 2300000, { nbPanneaux: 8 });
 
   it('économie annuelle = kWh arrondis × tarif', () => {
     expect(r.kwhAnnuels).toBe(Math.round(17.6 * 0.85 * 365)); // 5 460 kWh
@@ -103,16 +104,17 @@ describe('rentabilité — montants recalculés depuis les valeurs affichées', 
 
   it('gain net = cumul − investissement − provision − maintenance, sur les montants affichés', () => {
     expect(r.economiesCumulees).toBe(7917000);
-    expect(r.maintenanceTotale).toBe(450000); // 50 000 × (10 − 1)
-    expect(r.gainNet).toBe(7917000 - 2300000 - 320000 - 450000); // 4 847 000
+    expect(r.maintenanceAnnuelle).toBe(30000); // 8 panneaux : forfait des petits systèmes
+    expect(r.maintenanceTotale).toBe(270000); // 30 000 × (10 − 1)
+    expect(r.gainNet).toBe(7917000 - 2300000 - 320000 - 270000); // 5 027 000
   });
 
   it('le ROI en mois satisfait l’inéquation de couverture au mois près', () => {
-    expect(r.roiMois).toBe(42); // 3 ans et 6 mois
-    expect(libelleRoi(r.roiMois)).toBe('3 ans et 6 mois');
+    expect(r.roiMois).toBe(41); // 3 ans et 5 mois
+    expect(libelleRoi(r.roiMois)).toBe('3 ans et 5 mois');
     const couvre = (t) => r.economieAnnuelle * (t / 12) - r.maintenanceAnnuelle * Math.max(0, t / 12 - 1);
-    expect(couvre(42)).toBeGreaterThanOrEqual(r.investissement + r.provisionOnduleur);
-    expect(couvre(41)).toBeLessThan(r.investissement + r.provisionOnduleur);
+    expect(couvre(41)).toBeGreaterThanOrEqual(r.investissement + r.provisionOnduleur);
+    expect(couvre(40)).toBeLessThan(r.investissement + r.provisionOnduleur);
   });
 
   it('sans investissement : ni gain net ni ROI, jamais de NaN', () => {
@@ -121,6 +123,18 @@ describe('rentabilité — montants recalculés depuis les valeurs affichées', 
     expect(sans.roiMois).toBeNull();
     expect(sans.economieAnnuelle).toBeGreaterThan(0);
     expect(libelleRoi(null)).toBe('—');
+  });
+
+  it('maintenance de la fiche : la règle commune, sur les panneaux du système', () => {
+    const dossier = (numberOfPanels, rentabilite) => ({
+      consumption: { day: 12, night: 3 }, sizing: { autonomyNights: 1, numberOfPanels, batteryCapacity: 0 },
+      systemType: 'off-grid', panelName: 'Panneau 620W', sunHours: 4.3, batteries: [], cityName: 'Lomé', cityCountry: 'Togo', rentabilite,
+    });
+    expect(computeSheet(dossier(9)).renta).toMatchObject({ maintenanceAnnuelle: 30000, nbPanneaux: 9, maintenanceCalculee: true });
+    expect(computeSheet(dossier(20)).renta).toMatchObject({ maintenanceAnnuelle: 70000, maintenanceTotale: 70000 * 9, nbPanneaux: 20 });
+    // Montant saisi par l'installateur (espace Pro) : il prime, sans le détail de la règle.
+    expect(computeSheet(dossier(20, { maintenanceAnnuelle: 45000 })).renta).toMatchObject({ maintenanceAnnuelle: 45000, maintenanceCalculee: false });
+    expect(computeSheet(dossier(20, { maintenanceAnnuelle: 0 })).renta.maintenanceAnnuelle).toBe(0);
   });
 
   it('paramètres surchargeables (maintenance dès la 2e année : horizon − 1 annuités)', () => {

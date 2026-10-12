@@ -4,6 +4,7 @@
 import { maxEnParallele, PARALLELE_PAR_DEFAUT, estTriphase } from './inverters';
 import { prixPublic } from './price';
 import { resolveLignePrice } from './kits';
+import { calculMaintenanceAnnuelle } from './maintenance';
 
 // ---- Catalogue matériel ----
 
@@ -304,7 +305,6 @@ export const AUTONOMY_OPTIONS = [
 ];
 
 export const INSTALLATION_COST_PER_PANEL = 10000;
-export const MAINTENANCE_COST = 50000;
 export const ELECTRICITY_PRICE = 100; // F CFA / kWh
 // Repli (Togo) si données NASA/PVGIS indisponibles — heures de pic du PIRE
 // MOIS (saison des pluies), pas la moyenne annuelle : le système doit tenir
@@ -574,14 +574,17 @@ export const buildQuotation = (sizing, { products = [], includeMaintenance = tru
       totalPrice: installationCost,
     },
   ];
+  // Maintenance annuelle : la règle commune (utils/maintenance.js), sur le
+  // nombre total de panneaux dimensionnés.
+  const maintenanceCost = includeMaintenance ? calculMaintenanceAnnuelle(sizing.numberOfPanels) : 0;
   if (includeMaintenance) {
     prestations.push({
       type: 'prestation',
       name: 'Maintenance annuelle',
       description: 'Service après-vente et assistance technique',
       quantity: 1,
-      unitPrice: MAINTENANCE_COST,
-      totalPrice: MAINTENANCE_COST,
+      unitPrice: maintenanceCost,
+      totalPrice: maintenanceCost,
     });
   }
 
@@ -598,7 +601,7 @@ export const buildQuotation = (sizing, { products = [], includeMaintenance = tru
     prestations,
     equipmentCost,
     installationCost,
-    maintenanceCost: includeMaintenance ? MAINTENANCE_COST : 0,
+    maintenanceCost,
     subtotalHT,
     tva,
     total,

@@ -12,6 +12,7 @@
 // exactement comme l'assistant de devis de l'application.
 //
 // Logique pure, sans React — chaque maillon est testable séparément.
+import { calculMaintenanceAnnuelle } from './maintenance';
 
 export const JOURS_PAR_AN = 365;
 export const MOIS_PAR_AN = 12;
@@ -35,9 +36,6 @@ export const DUREE_SYSTEME_ANS = 25;
  * les francs.
  */
 export const KWH_PAR_LITRE_GAZOLE = 3;
-
-/** Entretien annuel de l'installation (nettoyage, contrôle) — F CFA. */
-export const MAINTENANCE_ANNUELLE = 15000;
 
 /** Hausse du prix de l'énergie par an, réseau et carburant confondus. */
 export const HAUSSE_TARIF_DEFAUT = 0.05;
@@ -180,7 +178,7 @@ export const coutActuel = ({
  * L'énergie renchérit d'année en année, les panneaux perdent un peu de
  * rendement, et l'entretien suit l'inflation.
  */
-export const economieAnnee = (annee, { coutAnnuel = 0, maintenance = MAINTENANCE_ANNUELLE, hausse = HAUSSE_TARIF_DEFAUT } = {}) => {
+export const economieAnnee = (annee, { coutAnnuel = 0, maintenance = 0, hausse = HAUSSE_TARIF_DEFAUT } = {}) => {
   const n = Math.max(1, Math.floor(Number(annee) || 1));
   const inflation = (1 + (Number(hausse) || 0)) ** (n - 1);
   const rendement = (1 - DEGRADATION_ANNUELLE) ** (n - 1);
@@ -191,7 +189,7 @@ export const economieAnnee = (annee, { coutAnnuel = 0, maintenance = MAINTENANCE
 export const projection = ({
   investissement = 0,
   coutAnnuel = 0,
-  maintenance = MAINTENANCE_ANNUELLE,
+  maintenance = 0,
   hausse = HAUSSE_TARIF_DEFAUT,
   duree = DUREE_SYSTEME_ANS,
 } = {}) => {
@@ -265,6 +263,8 @@ export const consommationRetenue = (appareils = [], conso = null) => {
  * @param {number}  e.tarifKwh           prix du kWh CEET
  * @param {number}  e.prixCarburant      prix du litre de gazole
  * @param {number}  e.duree              durée de vie retenue, en années
+ * @param {number}  e.nbPanneaux         panneaux du kit proposé : ils fixent
+ *                                       l'entretien annuel (utils/maintenance.js)
  */
 export const simulerRoi = ({
   appareils = [],
@@ -274,7 +274,7 @@ export const simulerRoi = ({
   tarifKwh = 0,
   prixCarburant = 0,
   groupeActif = false,
-  maintenance = MAINTENANCE_ANNUELLE,
+  nbPanneaux = 0,
   hausse = HAUSSE_TARIF_DEFAUT,
   duree = DUREE_SYSTEME_ANS,
 } = {}) => {
@@ -282,6 +282,9 @@ export const simulerRoi = ({
   const cout = coutActuel({
     kwhJour: consommation.total, heuresCoupureJour, tarifKwh, prixCarburant, groupeActif,
   });
+  // Entretien : la règle commune à toute l'application, sur les panneaux du
+  // système proposé — la fiche de dimensionnement donne le même montant.
+  const maintenance = calculMaintenanceAnnuelle(nbPanneaux);
   const lignes = projection({ investissement, coutAnnuel: cout.total, maintenance, hausse, duree });
   const invest = nombre(investissement);
   const cumulFinal = lignes.length ? lignes[lignes.length - 1].cumul : 0;
@@ -291,7 +294,8 @@ export const simulerRoi = ({
   return {
     conso: consommation,
     cout,
-    maintenance: Math.round(nombre(maintenance)),
+    maintenance,
+    nbPanneaux: Math.max(0, Math.round(Number(nbPanneaux) || 0)),
     economieAn1: lignes[0]?.economie ?? 0,
     retourAns: retourInvestissement(lignes, invest),
     gainDuree,

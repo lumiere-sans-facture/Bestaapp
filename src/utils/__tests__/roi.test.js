@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   consommationAppareils, consommationRetenue, consommationDepuisFacture, coutActuel, economieAnnee, projection, retourInvestissement,
   co2EviteAn, simulerRoi,
-  JOURS_PAR_AN, MOIS_PAR_AN, DUREE_SYSTEME_ANS, DUREES_SYSTEME, KWH_PAR_LITRE_GAZOLE, MAINTENANCE_ANNUELLE,
+  JOURS_PAR_AN, MOIS_PAR_AN, DUREE_SYSTEME_ANS, DUREES_SYSTEME, KWH_PAR_LITRE_GAZOLE,
   PART_JOUR_FACTURE, PART_NUIT_FACTURE,
   HAUSSE_TARIF_DEFAUT, DEGRADATION_ANNUELLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../roi';
@@ -187,7 +187,16 @@ describe('simulerRoi — la chaîne complète', () => {
     expect(sim.cout.kwhAn).toBe(Math.round(7.45 * JOURS_PAR_AN));
     expect(sim.cout.kwhReseauAn + sim.cout.kwhGroupeAn).toBeCloseTo(sim.cout.kwhAn, 0);
     // 2 → 4 : l'économie de l'an 1, c'est ce coût moins l'entretien.
-    expect(sim.economieAn1).toBe(sim.cout.total - MAINTENANCE_ANNUELLE);
+    expect(sim.economieAn1).toBe(sim.cout.total - sim.maintenance);
+  });
+
+  it('entretien : la règle commune, sur les panneaux du kit proposé', () => {
+    expect(sim.maintenance).toBe(30000); // kit inconnu : forfait des petits systèmes
+    expect(simulerRoi({ appareils: CLIENT, nbPanneaux: 9 }).maintenance).toBe(30000);
+    expect(simulerRoi({ appareils: CLIENT, nbPanneaux: 11 }).maintenance).toBe(52000);
+    const grand = simulerRoi({ appareils: CLIENT, tarifKwh: 114, nbPanneaux: 20 });
+    expect(grand.maintenance).toBe(70000);
+    expect(grand.economieAn1).toBe(grand.cout.total - 70000);
   });
 
   it('donne un remboursement plausible pour ce client', () => {
@@ -211,7 +220,7 @@ describe('simulerRoi — la chaîne complète', () => {
     const s = simulerRoi();
     expect(s.conso.total).toBe(0);
     expect(s.cout.total).toBe(0);
-    expect(s.economieAn1).toBe(-MAINTENANCE_ANNUELLE);
+    expect(s.economieAn1).toBe(-s.maintenance);
     expect(s.retourAns).toBeNull();
     expect(s.projection.every((l) => Number.isFinite(l.cumul))).toBe(true);
   });

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, FileText, Package } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
-import { formatCFA } from '../../../utils/format';
+import { formatCFA, formatNombre } from '../../../utils/format';
+import { calculMaintenanceAnnuelle } from '../../../utils/maintenance';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
   calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, PANEL_SPEC, INSTALLATION_COST_PER_PANEL,
@@ -263,6 +264,10 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     : (myClients.find((c) => c.id === clientId) || {});
   const villeDimensionnement = location?.name || clientSelectionne.ville || '';
   const tarifElecDefaut = tarifElectriciteParDefaut(villeDimensionnement, location?.country || '', pays.id);
+  // Maintenance de la fiche, champ laissé vide : la règle commune sur les
+  // panneaux du dimensionnement (le nombre que la fiche annonce).
+  const panneauxFiche = sizing?.numberOfPanels || 0;
+  const maintenanceDefaut = calculMaintenanceAnnuelle(panneauxFiche);
   const coefMainOeuvre = coefficientMainOeuvre({
     ville: villeDimensionnement,
     pays: location?.country || '',
@@ -915,9 +920,9 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                       <input className="input" type="number" min="0.1" max="1" step="0.05" value={renta.tauxUtilisation}
                         onChange={(e) => setRenta({ ...renta, tauxUtilisation: e.target.value })} placeholder="0,85" />
                     </Field>
-                    <Field label="Maintenance annuelle (F CFA)">
+                    <Field label={`Maintenance annuelle (F CFA) — défaut : ${formatNombre(maintenanceDefaut)} F (${panneauxFiche} panneaux)`}>
                       <input className="input" type="number" min="0" value={renta.maintenanceAnnuelle}
-                        onChange={(e) => setRenta({ ...renta, maintenanceAnnuelle: e.target.value })} placeholder="50 000" />
+                        onChange={(e) => setRenta({ ...renta, maintenanceAnnuelle: e.target.value })} placeholder={String(maintenanceDefaut)} />
                     </Field>
                     <Field label="Provision onduleur (F CFA)">
                       <input className="input" type="number" min="0" value={renta.provisionOnduleur}

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculateSystemSize, buildQuotation, PANEL_SPEC, PANEL_REFERENCE_WC, parsePanelWc, SIZING_PARAMS, combinaisonBatteries } from '../solarSizing';
+import { calculMaintenanceAnnuelle } from '../maintenance';
 
 describe('calculateSystemSize', () => {
   const sizing = calculateSystemSize({ day: 5, night: 5 }, 'off-grid', 5.5);
@@ -137,7 +138,9 @@ describe('buildQuotation', () => {
   });
 
   it('inclut ou exclut la maintenance selon l’option', () => {
-    expect(buildQuotation(sizing, { products: [], includeMaintenance: true }).maintenanceCost).toBe(50000);
+    // La règle commune, sur les panneaux dimensionnés (4 ici : forfait des petits systèmes).
+    expect(buildQuotation(sizing, { products: [], includeMaintenance: true }).maintenanceCost).toBe(calculMaintenanceAnnuelle(sizing.numberOfPanels));
+    expect(buildQuotation({ ...sizing, numberOfPanels: 30 }, { products: [] }).maintenanceCost).toBe(90000);
     const sans = buildQuotation(sizing, { products: [], includeMaintenance: false });
     expect(sans.maintenanceCost).toBe(0);
     expect(sans.prestations).toHaveLength(1);
