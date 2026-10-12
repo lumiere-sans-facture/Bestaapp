@@ -48,7 +48,11 @@ export function DataProvider({ children }) {
   stateRef.current = state;
 
   // Comptabilise le clic d'affiliation capturé à l'ouverture de l'app (?ref=…)
+  // — en mode local seulement. Avec le serveur, le clic est compté dès
+  // l'arrivée sur le lien, visiteur anonyme compris, au nom du parrain (voir
+  // App.jsx) : le compter ici le noterait chez le visiteur, une fois connecté.
   useEffect(() => {
+    if (isSupabaseConfigured) return;
     const code = consumeRefClick();
     if (!code) return;
     setState((s) =>

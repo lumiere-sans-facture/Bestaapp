@@ -5,6 +5,7 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { prixPublic } from '../../utils/price';
 import { resolveAutoPartner } from '../../utils/referral';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import PartnerField from './PartnerField';
 import LeadPicker from './LeadPicker';
 
@@ -30,7 +31,7 @@ export default function ManualWizard({ onDone, initialItems, initialLeadId = nul
   useEffect(() => {
     if (!selectedLeadId) return;
     const lead = leadsForUser(user).find((l) => l.id === selectedLeadId);
-    setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id)?.id || '' : '');
+    setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id, { regleServeur: isSupabaseConfigured })?.id || '' : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, partners]);
   // Pré-rempli depuis le panier de la boutique le cas échéant

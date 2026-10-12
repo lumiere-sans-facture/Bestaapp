@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  etatParrainage, peutChoisirParrain,
+  etatParrainage, peutChoisirParrain, etatParrainagePersonne,
   PARRAINAGE_ABSENT, PARRAINAGE_PAR_DEFAUT, PARRAINAGE_VERROUILLE,
 } from '../parrainage';
 
@@ -33,5 +33,21 @@ describe('état du parrainage', () => {
   it('ne suppose rien d’une organisation absente', () => {
     expect(etatParrainage(undefined)).toBe(PARRAINAGE_ABSENT);
     expect(etatParrainage(null)).toBe(PARRAINAGE_ABSENT);
+  });
+});
+
+// Le parrain de la PERSONNE (mon_parrain()) : chaque compte a le sien, alors
+// que l'organisation est commune à tous depuis la réunion des comptes.
+describe('état du parrainage d\'une personne', () => {
+  it('aucun parrain : saisie ouverte', () => {
+    expect(etatParrainagePersonne(null)).toBe(PARRAINAGE_ABSENT);
+  });
+  it('rattaché par défaut à BestaSolar : corrigeable une fois', () => {
+    expect(etatParrainagePersonne({ code: 'GERANT-AB12CD', source: 'defaut' })).toBe(PARRAINAGE_PAR_DEFAUT);
+  });
+  it('venu par le lien, par le code, ou corrigé : définitif', () => {
+    for (const source of ['inscription', 'saisie', 'admin', 'rattrapage']) {
+      expect(etatParrainagePersonne({ code: 'AWA-AAA111', source })).toBe(PARRAINAGE_VERROUILLE);
+    }
   });
 });

@@ -318,6 +318,9 @@ $$;
 -- les appels pour ambiguïté).
 -- Inscription centralisée : chaque nouveau compte rejoint Besta, sans créer
 -- une organisation distincte. Le parrainage reste enregistré dans referrals.
+-- ⚠ Redéfinie par migrations/20261013_parrainage_commissions.sql (parrain de la
+--   PERSONNE, commissions calculées par le serveur) : après avoir rejoué ce
+--   fichier, rejouer cette migration.
 drop function if exists public.signup_create_org(text, text);
 drop function if exists public.signup_create_org(text, text, text);
 drop function if exists public.signup_create_org(text, text, text, text);
@@ -380,6 +383,9 @@ end $$;
 -- changement — seule l'admin plateforme (BestaSolar) peut modifier, sur
 -- demande expresse du partenaire.
 -- ============================================================
+-- ⚠ Redéfinie par migrations/20261013_parrainage_commissions.sql (parrain de la
+--   PERSONNE, commissions calculées par le serveur) : après avoir rejoué ce
+--   fichier, rejouer cette migration.
 create or replace function public.set_org_referral(p_code text)
   returns void language plpgsql security definer set search_path = public as $$
 declare v_org text; v_role text; v_existing text; v_code text; v_defaut boolean;
@@ -766,6 +772,9 @@ end $$;
 --   2) l'abonnement de l'org est activé +30 jours (depuis sa fin si elle court),
 --   3) le partenaire PARRAIN de l'org touche sa commission (taux ci-dessus),
 --      dédupliquée par paiement — reconfirmer ne crée jamais de doublon.
+-- ⚠ Redéfinie par migrations/20261013_parrainage_commissions.sql (parrain de la
+--   PERSONNE, commissions calculées par le serveur) : après avoir rejoué ce
+--   fichier, rejouer cette migration.
 create or replace function public.admin_confirm_subscription_payment(p_org_id text, p_payment_id text)
   returns void language plpgsql security definer set search_path = public as $$
 declare
@@ -969,6 +978,9 @@ end $$;
 -- p_approuver = true  : l'étape s'applique (et le « gagné » crée la commission
 --                       de l'apporteur, DANS SON organisation) ;
 --            = false  : la demande est simplement levée.
+-- ⚠ Redéfinie par migrations/20261013_parrainage_commissions.sql (parrain de la
+--   PERSONNE, commissions calculées par le serveur) : après avoir rejoué ce
+--   fichier, rejouer cette migration.
 create or replace function public.admin_decide_progression(
   p_org_id text, p_kind text, p_id text, p_approuver boolean)
   returns void language plpgsql security definer set search_path = public as $$

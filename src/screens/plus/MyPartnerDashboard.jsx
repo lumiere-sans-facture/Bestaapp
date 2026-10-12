@@ -6,7 +6,8 @@ import { formatCFA, formatDate, formatTaux } from '../../utils/format';
 import { dateEmissionDevis } from '../../utils/dateEmission';
 import { REF_TTL_DAYS, memeCode } from '../../utils/referral';
 import { isSupabaseConfigured } from '../../lib/supabase';
-import { fetchMyReferredOrgs } from '../../lib/remoteSync';
+import { fetchMesFilleuls, fetchMonParrain, fetchStatsParrainage } from '../../lib/remoteSync';
+import { sousTotauxParNiveau } from '../../utils/commissionSync';
 import StageBadge from '../../components/StageBadge';
 import Accordion from '../../components/Accordion';
 import Sheet from '../../components/Sheet';
@@ -44,18 +45,25 @@ export default function MyPartnerDashboard({ onBack }) {
     ensurePartnerForUser(user);
   }, [user, ensurePartnerForUser]);
 
-  // Filleuls INSCRITS sur la plateforme via mon lien (autres entreprises) :
-  // lecture serveur — la RLS d'isolation ne les montre pas dans l'état local.
-  const [referredOrgs, setReferredOrgs] = useState([]);
+  // Avec le serveur : mes filleuls, mon parrain et les compteurs de mon lien
+  // viennent du serveur (table parrainages, clics comptés à l'arrivée sur le
+  // lien). Le lien vit sur la PERSONNE : ni l'état local ni l'organisation,
+  // commune à tous, ne le connaissent.
+  const [reseau, setReseau] = useState({ filleuls: [], parrain: null, stats: null });
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    fetchMyReferredOrgs().then((rows) => setReferredOrgs(rows || [])).catch(() => {});
+    if (!isSupabaseConfigured) return undefined;
+    let actif = true;
+    Promise.all([
+      fetchMesFilleuls().catch(() => []),
+      fetchMonParrain().catch(() => null),
+      fetchStatsParrainage().catch(() => null),
+    ]).then(([filleuls, parrain, stats]) => { if (actif) setReseau({ filleuls, parrain, stats }); });
+    return () => { actif = false; };
   }, []);
 
   const me = partners.find((p) => p.userId === user.id);
   if (!me) return null;
 
-  const mesInscrits = referredOrgs.filter((r) => memeCode(r.partner_code, me.code));
 
   const l1Leads = leads.filter((l) => l.parrainL1 === me.id);
   const l2Leads = leads.filter((l) => l.parrainL2 === me.id);
@@ -75,7 +83,9 @@ export default function MyPartnerDashboard({ onBack }) {
     (a, b) => ORDRE_ETAT[etatDe(a)] - ORDRE_ETAT[etatDe(b)]
       || new Date(b.createdAt) - new Date(a.createdAt)
   );
-  const numeroDevis = (c) => (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber : null);
+  // Le devis d'un FILLEUL n'est pas dans mon état local : le serveur copie
+  // son numéro sur la commission.
+  const numeroDevis = (c) => (c.devisId ? (devis || []).find((d) => d.id === c.devisId)?.devisNumber || c.devisNumber || null : null);
   // Mes affaires gagnées : ce sont elles qui déclenchent les commissions, elles
   // se lisent donc ici et non sur le profil. Celles que j'ai apportées comme
   // celles que je suis, sans doublon.
@@ -85,10 +95,17 @@ export default function MyPartnerDashboard({ onBack }) {
   const totalGagne = mesGagnees.reduce((s, l) => s + (l.estimatedValue || 0), 0);
   const mesDevis = (devis || []).filter((d) => d.partnerId === me.id);
   const myReferrals = (referrals || []).filter((r) => memeCode(r.partnerCode, me.code));
-  const clicks = myReferrals.filter((r) => r.type === 'clic').length;
+  const clicks = isSupabaseConfigured
+    ? Number(reseau.stats?.clics || 0)
+    : myReferrals.filter((r) => r.type === 'clic').length;
+  const tauxConversion = reseau.stats?.taux_conversion;
   const conversions = myReferrals.filter((r) => r.type !== 'clic');
   const sponsor = me.sponsorId ? getPartnerById(me.sponsorId) : null;
   const filleuls = partners.filter((p) => p.sponsorId === me.id);
+  const nomParrain = isSupabaseConfigured ? reseau.parrain?.nom : sponsor?.name;
+  const nomsFilleuls = isSupabaseConfigured ? reseau.filleuls.map((f) => f.nom) : filleuls.map((f) => f.name);
+  const sousTotaux = sousTotauxParNiveau(myComs);
+  const tauxDe = (c) => formatTaux(c.taux != null ? Number(c.taux) : COMMISSION_RATES[c.level]);
   const stageInfo = (lead) => (lead.stage === 'perdu' ? lostStage : stages.find((s) => s.id === lead.stage));
 
   // ---- Demande de paiement des commissions ----
@@ -173,6 +190,16 @@ export default function MyPartnerDashboard({ onBack }) {
           <span className="kpi-value">{clicks}</span>
           <span className="kpi-label">Clics sur mon lien</span>
         </div>
+        {isSupabaseConfigured && reseau.stats && (
+          <div className="kpi-card is-info">
+            <span className="kpi-icon"><UserPlus size={18} /></span>
+            <span className="kpi-value">
+              {Number(reseau.stats.inscriptions || 0)}
+              {tauxConversion != null ? ` · ${Math.round(Number(tauxConversion) * 100)} %` : ''}
+            </span>
+            <span className="kpi-label">Inscriptions par mon lien · conversion</span>
+          </div>
+        )}
       </div>
 
       {/* DEMANDER SON PAIEMENT — l'action principale de l'espace partenaire.
@@ -213,6 +240,16 @@ export default function MyPartnerDashboard({ onBack }) {
 
       <Accordion icon={Wallet} title="Historique de mes commissions" count={myComs.length}
         resume={pending > 0 ? `${formatCFA(pending)} à réclamer` : (demandees > 0 ? `${formatCFA(demandees)} demandés` : null)}>
+        {sousTotaux.length > 1 && (
+          <div className="commissions-sous-totaux">
+            <span className="text-sm text-secondary">Par niveau</span>
+            {sousTotaux.map((n) => (
+              <span key={n.niveau} className={`chip-level n${n.niveau}`}>
+                N{n.niveau} · {formatCFA(n.total)} ({n.nombre})
+              </span>
+            ))}
+          </div>
+        )}
         {myComs.length ? historiqueComs.map((c) => (
           <div key={c.id} className="sheet-row">
             <span className="sheet-label">
@@ -222,10 +259,11 @@ export default function MyPartnerDashboard({ onBack }) {
               {/* Même pastille que l'écran Commissions : le niveau se lit à la
                   couleur, sans jamais emprunter l'ambre et le vert de l'état. */}
               <span className={`chip-level n${c.level}`}>
-                N{c.level} · {formatTaux(COMMISSION_RATES[c.level])}
+                N{c.level} · {tauxDe(c)}
               </span>{' '}
               {getLeadById(c.leadId)?.name || c.leadName || 'Commission manuelle'}
               <span className="text-secondary">
+                {c.level > 1 && c.vendeurNom ? ` · via ${c.vendeurNom}` : ''}
                 {numeroDevis(c) ? ` · ${numeroDevis(c)}` : ''}
                 {' · '}{c.status === 'payée' ? `payée le ${formatDate(c.paidAt)}` : `créée le ${formatDate(c.createdAt)}`}
               </span>
@@ -331,25 +369,32 @@ export default function MyPartnerDashboard({ onBack }) {
         )}
       </Accordion>
 
-      {/* Filleuls inscrits sur la plateforme via mon lien (mode SaaS) */}
+      {/* Mes filleuls : les comptes inscrits par mon lien ou mon code (mode SaaS) */}
       {isSupabaseConfigured && (
-        <Accordion icon={UserPlus} title="Mes filleuls inscrits" count={mesInscrits.length}>
-          {mesInscrits.length ? mesInscrits.map((r) => (
-            <div key={r.org_id} className="sheet-row">
+        <Accordion icon={UserPlus} title="Mes filleuls" count={reseau.filleuls.length}
+          resume={reseau.filleuls.some((f) => Number(f.commissions_generees) > 0)
+            ? `${formatCFA(reseau.filleuls.reduce((t, f) => t + Number(f.commissions_generees || 0), 0))} de commissions`
+            : null}>
+          {reseau.filleuls.length ? reseau.filleuls.map((f) => (
+            <div key={f.filleul_id} className="sheet-row">
               <span className="sheet-label">
-                {r.member_name || r.org_name}
-                <span className="text-secondary"> · inscrit le {formatDate(r.inscrit_le)}</span>
+                {f.nom}
+                <span className="text-secondary"> · inscrit le {formatDate(f.inscrit_le)}</span>
+                {Number(f.commissions_generees) > 0 && (
+                  <span className="text-secondary"> · vous a rapporté {formatCFA(Number(f.commissions_generees))}</span>
+                )}
               </span>
               <span className="sheet-value">
-                {r.pro_actif
+                {f.statut && f.statut !== 'actif' && <span className="badge badge-muted">{f.statut}</span>}{' '}
+                {f.pro_actif
                   ? <span className="badge badge-success"><Crown size={11} style={{ verticalAlign: -1 }} /> Abonné Pro</span>
                   : <span className="badge badge-muted">Gratuit</span>}
               </span>
             </div>
           )) : (
             <div className="text-sm text-secondary">
-              Personne ne s'est encore inscrit avec votre lien. Chaque filleul abonné à
-              Devis Pro vous rapporte une commission à chacun de ses paiements.
+              Personne ne s'est encore inscrit avec votre lien ou votre code. Chaque
+              affaire validée d'un filleul vous rapporte une commission de niveau 2.
             </div>
           )}
         </Accordion>
@@ -382,15 +427,12 @@ export default function MyPartnerDashboard({ onBack }) {
         resume={me.momoNumber ? me.momoNumber : 'Mobile Money à renseigner'}>
         <div className="sheet-row">
           <span className="sheet-label"><Network size={14} /> Mon parrain</span>
-          <span className="sheet-value">{sponsor ? sponsor.name : '— Tête de réseau'}</span>
+          <span className="sheet-value">{nomParrain || '— Tête de réseau'}</span>
         </div>
         <div className="sheet-row">
           <span className="sheet-label"><Users size={14} /> Mes filleuls</span>
           <span className="sheet-value">
-            {(() => {
-              const noms = [...filleuls.map((f) => f.name), ...mesInscrits.map((r) => r.member_name || r.org_name)];
-              return noms.length ? noms.join(', ') : 'Aucun';
-            })()}
+            {nomsFilleuls.length ? nomsFilleuls.join(', ') : 'Aucun'}
           </span>
         </div>
         <div className="momo-row">

@@ -6,11 +6,10 @@ import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
 import { useTheme } from '../context/ThemeContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { setOrgReferral, fetchPlatformCommissions, payPlatformCommission, fetchPlatformPayouts, decidePlatformPayout } from '../lib/remoteSync';
+import { choisirMonParrain, fetchMonParrain, rattraperCommissions, fetchPlatformCommissions, payPlatformCommission, fetchPlatformPayouts, decidePlatformPayout } from '../lib/remoteSync';
 import { formatCFA, formatDate, formatTaux } from '../utils/format';
-import { estProprietaireEspace } from '../utils/roles';
 import { normaliseCode } from '../utils/referral';
-import { etatParrainage, PARRAINAGE_PAR_DEFAUT, PARRAINAGE_VERROUILLE } from '../utils/parrainage';
+import { etatParrainagePersonne, PARRAINAGE_PAR_DEFAUT, PARRAINAGE_VERROUILLE } from '../utils/parrainage';
 import { configActive, providerById, MODE_LABEL } from '../utils/paiementProviders';
 import { SUBSCRIPTION_PRICE, effectiveStatus, daysLeft, formule, FORMULE_DEFAUT } from '../utils/subscription';
 import { estEssai } from '../utils/codePromo';
@@ -46,22 +45,34 @@ import RoiSection from './plus/RoiSection';
 import { SyncStatusRow } from '../components/SyncStatus';
 import DiagnosticCard from '../components/DiagnosticCard';
 import { buildRecuCommissionHtml, buildReleveCommissionsHtml, openHtmlDoc, PAY_MODE_LABEL } from '../utils/commissionDocs';
-import { reconcileMissingCommissions } from '../utils/commissionSync';
+import { reconcileMissingCommissions, sousTotauxParNiveau } from '../utils/commissionSync';
 import { MODES_RETRAIT, ETATS_COMMISSION, commissionsEngagees, etatCommission } from '../utils/payouts';
 import { suivre, EVENEMENTS } from '../lib/analytique';
 
 const THEME_LABEL = { clair: 'Clair', sombre: 'Sombre', systeme: 'Système' };
 
 export default function Plus() {
-  const { user, logout, refreshOrg } = useAuth();
+  const { user, logout } = useAuth();
   // Parrainage de l'entreprise : saisie une seule fois, puis verrouillé (serveur).
   const [refInput, setRefInput] = useState('');
   const [refSaving, setRefSaving] = useState(false);
+  // Mon parrain, lu sur le serveur : il appartient à la PERSONNE (table
+  // parrainages). L'organisation, commune à tous les comptes, n'en dit rien.
+  const [monParrain, setMonParrain] = useState(null);
+  const [parrainLu, setParrainLu] = useState(false);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+    let actif = true;
+    fetchMonParrain()
+      .then((p) => { if (actif) { setMonParrain(p); setParrainLu(true); } })
+      .catch(() => {});
+    return () => { actif = false; };
+  }, [user.id]);
   const { setMode, proActive } = useMode();
   const { theme } = useTheme();
   const data = useData();
   const {
-    partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team, teamChargee,
+    partners, commissions, leads, orders, devis, referrals, kits, inverters, pompeKits, paiementConfigs, payoutRequests, team,
     getPartnerById, getLeadById,
     payCommission, addCommission, syncCommissions, approvePayout, rejectPayout,
     getSubscriptionForUser, requestSubscription, activerAbonnementVerifie, importData,
@@ -376,7 +387,26 @@ export default function Plus() {
 
   // Rattrapage des commissions : recense les affaires validées (pistes
   // gagnées, conversions devis validées) sans commission, puis les crée.
-  const handleSyncCommissions = () => {
+  const handleSyncCommissions = async () => {
+    // Avec le serveur, le rattrapage se fait LÀ-BAS, avec la même règle que
+    // le calcul automatique (niveau 1 = technicien propriétaire du client,
+    // niveau 2 = son parrain). Rien de payé ni de demandé n'est touché : ces
+    // cas reviennent « à vérifier ».
+    if (isSupabaseConfigured) {
+      setSyncMsg('Rattrapage en cours…');
+      try {
+        const rapport = await rattraperCommissions(true);
+        const aVerifier = rapport.filter((r) => r.etape === 'à vérifier');
+        const faits = rapport.length - aVerifier.length;
+        setSyncMsg([
+          faits ? `${faits} correction(s) appliquée(s) (liens de parrainage, commissions créées ou réattribuées).` : 'Tout est à jour : rien à corriger.',
+          aVerifier.length ? `${aVerifier.length} point(s) à vérifier : ${aVerifier.slice(0, 3).map((r) => `${r.objet} — ${r.detail}`).join(' · ')}${aVerifier.length > 3 ? ' …' : ''}` : '',
+        ].filter(Boolean).join(' '));
+      } catch (err) {
+        setSyncMsg(`Rattrapage impossible : ${err.message}`);
+      }
+      return;
+    }
     const missing = reconcileMissingCommissions(
       { leads, devis, partners, commissions, referrals },
       COMMISSION_RATES,
@@ -527,6 +557,16 @@ export default function Plus() {
           </button>
         </div>
       </div>
+      {sousTotauxParNiveau(filteredCommissions).length > 1 && (
+        <div className="commissions-sous-totaux card">
+          <span className="text-sm text-secondary">Par niveau</span>
+          {sousTotauxParNiveau(filteredCommissions).map((n) => (
+            <span key={n.niveau} className={`chip-level n${n.niveau}`}>
+              N{n.niveau} · {formatCFA(n.total)} ({n.nombre})
+            </span>
+          ))}
+        </div>
+      )}
       <div className="commissions-list">
         {filteredCommissions.map((commission) => (
           <div
@@ -538,9 +578,12 @@ export default function Plus() {
                 <div className="commission-lead">{nomClient(commission)}</div>
                 <div className="commission-sub">
                   <span className={`chip-level n${commission.level}`}>
-                    N{commission.level} · {formatTaux(COMMISSION_RATES[commission.level])}
+                    N{commission.level} · {formatTaux(commission.taux != null ? Number(commission.taux) : COMMISSION_RATES[commission.level])}
                   </span>
                   <span className="commission-partner">{nomPartenaire(commission)}</span>
+                  {commission.level > 1 && commission.vendeurNom && (
+                    <span className="commission-ref">via {commission.vendeurNom}</span>
+                  )}
                   {numeroDevis(commission) && <span className="commission-ref">{numeroDevis(commission)}</span>}
                   {commission.externe && commission.orgName && (
                     <span className="commission-ref">{commission.orgName}</span>
@@ -721,22 +764,23 @@ export default function Plus() {
           n'ont rien à y faire et ne doivent pas s'en inquiéter). */}
       {user.role === 'gerant' && <div className="sync-inline"><SyncStatusRow /></div>}
 
-      {/* Parrainage de l'entreprise. Trois états, et c'est le drapeau
-          `referral_par_defaut` qui les sépare : un code CHOISI est définitif,
-          un rattachement PAR DÉFAUT (BestaSolar, faute de code à l'inscription)
-          se corrige une fois — sans quoi l'app aurait verrouillé un parrain que
-          le partenaire n'a jamais désigné.
-          Visible pour le gérant — ou l'utilisateur seul dans son espace. */}
-      {isSupabaseConfigured && user.org && estProprietaireEspace(user, team, teamChargee) && (
+      {/* Mon parrainage. Trois états : un parrain CHOISI (lien ou code) est
+          définitif ; un rattachement PAR DÉFAUT (BestaSolar, faute de code à
+          l'inscription) se corrige une fois ; sans parrain, la saisie est
+          ouverte. Le parrain est celui de la PERSONNE — chaque compte a le
+          sien, technicien compris. */}
+      {isSupabaseConfigured && parrainLu && (
         <div className="card">
           <div className="sheet-section-title"><Handshake size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Parrainage</div>
-          {etatParrainage(user.org) === PARRAINAGE_VERROUILLE ? (
+          {etatParrainagePersonne(monParrain) === PARRAINAGE_VERROUILLE ? (
             <>
               <div className="sheet-row">
                 <span className="sheet-label">Parrainé par</span>
-                <span className="sheet-value"><span className="flat-badge">{user.org.referred_by}</span></span>
+                <span className="sheet-value">
+                  {monParrain.nom ? `${monParrain.nom} ` : ''}<span className="flat-badge">{monParrain.code}</span>
+                </span>
               </div>
-              <div className="field-hint">Ce code est définitif — pour toute correction, le partenaire doit en faire la demande à BestaSolar.</div>
+              <div className="field-hint">Ce parrain est définitif — pour toute correction, faites-en la demande à BestaSolar.</div>
             </>
           ) : (
             <form
@@ -745,8 +789,9 @@ export default function Plus() {
                 if (!refInput.trim()) return;
                 setRefSaving(true);
                 try {
-                  await setOrgReferral(refInput);
-                  await refreshOrg();
+                  await choisirMonParrain(refInput);
+                  setMonParrain(await fetchMonParrain());
+                  setRefInput('');
                   toast('Parrain enregistré. Ce choix est maintenant définitif.');
                 } catch (err) {
                   toast(err.message || 'Attribution impossible.', { type: 'error' });
@@ -755,14 +800,14 @@ export default function Plus() {
                 }
               }}
             >
-              {etatParrainage(user.org) === PARRAINAGE_PAR_DEFAUT && (
+              {etatParrainagePersonne(monParrain) === PARRAINAGE_PAR_DEFAUT && (
                 <div className="sheet-row">
                   <span className="sheet-label">Rattaché par défaut</span>
-                  <span className="sheet-value"><span className="flat-badge">{user.org.referred_by}</span></span>
+                  <span className="sheet-value"><span className="flat-badge">{monParrain.code}</span></span>
                 </div>
               )}
               <p className="text-sm text-secondary" style={{ marginBottom: 10 }}>
-                {etatParrainage(user.org) === PARRAINAGE_PAR_DEFAUT
+                {etatParrainagePersonne(monParrain) === PARRAINAGE_PAR_DEFAUT
                   ? <>Vous vous êtes inscrit sans code : votre compte est rattaché à BestaSolar.
                       Si un partenaire vous a recommandé, saisissez son code — vous ne pourrez
                       le faire <strong>qu'une seule fois</strong>.</>

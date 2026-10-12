@@ -3,6 +3,7 @@
 import { generatePartnerCode, memeCode, normaliseCode } from '../../utils/referral';
 import { missingCommissionsForLead, reconcileMissingCommissions, rattacherCommissionsClient } from '../../utils/commissionSync';
 import { COMMISSION_RATES, partnerFromActiveRef } from './shared';
+import { isSupabaseConfigured } from '../../lib/supabase';
 
 export function createPartnerActions(setState) {
   return {
@@ -65,8 +66,14 @@ export function createPartnerActions(setState) {
     //    commission de 1,5 % n'est jamais attribuée.
     ensurePartnerForUser: (user) =>
       setState((s) => {
+        // Avec le serveur, le parrain vient de la table parrainages : le
+        // serveur l'inscrit lui-même sur la fiche (sponsorId / sponsorCode).
+        // L'organisation, commune à tous depuis la réunion des comptes, ne dit
+        // RIEN du parrain d'une personne — la lire donnait le même « parrain »
+        // à tout le monde. Ce qui suit ne sert donc qu'au mode local.
+        const avecServeur = isSupabaseConfigured;
         // Le code venu du serveur peut encore porter l'ancien préfixe BESTA-.
-        const codeOrg = normaliseCode(user.org?.referred_by) || null;
+        const codeOrg = avecServeur ? null : normaliseCode(user.org?.referred_by) || null;
         const existant = s.partners.find((p) => p.userId === user.id);
         if (existant) {
           // Réparation des profils créés avant que le code d'organisation ne
@@ -83,7 +90,7 @@ export function createPartnerActions(setState) {
         // Rattachement automatique : si un lien de parrainage (?ref=…) est
         // actif sur l'appareil à la création du profil, son propriétaire
         // devient le parrain — sans saisie manuelle.
-        const refPartner = partnerFromActiveRef(s.partners);
+        const refPartner = avecServeur ? null : partnerFromActiveRef(s.partners);
         const parrain = (refPartner && refPartner.userId !== user.id ? refPartner : null)
           || (codeOrg ? s.partners.find((p) => memeCode(p.code, codeOrg)) : null)
           || null;
@@ -120,7 +127,9 @@ export function createPartnerActions(setState) {
       setState((s) => {
         const referral = (s.referrals || []).find((r) => r.id === referralId);
         let commissions = s.commissions;
-        if (status === 'validé' && referral?.type === 'devis' && referral.leadId) {
+        // Avec le serveur, les commissions naissent de la validation de
+        // l'affaire elle-même (devis ou client gagné), sur le serveur.
+        if (!isSupabaseConfigured && status === 'validé' && referral?.type === 'devis' && referral.leadId) {
           const lead = s.leads.find((l) => l.id === referral.leadId);
           const generated = missingCommissionsForLead(
             { lead, devis: s.devis, partners: s.partners, commissions: s.commissions },
@@ -139,8 +148,11 @@ export function createPartnerActions(setState) {
     // Rattrapage : recrée toutes les commissions manquantes sur les affaires
     // déjà validées (pistes gagnées, conversions devis validées). Idempotent —
     // relancer ne crée jamais de doublon.
+    // Avec le serveur, ce rattrapage se fait sur le serveur
+    // (rattraperCommissions, depuis l'écran Commissions) : ici, mode local seulement.
     syncCommissions: () =>
       setState((s) => {
+        if (isSupabaseConfigured) return s;
         const today = new Date().toISOString().slice(0, 10);
         // 1) Réparer les doublons déjà enregistrés (commission « niveau
         // client » sur une piste dont un devis est gagné).
@@ -198,6 +210,9 @@ export function createPartnerActions(setState) {
               ...commission,
               partnerId,
               id: crypto.randomUUID(),
+              // Le serveur n'accepte de l'application que les commissions
+              // ajoutées à la main par le gérant : il les reconnaît à ce champ.
+              source: 'manuel',
               status: 'en_attente',
               paidAt: null,
               createdAt: new Date().toISOString().slice(0, 10),

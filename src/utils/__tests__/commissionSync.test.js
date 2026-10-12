@@ -4,6 +4,8 @@ import {
   resolveLeadPartners,
   missingCommissionsForLead,
   reconcileMissingCommissions,
+  proprietaireAffaire,
+  sousTotauxParNiveau,
 } from '../commissionSync';
 
 const RATES = { 1: 0.03, 2: 0.015 };
@@ -118,5 +120,35 @@ describe('reconcileMissingCommissions', () => {
     const refs = [{ id: 'r9', type: 'devis', status: 'validé', leadId: 'l9' }];
     const out = reconcileMissingCommissions({ leads: both, devis: [], partners, commissions: [], referrals: refs }, RATES, TODAY);
     expect(out).toHaveLength(1);
+  });
+});
+
+// Règle du serveur (proprietaire_affaire, migration 20261013) : le niveau 1
+// revient au technicien propriétaire du client.
+describe('proprietaireAffaire', () => {
+  it('celui qui a enregistré le client prime', () => {
+    expect(proprietaireAffaire({ registeredByUserId: 'tech', assignedTo: 'autre' }, { createdBy: 'gerant' })).toBe('tech');
+  });
+  it('puis le commercial assigné, puis l\'auteur du devis', () => {
+    expect(proprietaireAffaire({ assignedTo: 'autre' }, { createdBy: 'gerant' })).toBe('autre');
+    expect(proprietaireAffaire({}, { createdBy: 'gerant' })).toBe('gerant');
+    expect(proprietaireAffaire(null, null)).toBeNull();
+  });
+});
+
+describe('sousTotauxParNiveau', () => {
+  it('total et nombre par niveau, niveaux croissants', () => {
+    const coms = [
+      { level: 2, amount: 15000 }, { level: 1, amount: 30000 },
+      { level: 1, amount: 12000 }, { level: '2', amount: '6000' },
+    ];
+    expect(sousTotauxParNiveau(coms)).toEqual([
+      { niveau: 1, total: 42000, nombre: 2 },
+      { niveau: 2, total: 21000, nombre: 2 },
+    ]);
+  });
+  it('ignore une commission sans niveau ; liste vide sans commission', () => {
+    expect(sousTotauxParNiveau([{ amount: 100 }])).toEqual([]);
+    expect(sousTotauxParNiveau()).toEqual([]);
   });
 });

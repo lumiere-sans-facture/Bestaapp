@@ -2320,6 +2320,14 @@ form .login-link { width: 100%; margin-top: 4px; }
 .chip-level.n1 { background: var(--warning-light); color: var(--warning-dark); }
 .chip-level.n2 { background: var(--success-light); color: var(--success-text); }
 .commission-ref { font-size: 0.75rem; color: var(--text-muted); }
+/* Sous-totaux par niveau, au-dessus d'une liste de commissions : une rangée
+   de pastilles qui passe à la ligne sur un téléphone. Un niveau au-delà du 2
+   garde la pastille neutre. */
+.commissions-sous-totaux {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 4px 0 10px; margin-bottom: 4px;
+}
+.commissions-sous-totaux.card { padding: 10px 14px; margin-bottom: 10px; }
 .commission-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .commission-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

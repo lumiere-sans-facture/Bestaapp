@@ -21,6 +21,30 @@
   document.getElementById('code').textContent = code;
   document.getElementById('web').href = '/?ref=' + encodeURIComponent(code);
 
+  // Cette visite compte comme un clic sur le lien du parrain. La page n'a pas
+  // les clés de la base : la route /api/clic s'en charge (une fois par
+  // visiteur et par lien sur 24 h). Jamais bloquant pour le téléchargement.
+  // L'identifiant de navigateur est le même que celui de l'application
+  // (src/utils/referral.js → identifiantVisiteur).
+  function visiteur() {
+    try {
+      var id = localStorage.getItem('bestasolar_visiteur');
+      if (!id && window.crypto && crypto.randomUUID) {
+        id = crypto.randomUUID();
+        localStorage.setItem('bestasolar_visiteur', id);
+      }
+      return id || '';
+    } catch { return ''; }
+  }
+  try {
+    var corps = JSON.stringify({ code: code, visiteur: visiteur() });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/clic', new Blob([corps], { type: 'application/json' }));
+    } else {
+      fetch('/api/clic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: corps, keepalive: true });
+    }
+  } catch { /* clic perdu : sans conséquence pour le visiteur */ }
+
   // Repli des navigateurs sans API presse-papiers (ou adresse non sécurisée).
   function copierAncien(texte) {
     var zone = document.createElement('textarea');

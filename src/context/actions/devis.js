@@ -5,8 +5,9 @@
 // Comme pour les pistes, un commercial DEMANDE le changement d'étape et le
 // gérant valide : la commission ne naît qu'à la validation.
 import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
-import { missingCommissionsForDevis, rattacherCommissionsClient } from '../../utils/commissionSync';
+import { missingCommissionsForDevis, rattacherCommissionsClient, proprietaireAffaire } from '../../utils/commissionSync';
 import { suivre, EVENEMENTS } from '../../lib/analytique';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import { devisStage, etapeDuClient, prochainNumeroDevis } from '../../utils/affaires';
 
 // L'issue d'un devis met à jour la fiche du CLIENT : son activité (indicateur
@@ -49,13 +50,19 @@ export function createDevisActions(setState) {
       // qu'un devis de ce client est gagné : la rémunération se fait alors
       // devis par devis. Sans cela, conclure le client PUIS son devis payait
       // deux fois la même vente.
-      const pool = rattacherCommissionsClient(s.commissions, d);
-      const generated = missingCommissionsForDevis(
-        { devis: d, lead, partners: s.partners, commissions: pool },
-        COMMISSION_RATES,
-        today
-      );
-      commissions = generated.length ? [...generated, ...pool] : pool;
+      // Avec le serveur, c'est LUI qui calcule, à la réception du devis gagné
+      // (une seule règle, dans une transaction, sans doublon possible) : les
+      // commissions arrivent à la synchronisation suivante. Ici, seul le mode
+      // local (sans serveur) les calcule encore.
+      if (!isSupabaseConfigured) {
+        const pool = rattacherCommissionsClient(s.commissions, d);
+        const generated = missingCommissionsForDevis(
+          { devis: d, lead, partners: s.partners, commissions: pool },
+          COMMISSION_RATES,
+          today
+        );
+        commissions = generated.length ? [...generated, ...pool] : pool;
+      }
       // Affaire gagnée : les conversions d'affiliation encore en attente sur
       // cette piste sont validées d'office (registre cohérent avec la commission).
       referrals = referrals.map((r) =>
@@ -109,7 +116,13 @@ export function createDevisActions(setState) {
         const lead = s.leads.find((l) => l.id === devis.leadId);
         let partnerId = devis.partnerId || lead?.parrainL1 || null;
         let referrals = s.referrals || [];
-        if (!partnerId) {
+        // Avec le serveur, l'apporteur figé sur le devis est celui que le
+        // serveur paiera au niveau 1 : le propriétaire du client.
+        if (!partnerId && isSupabaseConfigured) {
+          const proprietaire = proprietaireAffaire(lead, devis);
+          partnerId = s.partners.find((p) => p.userId === proprietaire)?.id || null;
+        }
+        if (!partnerId && !isSupabaseConfigured) {
           const refPartner = partnerFromActiveRef(s.partners);
           if (refPartner) {
             partnerId = refPartner.id;

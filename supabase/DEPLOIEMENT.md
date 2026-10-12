@@ -63,6 +63,14 @@ correspond à une fonctionnalité livrée après la première installation :
 
 > **Vitesse** : `migrations/20261012_index_email_profils.sql` ajoute un index sur `lower(email)` dans `profiles`. Les règles de sécurité y cherchent le profil de la session pour chaque ligne lue ; sans l'index, chaque recherche parcourait toute la table, et la connexion comme la synchronisation ralentissaient à chaque nouvel inscrit. Indépendant des autres scripts, sans effet sur les droits, à passer à tout moment dans les deux projets.
 
+> **Parrainage et commissions (octobre 2026)**, à passer dans les deux projets, **dans cet ordre** :
+> 1. `migrations/20261013_parrainage_commissions.sql`. Le parrain devient celui de la **personne** (table `parrainages`, écrite à l'inscription), et non plus celui de l'organisation, commune à tous depuis la réunion des comptes. Les commissions sont **calculées par le serveur** quand un devis (ou un client) passe à « gagné » : niveau 1 au technicien propriétaire du client, niveau 2 à son parrain. Il y a une ligne par niveau, sans doublon possible, avec les taux dans `reglages_commissions` (3 % et 1,5 %). Chacun lit ses commissions ; le gérant les lit toutes, et lui seul les modifie. Les clics sur les liens (`?ref=`, `/r/CODE`, `/telecharger?ref=`) sont comptés au nom du parrain, une fois par visiteur et par 24 h, avec l'adresse IP hachée. **Après avoir rejoué `multitenant.sql`, rejouer cette migration** : elle redéfinit quatre de ses fonctions.
+> 2. `rattrapage-parrainage.sql`. L'**aperçu** d'abord (rien ne change), puis l'application (une ligne à décommenter). Il retrouve les liens parrain–filleul et recale les commissions des affaires déjà validées. Une commission payée ou demandée n'est jamais touchée : elle est signalée « à vérifier ».
+>
+> Retour arrière : `annuler-parrainage-commissions.sql` (les données sont conservées). Les fonctions SQL sont testées de bout en bout sur un PostgreSQL local par `tests/lancer.sh` (scénario `tests/parrainage.sql` : A parraine B, B parraine C, le devis du client de C est validé).
+>
+> Pour la page `/telecharger`, le comptage des clics passe par la route `/api/clic`, qui utilise la variable Vercel `SUPABASE_SERVICE_ROLE_KEY`, déjà requise par le paiement en ligne.
+
 L'ordre 8 → 9 n'est pas indifférent : l'index unique répare d'abord les
 doublons hérités, le renommage travaille ensuite sur une base saine.
 

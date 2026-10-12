@@ -7,6 +7,7 @@ import {
   SOURCES_EAU, HEURES_POMPAGE, debitRequis, hmtEstimee, suggestPompeKit, buildPompeQuotation,
 } from '../../utils/pompeSizing';
 import { resolveAutoPartner } from '../../utils/referral';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import PartnerField from './PartnerField';
 import LeadPicker from './LeadPicker';
 import Field from '../../components/Field';
@@ -39,7 +40,7 @@ export default function PompeWizard({ onDone, initialLeadId = null }) {
   useEffect(() => {
     if (!selectedLeadId) return;
     const lead = leadsForUser(user).find((l) => l.id === selectedLeadId);
-    setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id)?.id || '' : '');
+    setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id, { regleServeur: isSupabaseConfigured })?.id || '' : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, partners]);
 

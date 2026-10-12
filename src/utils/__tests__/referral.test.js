@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { codeBaseFromName, generatePartnerCode, memeCode, normaliseCode } from '../referral';
+import { codeBaseFromName, generatePartnerCode, memeCode, normaliseCode, codeDepuisChemin, identifiantVisiteur } from '../referral';
 
 describe('codeBaseFromName', () => {
   it('prend le premier mot en majuscules', () => {
@@ -73,5 +73,33 @@ describe('generatePartnerCode — mot réservé', () => {
     const code = generatePartnerCode('Besta Kodjo', [], 'partner-9');
     expect(code).toMatch(/^PARTENAIRE-[A-Z2-9]{6}$/);
     expect(normaliseCode(code)).toBe(code);
+  });
+});
+
+// Lien court /r/CODE : même attribution que ?ref=CODE.
+describe('codeDepuisChemin', () => {
+  it('reconnaît /r/CODE, avec ou sans barre finale, et normalise', () => {
+    expect(codeDepuisChemin('/r/awa-aaa111')).toBe('AWA-AAA111');
+    expect(codeDepuisChemin('/r/BESTA-AWA-AAA111/')).toBe('AWA-AAA111');
+  });
+  it('rien d\'autre n\'est pris pour un code', () => {
+    for (const chemin of ['/', '/dashboard', '/r/', '/r/a', '/r/AWA/plus', '/clients/r/AWA-AAA111', null]) {
+      expect(codeDepuisChemin(chemin)).toBeNull();
+    }
+  });
+});
+
+// Identifiant anonyme du navigateur : un clic par visiteur et par lien sur 24 h.
+describe('identifiantVisiteur', () => {
+  it('tiré au sort une fois, puis toujours le même', () => {
+    const store = new Map();
+    globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+    const id = identifiantVisiteur();
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(identifiantVisiteur()).toBe(id);
+  });
+  it('stockage indisponible : null, jamais d\'erreur', () => {
+    globalThis.localStorage = { getItem: () => { throw new Error('bloqué'); }, setItem: () => {}, removeItem: () => {} };
+    expect(identifiantVisiteur()).toBeNull();
   });
 });

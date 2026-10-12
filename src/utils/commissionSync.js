@@ -168,3 +168,29 @@ export function reconcileMissingCommissions({ leads = [], devis = [], partners =
   }
   return out;
 }
+
+// ---- Règle du serveur (Supabase) ----
+// Avec le backend, les commissions sont calculées par la base (voir
+// supabase/migrations/20261013_parrainage_commissions.sql). Ces deux helpers
+// en reprennent la règle pour l'AFFICHAGE : qui touchera le niveau 1, et les
+// totaux par niveau.
+
+/** Propriétaire d'une affaire = bénéficiaire du niveau 1 : celui qui a
+ *  enregistré le client, sinon le commercial assigné, sinon l'auteur du
+ *  devis. Même règle que `proprietaire_affaire` côté serveur. */
+export const proprietaireAffaire = (lead, devis) =>
+  lead?.registeredByUserId || lead?.assignedTo || lead?.userId || devis?.createdBy || null;
+
+/** Sous-totaux par niveau, niveaux croissants : [{ niveau, total, nombre }]. */
+export function sousTotauxParNiveau(commissions = []) {
+  const parNiveau = new Map();
+  for (const c of commissions) {
+    const niveau = Number(c?.level) || 0;
+    if (!niveau) continue;
+    const ligne = parNiveau.get(niveau) || { niveau, total: 0, nombre: 0 };
+    ligne.total += Number(c.amount) || 0;
+    ligne.nombre += 1;
+    parNiveau.set(niveau, ligne);
+  }
+  return [...parNiveau.values()].sort((a, b) => a.niveau - b.niveau);
+}

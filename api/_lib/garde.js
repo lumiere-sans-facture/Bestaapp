@@ -32,6 +32,9 @@ export const PLAFONDS = {
   // Agent devis : chaque tour d'outil est une requête, et chacune coûte un
   // appel payant à Claude. Large pour une conversation, borné contre une boucle.
   agentDevis: 30,
+  // Visite de la page d'installation (comptage des clics de parrainage) :
+  // un visiteur l'ouvre une fois ; le dédoublonnage fin est fait en base.
+  clic: 20,
 };
 
 /** Journal de sécurité : une ligne par événement, horodatée et attribuée. */

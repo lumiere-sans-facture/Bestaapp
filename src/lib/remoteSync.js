@@ -556,6 +556,61 @@ export async function fetchMyReferredOrgs() {
   return data || [];
 }
 
+// ---- Parrainage de la PERSONNE (migration 20261013) ----
+// Le lien parrain → filleul vit sur le serveur (table parrainages), écrit à
+// l'inscription : plus jamais déduit de l'organisation, commune à tous.
+
+/** Mes filleuls directs : { filleul_id, nom, telephone, inscrit_le, source,
+ *  statut, pro_actif, commissions_generees, commissions_nombre }. */
+export async function fetchMesFilleuls() {
+  const { data, error } = await supabase.rpc('mes_filleuls');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/** Mon parrain { partenaire_id, code, nom, source, depuis }, ou null (tête de réseau). */
+export async function fetchMonParrain() {
+  const { data, error } = await supabase.rpc('mon_parrain');
+  if (error) throw new Error(error.message);
+  return data?.[0] || null;
+}
+
+/** Saisie du code de son parrain après l'inscription (une seule fois). */
+export async function choisirMonParrain(code) {
+  const { error } = await supabase.rpc('choisir_mon_parrain', { p_code: code });
+  if (error) throw new Error(error.message);
+}
+
+/** Mes clics, inscriptions venues de mon lien, filleuls et taux de conversion. */
+export async function fetchStatsParrainage() {
+  const { data, error } = await supabase.rpc('mes_stats_parrainage');
+  if (error) throw new Error(error.message);
+  return data?.[0] || null;
+}
+
+/**
+ * Compte la visite d'un lien de parrainage, au nom du parrain. Le visiteur
+ * est anonyme : le serveur note l'empreinte hachée de la requête et ne
+ * compte qu'un clic par visiteur et par lien sur 24 h. Jamais bloquant :
+ * un échec (hors-ligne, base en retard) ne doit rien empêcher d'afficher.
+ */
+export function compterClicParrainage(code, visiteur = null) {
+  if (!supabase || !code) return Promise.resolve(false);
+  return supabase.rpc('compter_clic_parrainage', { p_code: code, p_visiteur: visiteur })
+    .then(({ data, error }) => !error && data === true, () => false);
+}
+
+/**
+ * Rattrapage serveur (admin plateforme) : liens parrain → filleul manquants
+ * et commissions par niveau des affaires déjà validées. `appliquer` faux :
+ * aperçu, rien n'est modifié. Renvoie le rapport [{ etape, objet, detail }].
+ */
+export async function rattraperCommissions(appliquer = false) {
+  const { data, error } = await supabase.rpc('rattraper_parrainage_commissions', { p_appliquer: appliquer });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 /** Vue admin plateforme : abonnements + paiements de TOUTES les organisations. */
 export async function adminSubscriptionsOverview() {
   const { data, error } = await supabase.rpc('admin_subscriptions_overview');

@@ -7,7 +7,8 @@ import { CartProvider } from './context/CartContext';
 import { ModeProvider, useMode } from './context/ModeContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
-import { captureRefFromUrl } from './utils/referral';
+import { captureRefFromUrl, identifiantVisiteur } from './utils/referral';
+import { compterClicParrainage } from './lib/remoteSync';
 import { capturerFormuleUrl, lireFormuleChoisie } from './utils/formuleChoisie';
 import { ecranDentree, vueRacine } from './utils/entree';
 import AppLayout from './components/AppLayout';
@@ -19,9 +20,12 @@ import { installerAnalytique, suivrePage, signalerOuvertureApp } from './lib/ana
 import { installerBarreEtat } from './lib/barreEtat';
 import { codeParrainageInstallation } from './lib/parrainageInstallation';
 
-// Capture l'attribution d'affiliation (?ref=AMINATA) dès le chargement,
-// avant même la connexion — durée 30 jours, last-click.
+// Capture l'attribution d'affiliation (?ref=AMINATA, ou /r/AMINATA) dès le
+// chargement, avant même la connexion — durée 30 jours, last-click.
 const REF_DU_LIEN = captureRefFromUrl();
+// Le clic est compté sur le serveur, au nom du parrain, alors même que le
+// visiteur est anonyme : un seul par visiteur et par lien sur 24 h.
+if (REF_DU_LIEN) compterClicParrainage(REF_DU_LIEN, identifiantVisiteur());
 
 // Formule choisie sur la page d'accueil (« Choisir Pro Premium »), captée
 // avant tout rendu : elle doit survivre à la création du compte, qui

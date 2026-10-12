@@ -6,6 +6,7 @@
 // directement.
 import { COMMISSION_RATES, STAGE_LABEL, newReferral, note, partnerFromActiveRef } from './shared';
 import { missingCommissionsForLead } from '../../utils/commissionSync';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import { appendClientSource, buildClientSource, canSyncClientContact, isSameClient, sourceHistoryFor } from '../../utils/clientContact';
 
 export function createLeadActions(setState) {
@@ -18,7 +19,8 @@ export function createLeadActions(setState) {
     if (stage === 'gagne' && lead) {
       // Base de calcul : total du dernier devis finalisé (sinon valeur
       // estimée) ; apporteur : parrain de la piste, sinon celui du devis.
-      const generated = missingCommissionsForLead(
+      // Avec le serveur, la commission naît sur le serveur (voir devis.js).
+      const generated = isSupabaseConfigured ? [] : missingCommissionsForLead(
         { lead, devis: s.devis, partners: s.partners, commissions: s.commissions },
         COMMISSION_RATES,
         today
@@ -56,7 +58,12 @@ export function createLeadActions(setState) {
     addLead: (lead) =>
       setState((s) => {
         let parrainL1 = lead.parrainL1 || null;
-        if (!parrainL1) {
+        // Avec le serveur, le niveau 1 revient au propriétaire du client et
+        // le niveau 2 à SON parrain (table parrainages) : un lien cliqué un
+        // jour sur cet appareil ne fait plus d'un tiers « l'apporteur » des
+        // clients qu'on y saisit — c'est ce qui versait le niveau 1 au parrain
+        // plutôt qu'au technicien.
+        if (!parrainL1 && !isSupabaseConfigured) {
           const refPartner = partnerFromActiveRef(s.partners);
           if (refPartner) parrainL1 = refPartner.id;
         }

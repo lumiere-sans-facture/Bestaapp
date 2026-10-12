@@ -17,3 +17,15 @@ export const etatParrainage = (org = {}) => {
 
 /** La saisie d'un code n'est proposée que tant qu'elle est encore possible. */
 export const peutChoisirParrain = (org) => etatParrainage(org) !== PARRAINAGE_VERROUILLE;
+
+// Depuis la réunion de tous les comptes dans une organisation unique, le
+// parrain est celui de la PERSONNE (table parrainages, voir mon_parrain()),
+// et non plus celui de l'organisation, commune à tous. Mêmes trois états :
+//   source « defaut » : inscrit sans code, rattaché à BestaSolar, corrigeable une fois ;
+//   toute autre source : choix réel, définitif ;
+//   aucun parrain : saisie possible.
+/** @param {{source?: string}|null} parrain  ligne renvoyée par mon_parrain() */
+export const etatParrainagePersonne = (parrain) => {
+  if (!parrain) return PARRAINAGE_ABSENT;
+  return parrain.source === 'defaut' ? PARRAINAGE_PAR_DEFAUT : PARRAINAGE_VERROUILLE;
+};

@@ -1,5 +1,6 @@
 // Programme d'affiliation : codes partenaires et tracking du lien de parrainage.
 import { SITE_PUBLIC } from '../config/legal';
+import { proprietaireAffaire } from './commissionSync';
 
 // Alphabet sans ambiguïté pour les suffixes : pas de 0/O ni de 1/I.
 const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -131,17 +132,46 @@ export const doitChercherCodeInstallation = ({ plateforme, dejaFait = false, cle
 const REF_KEY = 'bestasolar_ref';
 export const REF_TTL_DAYS = 30;
 
-/** À appeler au chargement de l'app : capture ?ref=NOM-XXXXXX et nettoie l'URL. */
+/** Code d'un lien court « /r/NOM-XXXXXX », ou null. */
+export const codeDepuisChemin = (chemin = '') => {
+  const m = String(chemin || '').match(/^\/r\/([A-Za-z0-9][A-Za-z0-9-]{2,39})\/?$/);
+  return m ? normaliseCode(m[1]) : null;
+};
+
+/** À appeler au chargement de l'app : capture ?ref=NOM-XXXXXX (ou le lien
+ *  court /r/NOM-XXXXXX), nettoie l'URL et renvoie le code. */
 export const captureRefFromUrl = () => {
   try {
     const params = new URLSearchParams(window.location.search);
-    const ref = params.get('ref');
+    const ref = params.get('ref') || codeDepuisChemin(window.location.pathname);
     if (!ref) return null;
     const code = enregistrerRef(ref);
     const url = new URL(window.location.href);
     url.searchParams.delete('ref');
+    if (codeDepuisChemin(url.pathname)) url.pathname = '/';
     window.history.replaceState({}, '', url);
     return code;
+  } catch {
+    return null;
+  }
+};
+
+const VISITEUR_KEY = 'bestasolar_visiteur';
+
+/**
+ * Identifiant anonyme et durable de ce navigateur, tiré au sort une fois.
+ * Il ne sert qu'à ne compter qu'UN clic par visiteur et par lien sur 24 h :
+ * le serveur ne le garde que haché. null si le stockage est indisponible
+ * (le serveur se rabat alors sur l'empreinte adresse + navigateur).
+ */
+export const identifiantVisiteur = () => {
+  try {
+    let id = localStorage.getItem(VISITEUR_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(VISITEUR_KEY, id);
+    }
+    return id;
   } catch {
     return null;
   }
@@ -189,7 +219,14 @@ export const consumeRefClick = () => {
  * 3) sinon le profil partenaire du créateur du devis — chaque affaire a
  *    impérativement un apporteur.
  */
-export const resolveAutoPartner = (lead, partners, creatorUserId = null) => {
+export const resolveAutoPartner = (lead, partners, creatorUserId = null, { regleServeur = false } = {}) => {
+  // Avec le serveur, une seule règle : le niveau 1 revient au propriétaire du
+  // client (celui qui l'a enregistré, sinon le commercial assigné, sinon
+  // l'auteur du devis) — voir proprietaireAffaire.
+  if (regleServeur) {
+    const proprietaire = proprietaireAffaire(lead, { createdBy: creatorUserId });
+    return (proprietaire && partners.find((p) => p.userId === proprietaire)) || null;
+  }
   if (lead?.parrainL1) {
     return partners.find((p) => p.id === lead.parrainL1) || null;
   }

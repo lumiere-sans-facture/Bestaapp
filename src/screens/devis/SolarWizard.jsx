@@ -10,6 +10,7 @@ import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
 import { provisionOnduleurDuDevis } from '../../utils/sizingSheet/compute';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import PartnerField from './PartnerField';
 import LeadPicker from './LeadPicker';
 import Field from '../../components/Field';
@@ -72,7 +73,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   useEffect(() => {
     if (!selectedLeadId) return;
     const lead = leadsForUser(user).find((l) => l.id === selectedLeadId);
-    setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id)?.id || '' : '');
+    setPartnerId(lead ? resolveAutoPartner(lead, partners, user.id, { regleServeur: isSupabaseConfigured })?.id || '' : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, partners]);
   const [rows, setRows] = useState(reprise.appareils); // appareils sélectionnés

@@ -32,3 +32,25 @@ describe('resolveAutoPartner', () => {
     expect(resolveAutoPartner({ parrainL1: null }, partners)).toBeNull();
   });
 });
+
+// Avec le serveur : une seule règle, celle de la base (niveau 1 = le
+// propriétaire du client). Un lien cliqué un jour sur l'appareil ou le parrain
+// noté sur la piste ne désignent plus le bénéficiaire du niveau 1 — c'est ce
+// qui versait la commission au parrain (ou au gérant) plutôt qu'au technicien.
+describe('resolveAutoPartner — règle du serveur', () => {
+  const avecTech = [...partners, { id: 'p-user-tech', name: 'Kofi', code: 'KOFI', status: 'actif', userId: 'tech' }];
+
+  it('le technicien qui a enregistré le client, même si le gérant crée le devis', () => {
+    const lead = { id: 'l1', registeredByUserId: 'tech', assignedTo: 'u2', parrainL1: 'p1' };
+    expect(resolveAutoPartner(lead, avecTech, 'gerant', { regleServeur: true })?.id).toBe('p-user-tech');
+  });
+
+  it('sans auteur noté, le commercial assigné, puis le créateur du devis', () => {
+    expect(resolveAutoPartner({ id: 'l2', assignedTo: 'u2' }, avecTech, 'tech', { regleServeur: true })?.id).toBe('p-user-u2');
+    expect(resolveAutoPartner({ id: 'l3' }, avecTech, 'tech', { regleServeur: true })?.id).toBe('p-user-tech');
+  });
+
+  it('aucune fiche partenaire pour ce compte : aucun apporteur affiché', () => {
+    expect(resolveAutoPartner({ id: 'l4', registeredByUserId: 'inconnu' }, avecTech, null, { regleServeur: true })).toBeNull();
+  });
+});
