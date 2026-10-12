@@ -11,6 +11,14 @@ import { signalerErreur } from '../../lib/rapportErreur';
 import { telechargerFichier, partagerFichier } from '../../lib/fichiers';
 
 /**
+ * Options de la notification d'un téléchargement : quand le navigateur a
+ * bloqué l'onglet du PDF, un bouton « Ouvrir » pour l'ouvrir d'un toucher.
+ */
+export const optionsAnnonce = (resultat) => (resultat?.ouvrir
+  ? { action: { libelle: 'Ouvrir', onClick: resultat.ouvrir } }
+  : {});
+
+/**
  * @param {object} o
  * @param {string} o.ecran     route, pour le rapport d'erreur
  * @param {string} o.origine   préfixe du rapport d'erreur (ex. 'document-devis')
@@ -42,12 +50,13 @@ export function useEnvoiPdf({ ecran, origine }) {
   };
 
   /** « Devis BS-… téléchargé. » / « Facture FAC-… enregistrée dans Documents/BestaSolar. » */
-  const annoncer = (libelle, { emplacement }, { feminin = false } = {}) => {
+  const annoncer = (libelle, resultat, { feminin = false } = {}) => {
     const e = feminin ? 'ée' : 'é';
-    toast(emplacement ? `${libelle} enregistr${e} dans ${emplacement}.` : `${libelle} téléchargé${feminin ? 'e' : ''}.`);
+    toast(resultat.emplacement ? `${libelle} enregistr${e} dans ${resultat.emplacement}.` : `${libelle} téléchargé${feminin ? 'e' : ''}.`,
+      optionsAnnonce(resultat));
   };
 
-  /** Télécharge le PDF et l'annonce. */
+  /** Télécharge le PDF, l'ouvre (application, ordinateur) et l'annonce. */
   const telecharger = async (pdf, libelle, accord) => annoncer(libelle, await telechargerFichier(pdf), accord);
 
   /**
@@ -60,7 +69,8 @@ export function useEnvoiPdf({ ecran, origine }) {
     if (resultat === 'whatsapp' || resultat === 'partage') toast(envoi.confirmation || 'Document partagé.');
     else if (resultat === 'geste-requis') setEnvoiPret({ ...envoi, mode: 'partage' });
     else if (resultat === 'non-supporte') {
-      await telechargerFichier(envoi);
+      // À joindre dans WhatsApp : enregistré seulement, pas d'onglet en plus.
+      await telechargerFichier(envoi, { ouvrir: false });
       setEnvoiPret({ ...envoi, mode: 'joindre' });
     }
   };
@@ -72,7 +82,7 @@ export function useEnvoiPdf({ ecran, origine }) {
     try {
       const resultat = await partagerFichier(envoi);
       if (resultat === 'whatsapp' || resultat === 'partage' || resultat === 'annule') { setEnvoiPret(null); return; }
-      await telechargerFichier(envoi);
+      await telechargerFichier(envoi, { ouvrir: false });
       setEnvoiPret({ ...envoi, mode: 'joindre' });
     } catch (e) {
       signalerErreur(e, { origine: `${origine}-partage`, ecran });

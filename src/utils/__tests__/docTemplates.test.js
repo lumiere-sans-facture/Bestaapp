@@ -266,12 +266,6 @@ describe('modèle Sobre — noir, blanc et gris', () => {
     expect(html).toContain('Franc CFA');
   });
 
-  it('repeint l’annexe « Ajustements du kit » aux couleurs de Sobre', () => {
-    for (const regle of [/\.page\.annexe \{ color: #333333/, /\.annexe h2 \{ color: #111111/, /\.annexe td \{ border-bottom-color: #e3e3e3/]) {
-      expect(CSS_SOBRE).toMatch(regle);
-    }
-  });
-
   it('n’emploie que les tailles 28 / 18 / 13 / 11 px', () => {
     const tailles = [...new Set([...CSS_SOBRE.matchAll(/font-size:\s*(\d+)px/g)].map((m) => Number(m[1])))].sort((a, b) => a - b);
     expect(tailles).toEqual([11, 13, 18, 28]);

@@ -19,6 +19,7 @@ import AjustementsKit from '../../components/AjustementsKit';
 import { TVA_PCT } from '../../config/company';
 import { signalerErreur } from '../../lib/rapportErreur';
 import { enregistrerFichePdf } from '../../lib/fichiers';
+import { optionsAnnonce } from './useEnvoiPdf';
 import { donneesFiche } from '../../utils/sizingSheet/donnees';
 import { useToast } from '../../components/Toast';
 import {
@@ -255,14 +256,15 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     const lead = myLeads.find((l) => l.id === selectedLeadId);
     const apporteur = partnerId ? partners.find((p) => p.id === partnerId) : null;
     try {
-      const { emplacement } = await enregistrerFichePdf(donneesFiche({
+      const resultat = await enregistrerFichePdf(donneesFiche({
         lead, apporteur, rows, consoMode, consumption, systemType,
         sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
         location, solarSource: solar?.source || null, sizing,
         investissement: displayQuotation?.total || null,
         provisionOnduleur: provisionOnduleurDuDevis(displayQuotation?.components),
       }));
-      toast(emplacement ? `Fiche de dimensionnement enregistrée dans ${emplacement}.` : 'Fiche de dimensionnement téléchargée.');
+      toast(resultat.emplacement ? `Fiche de dimensionnement enregistrée dans ${resultat.emplacement}.` : 'Fiche de dimensionnement téléchargée.',
+        optionsAnnonce(resultat));
     } catch (e) {
       signalerErreur(e, { origine: 'fiche-dimensionnement', ecran: '/devis' });
       toast('La fiche n’a pas pu être produite. Réessayez.', { type: 'error' });

@@ -7,8 +7,10 @@
 //    OUVERT aussitôt dans le lecteur PDF du téléphone ; dans le cache pour un
 //    envoi, qui part directement dans la conversation WhatsApp du client
 //    (module natif FichiersNatifs, comme la relance) ;
-//  - navigateur : téléchargement classique, et partage de FICHIER par le menu
-//    du téléphone quand il le permet (Chrome Android, Safari iOS).
+//  - navigateur : téléchargement classique — ouvert en plus dans un onglet
+//    quand le navigateur affiche les PDF (ordinateur) —, et partage de
+//    FICHIER par le menu du téléphone quand il le permet (Chrome Android,
+//    Safari iOS).
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { numeroWhatsApp } from '../utils/phone';
 
@@ -29,13 +31,23 @@ const enBase64 = (blob) => new Promise((resolve, reject) => {
 });
 
 /**
- * Enregistre le fichier sur l'appareil — et, dans l'application Android,
- * l'ouvre aussitôt dans le lecteur PDF du téléphone.
- * @returns {Promise<{emplacement: string|null, ouvert?: boolean}>} dossier où
- *   le trouver (app), null dans un navigateur (il range lui-même ses
- *   téléchargements, et propose de les ouvrir).
+ * Le navigateur sait-il AFFICHER un PDF dans un onglet ? Oui sur ordinateur ;
+ * non sur Chrome Android, où l'onglet le téléchargerait une seconde fois.
  */
-export async function telechargerFichier({ blob, nom }) {
+const pdfLisibleEnOnglet = (blob) => (blob?.type || 'application/pdf') === 'application/pdf'
+  && typeof navigator !== 'undefined' && navigator.pdfViewerEnabled === true;
+
+/**
+ * Enregistre le fichier sur l'appareil, et l'OUVRE : dans l'application
+ * Android, dans le lecteur PDF du téléphone ; sur ordinateur, dans un onglet.
+ * `ouvrir: false` : enregistrer seulement (fichier à joindre ailleurs).
+ * @returns {Promise<{emplacement: string|null, ouvert: boolean, ouvrir: (() => boolean)|null}>}
+ *   `emplacement` : dossier où le trouver (app), null dans un navigateur (il
+ *   range lui-même ses téléchargements). `ouvrir` : quand le navigateur a
+ *   bloqué l'onglet (la préparation a duré trop longtemps pour qu'il y voie
+ *   encore le clic), de quoi l'ouvrir d'un nouveau toucher — null sinon.
+ */
+export async function telechargerFichier({ blob, nom }, { ouvrir: aOuvrir = true } = {}) {
   if (natif()) {
     const { Filesystem, Directory } = await import('@capacitor/filesystem');
     // Android 10 et plus ancien : le dossier Documents demande l'autorisation
@@ -50,10 +62,10 @@ export async function telechargerFichier({ blob, nom }) {
     // Le fichier est enregistré quoi qu'il arrive : un téléphone sans lecteur
     // PDF le retrouve dans Documents/BestaSolar.
     let ouvert = false;
-    if (moduleNatif()) {
+    if (aOuvrir && moduleNatif()) {
       try { await FichiersNatifs.ouvrir({ chemin: uri, type: blob.type || 'application/pdf' }); ouvert = true; } catch { /* aucun lecteur PDF */ }
     }
-    return { emplacement: `Documents/${DOSSIER}`, ouvert };
+    return { emplacement: `Documents/${DOSSIER}`, ouvert, ouvrir: null };
   }
   const url = URL.createObjectURL(blob);
   const lien = document.createElement('a');
@@ -62,9 +74,17 @@ export async function telechargerFichier({ blob, nom }) {
   document.body.appendChild(lien);
   lien.click();
   lien.remove();
-  // Révoquée plus tard : certains navigateurs lisent l'URL après le clic.
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
-  return { emplacement: null };
+  const lisible = aOuvrir && pdfLisibleEnOnglet(blob);
+  const ouvrirOnglet = () => {
+    const onglet = window.open(url, '_blank');
+    if (onglet) { try { onglet.opener = null; } catch { /* autre origine */ } }
+    return !!onglet;
+  };
+  const ouvert = lisible ? ouvrirOnglet() : false;
+  // Révoquée plus tard : certains navigateurs lisent l'URL après le clic —
+  // et, onglet bloqué, le bouton « Ouvrir » de la notification s'en sert.
+  setTimeout(() => URL.revokeObjectURL(url), lisible && !ouvert ? 5 * 60000 : 60000);
+  return { emplacement: null, ouvert, ouvrir: lisible && !ouvert ? ouvrirOnglet : null };
 }
 
 /** Le navigateur sait-il partager un FICHIER (et pas seulement un lien) ? */

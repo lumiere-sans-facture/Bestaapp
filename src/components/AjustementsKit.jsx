@@ -16,6 +16,8 @@ const STATUT_ONDULEUR = {
  * Section « Ajustements du kit » : ce que l'extension d'un kit ajoute au devis
  * (panneaux, chaînes, onduleur, matériel, main-d'œuvre) et ce que cela coûte.
  * Lecture seule ; le calcul vient de utils/ajustementsKit.js via le devis.
+ * Pour le vendeur seulement : le devis et la facture du client n'impriment
+ * que la composition retenue, sans ce détail (utils/compositionKit.js).
  */
 export default function AjustementsKit({ ajustements, kitName }) {
   if (!ajustements?.actif) return null;

@@ -9,17 +9,22 @@ const ToastContext = createContext(() => {});
  *   const toast = useToast();
  *   toast('Sauvegarde restaurée.');
  *   toast('Impossible de lire cette image.', { type: 'error' });
+ *   toast('Devis téléchargé.', { action: { libelle: 'Ouvrir', onClick: ouvrir } });
  */
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const idRef = useRef(0);
 
-  const toast = useCallback((message, { type = 'success', duration = 3500 } = {}) => {
+  const retirer = useCallback((id) => setToasts((list) => list.filter((t) => t.id !== id)), []);
+
+  // `action` : un bouton dans la notification (laissée plus longtemps à
+  // l'écran, le temps de le toucher).
+  const toast = useCallback((message, { type = 'success', duration, action = null } = {}) => {
     idRef.current += 1;
     const id = idRef.current;
-    setToasts((list) => [...list, { id, message, type }]);
-    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), duration);
-  }, []);
+    setToasts((list) => [...list, { id, message, type, action }]);
+    setTimeout(() => retirer(id), duration ?? (action ? 8000 : 3500));
+  }, [retirer]);
 
   return (
     <ToastContext.Provider value={toast}>
@@ -28,7 +33,12 @@ export function ToastProvider({ children }) {
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`}>
             {t.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
-            {t.message}
+            <span className="toast-message">{t.message}</span>
+            {t.action && (
+              <button type="button" className="toast-action" onClick={() => { retirer(t.id); t.action.onClick(); }}>
+                {t.action.libelle}
+              </button>
+            )}
           </div>
         ))}
       </div>

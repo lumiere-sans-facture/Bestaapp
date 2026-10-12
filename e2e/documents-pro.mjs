@@ -59,6 +59,22 @@ const ouvrirPro = async (p) => {
   await p.goto(B + '/pro/documents');
   await p.locator('.flat-row', { hasText: DEVIS }).waitFor({ timeout: 15000 });
 };
+// Onglets : sur ordinateur, « Télécharger » OUVRE aussi le PDF (onglet
+// blob:, le fichier lui-même). Aucun autre onglet n'est admis — jamais une
+// page à imprimer.
+const suivreOnglets = (contexte) => {
+  const suivi = { ouverts: 0, autres: [] };
+  contexte.on('page', async (pg) => {
+    // Seuls comptent les onglets ouverts PAR l'app, pas ceux du parcours.
+    if (!(await pg.opener())) return;
+    suivi.ouverts += 1;
+    // L'adresse se lit à l'ouverture : le lecteur PDF la remplace ensuite.
+    if (/^blob:/.test(pg.url())) return;
+    await pg.waitForLoadState('domcontentloaded').catch(() => {});
+    if (!/^blob:/.test(pg.url())) suivi.autres.push(pg.url());
+  });
+  return suivi;
+};
 const ongletFactures = (p) => p.getByRole('button', { name: /Factures \(1\)/ }).click();
 const selecteur = (p) => p.locator('[aria-labelledby="doc-modele-label"]').evaluate((g) => [...g.querySelectorAll('.segmented-btn')]
   .map((b) => (b.classList.contains('active') ? `[${b.textContent.trim()}]` : b.textContent.trim())).join(' '));
@@ -72,11 +88,10 @@ const devisStocke = async (p, modele) => {
 // ---- 1. Ordinateur ----
 {
   const ctx = await nav.newContext({ viewport: { width: 1280, height: 950 }, acceptDownloads: true });
-  let onglets = 0; ctx.on('page', () => { onglets += 1; });
+  const onglets = suivreOnglets(ctx);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => R.push('❌ ERREUR JS : ' + e));
   await ouvrirPro(page);
-  const ongletsAvant = onglets;
 
   // Devis : téléchargement direct sur la ligne, au modèle de l'entreprise.
   const ligneDevis = page.locator('.flat-row', { hasText: DEVIS });
@@ -128,7 +143,7 @@ const devisStocke = async (p, modele) => {
     'fiche de la facture : Télécharger, Envoyer sur WhatsApp (PDF), Relancer — plus d’« imprimable »');
   ok(await selecteur(page) === 'Studio Vague [Sobre]', `modèle proposé : celui de la facture, pas celui de l’entreprise [${await selecteur(page)}]`);
   await page.locator('.doc-actions-list').screenshot({ path: '/tmp/claude-0/documents-pro-facture.png' });
-  ok(onglets === ongletsAvant, `aucun onglet ouvert par les documents [${onglets - ongletsAvant}]`);
+  ok(!onglets.autres.length, `aucune page à imprimer : seuls les PDF s'ouvrent [${onglets.ouverts} onglet(s) PDF${onglets.autres.length ? ` ; autres : ${onglets.autres.join(', ')}` : ''}]`);
   await ctx.close();
 }
 
@@ -192,7 +207,7 @@ for (const premierRefus of [false, true]) {
 // celle de l'assistant — rentabilité saisie comprise.
 for (const mode of ['kit', 'composition']) {
   const c = await nav.newContext({ viewport: { width: 1280, height: 950 }, acceptDownloads: true });
-  let ongletsFiche = 0; c.on('page', () => { ongletsFiche += 1; });
+  const ongletsFiche = suivreOnglets(c);
   // Les données remises au moteur de la fiche sont relevées au passage (le
   // PDF, lui, est une image).
   await c.route(/\/src\/utils\/sizingSheet\/pdf\.js/, async (route) => {
@@ -247,12 +262,11 @@ for (const mode of ['kit', 'composition']) {
   const bouton = p.locator('.doc-actions-list button', { hasText: 'Fiche de dimensionnement (PDF)' });
   ok(await bouton.isVisible(), `${mode} : bouton « Fiche de dimensionnement (PDF) » dans la fiche du devis`);
   if (mode === 'kit') await p.locator('.doc-actions-list').screenshot({ path: '/tmp/claude-0/documents-pro-devis-fiche.png' });
-  const avant = ongletsFiche;
   const [ficheListe] = await Promise.all([p.waitForEvent('download', { timeout: 30000 }), bouton.click()]);
   const fl = await lirePdf(ficheListe);
   const liste = (await p.evaluate(() => window.__fiches || []))[1];
   const toast = await p.locator('.toast', { hasText: 'Fiche' }).last().innerText().catch(() => '');
-  ok(fl.pdf && fl.pages === 3 && fl.nom === fp.nom && ongletsFiche === avant, `${mode} : fiche téléchargée depuis la liste, sans onglet [${fl.nom} ; « ${toast} »]`);
+  ok(fl.pdf && fl.pages === 3 && fl.nom === fp.nom && !ongletsFiche.autres.length, `${mode} : fiche téléchargée depuis la liste, sans page à imprimer [${fl.nom} ; « ${toast} »]`);
   const ecarts = assistant && liste ? Object.keys({ ...assistant, ...liste }).filter((k) => JSON.stringify(assistant[k]) !== JSON.stringify(liste[k])) : ['(absente)'];
   ok(ecarts.length === 0, `${mode} : la fiche de la liste est identique à celle de l’assistant${ecarts.length ? ` — écarts : ${ecarts.join(', ')}` : ''}`);
   await c.close();

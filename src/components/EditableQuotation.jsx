@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { formatCFA } from '../utils/format';
 import { prixPublic } from '../utils/price';
+import { compositionRetenue } from '../utils/compositionKit';
 
 const identifiantLigne = () => crypto.randomUUID();
 
@@ -97,15 +98,14 @@ export default function EditableQuotation({ lines, onChange, products = [] }) {
   );
 }
 
-export const lignesDepuisDevisKit = (quotation) => [
+// Lignes du devis Pro depuis le kit proposé : sa composition RETENUE — les
+// lignes « — extension » d'un kit étendu rejoignent celles du kit, le devis
+// ne détaille pas les ajustements (utils/compositionKit.js).
+export const lignesDepuisDevisKit = (quotation) => compositionRetenue([
   ...(quotation?.components || []),
   ...(quotation?.prestations || []),
-].map((line) => ({
-  id: identifiantLigne(),
-  designation: line.name,
-  qty: line.quantity,
-  pu: line.unitPrice,
-}));
+].map((line) => ({ designation: line.name, qty: line.quantity, pu: line.unitPrice })))
+  .map((line) => ({ id: identifiantLigne(), ...line }));
 
 export const lignesModifiables = (lines = []) => lines.map((line) => ({
   ...line,

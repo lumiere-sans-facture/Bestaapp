@@ -32,8 +32,24 @@ const ouvrirAvecDevis = async (p, d) => {
   await p.goto(B + '/devis'); await p.waitForTimeout(1500);
 };
 
+// Onglets : sur ordinateur, « Télécharger » OUVRE aussi le PDF (onglet
+// blob:, le fichier lui-même). Aucun autre onglet n'est admis — jamais une
+// page à imprimer.
+const suivreOnglets = (contexte) => {
+  const suivi = { ouverts: 0, autres: [] };
+  contexte.on('page', async (pg) => {
+    // Seuls comptent les onglets ouverts PAR l'app, pas ceux du parcours.
+    if (!(await pg.opener())) return;
+    suivi.ouverts += 1;
+    // L'adresse se lit à l'ouverture : le lecteur PDF la remplace ensuite.
+    if (/^blob:/.test(pg.url())) return;
+    await pg.waitForLoadState('domcontentloaded').catch(() => {});
+    if (!/^blob:/.test(pg.url())) suivi.autres.push(pg.url());
+  });
+  return suivi;
+};
 const ctx = await nav.newContext({ viewport: { width: 1280, height: 950 }, acceptDownloads: true });
-let onglets = 0; ctx.on('page', () => { onglets += 1; });
+const onglets = suivreOnglets(ctx);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => R.push('❌ ERREUR JS : ' + e));
 await page.goto(B);
@@ -56,14 +72,13 @@ await ajouter('Réfrigérateur');
 await ajouter('Téléviseur 32"');
 await suivant().click(); await page.waitForTimeout(900);
 await suivant().click(); await page.waitForTimeout(1600);
-const ongletsAvant = onglets;
 const [ficheAssistant] = await Promise.all([
   page.waitForEvent('download', { timeout: 30000 }),
   page.locator('button:has-text("Fiche de dimensionnement (PDF)")').click(),
 ]);
 const fa = await lirePdf(ficheAssistant);
-ok(fa.pdf && fa.pages === 3 && /^Fiche-dimensionnement.*\.pdf$/.test(fa.nom) && onglets === ongletsAvant,
-  `assistant : fiche téléchargée en PDF, sans onglet [${fa.nom}, ${fa.pages} pages, ${Math.round(fa.taille / 1024)} Ko]`);
+ok(fa.pdf && fa.pages === 3 && /^Fiche-dimensionnement.*\.pdf$/.test(fa.nom) && !onglets.autres.length,
+  `assistant : fiche téléchargée en PDF, sans page à imprimer [${fa.nom}, ${fa.pages} pages, ${Math.round(fa.taille / 1024)} Ko]`);
 await page.locator('button:has-text("Créer le devis")').first().click(); await page.waitForTimeout(2000);
 const devis = await page.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).devis.find((d) => d.type === 'solar'));
 ok(!!devis?.dimensionnement, `devis solaire enregistré avec son étude [${devis?.devisNumber}]`);
@@ -103,7 +118,7 @@ const envoi = page.locator('.sheet', { hasText: 'Envoyer le devis' }).last();
 const lien = await envoi.locator('a:has-text("Ouvrir WhatsApp")').getAttribute('href').catch(() => null);
 ok((await lirePdf(pourWhatsapp)).pdf && /^https:\/\/wa\.me\/\d*\?text=/.test(lien || '') && decodeURIComponent(lien).includes(devis.devisNumber),
   `ordinateur : PDF téléchargé et WhatsApp prêt sur la conversation [${(lien || '').slice(0, 40)}…]`);
-ok(onglets === ongletsAvant, `aucun onglet ouvert par les documents [${onglets - ongletsAvant}]`);
+ok(!onglets.autres.length, `aucune page à imprimer : seuls les PDF s'ouvrent [${onglets.ouverts} onglet(s) PDF${onglets.autres.length ? ` ; autres : ${onglets.autres.join(', ')}` : ''}]`);
 await ctx.close();
 
 // ---- 5. Téléphone : le PDF part JOINT par le menu de partage ----
@@ -154,7 +169,7 @@ for (const premierRefus of [false, true]) {
 // ---- 7. Espace Pro : la fiche de l'assistant se télécharge aussi ----
 {
   const c = await nav.newContext({ viewport: { width: 1280, height: 950 }, acceptDownloads: true });
-  let ongletsPro = 0; c.on('page', () => { ongletsPro += 1; });
+  const ongletsPro = suivreOnglets(c);
   const p = await c.newPage();
   p.on('pageerror', (e) => R.push('❌ ERREUR JS : ' + e));
   await p.goto(B + '/privacy.html');
@@ -178,13 +193,12 @@ for (const premierRefus of [false, true]) {
   await p.locator('.manual-consumption-grid input').nth(1).fill('4');
   await etape().click(); await p.waitForTimeout(800);
   await etape().click(); await p.waitForTimeout(1500);
-  const avant = ongletsPro;
   const [fichePro] = await Promise.all([
     p.waitForEvent('download', { timeout: 30000 }),
     p.locator('button:has-text("Fiche de dimensionnement")').first().click(),
   ]);
   const fp = await lirePdf(fichePro);
-  ok(fp.pdf && fp.pages === 3 && ongletsPro === avant, `Pro : fiche de l’assistant téléchargée, sans onglet [${fp.nom}, ${fp.pages} pages]`);
+  ok(fp.pdf && fp.pages === 3 && !ongletsPro.autres.length, `Pro : fiche de l’assistant téléchargée, sans page à imprimer [${fp.nom}, ${fp.pages} pages]`);
   await c.close();
 }
 

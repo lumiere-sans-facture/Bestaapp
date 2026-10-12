@@ -959,7 +959,8 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     // Suppléments de main-d'œuvre (panneaux, batterie) : fondus dans LA ligne
     // « Main d'œuvre » du kit, à la demande du gérant — une seule ligne au
     // devis, au montant final. Le détail reste dans la section « Ajustements
-    // du kit » et l'annexe imprimée.
+    // du kit », à l'écran du vendeur ; le document du client n'imprime que la
+    // composition retenue (utils/compositionKit.js).
     const supplement = ajustements.lignes.filter((l) => l.labor).reduce((t, l) => t + l.qty * l.pu, 0);
     const iMo = lines.findIndex((l) => l.labor);
     const avant = iMo === -1 ? lines : lines.slice(0, iMo);

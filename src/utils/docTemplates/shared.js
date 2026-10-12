@@ -7,6 +7,7 @@ import { dateEmissionDevis } from '../dateEmission';
 import { LOGO_BESTASOLAR } from '../../assets/logoBestaSolar';
 import { prixPublic } from '../price';
 import { paysDeLEntreprise } from '../../data/pays';
+import { compositionRetenue } from '../compositionKit';
 
 // ---------------------------------------------------------------------------
 // Formatage
@@ -159,6 +160,13 @@ export function categorieLigne({ categorie, type, designation } = {}) {
  * de produits. Même normalisation que l'export PDF historique.
  */
 export function lignesDeDevis(devis = {}, products = []) {
+  // La composition RETENUE du kit, sans le détail des ajustements d'un kit
+  // étendu (lignes « — extension » fondues dans celles du kit) : le client
+  // lit le matériel final, pas l'historique du calcul.
+  return compositionRetenue(lignesBrutesDeDevis(devis, products));
+}
+
+function lignesBrutesDeDevis(devis, products) {
   if (Array.isArray(devis.lignes) && devis.lignes.length) {
     return devis.lignes.map((l) => ({
       designation: l.designation, qty: Number(l.qty) || 0, pu: Number(l.pu) || 0, categorie: categorieLigne(l),
@@ -221,11 +229,6 @@ export function donneesDeDevis({ devis, company, lead, partner, products = [] })
     lignes,
     totaux: totauxDe(lignes, { tva, tvaActive: tva > 0 }),
     apporteur: apporteurDe(devis, partner),
-    // Annexe d'un kit étendu. Un devis public dont les lignes ont été
-    // retouchées à la main n'en a plus : elle ne correspondrait plus.
-    ajustements: devis.type !== 'pro' && Array.isArray(devis.lignes) && devis.lignes.length
-      ? null
-      : devis.quotation?.ajustements || devis.ajustements || null,
   };
 }
 
@@ -259,9 +262,10 @@ export const piedApporteur = (data) => {
 
 /** Données de document depuis une facture Pro. */
 export function donneesDeFacture({ facture, company }) {
-  const lignes = (facture.lignes || []).map((l) => ({
+  // Même règle que le devis : la composition retenue, sans « — extension ».
+  const lignes = compositionRetenue((facture.lignes || []).map((l) => ({
     designation: l.designation, qty: Number(l.qty) || 0, pu: Number(l.pu) || 0, categorie: categorieLigne(l),
-  }));
+  })));
   return {
     numero: facture.numero || '',
     objet: facture.objet || '',
@@ -362,14 +366,6 @@ const CSS_BASE = `
     font-family: inherit; font-size: 13px; font-weight: 600; color: #fff;
     background: #212529; border: none; border-radius: 4px; padding: 12px 24px; cursor: pointer;
   }
-  /* Annexe « Ajustements du kit » : page à part, commune aux trois modèles. */
-  .page.annexe { padding: 48px 56px; color: #3a3a3a; }
-  .annexe h2 { font-size: 18px; margin: 0 0 4px; color: #1a1a1a; }
-  .annexe .annexe-intro { font-size: 12px; color: #6b6b6b; margin-bottom: 16px; }
-  .annexe h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6b6b6b; margin: 16px 0 6px; }
-  .annexe td { padding: 4px 0; border-bottom: 1px solid #ececec; font-size: 12px; vertical-align: top; }
-  .annexe .total td { font-weight: 700; border-bottom: none; }
-  .annexe .note { font-size: 11px; color: #6b6b6b; margin-top: 6px; }
   @page { size: A4; margin: 0; }
   @media print {
     body { background: #fff; padding: 0; }
@@ -381,61 +377,7 @@ const CSS_BASE = `
 `;
 
 /** Assemble le document complet (police, styles, pages, barre d'impression). */
-const kwhFr = (v) => `${(Number(v) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWh`;
-const kwcFr = (v) => `${(Number(v) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kWc`;
-const STATUTS_ONDULEUR = {
-  conserve: 'conservé', remplace: 'remplacé', double: 'doublé (en parallèle)',
-  'non-verifie': 'conservé (chaînes non vérifiées)', impossible: 'aucun ne convient',
-};
-
-/**
- * Page d'annexe « Ajustements du kit » d'un devis dont le kit a été étendu
- * (vide sinon) : panneaux, chaînes, onduleur, matériel ajouté, détail de la
- * main-d'œuvre et impact sur le prix. Page à part : elle ne touche pas à la
- * pagination des lignes du modèle.
- */
-export function pageAjustements(data) {
-  const a = data?.ajustements;
-  if (!a?.actif) return '';
-  const p = a.panneaux;
-  const b = a.batterie;
-  const ligne = (g, d) => `<tr><td>${g}</td><td class="num">${d}</td></tr>`;
-  const o = a.onduleur;
-  const nouveau = o?.nouveau ? [o.nouveau.brand, o.nouveau.model].filter(Boolean).join(' ') : '';
-  const mo = a.mainOeuvre;
-  return `<section class="page annexe">
-  <h2>Ajustements du kit</h2>
-  <div class="annexe-intro">Devis ${esc(data.numero || '')} — le kit de base est la référence ; voici comment il est ajusté au besoin.</div>
-  <h3>Panneaux et batterie</h3>
-  <table>
-    ${ligne('Kit de base', `${p.base} panneaux · ${kwcFr(p.kwcBase)}`)}
-    ${ligne(`Proposition (${p.demande} demandés)`, `${p.final} panneaux · ${kwcFr(p.kwcFinal)}`)}
-    ${p.ajoutes > 0 ? ligne('Ajoutés', `+${p.ajoutes} panneaux de ${p.wc} Wc · +${kwcFr(p.kwcAjoutes)}`) : ''}
-    ${p.retires > 0 ? ligne('En moins (ajustés au besoin)', `−${p.retires} panneaux de ${p.wc} Wc · −${kwcFr(p.kwcRetires)}`) : ''}
-    ${b?.ajoutes > 0 ? ligne(`Batterie (+${kwhFr(b.ajoutes)} en modules)`, `${kwhFr(b.base)} → ${kwhFr(b.finale)}`) : ''}
-    ${ligne('Chaînes solaires', a.chaines ? esc(a.chaines.final.map((f) => f.libelle).join(' / ')) : p.ajoutes === 0 && !p.retires ? 'inchangées (aucun panneau ajouté)' : 'non vérifiées')}
-    ${o ? ligne(`Onduleur ${STATUTS_ONDULEUR[o.statut] || ''}`, esc(nouveau ? `${o.ancien?.designation || ''} → ${o.quantite > 1 ? `${o.quantite} × ` : ''}${nouveau}` : o.ancien?.designation || '')) : ''}
-  </table>
-  ${o?.raisons?.length && o.statut !== 'conserve' ? `<div class="note">Raison technique : ${esc(o.raisons.join(' ; '))}</div>` : ''}
-  ${(a.materiel || []).length ? `<h3>Matériel ajouté</h3><table>${a.materiel.map((m) =>
-    ligne(`${esc(m.designation.replace(/ — extension$/, ''))} × ${m.qty}${m.unit === 'm' ? ' m' : ''}${m.motif ? ` <span class="note">(${esc(m.motif)})</span>` : ''}`, `${nf(m.qty * m.pu)} F`)).join('')}</table>` : ''}
-  ${mo ? `<h3>Main-d'œuvre</h3><table>
-    ${ligne('Main-d’œuvre initiale du kit', `${nf(mo.base)} F`)}
-    ${mo.panneaux.montant ? ligne(`Supplément panneaux (${mo.panneaux.nombre} × ${nf(mo.panneaux.tarif)} F)`, `${nf(mo.panneaux.montant)} F`) : ''}
-    ${mo.batterie.montant ? ligne(`Supplément batterie (${kwhFr(mo.batterie.kwh)} × ${nf(mo.batterie.tarif)} F)`, `${nf(mo.batterie.montant)} F`) : ''}
-    ${mo.coef > 1 ? ligne(`Chantier au Togo (× ${mo.coef})`, `${nf((mo.totalFinal || 0) - mo.total)} F`) : ''}
-    <tr class="total"><td>Main-d’œuvre finale</td><td class="num">${nf(mo.totalFinal ?? mo.total)} F</td></tr>
-  </table>` : ''}
-  ${a.impact ? `<h3>Impact sur le prix</h3><table>
-    ${a.impact.postes.map((x) => ligne(esc(x.libelle), `${x.montant > 0 ? '+' : ''}${nf(x.montant)} F`)).join('')}
-    <tr class="total"><td>Kit de base ${nf(a.impact.totalBase)} F → proposition</td><td class="num">${nf(a.impact.total)} F</td></tr>
-  </table>` : ''}
-  ${(a.alertes || []).map((x) => `<div class="note">⚠ ${esc(x)}</div>`).join('')}
-  <div class="note push">Détail calculé à la création du devis.</div>
-</section>`;
-}
-
-export const documentHtml = ({ titre, css, pages, annexe = '' }) => `<!DOCTYPE html>
+export const documentHtml = ({ titre, css, pages }) => `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -446,7 +388,6 @@ ${policeDocument()}
 </head>
 <body>
 ${pages.join('\n')}
-${annexe}
 <div class="print-bar"><button class="print-btn" onclick="window.print()">Imprimer / Exporter en PDF</button></div>
 </body>
 </html>`;

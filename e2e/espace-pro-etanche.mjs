@@ -18,7 +18,9 @@ const DEVIS_PUBLIC = 'BS-20261001-0055';
 
 const ctx = await nav.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2, acceptDownloads: true });
 const page = await ctx.newPage();
-let onglets = 0; ctx.on('page', () => { onglets += 1; }); // pages ouvertes APRÈS celle-ci
+// Pages ouvertes APRÈS celle-ci, hors PDF : « Télécharger » ouvre aussi le
+// PDF sur ordinateur (onglet blob:), c'est voulu ; un onglet d'aperçu, non.
+let onglets = 0; ctx.on('page', (pg) => { if (!/^blob:/.test(pg.url())) onglets += 1; });
 page.on('pageerror', (e) => R.push('❌ ERREUR JS : ' + e));
 await page.goto(B + '/privacy.html');
 await page.evaluate((u) => localStorage.setItem('bestasolar_user', JSON.stringify(u)), GERANT);

@@ -167,9 +167,12 @@ describe('main-d’œuvre : base + 10 000 F par panneau + 3 500 F par kWh de bat
     const q = buildKitQuotation(k60, 'tole', true, { batteryCapacity: 80, requiredPanelPower: 49 * 620 });
     expect(q.prestations).toEqual([expect.objectContaining({ name: "Main d'œuvre", totalPrice: 650000 + 70000 + 84000 })]);
     expect(q.ajustements.mainOeuvre.total).toBe(650000 + 70000 + 84000);
+    // Le détail des suppléments reste à l'écran (section « Ajustements du
+    // kit ») ; le document n'imprime que la main-d'œuvre finale.
+    expect(q.ajustements.mainOeuvre.batterie).toMatchObject({ kwh: 24, tarif: 3500, montant: 84000 });
     const html = buildDocHtml({ kind: 'devis', model: 'studio', data: donneesDeDevis({ devis: { devisNumber: 'BS-2', type: 'solar', createdAt: '2026-10-05', quotation: q }, company: COMPANY, lead: null, partner: null }) });
-    expect(html).toContain('Supplément batterie (24 kWh × 3 500 F)');
-    expect(html).toContain('Batterie (+24 kWh en modules)');
+    expect(html).not.toContain('Supplément');
+    expect(html).not.toContain('en modules');
   });
 });
 
@@ -356,29 +359,33 @@ describe('chaînes : limites électriques jamais dépassées', () => {
   });
 });
 
-describe('document imprimé : annexe « Ajustements du kit »', () => {
-  const doc = (quotation, model = 'studio', extra = {}) => buildDocHtml({
-    kind: 'devis', model,
-    data: donneesDeDevis({ devis: { devisNumber: 'BS-1', type: 'solar', createdAt: '2026-10-05', quotation, ...extra }, company: COMPANY, lead: null, partner: null }),
-  });
+describe('document imprimé : la composition retenue, sans les ajustements', () => {
+  const donnees = (quotation, extra = {}) => donneesDeDevis({ devis: { devisNumber: 'BS-1', type: 'solar', createdAt: '2026-10-05', quotation, ...extra }, company: COMPANY, lead: null, partner: null });
+  const doc = (quotation, model = 'studio', extra = {}) => buildDocHtml({ kind: 'devis', model, data: donnees(quotation, extra) });
 
-  it('présente dans les trois modèles quand le kit est étendu', () => {
+  it('kit étendu : ni annexe, ni « — extension », ni suppléments — dans les trois modèles', () => {
     const q = devis(KIT_8K, 14, [OND_8K]);
+    // Le calcul garde bien ses ajustements (section à l'écran)…
+    expect(q.ajustements?.actif).toBe(true);
+    expect([...q.components, ...q.prestations].some((c) => /— extension$/.test(c.name))).toBe(true);
     for (const m of MODELS) {
       const html = doc(q, m.id);
-      expect(html).toContain('<h2>Ajustements du kit</h2>');
-      expect(html).toContain('2 chaînes de 7 panneaux');
-      expect(html).toContain('Supplément panneaux (6 × 10 000 F)');
-      // Batterie inchangée : pas de ligne de supplément à 0 F.
-      expect(html).not.toContain('Supplément batterie');
-      expect(html).toContain('Main-d’œuvre finale');
+      // … le document du client, non.
+      expect(html).not.toContain('Ajustements du kit');
+      expect(html).not.toContain('— extension');
+      expect(html).not.toContain('Supplément');
+      expect(html).not.toContain('class="page annexe"');
     }
   });
 
-  it('absente pour un kit posé tel quel, ou des lignes retouchées à la main', () => {
-    expect(doc(devis(KIT_8K, 8, [OND_8K]))).not.toContain('<h2>Ajustements du kit</h2>');
+  it('les extensions rejoignent les lignes du kit : même total, moins de lignes', () => {
     const q = devis(KIT_8K, 14, [OND_8K]);
-    expect(doc(q, 'studio', { lignes: [{ designation: 'X', qty: 1, pu: 1 }] })).not.toContain('<h2>Ajustements du kit</h2>');
+    const { lignes, totaux } = donnees(q);
+    const brutes = [...q.components, ...q.prestations];
+    expect(totaux.totalHT).toBe(brutes.reduce((s, c) => s + c.quantity * c.unitPrice, 0));
+    expect(lignes.length).toBeLessThanOrEqual(brutes.length);
+    expect(new Set(lignes.map((l) => `${l.designation}|${l.pu}`)).size).toBe(lignes.length);
+    expect(lignes.find((l) => /^Panneau/i.test(l.designation)).qty).toBe(14);
   });
 });
 

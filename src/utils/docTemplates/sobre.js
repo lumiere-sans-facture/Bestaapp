@@ -5,7 +5,7 @@
 // Tailles : 28 / 18 / 13 / 11 px, rien entre. Une ligne d'article fait au
 // moins 40 px. Le tableau garde sa largeur quoi qu'il arrive : une
 // désignation longue passe à la ligne dans sa cellule.
-import { nf, esc, libelles, conditionsPour, paginer, documentHtml, pageAjustements, piedApporteur } from './shared';
+import { nf, esc, libelles, conditionsPour, paginer, documentHtml, piedApporteur } from './shared';
 
 /** Les seules couleurs du modèle (vérifié par les tests). */
 export const COULEURS_SOBRE = ['#111111', '#222222', '#333333', '#444444', '#555555', '#666666', '#888888', '#e3e3e3', '#ffffff'];
@@ -92,14 +92,6 @@ export const CSS_SOBRE = `
   .signature-libelle { font-size: 11px; color: #666666; margin-top: 4px; }
 
   .pied { text-align: center; font-size: 11px; color: #333333; }
-
-  /* Annexe « Ajustements du kit » (commune aux modèles) : ici aussi, rien
-     hors de la palette ni des tailles de Sobre. */
-  .page.annexe { color: #333333; }
-  .annexe h2 { color: #111111; }
-  .annexe .annexe-intro, .annexe h3, .annexe .note { color: #666666; }
-  .annexe .annexe-intro, .annexe td { font-size: 13px; }
-  .annexe td { border-bottom-color: #e3e3e3; }
 `;
 
 /** 09/10/2026 */
@@ -234,6 +226,5 @@ export function renderSobre({ kind, data }) {
     titre: `${L.titre} ${data.numero} — ${c.name || ''}`,
     css: CSS_SOBRE,
     pages: corps,
-    annexe: pageAjustements(data),
   });
 }

@@ -24,6 +24,7 @@ import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../compon
 import AjustementsKit from '../../../components/AjustementsKit';
 import { signalerErreur } from '../../../lib/rapportErreur';
 import { enregistrerFichePdf } from '../../../lib/fichiers';
+import { optionsAnnonce } from '../../devis/useEnvoiPdf';
 import { donneesFiche, materielChoisi, contexteCalculPro, parametresRentabilite, rentaSaisie } from '../../../utils/sizingSheet/donnees';
 import { useToast } from '../../../components/Toast';
 import {
@@ -376,8 +377,9 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
       // Rentabilité (page 3) : total du devis par défaut, surchargeable
       // champ par champ dans « Paramètres de rentabilité » ci-dessous.
       ...parametresRentabilite(renta, { investissement: totals.totalTTC, provisionOnduleur: provisionOnduleurDefaut }),
-    })).then(({ emplacement }) => {
-      toast(emplacement ? `Fiche de dimensionnement enregistrée dans ${emplacement}.` : 'Fiche de dimensionnement téléchargée.');
+    })).then((resultat) => {
+      toast(resultat.emplacement ? `Fiche de dimensionnement enregistrée dans ${resultat.emplacement}.` : 'Fiche de dimensionnement téléchargée.',
+        optionsAnnonce(resultat));
     }).catch((e) => {
       signalerErreur(e, { origine: 'fiche-dimensionnement', ecran: '/plus/devis-pro' });
       toast('La fiche n’a pas pu être produite. Réessayez.', { type: 'error' });
@@ -424,7 +426,8 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
       pro: true,
       kitId: proposalMode === 'kit' ? selectedKit?.id || null : null,
       kitName: proposalMode === 'kit' ? selectedKit?.name || null : null,
-      // Détail des ajustements d'un kit étendu, pour l'annexe du document.
+      // Détail des ajustements d'un kit étendu, gardé avec le devis pour le
+      // vendeur — le document du client n'imprime que la composition retenue.
       ajustements: proposalMode === 'kit' ? kitQuotation?.ajustements || null : null,
       consumption,
       dimensionnement,

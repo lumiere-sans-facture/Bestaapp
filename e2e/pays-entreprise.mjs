@@ -97,7 +97,8 @@ ok(html.includes('<span class="lib">Paiement</span> Orange Money') && html.inclu
 // ---- 5. Relance WhatsApp : le numéro local du client part en +237 ----
 await ligne.click(); await page.locator('.doc-actions-list').waitFor();
 await page.locator('.doc-actions-list button', { hasText: 'Relancer par WhatsApp' }).click(); await page.waitForTimeout(400);
-const [lien] = await page.evaluate(() => window.__ouverts);
+// (Le téléchargement de l'étape 4 a aussi ouvert le PDF : on prend le lien WhatsApp.)
+const lien = (await page.evaluate(() => window.__ouverts)).find((u) => String(u).startsWith('https://wa.me/'));
 ok((lien || '').startsWith('https://wa.me/237677123456?text='), `relance : wa.me/237… [${(lien || '').slice(0, 40)}]`);
 ok(decodeURIComponent(lien || '').includes('Règlement Orange Money : +237 6 99 00 00 00'), 'relance : « Règlement Orange Money : … »');
 

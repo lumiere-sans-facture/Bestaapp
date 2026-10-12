@@ -1,6 +1,8 @@
 /* Extension d'un kit : un besoin qui exige plus de panneaux que le kit en
-   compte → section « Ajustements du kit » (chaînes, onduleur, matériel,
-   main-d'œuvre, impact prix), devis créé, annexe sur le document imprimé.
+   compte → section « Ajustements du kit » à l'écran du vendeur (chaînes,
+   onduleur, matériel, main-d'œuvre, impact prix), devis créé ; le document
+   du client, lui, n'imprime que la composition retenue — ni annexe, ni
+   lignes « — extension », ni suppléments.
    Puis les caractéristiques électriques dans « Plus › Onduleurs ».
    Lancer `npm run dev` à côté. */
 import { chromium } from '@playwright/test';
@@ -73,7 +75,7 @@ const creer = page.locator('button:has-text("Créer le devis")');
 ok(!(await creer.isDisabled()), 'configuration sûre : le devis peut être créé');
 await section.screenshot({ path: '/tmp/claude-0/ajustements-kit.png' });
 
-// ---- 2. DEVIS CRÉÉ, ANNEXE IMPRIMÉE ----
+// ---- 2. DEVIS CRÉÉ : LE DOCUMENT NE MONTRE QUE LA COMPOSITION RETENUE ----
 await creer.click();
 await page.waitForTimeout(2000);
 const d = await page.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).devis.find((x) => x.type === 'solar'));
@@ -86,11 +88,18 @@ await page.goto(B + '/devis'); await page.waitForTimeout(1500);
 await page.locator('.flat-row').first().click(); await page.waitForTimeout(700);
 const doc = await documentDuDevis(page, ctx);
 await doc.waitForLoadState(); await doc.waitForTimeout(800);
-const annexe = await doc.evaluate(() => document.querySelector('.page.annexe')?.innerText || '');
-ok(/Ajustements du kit/.test(annexe) && /Main-d’œuvre finale/.test(annexe), 'annexe « Ajustements du kit » sur le document');
+const imprime = await doc.evaluate(() => document.body.innerText);
+ok(d.quotation.components.some((c) => /— extension$/.test(c.name)) && !/Ajustements du kit|— extension|Supplément|Kit de base/.test(imprime)
+   && !(await doc.locator('.page.annexe').count()),
+   'document : la composition retenue seule — ni annexe, ni « — extension », ni suppléments');
+const designations = await doc.evaluate(() => [...document.querySelectorAll('.page tbody tr td:first-child')].map((td) => td.innerText.trim()).filter(Boolean));
+const doublons = designations.filter((x, i) => designations.indexOf(x) !== i);
+ok(designations.length > 0 && !doublons.length, `une ligne par article [${designations.length} lignes${doublons.length ? ` ; en double : ${doublons.join(' | ')}` : ''}]`);
+const totalImprime = await doc.evaluate(() => document.body.innerText.replace(/[\s\u202f\u00a0]/g, ''));
+ok(totalImprime.includes(String(Math.round(d.quotation.total))), `même total que le devis [${Math.round(d.quotation.total)} F]`);
 const deborde = await doc.evaluate(() => [...document.querySelectorAll('.page')].some((p) => p.scrollHeight > p.clientHeight + 1));
 ok(!deborde, 'aucune page du document ne déborde');
-await doc.locator('.page.annexe').screenshot({ path: '/tmp/claude-0/annexe-ajustements.png' });
+await doc.locator('.page').first().screenshot({ path: '/tmp/claude-0/devis-composition-retenue.png' });
 
 // ---- 3. PLUS › ONDULEURS : entrée PV saisissable ----
 await page.goto(B + '/plus/inverters'); await page.waitForTimeout(1200);
@@ -131,6 +140,7 @@ const moPro = (dPro?.lignes || []).filter((l) => /main d.œuvre/i.test(l.designa
 ok(dPro?.ajustements?.actif === true && moPro.length === 1 && moPro[0].qty * moPro[0].pu === dPro.ajustements.mainOeuvre.totalFinal
    && !dPro.lignes.some((l) => /supplément/.test(l.designation)),
    `devis Pro : ajustements enregistrés, une seule ligne de main-d’œuvre [${moPro.map((l) => l.qty * l.pu).join(' · ')}]`);
+ok(!dPro.lignes.some((l) => /— extension/.test(l.designation)), `devis Pro : lignes à la composition retenue, sans « — extension » [${dPro.lignes.length} lignes]`);
 
 // ---- 5. CONFIGURATION IMPOSSIBLE : alerte, devis bloqué ----
 // Sans le 12 kVA, et le 6 kVA non couplable, rien n'accepte 15 panneaux.
@@ -163,5 +173,5 @@ ok(/aucun ne convient/i.test(await page.locator('.ajustements-kit').innerText())
 console.log('\n' + R.join('\n'));
 await nav.close();
 const echecs = R.filter((l) => l.startsWith('❌')).length;
-console.log(echecs ? `\n❌ ${echecs} échec(s)` : '\n✅ Extension de kit : ajustements explicites, vérifiés et imprimés');
+console.log(echecs ? `\n❌ ${echecs} échec(s)` : '\n✅ Extension de kit : ajustements à l’écran, composition retenue sur le document');
 process.exit(echecs ? 1 : 0);
