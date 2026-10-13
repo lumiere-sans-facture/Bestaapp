@@ -470,7 +470,7 @@ export const calculateSystemSize = (
 
 import { TVA_RATE } from '../config/company';
 import { tensionKit, onduleursCompatibles, estKitHauteTension } from './tension';
-import { capacitePourBesoin, capaciteMaxKit, etendreBatterie } from './extensionBatterie';
+import { capacitePourBesoin, capaciteMaxKit, poserBatterie } from './extensionBatterie';
 import { ajusterKit, ordreEscalade, panneauxPourKit, panneauxMinimumOnduleur } from './ajustementsKit';
 
 // Extrait le prix du panneau depuis le catalogue produits (catégorie 'panneaux').
@@ -706,6 +706,8 @@ export const onduleurPourPanneaux = (onduleurKit, candidats = [], { pvPower = 0,
  * Synthèse affichable des ajustements d'un kit étendu : postes chiffrés au
  * prix du devis (coefficient pays compris) et impact sur le total.
  */
+const fmtKwhCourt = (v) => Number(v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+
 const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, prixUnitaire, mounting, includeMounting, inverterSuggested }) => {
   const { panneaux } = ajustements;
   const lignePanneaux = lines.find((l) => PANEL_LINE_RE.test(l.designation) && !l.ajustement);
@@ -728,7 +730,9 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
   const ecart = Math.round(total - totalBase);
   const reste = ecart - postes.reduce((s, p) => s + p.montant, 0);
   // Ce qui ne relève pas des panneaux (modules batterie ajoutés) ferme le compte.
-  poste(ajustements.batterie?.ajoutes > 0 ? `Modules batterie (+${ajustements.batterie.ajoutes} kWh)` : 'Autres', reste);
+  const b = ajustements.batterie;
+  poste(b?.ajoutes > 0 ? `Modules batterie (+${fmtKwhCourt(b.ajoutes)} kWh)`
+    : b?.retires > 0 ? `Modules batterie (−${fmtKwhCourt(b.retires)} kWh)` : 'Autres', reste);
   const coutConnu = materiel.reduce((s, l) => s + (l.cout || 0), 0);
   const venteConnue = materiel.filter((l) => l.cout != null).reduce((s, l) => s + l.qty * prixUnitaire(l), 0);
   return {
@@ -780,6 +784,15 @@ const syntheseAjustements = ({ ajustements, kit, lines, total, totalBase, coef, 
  *   — sauf kit haute tension, au même tarif dans les deux pays.
  *   Le matériel n'est jamais touché — même fournisseur des deux côtés.
  */
+/**
+ * @param {object} options
+ * @param {1|3} options.phases     réseau du chantier (3 = triphasé)
+ * @param {number|null} options.panneaux  panneaux choisis à la main (boutons
+ *   +/− de l'écran) ; `null` = ceux du dimensionnement. Sous le kit, ramenés
+ *   au nombre valide le plus proche (chaîne minimale de l'onduleur).
+ * @param {number|null} options.modules   modules batterie choisis à la main ;
+ *   `null` = ceux du besoin (voir utils/extensionBatterie.js#poserBatterie).
+ */
 export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, includeMounting = true, sizing = null, inverters = [], products = [], coefMainOeuvre = 1, options = {}) => {
   const mounting = MOUNTING_TYPES.find((m) => m.id === mountingType) || MOUNTING_TYPES[0];
   // Onduleur : celui du kit ne convient peut-être pas — soit il ne tient pas
@@ -799,9 +812,12 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // composé pour 12) comme en dessous (besoin 7, kit de 10). Sous le kit, on
   // ne descend pas plus bas qu'une chaîne valide sur l'onduleur du kit (voir
   // panneauxPourKit). Sans dimensionnement, le kit tel quel.
-  const panneauxDemandes = sizing?.requiredPanelPower && kit.panelW
+  const panneauxBesoin = sizing?.requiredPanelPower && kit.panelW
     ? Math.ceil(sizing.requiredPanelPower / kit.panelW)
     : kit.panels;
+  // Réglage à la main (boutons +/−) : il remplace le nombre du besoin.
+  const panneauxManuels = Math.round(Number(options?.panneaux));
+  const panneauxDemandes = options?.panneaux != null && panneauxManuels >= 1 ? panneauxManuels : panneauxBesoin;
   // TRIPHASÉ demandé (choix « Monophasé / Triphasé » de l'assistant) : un
   // onduleur de kit déjà triphasé est gardé ; sinon on retient le plus petit
   // onduleur triphasé de « Mes onduleurs » — même tension batterie, puissance
@@ -828,12 +844,14 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   const remplacePourTri = !!onduleurBase && onduleurBase !== currentSpec;
   // Onduleur triphasé substitué : le kit a été composé pour SON onduleur ;
   // le nouveau peut exiger plus de panneaux en série pour démarrer.
-  const neededPanels = Math.max(
-    panneauxPourKit(kit, panneauxDemandes, onduleurBase),
+  const panneauxValides = (demande) => Math.max(
+    panneauxPourKit(kit, demande, onduleurBase),
     remplacePourTri ? panneauxMinimumOnduleur(kit.panelW, onduleurBase) : 0,
   );
-  // Kit extensible : modules batterie ajoutés jusqu'à couvrir le besoin.
-  const batterie = etendreBatterie(kit, kit.lines, sizing?.batteryCapacity);
+  const neededPanels = panneauxValides(panneauxDemandes);
+  // Modules batterie : ceux du besoin (kit étendu au besoin), ou ceux choisis
+  // à la main — toujours des modules identiques à ceux du kit.
+  const batterie = poserBatterie(kit, kit.lines, sizing?.batteryCapacity, options?.modules);
   const withPanels = batterie.lignes.map((l) => (
     PANEL_LINE_RE.test(l.designation) && neededPanels !== l.qty ? { ...l, qty: neededPanels } : l
   ));
@@ -1033,6 +1051,15 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     tension,
     // Capacité batterie RÉELLEMENT posée (modules ajoutés compris).
     batteryCapacity: batterie.capacite,
+    // Réglages de l'écran (boutons +/−) : ce qui est posé, ce que le besoin
+    // demandait, et les bornes. Les panneaux du besoin et le minimum suivent
+    // la même règle que le devis (chaîne valide sur l'onduleur retenu).
+    panneauxAuto: panneauxValides(panneauxBesoin),
+    panneauxMin: panneauxValides(1),
+    batterie: {
+      modules: batterie.modules, auto: batterie.auto, base: batterie.base,
+      min: batterie.min, max: batterie.max, moduleKwh: batterie.moduleKwh,
+    },
     total,
     roi: 0,
     kitId: kit.id,

@@ -5,7 +5,8 @@ import { useData } from '../../context/DataContext';
 import { formatCFA } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
 import { factureVersConsommation } from '../../utils/factureConso';
-import { calculateSystemSize, buildKitQuotation, suggestKitsForBattery, designationOnduleur, phasesDuKit, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
+import { buildKitQuotation, designationOnduleur, phasesDuKit, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
+import { propositionDepuisEtude, consommationDimensionnement, reglerProposition } from '../../utils/propositionKit';
 import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
 import { provisionOnduleurDuDevis } from '../../utils/sizingSheet/compute';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
@@ -17,6 +18,7 @@ import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../components/SolarConsumptionControls';
 import AjustementsKit from '../../components/AjustementsKit';
+import ReglageKit from '../../components/ReglageKit';
 import { TVA_PCT } from '../../config/company';
 import { signalerErreur } from '../../lib/rapportErreur';
 import { enregistrerFichePdf } from '../../lib/fichiers';
@@ -38,12 +40,16 @@ const STEP_NAMES = ['Client', 'Consommation', 'Type de système', 'Résultat'];
  *   être ajustée. Le devis est alors MIS À JOUR, jamais dupliqué : le numéro,
  *   l'apporteur et la commission déjà calculée restent attachés au même
  *   document.
+ * @param {object|null} etudeInitiale  proposition reprise du Simulateur ROI
+ *   (format utils/dimensionnement.js) : un NOUVEAU devis, prérempli avec la
+ *   même consommation, le même kit et les mêmes réglages.
  */
-export default function SolarWizard({ onDone, initialLeadId = null, devisAModifier = null }) {
+export default function SolarWizard({ onDone, initialLeadId = null, devisAModifier = null, etudeInitiale = null }) {
   // Lu une seule fois : rejouer la restauration à chaque rendu écraserait ce
   // que le technicien est en train de modifier.
   const [reprise] = useState(() => {
-    const r = restaurerDimensionnement(devisAModifier);
+    const r = restaurerDimensionnement(devisAModifier
+      || (etudeInitiale ? { type: 'solar', dimensionnement: etudeInitiale } : null));
     // Le compteur de lignes est global au module : le recaler au-dessus des
     // lignes restaurées évite qu'un appareil ajouté ensuite reprenne le
     // `rowId` d'une ligne existante — les deux se modifieraient ensemble.
@@ -101,7 +107,9 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   const [includeMounting, setIncludeMounting] = useState(reprise.includeMounting);
   // Parmi les variantes de même capacité suggérée, le premier kit est sélectionné
   // par défaut ; le technicien peut ensuite retenir l’autre composition.
-  const [selectedSuggestedKitId, setSelectedSuggestedKitId] = useState(null);
+  const [selectedSuggestedKitId, setSelectedSuggestedKitId] = useState(reprise.kitId || null);
+  // Réglages +/− des panneaux et des modules batterie (null = automatique).
+  const [reglages, setReglages] = useState(reprise.reglages || null);
   // Ensoleillement : récupéré en ligne (PVGIS / NASA POWER) via géolocalisation
   // ou recherche de ville ; repli en saisie manuelle des heures de pic.
   const [sunHours, setSunHours] = useState(reprise.sunHours);
@@ -176,53 +184,26 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
 
   const removeRow = (rowId) => setRows((prev) => prev.filter((r) => r.rowId !== rowId));
 
-  // Consommation jour/nuit en kWh — selon le mode de saisie choisi.
+  // Facture convertie (affichée sous les champs de la facture).
   const factureConso = useMemo(
     () => factureVersConsommation(facture.montant, facture.prixKwh, facture.repartition),
     [facture]
   );
-  const consumption = useMemo(() => {
-    if (consoMode === 'direct') return { day: Number(manual.day) || 0, night: Number(manual.night) || 0 };
-    if (consoMode === 'facture') return { day: factureConso.day, night: factureConso.night };
-    const day = rows.reduce((sum, r) => sum + r.power * r.quantity * r.day, 0) / 1000;
-    const night = rows.reduce((sum, r) => sum + r.power * r.quantity * r.night, 0) / 1000;
-    return { day: Number(day.toFixed(2)), night: Number(night.toFixed(2)) };
-  }, [rows, consoMode, manual, factureConso]);
+  // L'ÉTUDE telle qu'elle sera enregistrée : c'est elle, et elle seule, qui
+  // produit la proposition (utils/propositionKit.js) — la même fonction que
+  // le Simulateur ROI, donc le même kit et le même prix pour un même besoin.
+  const etude = useMemo(() => capturerDimensionnement({
+    consoMode, rows, manual, facture, systemType, autonomyNights,
+    mountingType, includeMounting, phases, sunHours: Number(sunHours) || DEFAULT_PEAK_SUN_HOURS,
+    location, solar, kitId: selectedSuggestedKitId, reglages,
+  }), [consoMode, rows, manual, facture, systemType, autonomyNights, mountingType, includeMounting, phases, sunHours, location, solar, selectedSuggestedKitId, reglages]);
 
+  // Consommation jour/nuit en kWh — selon le mode de saisie choisi — et pic
+  // de charge (toutes les charges branchées en même temps).
+  const conso = useMemo(() => consommationDimensionnement(etude), [etude]);
+  const consumption = useMemo(() => ({ day: conso.day, night: conso.night }), [conso]);
   const totalConsumption = consumption.day + consumption.night;
-  // Pic de charge : toutes les charges branchées en même temps (dimensionne l'onduleur).
-  const peakLoad = useMemo(() => rows.reduce((s, r) => s + r.power * r.quantity, 0), [rows]);
-
-  const sizing = useMemo(
-    () => (totalConsumption > 0
-      ? calculateSystemSize(consumption, systemType, Number(sunHours) || DEFAULT_PEAK_SUN_HOURS, undefined, autonomyNights, { peakLoad, inverters: INVERTERS })
-      : null),
-    [consumption, systemType, sunHours, totalConsumption, autonomyNights, peakLoad, INVERTERS]
-  );
-
-  // Kits suggérés : la plus petite capacité qui couvre le besoin est retenue
-  // (jamais moins). Quand plusieurs variantes ont cette même capacité, elles
-  // sont toutes affichées afin de laisser le technicien choisir la composition.
-  const suggestedKits = useMemo(
-    () => (sizing ? suggestKitsForBattery(SOLAR_KITS, sizing.batteryCapacity) : []),
-    [sizing, SOLAR_KITS]
-  );
-  // La liste est modifiable depuis « Mes kits » : elle peut être vide, ou le
-  // kit retenu avoir été supprimé entre-temps. Tout est optionnel à partir d'ici.
-  const effectiveKitId = (suggestedKits.some((k) => k.id === selectedSuggestedKitId)
-    ? selectedSuggestedKitId
-    : suggestedKits[0]?.id) || SOLAR_KITS[0]?.id || null;
-  const selectedKit = SOLAR_KITS.find((k) => k.id === effectiveKitId) || SOLAR_KITS[0] || null;
-  // Réseau électrique calé sur l'onduleur du kit retenu : triphasé pour un
-  // kit à onduleur triphasé, monophasé sinon — à chaque changement de kit.
-  // Le technicien peut ensuite le modifier ; une étude rouverte garde le
-  // choix enregistré tant que son kit reste celui du devis.
-  const kitDuReseau = useRef(reprise.restaure ? devisAModifier?.kit?.id || null : null);
-  useEffect(() => {
-    if (!selectedKit || kitDuReseau.current === selectedKit.id) return;
-    kitDuReseau.current = selectedKit.id;
-    setPhases(phasesDuKit(selectedKit, INVERTERS));
-  }, [selectedKit, INVERTERS]);
+  const peakLoad = conso.peakLoad;
   // Le devis est toujours basé sur un kit préconfiguré : pas de dimensionnement
   // « calculé » proposé. La consommation sert uniquement à suggérer le bon kit
   // — dont le nombre de panneaux est ensuite complété si le besoin réel en
@@ -237,10 +218,29 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     pays: location?.country || '',
     telephone: selectedLead?.phone || '',
   });
-  const displayQuotation = useMemo(
-    () => (selectedKit ? buildKitQuotation(selectedKit, mountingType, includeMounting, sizing, INVERTERS, products, coefMainOeuvre, { phases }) : null),
-    [selectedKit, mountingType, includeMounting, phases, sizing, INVERTERS, products, coefMainOeuvre]
+  // Proposition : kits suggérés (la plus petite capacité qui couvre le besoin,
+  // toutes ses variantes), kit retenu, réglages +/− et devis chiffré.
+  const proposition = useMemo(
+    () => propositionDepuisEtude(etude, { kits: SOLAR_KITS, inverters: INVERTERS, products, coefMainOeuvre }),
+    [etude, SOLAR_KITS, INVERTERS, products, coefMainOeuvre]
   );
+  const sizing = proposition?.sizing || null;
+  const suggestedKits = proposition?.suggeres || [];
+  // La liste est modifiable depuis « Mes kits » : elle peut être vide, ou le
+  // kit retenu avoir été supprimé entre-temps. Tout est optionnel à partir d'ici.
+  const selectedKit = proposition?.kit || null;
+  const displayQuotation = proposition?.quotation || null;
+  const regler = (quoi, valeur) => setReglages(reglerProposition(proposition, quoi, valeur));
+  // Réseau électrique calé sur l'onduleur du kit retenu : triphasé pour un
+  // kit à onduleur triphasé, monophasé sinon — à chaque changement de kit.
+  // Le technicien peut ensuite le modifier ; une étude rouverte garde le
+  // choix enregistré tant que son kit reste celui du devis.
+  const kitDuReseau = useRef(reprise.restaure ? devisAModifier?.kit?.id || reprise.kitId || null : null);
+  useEffect(() => {
+    if (!selectedKit || kitDuReseau.current === selectedKit.id) return;
+    kitDuReseau.current = selectedKit.id;
+    setPhases(phasesDuKit(selectedKit, INVERTERS));
+  }, [selectedKit, INVERTERS]);
   // Panneaux réellement inclus au devis : ceux du dimensionnement (plus ou moins que le kit) ;
   // calculé en exige plus (kit choisi sur sa batterie, pas ses panneaux).
   const installedPanels = displayQuotation?.panelsIncluded || selectedKit?.panels || 0;
@@ -304,6 +304,9 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
     const dimensionnement = capturerDimensionnement({
       consoMode, rows, manual, facture, systemType, autonomyNights,
       mountingType, includeMounting, phases, sunHours: psh, location, solar,
+      // Le kit retenu et les réglages +/− réellement appliqués : rouvrir le
+      // devis redonne exactement cette composition.
+      kitId: selectedKit.id, reglages: proposition?.reglages || null,
     });
     const contenu = {
       consumption,
@@ -345,6 +348,12 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
         {step === 1 && (
           <div>
             <div className="wizard-step-title">Sélectionnez un client</div>
+            {etudeInitiale && (
+              <div className="devis-client-note" role="status">
+                <Package size={17} />
+                <span>Proposition reprise du <strong>Simulateur ROI</strong> : consommation, kit et réglages sont déjà remplis. Choisissez le client, puis vérifiez le résultat.</span>
+              </div>
+            )}
             <LeadPicker leads={myLeads} selectedLeadId={selectedLeadId} onSelect={setSelectedLeadId} />
             {selectedLeadId && <PartnerField value={partnerId} />}
           </div>
@@ -627,7 +636,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                       key={kit.id}
                       type="button"
                       className={`kit-option ${isSelected ? 'selected' : ''}`}
-                      onClick={() => setSelectedSuggestedKitId(kit.id)}
+                      onClick={() => { setSelectedSuggestedKitId(kit.id); if (kit.id !== selectedKit.id) setReglages(null); }}
                       aria-pressed={isSelected}
                     >
                       <span className="kit-option-name">
@@ -645,10 +654,14 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
               <Package size={16} />
               <span>
                 {selectedKit.name} — {installedPanels} panneaux {selectedKit.panelW}Wc
-                {installedPanels > selectedKit.panels && ` (complétés depuis ${selectedKit.panels})`}
-                {installedPanels < selectedKit.panels && ` (ajustés au besoin, au lieu de ${selectedKit.panels})`}
+                {installedPanels !== selectedKit.panels && (proposition?.reglages?.panneaux != null
+                  ? ` (réglés à la main, au lieu de ${selectedKit.panels})`
+                  : installedPanels > selectedKit.panels
+                    ? ` (complétés depuis ${selectedKit.panels})`
+                    : ` (ajustés au besoin, au lieu de ${selectedKit.panels})`)}
                 {' '}· batterie {displayQuotation.batteryCapacity ?? selectedKit.battery} kWh
                 {(displayQuotation.batteryCapacity ?? 0) > Number(selectedKit.battery) && ` (étendue depuis ${selectedKit.battery})`}
+                {(displayQuotation.batteryCapacity ?? Infinity) < Number(selectedKit.battery) && ` (réduite depuis ${selectedKit.battery})`}
                 {' '}· onduleur{' '}
                 {displayQuotation.inverterSuggested
                   ? `${displayQuotation.inverterSuggested.quantite > 1 ? `${displayQuotation.inverterSuggested.quantite} × ` : ''}${displayQuotation.inverterSuggested.capacity} kVA ${displayQuotation.inverterSuggested.brand}`
@@ -664,6 +677,9 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                 {displayQuotation.inverterSuggested.quantite > 1 ? ' en parallèle retenus à la place.' : ' retenu à la place.'}
               </div>
             )}
+            {/* Panneaux et modules batterie, un à un : recalcul en direct de la
+                capacité, de l'autonomie, de la puissance et du prix. */}
+            <ReglageKit proposition={proposition} onRegler={regler} onReinitialiser={() => setReglages(null)} />
             {/* Kit étendu au-delà de ses limites électriques : aucun onduleur,
                 même doublé, n'accepte ces panneaux. Le devis ne part pas. */}
             {displayQuotation?.configurationImpossible && (

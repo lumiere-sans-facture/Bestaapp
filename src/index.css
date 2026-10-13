@@ -1659,6 +1659,26 @@ form .login-link { width: 100%; margin-top: 4px; }
   font-size: 0.875rem; color: var(--text-primary);
 }
 .kit-summary svg { color: var(--primary-ink); flex-shrink: 0; }
+
+/* Réglage de la proposition (components/ReglageKit) : panneaux et modules
+   batterie un à un, dans le Simulateur comme dans l'assistant de devis. */
+.reglage-kit { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px; background: var(--bg-card); }
+.reglage-kit-titre { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); margin-bottom: 8px; }
+.reglage-kit-ligne { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.reglage-kit-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.reglage-kit-libelle { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: .9rem; color: var(--text-primary); }
+.reglage-kit-libelle svg { color: var(--primary-ink); }
+.reglage-kit .qty-value { min-width: 28px; text-align: center; font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+.reglage-kit-detail { margin-top: 4px; font-size: .8rem; color: var(--text-secondary); }
+.reglage-kit-limite { margin-top: 4px; font-size: .78rem; color: var(--text-secondary); font-style: italic; }
+/* Deux colonnes dans la colonne étroite du Simulateur, quatre dans
+   l'assistant de devis : la grille suit la place réelle, pas l'écran. */
+.reglage-kit-resume { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 12px; padding-top: 10px; }
+.reglage-kit-resume div { display: flex; flex-direction: column; min-width: 0; }
+.reglage-kit-resume span { font-size: .72rem; color: var(--text-secondary); }
+.reglage-kit-resume strong { font-size: .9rem; color: var(--text-primary); overflow-wrap: anywhere; }
+.reglage-kit-alerte { margin-top: 10px; }
+.reglage-kit-auto { margin-top: 10px; }
 @media (min-width: 560px) {
   .kit-options { grid-template-columns: repeat(3, 1fr); }
   .kit-option { flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -2444,6 +2464,9 @@ form .login-link { width: 100%; margin-top: 4px; }
 
 /* Kit retenu par l'assistant de devis pour cette consommation. */
 .roi-kit { margin-top: 12px; padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm); }
+.roi-kit + .reglage-kit { margin-top: 12px; }
+.roi-variantes { margin: 10px 0 0; }
+.roi-creer-devis { margin-top: 12px; }
 .roi-kit-nom { font-weight: 700; }
 .roi-kit-spec { margin-top: 3px; font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.45; }
 

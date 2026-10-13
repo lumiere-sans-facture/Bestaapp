@@ -19,6 +19,11 @@ export const nouveauKit = () => ({
   lines: [nouvelleLigneKit()],
 });
 
+const entierPositif = (v) => {
+  const n = Math.round(Number(String(v ?? '').replace(',', '.')));
+  return String(v ?? '').trim() !== '' && Number.isFinite(n) && n >= 1 ? n : null;
+};
+
 const nombre = (v, defaut = 0) => {
   const n = Number(String(v ?? '').replace(',', '.'));
   return Number.isFinite(n) && n >= 0 ? n : defaut;
@@ -41,6 +46,10 @@ export const normaliserKit = (brouillon) => ({
   // batterie (« Batterie lithium 24V … »). Elle décide des onduleurs
   // proposables pour ce kit.
   tension: lireTension(brouillon.tension) ?? tensionKit({ lines: brouillon.lines }),
+  // Modules batterie identiques acceptés en parallèle (boutons +/− du devis
+  // et du simulateur). Vide = la valeur par défaut (4, voir
+  // utils/extensionBatterie.js) ; un kit haute tension suit son boîtier.
+  modulesMax: entierPositif(brouillon.modulesMax),
   lines: (brouillon.lines || [])
     .filter((l) => (l.designation || '').trim() !== '')
     .map((l) => ({

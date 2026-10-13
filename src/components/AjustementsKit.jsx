@@ -41,9 +41,11 @@ export default function AjustementsKit({ ajustements, kitName }) {
         <div className="bom-price">{panneaux(p.final)} · {kwc(p.kwcFinal)}</div>
       </div>
 
-      {batterie?.ajoutes > 0 && (
+      {(batterie?.ajoutes > 0 || batterie?.retires > 0) && (
         <div className="bom-row">
-          <div className="bom-name">Batterie <span className="bom-qty">(+{kwh(batterie.ajoutes)} en modules)</span></div>
+          <div className="bom-name">Batterie <span className="bom-qty">
+            ({batterie.ajoutes > 0 ? `+${kwh(batterie.ajoutes)}` : `−${kwh(batterie.retires)}`} en modules)
+          </span></div>
           <div className="bom-price">{kwh(batterie.base)} → {kwh(batterie.finale)}</div>
         </div>
       )}

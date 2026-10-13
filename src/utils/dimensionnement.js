@@ -69,6 +69,25 @@ export const prochainRowId = (appareils = []) =>
   appareils.reduce((max, a) => Math.max(max, Number(a?.rowId) || 0), 0) + 1;
 
 /**
+ * Réglages manuels de la proposition (boutons +/− des panneaux et des
+ * modules batterie), nettoyés. `null` quand tout est automatique. Ils portent
+ * la proposition automatique de référence : ils ne s'appliquent que tant que
+ * le besoin n'a pas changé (voir utils/propositionKit.js#reglagesApplicables).
+ */
+const reglagesPropres = (r) => {
+  if (!r || typeof r !== 'object' || !r.kitId) return null;
+  const entier = (v) => (v != null && Number(v) >= 1 ? Math.round(Number(v)) : null);
+  const propre = {
+    kitId: String(r.kitId),
+    autoPanneaux: entier(r.autoPanneaux),
+    autoModules: entier(r.autoModules),
+    panneaux: entier(r.panneaux),
+    modules: entier(r.modules),
+  };
+  return propre.panneaux == null && propre.modules == null ? null : propre;
+};
+
+/**
  * Photographie de l'étude, telle qu'elle sera rangée sur le devis.
  * Seules les SAISIES sont conservées : les résultats se recalculent, et deux
  * copies d'un même calcul finissent toujours par diverger.
@@ -104,6 +123,11 @@ export function capturerDimensionnement(etat = {}) {
       ...(etat.location.country ? { country: String(etat.location.country) } : {}),
     } : null,
     solarSource: etat.solar?.source ? String(etat.solar.source) : null,
+    // Kit retenu parmi les variantes suggérées, et réglages +/− : c'est ce qui
+    // permet de reprendre une proposition du Simulateur telle quelle dans un
+    // devis, et de rouvrir un devis sur exactement la même composition.
+    kitId: etat.kitId ? String(etat.kitId) : null,
+    reglages: reglagesPropres(etat.reglages),
   };
 }
 
@@ -154,6 +178,8 @@ export function restaurerDimensionnement(devis) {
       sunHours: d.sunHours,
       location: d.location,
       solar: d.solarSource ? { source: d.solarSource } : null,
+      kitId: d.kitId,
+      reglages: d.reglages,
     }),
     restaure: true,
   };

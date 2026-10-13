@@ -198,9 +198,15 @@ export const ajusterKit = ({
 }) => {
   // Batterie : capacité du kit et capacité posée (modules ajoutés compris,
   // voir utils/extensionBatterie.js).
+  // Modules retirés à la main (bouton −) : la capacité descend sous celle du
+  // kit — sans réduire la main-d'œuvre, comme pour les panneaux en moins.
   const kwhBase = Number(kit?.battery) || 0;
-  const kwhFinal = Math.max(kwhBase, Number(batterieFinale) || kwhBase);
-  const batterie = { base: kwhBase, finale: kwhFinal, ajoutes: kwhFinal - kwhBase };
+  const kwhFinal = batterieFinale != null && Number(batterieFinale) > 0 ? Number(batterieFinale) : kwhBase;
+  const arrondi = (v) => Math.round(v * 100) / 100;
+  const batterie = {
+    base: kwhBase, finale: kwhFinal,
+    ajoutes: arrondi(Math.max(0, kwhFinal - kwhBase)), retires: arrondi(Math.max(0, kwhBase - kwhFinal)),
+  };
   const base = Number(kit?.panels) || 0;
   const wc = Number(kit?.panelW) || 0;
   const demande = Math.max(0, Math.ceil(Number(panneauxDemandes) || 0));
@@ -214,7 +220,7 @@ export const ajusterKit = ({
     base, demande, final, ajoutes, retires, wc, cas,
     kwcBase: kwc(base, wc), kwcFinal: kwc(final, wc), kwcAjoutes: kwc(ajoutes, wc), kwcRetires: kwc(retires, wc),
   };
-  if (ajoutes === 0 && retires === 0 && batterie.ajoutes === 0) {
+  if (ajoutes === 0 && retires === 0 && batterie.ajoutes === 0 && batterie.retires === 0) {
     return { actif: false, panneaux, batterie, verification: null, onduleur: null, chaines: null, lignes: [], mainOeuvre: null, alertes: [] };
   }
 
