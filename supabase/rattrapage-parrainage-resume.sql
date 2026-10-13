@@ -14,7 +14,8 @@
 --                  dans plusieurs entreprises : rien n'a été payé deux fois)
 --                  ou de commissions DIFFÉRENTES. « payé en trop » chiffre
 --                  le second cas ;
---   3. le reste    toutes les autres lignes de l'aperçu, une par une.
+--   3. le reste    toutes les autres lignes de l'aperçu, une par une (un
+--                  compte est désigné par son nom puis son identifiant).
 with apercu as (
   select etape, objet, detail from public.rattraper_parrainage_commissions(false)
 ), doublons as (
@@ -42,6 +43,11 @@ select '2. doublon',
          || x.montant || ' F chacune ; payé en trop : ' || greatest(x.payees - 1, 0) * x.montant || ' F'
   from doublons x
 union all
-select '3. ' || etape, objet, detail
-  from apercu where detail not like '%plusieurs commissions déjà payées%'
+select '3. ' || a.etape,
+       -- un compte est nommé, pour que le gérant reconnaisse qui est parrainé
+       case when p.id is not null then p.name || ' — ' || a.objet else a.objet end,
+       a.detail
+  from apercu a
+  left join public.profiles p on a.objet = 'compte ' || p.id
+ where a.detail not like '%plusieurs commissions déjà payées%'
 order by 1, 2;
