@@ -303,6 +303,9 @@ alter table public.orgs add column if not exists referral_par_defaut boolean not
 -- l'organisation INTERNE (celle marquée kind = 'interne', voir
 -- organisation-interne.sql). Null si elle n'existe pas ou n'a aucun code :
 -- mieux vaut alors ne rattacher à rien que d'inventer un parrain.
+-- ⚠ Redéfinie par migrations/20261013_parrainage_commissions.sql (la fiche du
+--   gérant d'abord, jamais une fiche de démonstration) : après avoir rejoué ce
+--   fichier, rejouer cette migration.
 create or replace function public.code_partenaire_defaut()
   returns text language sql stable security definer set search_path = public as $$
   select public.code_partenaire(pt.data ->> 'code')

@@ -5,8 +5,8 @@
 --  Rattrapage des données existantes : supabase/rattrapage-parrainage.sql
 --  DANS LES DEUX PROJETS : test (recette) ET production.
 --  Après avoir rejoué multitenant.sql, rejouer CE fichier : il redéfinit
---  signup_create_org, set_org_referral, admin_decide_progression et
---  admin_confirm_subscription_payment.
+--  signup_create_org, set_org_referral, admin_decide_progression,
+--  admin_confirm_subscription_payment et code_partenaire_defaut.
 -- =====================================================================
 --
 -- CE QUE ÇA CORRIGE. Depuis la réunion de tous les comptes dans une
@@ -84,20 +84,6 @@ begin
         select nullif(regexp_replace(upper(trim(coalesce(p_code, ''))), '^BESTA-', ''), '')
       $c$ $f$;
   end if;
-  -- Code de rattachement par défaut : le plus ancien partenaire de
-  -- l'organisation interne (BestaSolar).
-  if to_regprocedure('public.code_partenaire_defaut()') is null then
-    execute $f$
-      create function public.code_partenaire_defaut()
-        returns text language sql stable security definer set search_path = public as $c$
-        select public.code_partenaire(pt.data ->> 'code')
-        from public.partners pt
-        join public.orgs o on o.id = pt.org_id and o.kind = 'interne'
-        where coalesce(pt.data ->> 'code', '') <> ''
-        order by pt.updated_at asc, pt.id asc
-        limit 1
-      $c$ $f$;
-  end if;
   -- Propriétaire de l'espace : le gérant, l'admin plateforme, ou l'inscrit
   -- seul dans une organisation sans gérant (même règle que utils/roles.js).
   if to_regprocedure('public.auth_est_proprietaire_espace()') is null then
@@ -116,6 +102,28 @@ begin
       $c$ $f$;
   end if;
 end $$;
+
+-- Parrain par défaut d'un inscrit SANS code : BestaSolar, c'est-à-dire la
+-- fiche du gérant. multitenant.sql prenait la plus ANCIENNE fiche de
+-- l'organisation interne : sur une base qui a reçu les données de
+-- démonstration de l'application (Mamadou, Adam…), c'était une personne
+-- fictive, et le niveau 2 de chaque nouvel inscrit sans code lui revenait.
+-- Ordre : la fiche de l'admin plateforme, puis celle d'un vrai compte (un
+-- profil de démonstration n'a pas de compte de connexion), puis d'un gérant,
+-- puis la plus ancienne.
+create or replace function public.code_partenaire_defaut()
+  returns text language sql stable security definer set search_path = public as $$
+  select public.code_partenaire(pt.data ->> 'code')
+  from public.partners pt
+  join public.orgs o on o.id = pt.org_id and o.kind = 'interne'
+  left join public.profiles pr on pr.id = pt.data ->> 'userId'
+  where coalesce(pt.data ->> 'code', '') <> ''
+  order by coalesce(pr.is_platform_admin, false) desc,
+           exists (select 1 from auth.users au where au.id::text = pr.id) desc,
+           coalesce(pr.role = 'gerant', false) desc,
+           pt.updated_at asc, pt.id asc
+  limit 1
+$$;
 
 -- Montant lu dans un JSON : jamais d'erreur de conversion, 0 si illisible.
 create or replace function public.montant_json(p_texte text)

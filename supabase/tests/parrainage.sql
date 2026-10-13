@@ -494,5 +494,22 @@ reset role;
 select set_config('request.jwt.claims', '', false);
 \echo '   ✓ correction à la main depuis le SQL Editor, refusée à un technicien'
 
+\echo '16. Parrain par défaut : la fiche du gérant, jamais une fiche de démonstration'
+-- Les données d'exemple de l'application (Mamadou, Adam…) ont pu atterrir dans
+-- l'organisation interne, avec des fiches plus ANCIENNES que celle du gérant.
+set session_replication_role = replica;
+-- schema.sql insère lui-même les profils de démonstration u1, u2, u3.
+insert into public.profiles (id, email, name, role, org_id) values ('u1', 'adam@bestasolar.tg', 'Adam (démo)', 'gerant', 'org-bestasolar')
+  on conflict (id) do nothing;
+insert into public.partners (org_id, id, data, updated_at) values
+  ('org-bestasolar', 'p1', '{"id":"p1","name":"Mamadou (démo)","code":"MAMADOU-XW9RA3"}', now() - interval '1 year'),
+  ('org-bestasolar', 'p-user-u1', '{"id":"p-user-u1","userId":"u1","name":"Adam (démo)","code":"ADAM-YPOGEO"}', now() - interval '1 year');
+set session_replication_role = origin;
+do $$ begin
+  assert public.code_partenaire_defaut() = 'GERANT-AB12CD',
+    'le parrain par défaut est le gérant, pas ' || coalesce(public.code_partenaire_defaut(), 'personne');
+end $$;
+\echo '   ✓ inscrit sans code : rattaché au gérant'
+
 \echo ''
 \echo '✅ Scénario parrainage : tous les contrôles passent'
