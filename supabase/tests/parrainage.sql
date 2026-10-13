@@ -466,5 +466,33 @@ do $$ begin
 end $$;
 \echo '   ✓ inscription avant fiche, code rattaché au compte, boucle signalée « à vérifier »'
 
+\echo '15. Correction à la main d''un parrain (admin_definir_parrain)'
+-- Depuis le SQL Editor (aucun compte connecté), comme le propose le rattrapage.
+select public.admin_definir_parrain('99999999-9999-4999-8999-999999999991', 'BIO-BBB222');
+do $$ begin
+  assert (select parrain_partner_id from public.parrainages where filleul_id = '99999999-9999-4999-8999-999999999991')
+         = 'p-user-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'parrain posé à la main';
+end $$;
+select public.admin_definir_parrain('99999999-9999-4999-8999-999999999991', null);
+do $$ begin
+  assert not exists (select 1 from public.parrainages where filleul_id = '99999999-9999-4999-8999-999999999991'), 'parrain retiré';
+  assert not exists (select 1 from public.partners where data ->> 'userId' = '99999999-9999-4999-8999-999999999991'
+                     and (data ? 'sponsorId' or data ? 'sponsorCode')), 'la fiche ne garde aucune trace du parrain retiré';
+end $$;
+-- Depuis l'application : un technicien ne peut pas s'en servir.
+set role authenticated;
+select set_config('request.jwt.claims', :'C', false);
+do $$ begin
+  begin
+    perform public.admin_definir_parrain('99999999-9999-4999-8999-999999999991', 'BIO-BBB222');
+    raise exception 'un technicien a pu définir un parrain';
+  exception when others then
+    if sqlerrm not like 'réservé%' then raise; end if;
+  end;
+end $$;
+reset role;
+select set_config('request.jwt.claims', '', false);
+\echo '   ✓ correction à la main depuis le SQL Editor, refusée à un technicien'
+
 \echo ''
 \echo '✅ Scénario parrainage : tous les contrôles passent'

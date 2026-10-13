@@ -351,7 +351,11 @@ end $$;
 create or replace function public.admin_definir_parrain(p_filleul text, p_code text)
   returns void language plpgsql security definer set search_path = public as $$
 begin
-  if not public.auth_is_platform_admin() then raise exception 'réservé à l''admin plateforme'; end if;
+  -- Depuis l'application : l'admin plateforme seul. Depuis le SQL Editor
+  -- (aucun compte connecté), comme le rattrapage qui la propose : autorisé.
+  if coalesce(auth.jwt() ->> 'role', '') in ('authenticated', 'anon') and not public.auth_is_platform_admin() then
+    raise exception 'réservé à l''admin plateforme';
+  end if;
   if not exists (select 1 from public.profiles where id = p_filleul) then
     raise exception 'compte inconnu : %', p_filleul;
   end if;
