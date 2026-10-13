@@ -100,7 +100,30 @@ retombe sur la validation manuelle : c'est prévu, pas une panne.
 - [ ] La **fiche de dimensionnement** se génère aussi hors ligne, avec la
       bonne police (elle est embarquée depuis peu).
 
-## 8. Le tour du propriétaire
+## 8. Parrainage et commissions — avec des comptes NEUFS
+
+Les anciens comptes de test portent des données d'avant la réunion des
+entreprises (fiches recopiées, codes en double) : c'est sur des comptes créés
+maintenant qu'on vérifie la règle. Trois adresses e-mail suffisent (avec
+Gmail, `votrenom+a@gmail.com`, `+b`, `+c` arrivent dans la même boîte).
+
+- [ ] **A** s'inscrit sans code. Dans *Plus → Mon espace partenaire*, il voit
+      son code et son lien.
+- [ ] Ouvrir le lien de A dans une fenêtre privée, puis le rouvrir : chez A,
+      **1 clic** (un seul par visiteur et par 24 h).
+- [ ] **B** s'inscrit par le lien de A ; **C** par le lien de B. Chez A,
+      *Mes filleuls* montre B ; chez B, *Mes filleuls* montre C et *Mon
+      réseau* indique A comme parrain.
+- [ ] **C** crée un client, puis un devis, et le fait passer à « gagné » : la
+      demande part au gérant (C ne peut pas valider seul).
+- [ ] Le **gérant** valide. *Historique de mes commissions* : chez C,
+      **niveau 1 = 3 %** du devis ; chez B, **niveau 2 = 1,5 %** ; chez A,
+      rien. Le gérant les voit toutes dans *Commissions*, avec le sous-total
+      par niveau.
+- [ ] Revalider le même devis, ou le valider depuis un second appareil :
+      **aucune commission en double**.
+
+## 9. Le tour du propriétaire
 
 Cinq minutes à cliquer partout, sur téléphone de préférence :
 
