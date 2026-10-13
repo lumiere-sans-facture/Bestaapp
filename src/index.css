@@ -3362,16 +3362,16 @@ form .login-link { width: 100%; margin-top: 4px; }
 }
 
 
-/* La cloche du mode public est placée sur la ligne sous le logo pour ne
-   jamais recouvrir le nom de marque lorsque la barre latérale est étroite. */
-.sidebar-brand-public-meta {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  width: 100%;
-  margin-top: 6px;
-}
+/* Marque publique dépliée : icône, nom, cloche et repli sur UNE ligne,
+   comme en mode Pro. La cloche avait une ligne à elle sous le logo, ce qui
+   laissait 86 px vides avant « Tableau de bord ». Pour qu'elle tienne sans
+   recouvrir le nom dans les 264 px de la barre, la marque est resserrée :
+   marges latérales, icône et nom un peu plus petits. */
+.sidebar-brand-public { padding-left: 16px; padding-right: 16px; }
+.sidebar-brand-public .sidebar-brand-identite { gap: 8px; }
+.sidebar-brand-public .sidebar-brand-identite-icone { width: 30px; height: 30px; }
+.sidebar-brand-public .sidebar-brand-identite-nom { font-size: 17px; }
+.sidebar-brand-public .sidebar-repli { width: 26px; }
 
 /* Agent devis (prototype) : conversation façon messagerie. */
 .agent-chat { display: flex; flex-direction: column; gap: 8px; min-height: 240px; max-height: 60vh; overflow-y: auto;

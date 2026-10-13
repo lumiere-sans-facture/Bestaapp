@@ -117,9 +117,11 @@ export default function AppLayout() {
               </div>
             )}
             <div className="sidebar-brand-tools">
-              {/* En mode public étendu, la cloche est affichée sous le logo :
-                  elle ne recouvre plus le nom de la marque sur petits écrans. */}
-              {(isPro || repliee) && <NotificationBell />}
+              {/* Toujours sur la ligne du logo : posée sur une ligne à part en
+                  mode public, elle creusait un vide de 86 px avant le menu. La
+                  marque publique est resserrée pour qu'elle ne la recouvre pas
+                  (voir .sidebar-brand-public dans index.css). */}
+              <NotificationBell />
               <button
                 type="button"
                 className="sidebar-repli"
@@ -132,11 +134,6 @@ export default function AppLayout() {
               </button>
             </div>
           </div>
-          {!isPro && !repliee && (
-            <div className="sidebar-brand-public-meta">
-              <NotificationBell />
-            </div>
-          )}
         </div>
         <nav className="sidebar-nav" aria-label="Navigation principale">
           {sidebarItems.map((item) => (

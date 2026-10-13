@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-13
+- **Barre latérale : le menu commence juste sous le logo.** La cloche des notifications occupait une ligne entière sous « BestaSolar Pro », ce qui laissait 86 px vides avant « Tableau de bord ». Elle revient sur la ligne du logo, comme en mode Pro, et l'écart tombe à 38 px. La marque est très légèrement resserrée pour que la cloche ne recouvre jamais le nom ; mesuré dans Chromium avec la vraie police Inter : 10 px d'écart entre le nom et la cloche.
 - **Parrainage : la mise à jour passe sur les deux bases réelles, et les nouveaux inscrits ont le bon parrain.** Corrections trouvées en passant la migration sur le projet de test, puis sur la production :
   - **La migration passe sur une base restée aux scripts de fin août.** Elle refusait de s'exécuter (« Base en retard ») et conseillait de rejouer `multitenant.sql`. Ce conseil était dangereux : sur une base où les comptes ont été réunis, ce rejeu rouvre les clients de chacun à tous les membres. Elle crée maintenant elle-même ce qui lui manque, sans rien remplacer.
   - **Une affaire recopiée dans plusieurs entreprises** (avant la réunion des comptes) ne bloque plus le rattrapage, et rien de payé n'est jamais retiré. Un résumé en lecture seule (`rattrapage-parrainage-resume.sql`) dit, devis par devis, s'il s'agit de simples copies ou d'un vrai paiement en double.
