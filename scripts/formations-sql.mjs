@@ -5,6 +5,10 @@
 // (policy « formations lecture partagee »). Ajouter un cours au seed ne suffit
 // donc pas : il faut l'insérer en base, dans les DEUX projets Supabase.
 //
+// Un bloc indépendant par formation : chacun se colle et s'exécute seul dans
+// le SQL Editor (pratique depuis un téléphone), ou tous ensemble. Une leçon
+// par ligne, pour qu'un script relu ou recopié reste lisible.
+//
 // Le fichier JS reste la source de vérité ; le .sql en est la copie à
 // exécuter. Un test vérifie que les deux ne divergent jamais
 // (src/utils/__tests__/formationsAcademieSql.test.js).
@@ -16,20 +20,58 @@ import { FORMATIONS_ACADEMIE } from '../src/data/formationsAcademie.js';
 const CIBLE = 'supabase/formations-academie.sql';
 const BALISE = '$academie$';
 
-// Un cours par ligne : le diff d'une régénération reste lisible.
-const json = `[\n${FORMATIONS_ACADEMIE.map((c) => JSON.stringify(c)).join(',\n')}\n]`;
-if (json.includes(BALISE)) throw new Error(`Le contenu des cours contient la balise ${BALISE}`);
+/** JSON d'un cours, une leçon par ligne (le contenu est celui de JSON.stringify). */
+const jsonCours = (cours) => {
+  const { modules, ...tete } = cours;
+  const blocs = modules.map(({ lecons, ...module }) =>
+    `${JSON.stringify(module).slice(0, -1)},"lecons":[\n${lecons.map((l) => JSON.stringify(l)).join(',\n')}\n]}`);
+  return `${JSON.stringify(tete).slice(0, -1)},"modules":[\n${blocs.join(',\n')}\n]}`;
+};
+
+const bloc = (cours, n) => {
+  const json = jsonCours(cours);
+  if (json.includes(BALISE)) throw new Error(`Le cours ${cours.id} contient la balise ${BALISE}`);
+  return `-- ---------------------------------------------------------------------
+--  ${n}/${FORMATIONS_ACADEMIE.length} · ${cours.title.replace(/’/g, "'")}
+-- ---------------------------------------------------------------------
+do $$
+declare
+  v_org text;
+  v_n   int;
+begin
+  if to_regclass('public.orgs') is null
+     or not exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'formations' and column_name = 'org_id') then
+    raise exception 'Base en retard : multitenant.sql (le socle) n''est pas passé. Rien n''a été modifié.';
+  end if;
+  if (select count(*) from public.orgs where kind = 'interne') <> 1 then
+    raise exception 'Il faut exactement UNE organisation interne : voir organisation-interne.sql. Rien n''a été modifié.';
+  end if;
+  select id into v_org from public.orgs where kind = 'interne';
+
+  insert into public.formations (org_id, id, data)
+  select v_org, c ->> 'id', c
+    from (select ${BALISE}${json}${BALISE}::jsonb as c) as cours
+   where not exists (
+     select 1 from public.tombstones t
+      where t.org_id = v_org and t.id = c ->> 'id' and t.collection = 'formations'
+   )
+  on conflict (org_id, id) do nothing;
+  get diagnostics v_n = row_count;
+  raise notice '${cours.id} : % ajouté (0 = déjà présent ou supprimé par le gérant).', v_n;
+end $$;
+`;
+};
 
 const sql = `-- =====================================================================
 --  Académie BestaSolar — dotation des trois formations
---  « Démarrer avec BestaSolar Pro », « Créer des devis qui signent »,
---  « Gagner de l'argent avec BestaSolar Pro ».
 --
 --  FICHIER GÉNÉRÉ — ne pas modifier ici. Source : src/data/formationsAcademie.js
 --    node scripts/formations-sql.mjs
 --
---  À exécuter dans le SQL Editor (Run), en entier, dans les DEUX projets
---  Supabase : la base de recette, puis la base réelle.
+--  À exécuter dans le SQL Editor (Run) des DEUX projets Supabase : la base
+--  de recette, puis la base réelle. Tout d'un coup, ou bloc par bloc : chaque
+--  formation est un bloc indépendant.
 --
 --  Rejouable sans risque :
 --   - n'ajoute que les cours ABSENTS de l'organisation interne ;
@@ -39,38 +81,10 @@ const sql = `-- ================================================================
 --  l'organisation interne en partage, sans copie.
 -- =====================================================================
 
-do $$
-declare
-  v_internes int;
-  v_org      text;
-  v_ajoutes  int;
-begin
-  if to_regclass('public.orgs') is null
-     or not exists (select 1 from information_schema.columns
-                     where table_schema = 'public' and table_name = 'formations' and column_name = 'org_id') then
-    raise exception 'Base en retard : multitenant.sql (le socle) n''est pas passé. Rien n''a été modifié.';
-  end if;
-
-  select count(*) into v_internes from public.orgs where kind = 'interne';
-  if v_internes <> 1 then
-    raise exception '% organisation(s) interne(s) au lieu d''une : voir organisation-interne.sql. Rien n''a été modifié.', v_internes;
-  end if;
-  select id into v_org from public.orgs where kind = 'interne';
-
-  insert into public.formations (org_id, id, data)
-  select v_org, c ->> 'id', c
-    from jsonb_array_elements(${BALISE}${json}${BALISE}::jsonb) as c
-   where not exists (
-     select 1 from public.tombstones t
-      where t.org_id = v_org and t.id = c ->> 'id' and t.collection = 'formations'
-   )
-  on conflict (org_id, id) do nothing;
-  get diagnostics v_ajoutes = row_count;
-
-  raise notice 'Académie BestaSolar : % cours ajouté(s) à l''organisation %.', v_ajoutes, v_org;
-end $$;
-
--- CONTRÔLE — trois lignes attendues, « visible » à oui.
+${FORMATIONS_ACADEMIE.map((c, i) => bloc(c, i + 1)).join('\n')}
+-- ---------------------------------------------------------------------
+--  CONTRÔLE — trois lignes attendues, « visible » à oui.
+-- ---------------------------------------------------------------------
 select f.id,
        f.data ->> 'title'                                         as titre,
        jsonb_array_length(f.data -> 'modules')                    as modules,

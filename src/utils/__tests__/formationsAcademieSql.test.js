@@ -7,10 +7,9 @@ import { readFileSync } from 'node:fs';
 import { FORMATIONS_ACADEMIE } from '../../data/formationsAcademie';
 
 const SQL = readFileSync(new URL('../../../supabase/formations-academie.sql', import.meta.url), 'utf8');
-const coursDuScript = () => {
-  const m = /\$academie\$([\s\S]*?)\$academie\$::jsonb/.exec(SQL);
-  return m ? JSON.parse(m[1]) : null;
-};
+// Un bloc par formation : on relit le JSON de chacun, dans l'ordre.
+const coursDuScript = () =>
+  [...SQL.matchAll(/\$academie\$([\s\S]*?)\$academie\$::jsonb/g)].map((m) => JSON.parse(m[1]));
 
 describe('supabase/formations-academie.sql', () => {
   it('embarque exactement les cours de l’application (sinon : node scripts/formations-sql.mjs)', () => {
@@ -18,13 +17,14 @@ describe('supabase/formations-academie.sql', () => {
   });
 
   it('est rejouable : il n’écrase rien et ne ressuscite rien', () => {
-    expect(SQL).toMatch(/on conflict \(org_id, id\) do nothing/);
-    expect(SQL).toMatch(/not exists \(\s*select 1 from public\.tombstones/);
+    // Chaque bloc porte ses propres garde-fous : il s'exécute seul.
+    expect(SQL.match(/on conflict \(org_id, id\) do nothing/g)).toHaveLength(3);
+    expect(SQL.match(/not exists \(\s*select 1 from public\.tombstones/g)).toHaveLength(3);
     expect(SQL).not.toMatch(/\bdelete\s+from\b|\bdrop\s+(table|policy)\b|\bupdate\s+public\./i);
   });
 
   it('n’écrit que dans l’organisation interne, et s’arrête si elle est ambiguë', () => {
     expect(SQL).toMatch(/where kind = 'interne'/);
-    expect(SQL).toMatch(/if v_internes <> 1 then\s+raise exception/);
+    expect(SQL.match(/where kind = 'interne'\) <> 1 then\s+raise exception/g)).toHaveLength(3);
   });
 });

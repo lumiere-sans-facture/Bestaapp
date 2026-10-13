@@ -59,7 +59,9 @@ describe('Académie : structure des formations', () => {
       expect(c.author).toBe('Académie BestaSolar');
       // Couverture SVG en data URL : rien à télécharger, affichage hors ligne.
       expect(c.cover).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
-      expect(decodeURIComponent(c.cover)).toContain('viewBox="0 0 1600 900"');
+      expect(decodeURIComponent(c.cover)).toContain("viewBox='0 0 1600 900'");
+      // Encodage minimal : aucun caractère qui casserait l'URL ou le SQL.
+      expect(c.cover).not.toMatch(/["#<>]/);
       for (const l of allLecons(c)) {
         expect(TYPES_LECON.has(l.type)).toBe(true);
         expect(parseMinutes(l.duration)).toBeGreaterThan(0);

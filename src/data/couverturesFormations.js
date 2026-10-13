@@ -33,7 +33,8 @@ const DESSIN_DEMARRER = `
 <circle cx="1330" cy="285" r="62" fill="${ORANGE}"/>
 ${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
     const r = (a * Math.PI) / 180;
-    return `<line x1="${1330 + Math.cos(r) * 82}" y1="${285 + Math.sin(r) * 82}" x2="${1330 + Math.cos(r) * 108}" y2="${285 + Math.sin(r) * 108}" stroke="${ORANGE}" stroke-width="12" stroke-linecap="round"/>`;
+    const pt = (v) => Math.round(v); // au pixel près : pas de 1387.982756057297
+    return `<line x1="${pt(1330 + Math.cos(r) * 82)}" y1="${pt(285 + Math.sin(r) * 82)}" x2="${pt(1330 + Math.cos(r) * 108)}" y2="${pt(285 + Math.sin(r) * 108)}" stroke="${ORANGE}" stroke-width="12" stroke-linecap="round"/>`;
   }).join('')}
 <g transform="translate(1010 470) skewX(-12)">
   <rect width="300" height="170" rx="10" fill="#1F4FBF" stroke="#ffffff" stroke-width="6"/>
@@ -81,7 +82,15 @@ ${[[1370, 560, 120], [1440, 470, 210], [1510, 380, 300]].map(([x, y, h]) => `<re
 <polyline points="1330,520 1400,450 1460,470 1540,300" fill="none" stroke="${ORANGE}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M1512 292 L1556 280 L1548 326 Z" fill="${ORANGE}"/>`;
 
-const enDataUrl = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace(/\n\s*/g, ' '))}`;
+// Encodage minimal (comme mini-svg-data-uri) : guillemets simples, et seuls
+// les caractères qui gênent une URL sont encodés (%, #, <, >, accents). La
+// couverture pèse moitié moins qu'avec encodeURIComponent, et le script SQL
+// qui la transporte reste lisible.
+const enDataUrl = (svg) => `data:image/svg+xml;charset=utf-8,${svg
+  .replace(/\n\s*/g, ' ')
+  .replace(/"/g, "'")
+  .replace(/%/g, '%25').replace(/#/g, '%23').replace(/</g, '%3C').replace(/>/g, '%3E')
+  .replace(/[^\x20-\x7e]/g, encodeURIComponent)}`;
 
 export const COUVERTURE_DEMARRER = enDataUrl(cadre(
   ['Démarrer avec', 'BestaSolar Pro'], DESSIN_DEMARRER,
