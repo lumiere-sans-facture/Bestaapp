@@ -25,8 +25,14 @@
 --                         souvent) ;
 --   à vérifier            rien n'est touché : une commission déjà PAYÉE ou
 --                         DEMANDÉE ne se réécrit pas, une inscription notée
---                         par le seul nom ne se devine pas. À trancher à la
---                         main (la ligne propose la commande).
+--                         par le seul nom ne se devine pas, un parrain qui
+--                         fermerait une boucle ou dont le code est inconnu
+--                         n'est pas appliqué. À trancher à la main (la ligne
+--                         propose la commande).
+--
+--   Ordre des preuves d'un lien : le code utilisé à l'INSCRIPTION (ancienne
+--   entreprise, registre) passe avant le parrain noté sur la fiche
+--   partenaire, que l'ancienne application écrivait aussi d'office.
 -- Trop de lignes pour être lues ? rattrapage-parrainage-resume.sql en donne
 -- le résumé (lecture seule), doublons payés chiffrés.
 select etape, objet, detail

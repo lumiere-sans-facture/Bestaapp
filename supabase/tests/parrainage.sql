@@ -423,5 +423,48 @@ do $$ begin
 end $$;
 \echo '   ✓ affaire recopiée : aucune erreur, rien de payé n''est touché, niveau 2 créé une fois'
 
+\echo '14. RATTRAPAGE : indices contradictoires et codes portés par plusieurs fiches'
+-- Cas réel du projet de test. Yao s'est inscrit avec le code de Xavier (son
+-- ancienne entreprise le garde dans referred_by). Mais la fiche partenaire de
+-- Xavier porte « YAO » comme parrain, un reste de l'ancienne application.
+-- Chacun serait le parrain de l'autre. Et chaque code est AUSSI porté par une
+-- fiche plus ancienne sans compte (contact saisi à la main), ce qui masquait
+-- la boucle : les deux liens passaient.
+set session_replication_role = replica;
+insert into public.orgs (id, name, kind, referred_by) values ('org-yao', 'Entreprise de Yao', 'pro', 'XAV') on conflict do nothing;
+insert into auth.users (id, email) values
+  ('99999999-9999-4999-8999-999999999991', 'x@test.tg'), ('99999999-9999-4999-8999-999999999992', 'y@test.tg');
+insert into public.profiles (id, email, name, role, org_id) values
+  ('99999999-9999-4999-8999-999999999991', 'x@test.tg', 'Xavier', 'technicien', 'org-bestasolar'),
+  ('99999999-9999-4999-8999-999999999992', 'y@test.tg', 'Yao', 'technicien', 'org-yao');
+-- Les contacts homonymes ne peuvent exister que sur une base sans l'index
+-- d'unicité des codes (migration 20260830) : SOCLE=fin-aout.
+do $$ begin
+  if to_regclass('public.partners_unique_code_ci_idx') is null then
+    insert into public.partners (org_id, id, data, updated_at) values
+      ('org-bestasolar', 'contact-xav', '{"id":"contact-xav","name":"Xavier (contact)","code":"XAV"}', now() - interval '60 days'),
+      ('org-bestasolar', 'contact-yao', '{"id":"contact-yao","name":"Yao (contact)","code":"YAO"}', now() - interval '60 days');
+  end if;
+end $$;
+insert into public.partners (org_id, id, data, updated_at) values
+  ('org-bestasolar', 'p-user-99999999-9999-4999-8999-999999999991',
+   '{"id":"p-user-99999999-9999-4999-8999-999999999991","userId":"99999999-9999-4999-8999-999999999991","name":"Xavier","code":"XAV","sponsorCode":"YAO"}', now()),
+  ('org-yao', 'p-user-99999999-9999-4999-8999-999999999992',
+   '{"id":"p-user-99999999-9999-4999-8999-999999999992","userId":"99999999-9999-4999-8999-999999999992","name":"Yao","code":"YAO"}', now());
+set session_replication_role = origin;
+
+select etape, objet, detail from public.rattraper_parrainage_commissions(true)
+ where objet like '%99999999-9999-4999-8999-99999999999%' order by 1, 2;
+do $$ begin
+  assert (select parrain_partner_id from public.parrainages where filleul_id = '99999999-9999-4999-8999-999999999992')
+         = 'p-user-99999999-9999-4999-8999-999999999991',
+    'le code désigne la fiche du COMPTE, pas un contact homonyme sans compte';
+  assert not exists (select 1 from public.parrainages where filleul_id = '99999999-9999-4999-8999-999999999991'),
+    'l''inscription par code prime sur la fiche : le lien inverse, qui fermerait une boucle, est refusé';
+  assert not exists (select 1 from public.rattraper_parrainage_commissions(true) where etape <> 'à vérifier'),
+    'relancé, le rattrapage ne propose plus rien : le lien refusé reste « à vérifier »';
+end $$;
+\echo '   ✓ inscription avant fiche, code rattaché au compte, boucle signalée « à vérifier »'
+
 \echo ''
 \echo '✅ Scénario parrainage : tous les contrôles passent'

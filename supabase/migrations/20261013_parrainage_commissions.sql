@@ -181,13 +181,20 @@ create or replace function public.profil_du_partenaire(p_partenaire text)
 $$;
 
 -- Fiche partenaire désignée par un code (avec ou sans l'ancien préfixe).
+-- Sur une base sans l'index d'unicité des codes (migration 20260830), un
+-- même code peut figurer sur plusieurs fiches : celle d'un compte, et un
+-- contact saisi à la main avant que la personne ne s'inscrive. Le code
+-- désigne la PERSONNE : la fiche reliée à un compte passe donc en premier.
+-- Sans cela, le lien partait vers le contact, et ni « Mes filleuls » ni le
+-- garde-fou contre les boucles ne reconnaissaient le parrain.
 create or replace function public.partenaire_du_code(p_code text)
   returns text language sql stable security definer set search_path = public as $$
   select pt.id from public.partners pt
   where public.code_partenaire(p_code) is not null
     and (upper(btrim(pt.data ->> 'code')) = public.code_partenaire(p_code)
          or public.code_partenaire(pt.data ->> 'code') = public.code_partenaire(p_code))
-  order by pt.updated_at asc, pt.id
+  order by (coalesce(pt.data ->> 'userId', '') <> '' or pt.id like 'p-user-%') desc,
+           pt.updated_at asc, pt.id
   limit 1
 $$;
 
@@ -1250,8 +1257,53 @@ begin
     select public.code_partenaire(o.referred_by) into v_interne_ref
       from public.orgs o where o.kind = 'interne' and o.merged_into is null order by o.created_at limit 1;
 
-    -- A. LIENS PARRAIN → FILLEUL
-    -- A1. Le parrain noté sur la fiche partenaire du compte.
+    -- A. LIENS PARRAIN → FILLEUL, de la preuve la plus forte à la plus faible :
+    --    le code utilisé à l'inscription d'abord, la fiche partenaire ensuite.
+    -- A1. Une ancienne entreprise distincte, inscrite par un code : chacun de
+    --     ses membres a ce parrain.
+    for r in
+      select pr.id as filleul, public.code_partenaire(o.referred_by) as code
+      from public.orgs o
+      join public.profiles pr on pr.org_id = o.id
+      where o.referred_by is not null and o.kind <> 'interne'
+        and not exists (select 1 from public.parrainages pa where pa.filleul_id = pr.id)
+    loop
+      objet := 'compte ' || r.filleul;
+      begin
+        v_ok := public.enregistrer_parrainage(r.filleul, r.code, 'rattrapage');
+        etape := case when v_ok then 'lien parrain' else 'à vérifier' end;
+        detail := 'parrain ' || r.code || case when v_ok then ' (entreprise d''origine)' else ' non appliqué : code inconnu ou le sien' end;
+      exception when others then
+        etape := 'à vérifier'; detail := 'parrain ' || r.code || ' non appliqué : ' || sqlerrm;
+      end;
+      return next;
+    end loop;
+
+    -- A2. L'inscription notée au registre avec l'identifiant du filleul.
+    for r in
+      select distinct on (rf.data ->> 'filleulId') rf.data ->> 'filleulId' as filleul,
+             public.code_partenaire(rf.data ->> 'partnerCode') as code
+      from public.referrals rf
+      join public.profiles pr on pr.id = rf.data ->> 'filleulId'
+      where rf.data ->> 'type' = 'inscription'
+        and not exists (select 1 from public.parrainages pa where pa.filleul_id = rf.data ->> 'filleulId')
+      order by rf.data ->> 'filleulId', rf.updated_at
+    loop
+      objet := 'compte ' || r.filleul;
+      begin
+        v_ok := public.enregistrer_parrainage(r.filleul, r.code, 'rattrapage');
+        etape := case when v_ok then 'lien parrain' else 'à vérifier' end;
+        detail := 'parrain ' || r.code || case when v_ok then ' (inscription)' else ' non appliqué : code inconnu ou le sien' end;
+      exception when others then
+        etape := 'à vérifier'; detail := 'parrain ' || r.code || ' non appliqué : ' || sqlerrm;
+      end;
+      return next;
+    end loop;
+
+    -- A3. Le parrain noté sur la fiche partenaire du compte. En DERNIER :
+    --     c'est l'indice le plus faible (l'ancienne application l'écrivait
+    --     aussi d'office). Quand il contredit une inscription, le lien
+    --     qu'il proposerait fermerait une boucle et il est refusé.
     for r in
       select distinct on (pt.data ->> 'userId') pt.data ->> 'userId' as filleul,
         coalesce(
@@ -1275,51 +1327,10 @@ begin
       end if;
       begin
         v_ok := public.enregistrer_parrainage(r.filleul, r.code, 'rattrapage');
-        etape := case when v_ok then 'lien parrain' else 'lien impossible' end;
-        detail := 'parrain ' || r.code || case when v_ok then ' (fiche partenaire)' else ' : code inconnu' end;
+        etape := case when v_ok then 'lien parrain' else 'à vérifier' end;
+        detail := 'parrain ' || r.code || case when v_ok then ' (fiche partenaire)' else ' non appliqué : code inconnu ou le sien' end;
       exception when others then
-        etape := 'lien refusé'; detail := 'parrain ' || r.code || ' : ' || sqlerrm;
-      end;
-      return next;
-    end loop;
-
-    -- A2. Une ancienne entreprise distincte, inscrite par un code : chacun de
-    --     ses membres a ce parrain.
-    for r in
-      select pr.id as filleul, public.code_partenaire(o.referred_by) as code
-      from public.orgs o
-      join public.profiles pr on pr.org_id = o.id
-      where o.referred_by is not null and o.kind <> 'interne'
-        and not exists (select 1 from public.parrainages pa where pa.filleul_id = pr.id)
-    loop
-      objet := 'compte ' || r.filleul;
-      begin
-        v_ok := public.enregistrer_parrainage(r.filleul, r.code, 'rattrapage');
-        etape := case when v_ok then 'lien parrain' else 'lien impossible' end;
-        detail := 'parrain ' || r.code || case when v_ok then ' (entreprise d''origine)' else ' : code inconnu ou le sien' end;
-      exception when others then
-        etape := 'lien refusé'; detail := 'parrain ' || r.code || ' : ' || sqlerrm;
-      end;
-      return next;
-    end loop;
-
-    -- A3. L'inscription notée au registre avec l'identifiant du filleul.
-    for r in
-      select distinct on (rf.data ->> 'filleulId') rf.data ->> 'filleulId' as filleul,
-             public.code_partenaire(rf.data ->> 'partnerCode') as code
-      from public.referrals rf
-      join public.profiles pr on pr.id = rf.data ->> 'filleulId'
-      where rf.data ->> 'type' = 'inscription'
-        and not exists (select 1 from public.parrainages pa where pa.filleul_id = rf.data ->> 'filleulId')
-      order by rf.data ->> 'filleulId', rf.updated_at
-    loop
-      objet := 'compte ' || r.filleul;
-      begin
-        v_ok := public.enregistrer_parrainage(r.filleul, r.code, 'rattrapage');
-        etape := case when v_ok then 'lien parrain' else 'lien impossible' end;
-        detail := 'parrain ' || r.code || ' (inscription)';
-      exception when others then
-        etape := 'lien refusé'; detail := 'parrain ' || r.code || ' : ' || sqlerrm;
+        etape := 'à vérifier'; detail := 'parrain ' || r.code || ' non appliqué : ' || sqlerrm;
       end;
       return next;
     end loop;
