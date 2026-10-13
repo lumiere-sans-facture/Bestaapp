@@ -60,6 +60,22 @@ describe('dotation des nouveaux cours du seed', () => {
     expect(second.formations).toHaveLength(premier.formations.length);
   });
 
+  it('une installation d’avant l’Académie reçoit ses trois formations, progression intacte', () => {
+    // Situation réelle : les cours f1 à f5 sont dotés depuis longtemps, un
+    // technicien a déjà terminé une leçon de l'ancien cours d'accueil.
+    const anciens = seed.formations.filter((f) => !f.id.startsWith('academie-'));
+    const progres = [{ id: 'fp-u2-f1m1l1', userId: 'u2', formationId: 'f1', leconId: 'f1m1l1', status: 'complete' }];
+    store.set(STORAGE_KEY, JSON.stringify(etatSauvegarde(anciens, {
+      formationsDotees: anciens.map((f) => f.id),
+      formationProgress: progres,
+    })));
+    const s = loadState();
+    const ids = s.formations.map((f) => f.id);
+    expect(ids).toEqual([...anciens.map((f) => f.id), 'academie-demarrer', 'academie-devis', 'academie-revenus']);
+    expect(s.formationProgress).toEqual(progres);
+    expect(s.formationsDotees).toEqual(expect.arrayContaining(['academie-demarrer', 'academie-devis', 'academie-revenus']));
+  });
+
   it('l’état initial embarque tous les cours et le registre complet', () => {
     const s = buildInitialState();
     expect(s.formations).toEqual(seed.formations);

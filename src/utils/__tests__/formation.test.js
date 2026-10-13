@@ -4,6 +4,7 @@ import {
   parseMinutes, courseDuration, courseCounts,
   parseTimecode, formatTimecode, parseChaptersText, chaptersToText,
   coursVisible, coursVerrouille, actionCours,
+  corrigerQuiz, questionValide, blocsLecon, schemasCites,
 } from '../formation';
 
 const course = {
@@ -155,5 +156,47 @@ describe('actionCours — un cours vide reste ouvrable par son gestionnaire', ()
     expect(actionCours({ lecons: 4 })).toMatchObject({ label: 'Commencer', ouvrable: true });
     expect(actionCours({ lecons: 4, done: 2, pct: 50 })).toMatchObject({ label: 'Continuer', ouvrable: true });
     expect(actionCours({ lecons: 4, done: 4, pct: 100 })).toMatchObject({ label: 'Revoir le cours', ouvrable: true });
+  });
+});
+
+describe('quiz : correction automatique', () => {
+  const questions = [
+    { id: 'q1', question: 'A ?', choix: ['oui', 'non'], bonne: 0, explication: 'Parce que.' },
+    { id: 'q2', question: 'B ?', choix: ['x', 'y', 'z'], bonne: 2, explication: 'Ainsi.' },
+  ];
+  it('compte les bonnes réponses et ne se dit complet qu’une fois tout répondu', () => {
+    expect(corrigerQuiz(questions, { q1: 0 })).toMatchObject({ score: 1, total: 2, complet: false });
+    const c = corrigerQuiz(questions, { q1: 1, q2: 2 });
+    expect(c).toMatchObject({ score: 1, total: 2, complet: true });
+    expect(c.resultats.map((r) => r.juste)).toEqual([false, true]);
+    expect(c.resultats[0]).toMatchObject({ choisie: 1, bonne: 0 });
+  });
+  it('une réponse qui n’est pas un indice compte comme non répondue', () => {
+    expect(corrigerQuiz(questions, { q1: '0', q2: null }).complet).toBe(false);
+  });
+  it('un quiz sans question n’est jamais complet', () => {
+    expect(corrigerQuiz([], {})).toMatchObject({ score: 0, total: 0, complet: false });
+  });
+  it('questionValide refuse une bonne réponse hors des choix ou sans explication', () => {
+    expect(questionValide(questions[0])).toBe(true);
+    expect(questionValide({ ...questions[0], bonne: 2 })).toBe(false);
+    expect(questionValide({ ...questions[0], explication: ' ' })).toBe(false);
+    expect(questionValide({ ...questions[0], choix: ['seul'] })).toBe(false);
+  });
+});
+
+describe('texte de leçon : paragraphes, listes et schémas', () => {
+  it('reconnaît une ligne de schéma seule dans son bloc', () => {
+    const blocs = blocsLecon('Intro\nsuite\n\n[[schema:kit]]\n\n- un\n- deux');
+    expect(blocs).toEqual([
+      { type: 'texte', paragraphe: 'Intro suite', items: [] },
+      { type: 'schema', nom: 'kit' },
+      { type: 'texte', paragraphe: '', items: ['un', 'deux'] },
+    ]);
+    expect(schemasCites('a\n\n[[schema:flux-devis]]')).toEqual(['flux-devis']);
+  });
+  it('un schéma noyé dans un paragraphe reste du texte (jamais interprété)', () => {
+    expect(blocsLecon('Voir [[schema:kit]] ici')[0]).toMatchObject({ type: 'texte' });
+    expect(blocsLecon('[[schema:<script>]]')[0]).toMatchObject({ type: 'texte' });
   });
 });

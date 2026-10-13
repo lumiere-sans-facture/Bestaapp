@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Pencil, Check, PlayCircle, FileText, AlignLeft,
   Clock, ExternalLink, GraduationCap, CheckCircle2, Circle, Layers, Crown, Lock, EyeOff, ListOrdered,
-  Camera, Trash2,
+  Camera, Trash2, ListChecks,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -14,15 +14,17 @@ import { fetchYoutubeSommaire, youtubeVideoId } from '../../lib/youtube';
 import {
   allLecons, isLeconDone, courseProgress, resumeLecon, nextLecon, prevLecon,
   courseDuration, courseCounts, parseChaptersText, chaptersToText, formatTimecode,
-  coursVisible, coursVerrouille, actionCours,
+  coursVisible, coursVerrouille, actionCours, blocsLecon,
 } from '../../utils/formation';
 import Sheet from '../../components/Sheet';
 import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
 import DangerZone from '../../components/DangerZone';
+import QuizLecon from '../../components/formation/QuizLecon';
+import SchemaFormation from '../../components/formation/SchemaFormation';
 
-const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText };
-const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document' };
+const LECON_ICON = { video: PlayCircle, texte: AlignLeft, pdf: FileText, quiz: ListChecks };
+const LECON_TYPE_LABEL = { video: 'Vidéo', texte: 'Lecture', pdf: 'Document', quiz: 'Quiz' };
 const EMPTY_COURSE = { title: '', description: '', author: '', acces: 'tous', masque: false, cover: '' };
 
 /**
@@ -51,22 +53,19 @@ const MESSAGE_SOMMAIRE = {
 
 const EMPTY_LECON = { title: '', description: '', type: 'video', url: '', content: '', duration: '', chaptersText: '', actionTitle: '', actionContent: '', targetCourseId: '', targetModuleId: '' };
 
-/** Contenu d'une leçon texte : paragraphes + listes (« - … »), sans dépendance. */
+/** Contenu d'une leçon texte : paragraphes, listes (« - … ») et schémas
+ *  (« [[schema:nom]] » sur une ligne seule), sans dépendance. */
 function TexteContent({ content }) {
-  const blocks = String(content || '').split(/\n{2,}/);
   return (
     <div className="lecon-texte">
-      {blocks.map((block, i) => {
-        const lines = block.split('\n');
-        const items = lines.filter((l) => l.startsWith('- '));
-        const rest = lines.filter((l) => !l.startsWith('- ')).join(' ').trim();
-        return (
+      {blocsLecon(content).map((bloc, i) => (bloc.type === 'schema'
+        ? <SchemaFormation key={i} nom={bloc.nom} />
+        : (
           <div key={i}>
-            {rest && <p>{rest}</p>}
-            {items.length > 0 && <ul>{items.map((l, j) => <li key={j}>{l.slice(2)}</li>)}</ul>}
+            {bloc.paragraphe && <p>{bloc.paragraphe}</p>}
+            {bloc.items.length > 0 && <ul>{bloc.items.map((l, j) => <li key={j}>{l}</li>)}</ul>}
           </div>
-        );
-      })}
+        )))}
     </div>
   );
 }
@@ -102,6 +101,9 @@ export default function FormationSection({ onBack }) {
   const [mobileFocus, setMobileFocus] = useState(false); // mobile : contenu plein écran
   const [startAt, setStartAt] = useState(0); // démarrage vidéo (sommaire minuté)
   const [openModules, setOpenModules] = useState(new Set()); // modules dépliés
+  // Quiz vérifié pendant cette visite : une leçon quiz ne se termine qu'une
+  // fois ses réponses vérifiées (réussies ou non).
+  const [quizVerifie, setQuizVerifie] = useState(null);
 
   // Formulaires gérant
   const [courseEdit, setCourseEdit] = useState(null); // null | 'new' | id
@@ -231,7 +233,9 @@ export default function FormationSection({ onBack }) {
       title: leconForm.title.trim(),
       type: leconForm.type,
       duration: leconForm.duration.trim(),
-      url: leconForm.type === 'texte' ? '' : leconForm.url.trim(),
+      // Un quiz n'a ni lien ni texte : ses questions (champ `questions`, hors
+      // formulaire) sont conservées telles quelles par la mise à jour.
+      url: leconForm.type === 'texte' || leconForm.type === 'quiz' ? '' : leconForm.url.trim(),
       content: leconForm.type === 'texte' ? leconForm.content : '',
       description: leconForm.description.trim(),
       actionTitle: leconForm.actionTitle.trim(),
@@ -445,7 +449,7 @@ export default function FormationSection({ onBack }) {
                             targetCourseId: course.id,
                             targetModuleId: m.id,
                           });
-                          setLeconEdit({ moduleId: m.id, id: l.id });
+                          setLeconEdit({ moduleId: m.id, id: l.id, quiz: l.type === 'quiz' });
                         }}>
                         <Pencil size={13} />
                       </button>
@@ -512,6 +516,9 @@ export default function FormationSection({ onBack }) {
                 </a>
               )}
               {lecon.type === 'texte' && <TexteContent content={lecon.content} />}
+              {lecon.type === 'quiz' && (
+                <QuizLecon key={lecon.id} questions={lecon.questions || []} onVerifie={() => setQuizVerifie(lecon.id)} />
+              )}
               {lecon.type === 'pdf' && lecon.url && (
                 <a className="btn btn-outline" href={lecon.url} target="_blank" rel="noopener noreferrer">
                   <FileText size={15} /> Ouvrir le document
@@ -539,7 +546,9 @@ export default function FormationSection({ onBack }) {
                   <ChevronLeft size={15} /> Précédent
                 </button>
                 {!done(lecon.id) ? (
-                  <button className="btn btn-primary lesson-nav-main" onClick={finishAndNext}>
+                  <button className="btn btn-primary lesson-nav-main" onClick={finishAndNext}
+                    disabled={lecon.type === 'quiz' && quizVerifie !== lecon.id}
+                    title={lecon.type === 'quiz' && quizVerifie !== lecon.id ? 'Vérifiez d’abord vos réponses' : undefined}>
                     <Check size={16} /> {next ? 'Terminer et continuer' : 'Terminer la leçon'}
                   </button>
                 ) : next ? (
@@ -618,13 +627,19 @@ export default function FormationSection({ onBack }) {
                 <option value="video">Vidéo</option>
                 <option value="texte">Texte (dans l'app)</option>
                 <option value="pdf">Document PDF</option>
+                {/* Les questions d'un quiz s'écrivent dans les données du
+                    cours : le formulaire ne sait que le renommer ou le
+                    déplacer, sans jamais perdre ses questions. */}
+                {leconEdit?.quiz && <option value="quiz">Quiz</option>}
               </select>
             </Field>
             <Field label="Durée">
               <input className="input" value={leconForm.duration} onChange={(e) => setLeconForm({ ...leconForm, duration: e.target.value })} placeholder="Ex : 12 min" />
             </Field>
           </div>
-          {leconForm.type === 'texte' ? (
+          {leconForm.type === 'quiz' ? (
+            <div className="field-hint">Les questions de ce quiz sont conservées telles quelles.</div>
+          ) : leconForm.type === 'texte' ? (
             <Field label="Contenu de la leçon *">
               <textarea className="input" rows="8" required value={leconForm.content}
                 onChange={(e) => setLeconForm({ ...leconForm, content: e.target.value })}

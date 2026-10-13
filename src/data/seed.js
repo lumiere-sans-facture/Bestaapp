@@ -1,4 +1,5 @@
 import { catalogueProducts } from './catalogue';
+import { FORMATIONS_ACADEMIE } from './formationsAcademie';
 
 // v5 : réseau de partenaires à deux niveaux (sponsorId = parrain du partenaire)
 export const SEED_VERSION = 5;
@@ -53,7 +54,8 @@ export const commissions = [
 
 // Espace formation « école » : cours → modules → leçons (géré par le gérant).
 // Leçons : type 'video' (YouTube/Vimeo/mp4, lues dans l'app), 'texte' (contenu
-// intégré, lisible hors-ligne) ou 'pdf' (lien externe).
+// intégré, lisible hors-ligne), 'pdf' (lien externe) ou 'quiz' (QCM corrigé
+// sur place, voir utils/formation.js).
 const YT = 'https://www.youtube.com/@bestasolar';
 export const formations = [
   {
@@ -254,6 +256,8 @@ export const formations = [
       },
     ],
   },
+  // Académie BestaSolar : les trois parcours guidés (avec quiz et schémas).
+  ...FORMATIONS_ACADEMIE,
 ];
 
 export const productCategories = [

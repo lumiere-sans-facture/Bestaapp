@@ -3042,7 +3042,9 @@ form .login-link { width: 100%; margin-top: 4px; }
 .video-chapter { padding: 6px; }
 .video-chapter-time { background: transparent; padding: 0; color: var(--text-primary); font-size: .875rem; }
 .video-chapter.active .video-chapter-time { background: transparent; color: var(--primary-ink); }
-.lesson-action { margin-top: 20px; border: 1px solid rgba(245, 166, 35, .42); background: #fffdf7; }
+/* Voile orange translucide, pas un crème en dur : sur la carte sombre, le
+   texte clair du thème restait posé sur un fond clair, donc illisible. */
+.lesson-action { margin-top: 20px; border: 1px solid rgba(245, 166, 35, .42); background: rgba(245, 166, 35, .05); }
 .lesson-action-label { padding: 10px 13px; background: var(--accent); color: var(--primary-dark); font-weight: 800; }
 .lesson-action h3 { margin: 18px 18px 8px; text-align: center; font-size: 1.15rem; }
 .lesson-action-content { padding: 0 18px 8px; }
@@ -3052,6 +3054,67 @@ form .login-link { width: 100%; margin-top: 4px; }
 .lesson-next-label { color: var(--text-secondary); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .lesson-next-cta { display: inline-flex; align-items: center; gap: 3px; margin-top: 3px; color: var(--primary-ink); font-size: .8125rem; font-weight: 800; }
 .lesson-action-input { margin-top: 8px; }
+
+/* Schémas des formations (components/formation/SchemaFormation) : SVG
+   intégrés, colorés par les jetons du thème — lisibles en clair comme en
+   sombre. Pensés pour le téléphone (viewBox de 360 de large) : la figure
+   prend toute la largeur, plafonnée sur grand écran. */
+.schema-formation { margin: 4px auto 18px; max-width: 460px; }
+.schema-formation figcaption { margin-top: 6px; font-size: .8125rem; color: var(--text-secondary); text-align: center; }
+.sf { display: block; width: 100%; height: auto; font-family: inherit; }
+.sf text { font-size: 13px; }
+.sf .sf-petit { font-size: 11.5px; }
+.sf .sf-gras { font-weight: 700; }
+.sf-texte { fill: var(--text-primary); }
+.sf-texte-doux { fill: var(--text-secondary); }
+.sf-texte-inverse { fill: #fff; }
+.sf-texte-sombre { fill: #061540; }
+.sf-carte { fill: var(--bg-card); stroke: var(--border); stroke-width: 1.2; }
+.sf-carte-forte { stroke: var(--primary-ink); stroke-width: 1.6; }
+.sf-primaire { fill: var(--primary); }
+.sf-primaire-clair { fill: var(--primary-light); }
+.sf-accent { fill: var(--accent); }
+.sf-succes { fill: var(--success); }
+.sf-point-clair { fill: rgba(255, 255, 255, .55); }
+.sf-grille { stroke: rgba(255, 255, 255, .55); stroke-width: 1.5; }
+.sf-rayon { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.sf-trait { stroke: var(--border); stroke-width: 3; }
+.sf-fleche { stroke: var(--primary-ink); stroke-width: 2.2; fill: none; }
+.sf-pointe { fill: var(--primary-ink); }
+.sf-pointille { stroke-dasharray: 5 4; }
+.sf-hachure { fill: none; stroke: var(--accent-dark); stroke-width: 1.5; stroke-dasharray: 6 4; }
+
+/* Leçon « quiz » (components/formation/QuizLecon) : un QCM corrigé sur place.
+   Vert et rouge en bordure et en voile léger, jamais en aplat : lisibles sur
+   les deux thèmes. */
+.quiz { display: flex; flex-direction: column; gap: 16px; }
+.quiz-question { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin: 0; min-width: 0; }
+.quiz-enonce { display: flex; gap: 8px; align-items: baseline; padding: 0; font-weight: 700; font-size: .9375rem; line-height: 1.45; color: var(--text-primary); }
+.quiz-numero { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: .75rem; }
+.quiz-choix-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.quiz-choix {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--tap, 44px);
+  padding: 9px 12px; text-align: left; cursor: pointer;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card);
+  color: var(--text-primary); font: inherit; font-size: .875rem; line-height: 1.4;
+}
+.quiz-choix:disabled { cursor: default; }
+.quiz-choix-puce { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: var(--bg); color: var(--text-secondary); font-weight: 700; font-size: .75rem; }
+.quiz-choix-texte { flex: 1; }
+.quiz-choix-icone { flex-shrink: 0; }
+.quiz-choix.is-choisi { border-color: var(--primary-ink); background: rgba(10, 36, 114, .06); }
+.quiz-choix.is-choisi .quiz-choix-puce { background: var(--primary); color: #fff; }
+.quiz-choix.is-juste { border-color: var(--success); background: rgba(16, 185, 129, .1); }
+.quiz-choix.is-juste .quiz-choix-icone { color: var(--success-ink); }
+.quiz-choix.is-faux { border-color: var(--error); background: rgba(239, 68, 68, .1); }
+.quiz-choix.is-faux .quiz-choix-icone { color: var(--error-ink); }
+.quiz-choix.is-eteint { opacity: .6; }
+.quiz-explication { margin-top: 10px; padding: 9px 11px; border-radius: var(--radius-sm); border-left: 3px solid; font-size: .8438rem; line-height: 1.5; color: var(--text-primary); }
+.quiz-explication.is-juste { border-color: var(--success); background: rgba(16, 185, 129, .08); }
+.quiz-explication.is-faux { border-color: var(--error); background: rgba(239, 68, 68, .08); }
+.quiz-bilan { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px; border-radius: var(--radius); background: var(--bg); }
+.quiz-score { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: var(--primary-ink); }
+.quiz-vide { color: var(--text-secondary); }
 @media (min-width: 900px) { .school-layout { grid-template-columns: 320px minmax(0, 1fr); } .school-side { top: 84px; } }
 
 /* ============ Choix de la formule d'abonnement ============

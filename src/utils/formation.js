@@ -134,3 +134,70 @@ export const parseChaptersText = (text) =>
 /** Chapitres → texte éditable (une ligne par chapitre). */
 export const chaptersToText = (chapters = []) =>
   chapters.map((c) => `${formatTimecode(c.t)} ${c.label}`).join('\n');
+
+// ---- Quiz (leçon de type « quiz ») ----
+// Une question : { id, question, choix: [texte, …], bonne: index du bon
+// choix, explication }. Les réponses de l'apprenant : { [idQuestion]: index }.
+// La correction est automatique et immédiate : l'explication dit POURQUOI
+// la bonne réponse l'est, ce qui fait d'une erreur une occasion d'apprendre.
+
+/** La question est-elle jouable : un énoncé, au moins deux choix, une bonne
+ *  réponse qui existe parmi eux, et une explication à montrer après coup ? */
+export const questionValide = (q) => !!q
+  && typeof q.id === 'string' && q.id !== ''
+  && String(q.question || '').trim() !== ''
+  && Array.isArray(q.choix) && q.choix.length >= 2
+  && q.choix.every((c) => String(c || '').trim() !== '')
+  && Number.isInteger(q.bonne) && q.bonne >= 0 && q.bonne < q.choix.length
+  && String(q.explication || '').trim() !== '';
+
+/**
+ * Correction d'un quiz. `complet` : toutes les questions ont une réponse —
+ * la correction ne s'affiche qu'à ce moment, une question oubliée ne doit pas
+ * passer pour une erreur.
+ * @returns {{resultats: Array<{id, choisie, bonne, juste}>, score: number, total: number, complet: boolean}}
+ */
+export const corrigerQuiz = (questions = [], reponses = {}) => {
+  const resultats = (questions || []).map((q) => {
+    const choisie = reponses?.[q.id];
+    const repondu = Number.isInteger(choisie);
+    return { id: q.id, choisie: repondu ? choisie : null, bonne: q.bonne, juste: repondu && choisie === q.bonne };
+  });
+  return {
+    resultats,
+    score: resultats.filter((r) => r.juste).length,
+    total: resultats.length,
+    complet: resultats.length > 0 && resultats.every((r) => r.choisie != null),
+  };
+};
+
+// ---- Texte d'une leçon : paragraphes, listes et schémas ----
+// Un schéma s'insère par une ligne seule « [[schema:nom]] », séparée du reste
+// par une ligne vide. Le nom désigne un dessin livré AVEC l'application
+// (components/formation/SchemaFormation) : la base ne stocke jamais de SVG,
+// donc rien de ce qu'elle contient n'est injecté tel quel dans la page.
+const LIGNE_SCHEMA = /^\[\[schema:([a-z0-9-]+)\]\]$/;
+
+/**
+ * Blocs d'un texte de leçon, dans l'ordre :
+ *   { type: 'schema', nom }  ou  { type: 'texte', paragraphe, items }.
+ * Un bloc est séparé du suivant par une ligne vide ; dans un bloc texte, les
+ * lignes « - … » forment une liste, les autres un paragraphe.
+ */
+export const blocsLecon = (content) => String(content || '')
+  .split(/\n{2,}/)
+  .map((bloc) => {
+    const schema = LIGNE_SCHEMA.exec(bloc.trim());
+    if (schema) return { type: 'schema', nom: schema[1] };
+    const lignes = bloc.split('\n');
+    return {
+      type: 'texte',
+      paragraphe: lignes.filter((l) => !l.startsWith('- ')).join(' ').trim(),
+      items: lignes.filter((l) => l.startsWith('- ')).map((l) => l.slice(2)),
+    };
+  })
+  .filter((b) => b.type === 'schema' || b.paragraphe || b.items.length);
+
+/** Noms des schémas cités dans un texte de leçon. */
+export const schemasCites = (content) =>
+  blocsLecon(content).filter((b) => b.type === 'schema').map((b) => b.nom);
