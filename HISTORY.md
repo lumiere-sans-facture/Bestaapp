@@ -6,6 +6,8 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-14
+- **E-mail de confirmation : la présentation de l'e-mail actuel, avec le logo, et le code en plus.** Le modèle `supabase/emails/confirmation-inscription.html` reprend l'e-mail que reçoivent aujourd'hui les nouveaux inscrits : logo BestaSolar Pro en tête, « Vérifiez votre adresse e-mail pour continuer vers BestaSolar Pro », l'adresse du compte, le grand bouton orange « Vérifier mon adresse e-mail ». Le code à 6 chiffres est ajouté sous le bouton. Le logo est l'image de l'application, servie par app.bestasolar.com. Si la messagerie bloque les images, « BestaSolar Pro » s'affiche en texte à la place.
+  Rendu vérifié sur téléphone (320 et 400 px) et sur ordinateur, avec et sans images : aucun débordement.
 - **Inscription : un code de confirmation en plus du lien.** L'e-mail « Confirmez votre compte BestaSolar Pro » porte désormais un code à 6 chiffres sous le bouton. Juste après « Créer mon compte », l'écran « Confirmer votre adresse » s'ouvre : on recopie le code, et l'app s'ouvre connectée. Cela marche même quand l'e-mail est lu sur le téléphone et que le lien s'ouvre dans le navigateur au lieu de l'application. L'entreprise et le code partenaire saisis à l'inscription sont gardés. Le lien marche toujours.
   - « Renvoyer l'e-mail » envoie un nouveau code (seul celui du dernier e-mail vaut). Supabase limite les envois à un par minute, et l'écran le dit en français.
   - « J'ai reçu un code de confirmation » depuis l'écran de connexion. Un compte jamais confirmé qui se connecte avec le bon mot de passe arrive aussi sur la saisie du code, au lieu de « mot de passe incorrect ».
