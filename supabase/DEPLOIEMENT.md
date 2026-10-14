@@ -521,6 +521,25 @@ Providers → Email* (« Email OTP Length » à 6, « Email OTP Expiration » à
 qu'annonce l'e-mail). Un code expiré se redemande depuis l'app (« Renvoyer
 l'e-mail »).
 
+### 10.6 « Error sending confirmation email » (ou « … recovery email »)
+
+Supabase n'a pas réussi à remettre l'e-mail au serveur d'envoi : l'inscription
+échoue, et le compte n'est pas créé. L'app affiche « L'e-mail n'a pas pu être
+envoyé pour le moment » et inscrit l'incident au journal des erreurs. Le
+modèle de `supabase/emails/` n'est pas en cause s'il a été collé en entier :
+il est vérifié avec le moteur de modèles de Supabase (Go).
+
+1. Supabase → *Logs → Auth* (ou *Logs Explorer*, source `auth`) : chercher
+   « Error sending ». La ligne donne la vraie raison, en général une erreur
+   SMTP : `535` (identifiant ou clé SMTP Brevo refusés, § 10.2), `550` ou
+   « sender not allowed » (adresse d'envoi non validée chez Brevo), quota
+   journalier atteint, compte Brevo suspendu ou en attente de validation.
+   Autre cause possible : `template:`, si le modèle collé est incomplet.
+2. Brevo → *Transactional → Logs*, et l'état du compte (bandeau en haut du
+   tableau de bord Brevo).
+3. Pour isoler le modèle : recoller l'ancien et réessayer. Si l'e-mail part,
+   c'est le collage du nouveau modèle qu'il faut refaire, en entier.
+
 ## 11. Deux environnements — comment les tenir alignés
 
 Le projet vit sur **deux environnements complets**, chacun avec son projet

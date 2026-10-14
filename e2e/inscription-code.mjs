@@ -7,7 +7,9 @@
         code s'ouvre au lieu de « mot de passe incorrect » ;
      4. code tapé sur un AUTRE appareil (rien de l'inscription n'y est
         gardé) : l'adresse est confirmée, la dernière étape s'affiche ;
-     5. téléphone : écran sans débordement.
+     5. téléphone : écran sans débordement ;
+     6. Supabase n'arrive pas à envoyer l'e-mail (« Error sending
+        confirmation email ») : message en français, rapport au journal.
    Lancer avec un Supabase simulé :
      VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=x npm run dev */
 import { chromium } from '@playwright/test';
@@ -26,10 +28,10 @@ const JETON = `${b64({ alg: 'HS256' })}.${b64({ email: EMAIL, exp, sub: UID })}.
 const PROFIL = { id: UID, email: EMAIL, name: 'Kossi Nouveau', role: 'gerant', org_id: 'org-n', phone: '+22890123456', avatar: 'KN', is_platform_admin: false };
 
 /** Un appareil avec son Supabase simulé ; `t` garde ce que le serveur a reçu. */
-const appareil = async ({ viewport = { width: 1280, height: 900 }, compteNonConfirme = false } = {}) => {
+const appareil = async ({ viewport = { width: 1280, height: 900 }, compteNonConfirme = false, envoiEchoue = false } = {}) => {
   const ctx = await nav.newContext({ viewport });
-  const t = { verify: [], resend: 0, rpc: [], profilCree: false };
-  await ctx.route('**/api/erreur**', (route) => route.fulfill({ status: 204, body: '' }));
+  const t = { verify: [], resend: 0, rpc: [], profilCree: false, rapports: [] };
+  await ctx.route('**/api/erreur**', (route) => { t.rapports.push(route.request().postData() || ''); return route.fulfill({ status: 204, body: '' }); });
   await ctx.route('http://127.0.0.1:54321/**', async (route) => {
     const req = route.request(); const c = new URL(req.url()).pathname;
     const corps = () => JSON.parse(req.postData() || '{}');
@@ -37,6 +39,7 @@ const appareil = async ({ viewport = { width: 1280, height: 900 }, compteNonConf
     const utilisateur = { id: UID, email: EMAIL, aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {} };
     const session = { access_token: JETON, refresh_token: 'r', token_type: 'bearer', expires_in: 86400, expires_at: exp, user: { ...utilisateur, email_confirmed_at: new Date().toISOString() } };
     // Inscription avec « Confirm email » : un utilisateur, PAS de session.
+    if (c === '/auth/v1/signup' && envoiEchoue) return json({ code: 500, error_code: 'unexpected_failure', msg: 'Error sending confirmation email' }, 500);
     if (c === '/auth/v1/signup') return json({ ...utilisateur, email_confirmed_at: null, identities: [{ id: UID, provider: 'email' }] });
     if (c === '/auth/v1/verify') {
       const b = corps(); t.verify.push(b);
@@ -168,6 +171,25 @@ const titre = (page) => page.locator('.login-form-title').innerText();
   const debord = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
   ok(debord <= 0, `téléphone : aucun défilement horizontal (${debord} px)`);
   await page.screenshot({ path: `${CAPTURES}/inscription-code-mobile.png` });
+  await ctx.close();
+}
+
+// ---- 6. ENVOI DE L'E-MAIL REFUSÉ PAR SUPABASE ----
+{
+  const { ctx, page, t } = await appareil({ envoiEchoue: true });
+  await page.goto(B + '/inscription');
+  await page.waitForSelector('#signup-name');
+  await page.fill('#signup-name', 'Kossi Nouveau');
+  await page.fill('#signup-phone', '90123456');
+  await page.fill('#login-email', EMAIL);
+  await page.fill('#login-password', 'motdepasse123');
+  await page.locator('button[type="submit"]', { hasText: 'Créer mon compte' }).click();
+  await page.waitForSelector('.login-error', { timeout: 15000 });
+  const message = await page.locator('.login-error').innerText();
+  ok(/n’a pas pu être envoyé/.test(message) && !/Error sending/i.test(message), `envoi refusé : message en français [${message}]`);
+  await page.waitForTimeout(1500);
+  ok(t.rapports.some((r) => /envoi de l'e-mail refusé \(inscription\)/.test(r)) && !t.rapports.some((r) => r.includes(EMAIL)),
+    'le gérant est prévenu au journal des erreurs, sans l’adresse du client');
   await ctx.close();
 }
 

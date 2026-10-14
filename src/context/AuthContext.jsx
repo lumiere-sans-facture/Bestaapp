@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { users } from '../data/seed';
 import { supabase, isSupabaseConfigured, emailSessionMemorisee, estCoupureReseauAuth } from '../lib/supabase';
-import { setContexteErreur } from '../lib/rapportErreur';
+import { setContexteErreur, signalerErreur } from '../lib/rapportErreur';
 import { setContexteAnalytique } from '../lib/analytique';
 import { marquerGuideNouveauUtilisateur } from '../utils/onboarding';
 import { setSyncOrg, fetchMyOrg } from '../lib/remoteSync';
@@ -40,6 +40,18 @@ const sanitizeSignupError = (message) =>
   ACCOUNT_EXISTS_PATTERN.test(message || '')
     ? 'Inscription impossible. Si vous avez déjà un compte avec cet email, connectez-vous plutôt.'
     : message;
+
+// « Error sending confirmation email » / « … recovery email » : Supabase n'a
+// pas pu remettre l'e-mail à son serveur d'envoi (SMTP Brevo refusé, quota
+// atteint, modèle invalide). Ce n'est pas la faute du client : message en
+// français pour lui, et rapport au journal des erreurs pour le gérant — la
+// cause exacte se lit dans Supabase → Logs → Auth (DEPLOIEMENT § 10).
+const ENVOI_EMAIL_ECHOUE = /error sending .*e-?mail/i;
+const messageEnvoiEmail = (error, operation) => {
+  if (!ENVOI_EMAIL_ECHOUE.test(error?.message || '')) return null;
+  signalerErreur(new Error(`Supabase : envoi de l'e-mail refusé (${operation}) — ${error.message}`), { origine: 'auth' });
+  return 'L’e-mail n’a pas pu être envoyé pour le moment. Réessayez dans quelques minutes ; si cela continue, contactez BestaSolar.';
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -361,7 +373,7 @@ export function AuthProvider({ children }) {
       password,
       options: { data: { name, phone: phone || '', companyName: companyName || null, inviteCode: inviteCode || null } },
     });
-    if (error) return { ok: false, error: sanitizeSignupError(error.message) };
+    if (error) return { ok: false, error: messageEnvoiEmail(error, 'inscription') || sanitizeSignupError(error.message) };
     // Si la confirmation d'email est activée, le profil sera créé au premier
     // login : on mémorise l'entreprise / le code (invitation, parrainage) en attendant.
     localStorage.setItem(PENDING_KEY, JSON.stringify({ email: email.trim(), name, phone: phone || '', companyName, inviteCode, refCode: refCode || null }));
@@ -455,6 +467,8 @@ export function AuthProvider({ children }) {
     if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
     const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
     if (!error) return { ok: true };
+    const envoi = messageEnvoiEmail(error, 'renvoi de la confirmation');
+    if (envoi) return { ok: false, error: envoi };
     const attendre = error.status === 429 || /seconds|security purposes|rate limit/i.test(error.message || '');
     return {
       ok: false,
@@ -470,7 +484,7 @@ export function AuthProvider({ children }) {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: window.location.origin,
     });
-    return { ok: !error, error: error?.message };
+    return { ok: !error, error: error ? messageEnvoiEmail(error, 'mot de passe oublié') || error.message : undefined };
   };
 
   /** Définit le nouveau mot de passe après le clic sur le lien reçu. */
