@@ -516,8 +516,10 @@ L'e-mail de confirmation (« Confirm signup ») porte un lien ET un code à
 votre adresse ». Tant que l'ancien modèle reste collé, l'e-mail n'a que le
 lien : l'écran du code s'affiche quand même, et le lien continue de marcher.
 La longueur du code et sa durée de validité se règlent dans *Authentication →
-Providers → Email* (« Email OTP Length » à 6, « Email OTP Expiration » — la
-même durée pour le lien et le code).
+Providers → Email* (« Email OTP Length » à 6, « Email OTP Expiration » à
+3600, soit une heure — la même durée pour le lien et le code, et celle
+qu'annonce l'e-mail). Un code expiré se redemande depuis l'app (« Renvoyer
+l'e-mail »).
 
 ## 11. Deux environnements — comment les tenir alignés
 
