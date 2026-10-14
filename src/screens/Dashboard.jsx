@@ -9,6 +9,7 @@ import { SEV_LABEL, buildAlertFeed } from '../utils/alerts';
 import { devisSansSuite } from '../utils/affaires';
 import PageHeader from '../components/PageHeader';
 import Ring from '../components/Ring';
+import FormationEquipeCarte from '../components/FormationEquipeCarte';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -204,6 +205,10 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+
+        {/* Formation de l'équipe (gérant) : qui se forme, les cours suivis ou
+            délaissés — pour encourager chacun à avancer. */}
+        {user.role === 'gerant' && <FormationEquipeCarte />}
 
         {/* Pistes par étape */}
         <div className="card dash-block">

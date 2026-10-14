@@ -82,7 +82,7 @@ export default function FormationSection({ onBack }) {
     formations, formationProgress,
     addFormation, updateFormation, deleteFormation,
     addModule, updateModule, deleteModule,
-    addLecon, updateLecon, moveLecon, deleteLecon, setLeconDone,
+    addLecon, updateLecon, moveLecon, deleteLecon, setLeconDone, marquerLeconVue, enregistrerQuiz,
   } = useData();
 
   const isManager = user.role === 'gerant';
@@ -136,9 +136,12 @@ export default function FormationSection({ onBack }) {
     setOpenModules((prev) => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
 
   // Changement de leçon : repartir du début de la vidéo et déplier son module.
+  // La première ouverture est notée : le gérant voit ainsi quels cours sont
+  // regardés, même quand la leçon n'est pas (encore) terminée.
   useEffect(() => {
     setStartAt(0);
     if (lecon) setOpenModules((prev) => (prev.has(lecon.moduleId) ? prev : new Set([...prev, lecon.moduleId])));
+    if (lecon && course && !verrouille(course)) marquerLeconVue(user.id, course.id, lecon.id);
   }, [leconId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const finishAndNext = () => {
@@ -517,7 +520,12 @@ export default function FormationSection({ onBack }) {
               )}
               {lecon.type === 'texte' && <TexteContent content={lecon.content} />}
               {lecon.type === 'quiz' && (
-                <QuizLecon key={lecon.id} questions={lecon.questions || []} onVerifie={() => setQuizVerifie(lecon.id)} />
+                <QuizLecon key={lecon.id} questions={lecon.questions || []}
+                  onVerifie={(correction) => {
+                    setQuizVerifie(lecon.id);
+                    // Score gardé pour le suivi du gérant (chaque tentative compte).
+                    enregistrerQuiz(user.id, course.id, lecon.id, { score: correction.score, total: correction.total });
+                  }} />
               )}
               {lecon.type === 'pdf' && lecon.url && (
                 <a className="btn btn-outline" href={lecon.url} target="_blank" rel="noopener noreferrer">

@@ -1,4 +1,23 @@
 // Domaine formation « école » : cours → modules → leçons, avancement par leçon.
+
+/**
+ * Crée ou met à jour la fiche d'avancement d'un apprenant pour une leçon, et
+ * la remonte en tête de liste. Une fiche neuve naît « ouverte » (status 'vue').
+ */
+const majFiche = (s, userId, formationId, leconId, maj) => {
+  const liste = s.formationProgress || [];
+  const existante = liste.find((p) => p.userId === userId && p.leconId === leconId);
+  const maintenant = new Date().toISOString();
+  const base = existante || {
+    id: `fp-${userId}-${leconId}`, userId, formationId, leconId, status: 'vue', date: maintenant, vueLe: maintenant,
+  };
+  const fiche = maj({ ...base, formationId: base.formationId || formationId, vueLe: base.vueLe || base.date || maintenant });
+  return {
+    ...s,
+    formationProgress: [fiche, ...liste.filter((p) => p !== existante)],
+  };
+};
+
 export function createFormationActions(setState) {
   // Applique un patch fonctionnel à un cours donné.
   const patchCourse = (formationId, fn) => (s) => ({
@@ -101,15 +120,46 @@ export function createFormationActions(setState) {
       })),
 
     // ---- Avancement (par leçon) ----
+    // Une seule fiche par apprenant et par leçon (`fp-<userId>-<leconId>`) :
+    //   status  'vue'      leçon ouverte, pas encore terminée ;
+    //           'complete' leçon terminée ;
+    //   vueLe   première ouverture ;
+    //   quiz    { score, total, tentatives, meilleurScore, dernierLe } pour
+    //           une leçon quiz vérifiée.
+    // Le gérant en tire le suivi de son équipe (utils/suiviFormation.js) :
+    // qui se forme, ce qui est regardé, comment se passent les quiz.
     setLeconDone: (userId, formationId, leconId, done = true) =>
-      setState((s) => {
-        const rest = (s.formationProgress || []).filter((p) => !(p.userId === userId && p.leconId === leconId));
+      setState((s) => majFiche(s, userId, formationId, leconId, (fiche) => ({
+        ...fiche,
+        // « Marquer non terminée » : la leçon redevient seulement ouverte —
+        // le quiz déjà passé et la première ouverture restent au suivi.
+        status: done ? 'complete' : 'vue',
+        date: new Date().toISOString(),
+      }))),
+
+    // Leçon ouverte : notée UNE fois (première ouverture), pour savoir quels
+    // cours sont regardés même quand personne ne clique sur « Terminer ».
+    marquerLeconVue: (userId, formationId, leconId) =>
+      setState((s) => ((s.formationProgress || []).some((p) => p.userId === userId && p.leconId === leconId)
+        ? s
+        : majFiche(s, userId, formationId, leconId, (fiche) => fiche))),
+
+    // Quiz vérifié : score de la dernière tentative, meilleur score et nombre
+    // de tentatives. La leçon, elle, ne se termine qu'au clic « Terminer ».
+    enregistrerQuiz: (userId, formationId, leconId, { score = 0, total = 0 } = {}) =>
+      setState((s) => majFiche(s, userId, formationId, leconId, (fiche) => {
+        const avant = fiche.quiz || {};
+        const maintenant = new Date().toISOString();
         return {
-          ...s,
-          formationProgress: done
-            ? [{ id: `fp-${userId}-${leconId}`, userId, formationId, leconId, status: 'complete', date: new Date().toISOString() }, ...rest]
-            : rest,
+          ...fiche,
+          quiz: {
+            score, total,
+            tentatives: (Number(avant.tentatives) || 0) + 1,
+            meilleurScore: Math.max(Number(avant.meilleurScore) || 0, score),
+            premierLe: avant.premierLe || maintenant,
+            dernierLe: maintenant,
+          },
         };
-      }),
+      })),
   };
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, Calculator, Bot } from 'lucide-react';
+import { Users, DollarSign, User, LogOut, ChevronRight, ChevronLeft, Plus as PlusIcon, CheckCircle, Share2, GraduationCap, Crown, Clock, Check, Download, Upload, DatabaseBackup, RefreshCw, Handshake, Package, Banknote, X, Cpu, Droplets, CreditCard, Palette, Settings, Calculator, Bot, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData, COMMISSION_RATES } from '../context/DataContext';
 import { useMode } from '../context/ModeContext';
@@ -32,6 +32,7 @@ import OrdersSection from './plus/OrdersSection';
 import MyProfile from './plus/MyProfile';
 import TeamSection from './plus/TeamSection';
 import FormationSection from './plus/FormationSection';
+import SuiviFormationSection from './plus/SuiviFormationSection';
 import SubscriptionsAdmin from './plus/SubscriptionsAdmin';
 import KitsSection from './plus/KitsSection';
 import PaiementsSection from './plus/PaiementsSection';
@@ -90,14 +91,14 @@ export default function Plus() {
 
   // L'onglet actif est piloté par l'URL (/plus, /plus/partners…) pour que les
   // sous-sections soient accessibles directement depuis la barre latérale.
-  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup', 'roi', 'googlecontacts', 'agentdevis'];
+  const KNOWN_TABS = ['menu', 'parametres', 'apparence', 'partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'formation', 'subsadmin', 'mypartner', 'profile', 'backup', 'roi', 'googlecontacts', 'agentdevis', 'suiviformation'];
   // Sections d'ADMINISTRATION : masquer leur entrée de menu ne protège rien —
   // l'adresse reste tapable, et surtout elle SURVIT à une déconnexion (l'app
   // est une page unique : se reconnecter ne change pas l'URL affichée). Un
   // simple utilisateur restait ainsi sur l'écran des commissions du gérant,
   // boutons « Payer » et « Commission manuelle » compris. L'autorisation se
   // décide donc ici, à la section, pas au bouton.
-  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'backup', 'googlecontacts', 'agentdevis'];
+  const SECTIONS_GERANT = ['partners', 'commissions', 'orders', 'team', 'kits', 'inverters', 'pompekits', 'paiements', 'backup', 'googlecontacts', 'agentdevis', 'suiviformation'];
   const sectionAutorisee = (tab) => {
     if (!KNOWN_TABS.includes(tab)) return false;
     if (tab === 'subsadmin') {
@@ -857,6 +858,9 @@ export default function Plus() {
           <div className="plus-section-label">Apprendre & gagner</div>
           <div className="plus-card card">
             <MenuItem icon={GraduationCap} title="Formation" subtitle="Cours en ligne : modules, leçons et progression" onClick={() => setActiveTab('formation')} />
+            {user.role === 'gerant' && (
+              <MenuItem icon={BarChart3} title="Suivi des formations" subtitle="Progression de l’équipe, quiz, cours les plus et les moins suivis" onClick={() => setActiveTab('suiviformation')} />
+            )}
             <MenuItem icon={Share2} title="Mon espace partenaire" subtitle="Mon code, mon lien, mes commissions" onClick={() => setActiveTab('mypartner')} />
           </div>
         </div>
@@ -923,6 +927,7 @@ export default function Plus() {
         {activeTab === 'paiements' && <PaiementsSection />}
         {activeTab === 'googlecontacts' && <GoogleContactsSection />}
         {activeTab === 'formation' && <FormationSection onBack={() => setActiveTab('menu')} />}
+        {activeTab === 'suiviformation' && <SuiviFormationSection onBack={() => setActiveTab('menu')} />}
         {activeTab === 'subsadmin' && <SubscriptionsAdmin />}
         {activeTab === 'mypartner' && <MyPartnerDashboard onBack={() => setActiveTab('menu')} />}
         {activeTab === 'profile' && renderProfile()}
