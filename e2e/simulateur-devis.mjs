@@ -141,33 +141,49 @@ ok(debordAssistant <= 0, `téléphone, assistant : aucun défilement horizontal 
 await mobile.screenshot({ path: `${CAPTURES}/assistant-question-mobile.png` });
 await mobile.close();
 
-// ---- 5. ABONNEMENT EXPIRÉ : pas de « Renouveler » devant le client ----
-// Le Simulateur se montre au prospect : le rappel d'abonnement n'y figure
-// pas. Il reste sur les autres écrans (tableau de bord, devis).
-const expire = await nav.newPage({ viewport: { width: 375, height: 800 } });
-expire.on('pageerror', (e) => jsErr.push(String(e)));
-await expire.goto(B + '/');
-await expire.evaluate((u) => { localStorage.setItem('bestasolar_user', JSON.stringify(u)); localStorage.setItem(`bestasolar_guide_accueil_v1:${u.id}`, 'termine'); }, GERANT);
-await expire.goto(B + '/devis'); await expire.waitForTimeout(1200);
+// ---- 5. ABONNEMENT : aucun bandeau « Renouveler », nulle part ----
+// Les écrans se montrent au client : le rappel d'abonnement n'est plus un
+// bandeau en tête de page (décision du gérant). L'échéance proche reste
+// annoncée, discrètement, dans les alertes du tableau de bord et la cloche.
+const abo = await nav.newPage({ viewport: { width: 375, height: 800 } });
+abo.on('pageerror', (e) => jsErr.push(String(e)));
+await abo.goto(B + '/');
+await abo.evaluate((u) => { localStorage.setItem('bestasolar_user', JSON.stringify(u)); localStorage.setItem(`bestasolar_guide_accueil_v1:${u.id}`, 'termine'); }, GERANT);
+await abo.goto(B + '/devis'); await abo.waitForTimeout(1200);
 // L'état se prépare depuis une page statique : l'app, absente, ne peut pas
 // réécrire le stockage en partant.
-await expire.goto(B + '/privacy.html');
-await expire.evaluate(() => {
-  const s = JSON.parse(localStorage.getItem('bestasolar_data'));
-  s.subscriptions = [{ id: 'sub-expire', userId: 'u1', status: 'actif', formule: 'essentiel',
-    dateDebut: new Date(Date.now() - 60 * 864e5).toISOString(), dateFin: new Date(Date.now() - 2 * 864e5).toISOString() }];
-  localStorage.setItem('bestasolar_data', JSON.stringify(s));
-  localStorage.setItem('bestasolar_mode_u1', 'public');
-});
-const bandeau = () => expire.locator('.abo-alert', { hasText: 'a expiré' });
-await expire.goto(B + '/dashboard'); await expire.waitForTimeout(1500);
-ok(await bandeau().count() === 1, 'abonnement expiré : le rappel « Renouveler » reste au tableau de bord');
-await expire.goto(B + '/plus/roi'); await expire.waitForSelector('.roi-kit');
-ok(await bandeau().count() === 0, 'Simulateur ROI : aucun rappel d’abonnement devant le client');
-await expire.screenshot({ path: `${CAPTURES}/simulateur-sans-rappel.png` });
-await expire.goto(B + '/devis'); await expire.waitForTimeout(1200);
-ok(await bandeau().count() === 1, 'le rappel reste sur les autres écrans (Devis)');
-await expire.close();
+const abonnement = async (finDansJours, mode) => {
+  await abo.goto(B + '/privacy.html');
+  await abo.evaluate(({ j, m }) => {
+    const s = JSON.parse(localStorage.getItem('bestasolar_data'));
+    s.subscriptions = [{ id: 'sub-e2e', userId: 'u1', status: 'actif', formule: 'essentiel',
+      dateDebut: new Date(Date.now() - 60 * 864e5).toISOString(), dateFin: new Date(Date.now() + j * 864e5).toISOString() }];
+    localStorage.setItem('bestasolar_data', JSON.stringify(s));
+    localStorage.setItem('bestasolar_mode_u1', m);
+  }, { j: finDansJours, m: mode });
+};
+const renouveler = () => abo.locator('.page-content button:text-is("Renouveler"), .app-main > .storage-alert button:text-is("Renouveler")');
+const bandeaux = async () => (await abo.locator('.app-main > .storage-alert').count()) + (await renouveler().count());
+
+await abonnement(-2, 'public'); // expiré depuis deux jours
+for (const [chemin, nom] of [['/dashboard', 'tableau de bord'], ['/plus/roi', 'Simulateur ROI'], ['/devis', 'Devis']]) {
+  await abo.goto(B + chemin); await abo.waitForTimeout(1300);
+  ok(await bandeaux() === 0, `abonnement expiré : aucun bandeau « Renouveler » (${nom})`);
+}
+await abo.goto(B + '/plus/roi'); await abo.waitForSelector('.roi-kit');
+await abo.screenshot({ path: `${CAPTURES}/simulateur-sans-rappel.png` });
+
+await abonnement(2, 'public'); // expire dans deux jours
+await abo.goto(B + '/dashboard'); await abo.waitForTimeout(1300);
+ok(await bandeaux() === 0, 'échéance proche : aucun bandeau au tableau de bord');
+ok(/Abonnement Devis Pro expire dans 2 j/.test(await abo.locator('.page-content').innerText()), 'échéance proche : annoncée dans les alertes du tableau de bord');
+
+await abonnement(2, 'pro');
+await abo.goto(B + '/pro/documents'); await abo.waitForTimeout(1500);
+ok(await abo.locator('h1, .page-title', { hasText: 'Devis & Factures' }).count() > 0, 'espace Pro : l’écran Devis & Factures est bien ouvert');
+ok(await abo.locator('.pro-alert', { hasText: 'expire dans' }).count() === 0 && await renouveler().count() === 0,
+  'espace Pro, Devis & Factures : aucun bandeau « Renouveler »');
+await abo.close();
 
 console.log('\n' + R.join('\n'));
 console.log(jsErr.length ? `\n❌ erreurs JS : ${jsErr.join(' | ')}` : '\naucune erreur JS');
