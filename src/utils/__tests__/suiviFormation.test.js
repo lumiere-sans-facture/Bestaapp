@@ -1,6 +1,6 @@
 // Suivi des formations de l'équipe (tableau de bord du gérant).
 import { describe, it, expect } from 'vitest';
-import { suiviFormation, apprenantsEquipe, SEUIL_REUSSITE_QUIZ, messageEncouragement } from '../suiviFormation';
+import { suiviFormation, apprenantsEquipe, SEUIL_REUSSITE_QUIZ, messageEncouragement, chercherApprenants } from '../suiviFormation';
 
 const lecon = (id, extra = {}) => ({ id, title: `Leçon ${id}`, type: 'texte', ...extra });
 const COURS_A = { id: 'A', title: 'Démarrer', modules: [
@@ -119,5 +119,21 @@ describe('message d’encouragement', () => {
   });
   it('en cours : bravo et cours à continuer', () => {
     expect(messageEncouragement(ligne('k'))).toMatch(/4 leçons terminées.*Continuez « Devis » : vous en êtes à 0 %/);
+  });
+});
+
+describe('recherche d’apprenants', () => {
+  it('par nom, sans accents ni majuscules, chaque mot devant correspondre', () => {
+    expect(chercherApprenants(S.apprenants, 'fatou').map((l) => l.id)).toEqual(['f']);
+    expect(chercherApprenants(S.apprenants, 'KOSSI agbo').map((l) => l.id)).toEqual(['k']);
+    expect(chercherApprenants(S.apprenants, 'ibrahîm').map((l) => l.id)).toEqual(['i']);
+    expect(chercherApprenants(S.apprenants, 'fatou kossi')).toEqual([]);
+  });
+  it('par numéro, avec ou sans indicatif', () => {
+    expect(chercherApprenants(S.apprenants, '90000001').map((l) => l.id)).toEqual(['k']);
+    expect(chercherApprenants(S.apprenants, '+22890000001').map((l) => l.id)).toEqual(['k']);
+  });
+  it('recherche vide : tout le monde', () => {
+    expect(chercherApprenants(S.apprenants, '   ')).toHaveLength(3);
   });
 });

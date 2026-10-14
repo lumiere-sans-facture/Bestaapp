@@ -6,6 +6,10 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-14
+- **Suivi des formations : recherche d'un apprenant, et statistiques de l'équipe dans « Mon profil » du gérant.**
+  - **Recherche** dans Plus → « Suivi des formations » → Apprenants : par nom, e-mail ou numéro. Les accents et les majuscules sont ignorés, et chaque mot tapé doit correspondre. Elle se combine aux filtres et affiche « N apprenants sur M » ; quand rien ne correspond, l'écran le dit.
+  - **« Mon profil » du gérant** : un bloc « Formation de mon équipe » donne les membres à former, la part qui a commencé, les actifs sur 30 jours, les modules terminés, les quiz et leur moyenne, et ceux qui ont terminé un cours. Il montre aussi les trois plus avancés et ceux qui n'ont pas encore commencé, avec un lien vers le suivi détaillé. Le profil d'un technicien ne change pas.
+  Tests `suiviFormation` (15 cas, dont la recherche) ; parcours `e2e/suivi-formations.mjs` (37 vérifications) ; suite complète des parcours rejouée.
 - **Suivi des formations de l'équipe, pour le gérant : au tableau de bord et dans Plus.**
   - **Tableau de bord** (gérant seulement) : la carte « Formation de l'équipe » montre la part des membres qui ont commencé l'Académie, et combien n'ont pas commencé. Elle donne aussi les membres actifs sur 30 jours, les modules terminés, les quiz réalisés avec leur score moyen, et ceux qui ont terminé un cours. La carte « Cours de l'Académie » montre les cours les plus suivis et les moins suivis, en nombre de membres qui les ont ouverts.
   - **Plus → « Suivi des formations »** (réservé au gérant, adresse comprise) :

@@ -10,6 +10,7 @@ import Field from '../../components/Field';
 import { useToast } from '../../components/Toast';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { updateMyProfile } from '../../lib/remoteSync';
+import FormationEquipeResume from '../../components/FormationEquipeResume';
 
 // Le profil ne parle QUE de la personne et de son travail en cours.
 // Rien de ce qui mène à une commission n'y figure — montants, Mobile Money,
@@ -154,6 +155,9 @@ export default function MyProfile() {
           </>
         )}
       </div>
+
+      {/* Gérant : les statistiques de formation de son équipe, en résumé. */}
+      {user.role === 'gerant' && <FormationEquipeResume />}
 
       {/* Progression de MES clients : le commercial suit l'avancement de ses
           affaires sans ouvrir le kanban — y compris quand c'est le gérant qui

@@ -92,7 +92,7 @@ export function suiviFormation({ formations = [], progression = [], membres = []
     });
     const derniereActivite = plusRecente(siennes.map(dateFiche));
     return {
-      id: a.id, nom: a.name || a.email || 'Membre', role: a.role, telephone: a.phone || '',
+      id: a.id, nom: a.name || a.email || 'Membre', role: a.role, telephone: a.phone || '', email: a.email || '',
       leconsTerminees: terminees.size, leconsOuvertes: ouvertes.size, totalLecons,
       pct: pct(terminees.size, totalLecons),
       modulesTermines, modulesCommences, coursTermines, coursCommences,
@@ -171,6 +171,23 @@ export function suiviFormation({ formations = [], progression = [], membres = []
     moinsSuivis: [...parPopularite].reverse().filter((c) => !dejaCites.has(c.id)).slice(0, 3),
   };
 }
+
+const sansAccents = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/**
+ * Recherche d'apprenants : chaque mot tapé doit se retrouver dans le nom,
+ * l'e-mail ou le numéro (accents et majuscules ignorés ; les chiffres d'un
+ * numéro se cherchent sans espaces ni indicatif imposé).
+ */
+export const chercherApprenants = (lignes = [], requete = '') => {
+  const mots = sansAccents(requete).split(/\s+/).filter(Boolean);
+  if (!mots.length) return lignes;
+  return lignes.filter((l) => {
+    const texte = sansAccents(`${l.nom} ${l.email || ''}`);
+    const chiffres = String(l.telephone || '').replace(/\D/g, '');
+    return mots.every((m) => texte.includes(m) || (/^\+?\d+$/.test(m) && chiffres.includes(m.replace(/\D/g, ''))));
+  });
+};
 
 /** Message d'encouragement WhatsApp pour un apprenant (prénom seul). */
 export const messageEncouragement = (ligne, coursConseille = null) => {

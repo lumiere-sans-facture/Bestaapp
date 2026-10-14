@@ -4,7 +4,8 @@
      2. le technicien ne voit ni la carte du tableau de bord ni le suivi ;
      3. le gérant : carte « Formation de l'équipe » au tableau de bord (qui a
         commencé, modules terminés, quiz, cours les plus et moins suivis) ;
-     4. Plus → « Suivi des formations » : apprenants, filtre « Pas commencé »,
+     4. Plus → « Suivi des formations » : recherche d'un apprenant (nom,
+        numéro, sans accents), apprenants, filtre « Pas commencé »,
         détail d'un apprenant (cours, quiz et tentatives), cours, quiz,
         message WhatsApp d'encouragement ;
      5. téléphone : aucun débordement.
@@ -88,6 +89,9 @@ await page.goto(B + '/plus/suiviformation');
 await page.waitForTimeout(800);
 ok(new URL(page.url()).pathname === '/plus' && await page.locator('.section-title', { hasText: 'Suivi des formations' }).count() === 0,
   'technicien : le suivi est réservé au gérant (renvoi vers Plus)');
+await page.goto(B + '/plus/profile');
+await page.waitForSelector('.card-title:text-is("Mes informations")');
+ok(await page.locator('.formation-resume').count() === 0, 'technicien : pas de statistiques d’équipe dans son profil');
 
 // ---- 3. LE GÉRANT : TABLEAU DE BORD ----
 await connecter(GERANT, '/dashboard');
@@ -124,6 +128,20 @@ ok(/bravo pour votre progression.*3 leçons terminées.*Continuez « Démarrer a
 await page.locator('.category-chip', { hasText: 'Pas commencé' }).click();
 ok(await page.locator('.formation-apprenant').count() === 1 && await ligne('Ibrahim').count() === 1, 'filtre « Pas commencé » : Ibrahim seul');
 await page.locator('.category-chip', { hasText: 'Tous' }).click();
+
+// Recherche : nom sans accents ni majuscules, numéro, rien trouvé.
+const recherche = page.locator('input[aria-label="Rechercher un apprenant"]');
+await recherche.fill('FATOU');
+ok(await page.locator('.formation-apprenant').count() === 1 && await ligne('Fatou').count() === 1
+  && /1 apprenant sur 2/.test(await page.locator('.formation-compte').innerText()), 'recherche « FATOU » : Fatou seule, « 1 apprenant sur 2 »');
+await recherche.fill('ibrahîm djido');
+ok(await page.locator('.formation-apprenant').count() === 1 && await ligne('Ibrahim').count() === 1, 'recherche sans tenir compte des accents, plusieurs mots');
+await recherche.fill('96789012');
+ok(await page.locator('.formation-apprenant').count() === 1 && await ligne('Fatou').count() === 1, 'recherche par numéro');
+await recherche.fill('zzz');
+ok(/Aucun apprenant ne correspond à « zzz »/.test(await page.locator('.formation-suivi-carte').innerText()), 'rien trouvé : c’est dit');
+await recherche.fill('');
+ok(await page.locator('.formation-apprenant').count() === 2, 'recherche effacée : tout le monde revient');
 await page.mouse.move(0, 0);
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${CAPTURES}/suivi-formations.png`, fullPage: true });
@@ -145,11 +163,24 @@ await page.locator('[role="tab"]', { hasText: 'Quiz' }).click();
 const quiz = (await page.locator('.formation-cours-ligne').first().innerText()).replace(/\s+/g, ' ');
 ok(/Quiz — Votre compte/.test(quiz) && /100 %/.test(quiz) && /1 passé/.test(quiz), `vue Quiz : score moyen et réussite [${quiz}]`);
 
+// ---- 4 bis. MON PROFIL (GÉRANT) : LES STATISTIQUES DE L'ÉQUIPE ----
+await page.goto(B + '/plus/profile');
+await page.waitForSelector('.formation-resume');
+const resume = (await page.locator('.formation-resume').innerText()).replace(/\s+/g, ' ');
+ok(/2 membres à former/.test(resume) && /50 % ont commencé \(1\)/.test(resume) && /1 module terminé/.test(resume) && /1 quiz réalisé · moyenne 100 %/.test(resume),
+  `profil du gérant : chiffres de l’équipe [${resume.slice(0, 160)}…]`);
+ok(/les plus avancés Fatou Boko 4 %/i.test(resume), 'profil du gérant : les plus avancés');
+ok(/pas encore commencé \(1\) Ibrahim Dan Djido/i.test(resume), 'profil du gérant : qui n’a pas commencé');
+await page.locator('.formation-resume').screenshot({ path: `${CAPTURES}/profil-gerant-formation.png` });
+await page.locator('.formation-resume a', { hasText: 'Voir le suivi détaillé' }).click();
+await page.waitForSelector('.section-title:text-is("Suivi des formations")');
+ok(new URL(page.url()).pathname === '/plus/suiviformation', 'profil du gérant : « Voir le suivi détaillé »');
+
 // ---- 5. TÉLÉPHONE ----
 const mobile = await ctx.newPage();
 await mobile.setViewportSize({ width: 375, height: 800 });
 mobile.on('pageerror', (e) => jsErr.push(String(e)));
-for (const chemin of ['/dashboard', '/plus/suiviformation']) {
+for (const chemin of ['/dashboard', '/plus/suiviformation', '/plus/profile']) {
   await mobile.goto(B + chemin);
   await mobile.waitForTimeout(1200);
   const debord = await mobile.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);

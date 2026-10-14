@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MessageCircle, ListChecks, BookOpen, Users, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageCircle, ListChecks, BookOpen, Users, CheckCircle2, AlertTriangle, Search } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { suiviFormation, messageEncouragement, SEUIL_REUSSITE_QUIZ, JOURS_ACTIVITE_RECENTE } from '../../utils/suiviFormation';
+import { suiviFormation, messageEncouragement, chercherApprenants, SEUIL_REUSSITE_QUIZ, JOURS_ACTIVITE_RECENTE } from '../../utils/suiviFormation';
 import { ageInDays } from '../../utils/date';
 import { initials } from '../../utils/format';
 import { whatsappLink } from '../../utils/paiement';
@@ -55,13 +55,15 @@ export default function SuiviFormationSection({ onBack }) {
   );
   const [vue, setVue] = useState('apprenants');
   const [filtre, setFiltre] = useState('tous');
+  // Recherche par nom, e-mail ou numéro (accents et majuscules ignorés).
+  const [recherche, setRecherche] = useState('');
   const [detailId, setDetailId] = useState(null);
   const detail = s.apprenants.find((a) => a.id === detailId) || null;
   // Cours conseillé à qui n'a pas commencé : le plus suivi par l'équipe, ou
   // à défaut le premier du catalogue.
   const coursConseille = s.plusSuivis[0]?.titre || s.cours[0]?.titre || null;
 
-  const apprenants = s.apprenants.filter((a) => {
+  const apprenants = chercherApprenants(s.apprenants, recherche).filter((a) => {
     if (filtre === 'pas-commence') return !a.commence;
     if (filtre === 'en-cours') return a.commence && a.pct < 100;
     if (filtre === 'inactifs') return !a.actifRecent;
@@ -109,15 +111,28 @@ export default function SuiviFormationSection({ onBack }) {
 
       {vue === 'apprenants' && (
         <div className="card formation-suivi-carte">
+          <div className="search-box formation-recherche">
+            <Search size={18} className="search-icon" />
+            <input type="search" className="input search-input" aria-label="Rechercher un apprenant"
+              placeholder="Nom, e-mail ou numéro…" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
+          </div>
           <div className="categories-scroll is-wrap" style={{ marginBottom: 12 }} aria-label="Filtrer les apprenants">
             {FILTRES.map((f) => (
               <button key={f.id} type="button" className={`category-chip ${filtre === f.id ? 'active' : ''}`}
                 aria-pressed={filtre === f.id} onClick={() => setFiltre(f.id)}>{f.label}</button>
             ))}
           </div>
+          {(recherche.trim() || filtre !== 'tous') && apprenants.length > 0 && (
+            <div className="text-sm text-secondary formation-compte" role="status">
+              {apprenants.length} apprenant{apprenants.length > 1 ? 's' : ''} sur {equipe.total}
+            </div>
+          )}
           {apprenants.length === 0 ? (
-            <p className="text-sm text-secondary">
-              {!teamChargee ? 'Chargement de l’équipe…' : equipe.total === 0 ? 'Aucun membre dans l’équipe pour l’instant.' : 'Personne dans ce filtre.'}
+            <p className="text-sm text-secondary" role="status">
+              {!teamChargee ? 'Chargement de l’équipe…'
+                : equipe.total === 0 ? 'Aucun membre dans l’équipe pour l’instant.'
+                  : recherche.trim() ? `Aucun apprenant ne correspond à « ${recherche.trim()} ».`
+                    : 'Personne dans ce filtre.'}
             </p>
           ) : (
             <ul className="formation-apprenants">
