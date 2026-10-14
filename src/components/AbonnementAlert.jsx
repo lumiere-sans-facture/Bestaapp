@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AlertTriangle, Crown } from 'lucide-react';
 import { useMode } from '../context/ModeContext';
 import { effectiveStatus, needsRenewalAlert, daysLeft } from '../utils/subscription';
@@ -14,11 +14,19 @@ import { formatDate } from '../utils/format';
  *
  * Rien n'est affiché à qui n'a jamais souscrit (aucune sollicitation
  * commerciale intempestive).
+ *
+ * Ni sur les écrans montrés au client (ECRANS_CLIENT) : un « abonnement
+ * expiré — Renouveler » en haut du Simulateur ROI, devant le prospect, gêne
+ * la vente (décision du gérant). Le rappel reste partout ailleurs.
  */
+const ECRANS_CLIENT = ['/plus/roi'];
+
 export default function AbonnementAlert() {
   const { sub, mode } = useMode();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   if (!sub || mode === 'pro') return null; // l'espace Pro a déjà son propre rappel
+  if (ECRANS_CLIENT.includes(pathname.replace(/\/+$/, ''))) return null;
 
   const statut = effectiveStatus(sub);
 

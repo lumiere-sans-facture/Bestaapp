@@ -6,6 +6,8 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-14
+- **Simulateur ROI : plus de rappel « Abonnement expiré — Renouveler » en haut de l'écran.** Le Simulateur se montre au client : ce bandeau, en tête de page devant le prospect, gênait la vente. Le rappel reste sur les autres écrans, dont le tableau de bord et les devis, pour que l'abonnement ne se perde pas par oubli.
+  Vérifié au navigateur avec un abonnement expiré, sur téléphone (`e2e/simulateur-devis.mjs`, 26 vérifications) : aucun rappel au Simulateur ; rappel présent au tableau de bord et sur Devis.
 - **Simulateur ROI : il s'ouvre sur « D'après sa facture ».** C'est le chiffre que le client a en main. « D'après ses appareils », avec la reprise de l'étude d'un devis, reste à un clic. L'assistant de devis ne change pas : il s'ouvre toujours sur la liste des appareils, et sa rangée des modes de saisie reste une seule ligne qu'on fait glisser.
   Vérifié au navigateur (`e2e/simulateur-devis.mjs`, 23 vérifications, dont les réponses de « Quand consomme-t-il le plus ? » à la ligne dans l'assistant sur téléphone) ; parcours maintenance adapté (il passe sur « D'après ses appareils » pour reprendre l'étude) et rejoué.
 - **« Quand consomme-t-il le plus ? » : les trois réponses visibles d'un coup.** Dans le Simulateur ROI comme dans l'assistant de devis (public et Pro), les réponses passent à la ligne quand la place manque. Avant, elles défilaient sur une seule rangée, et « Surtout le soir » était coupé au bord de la carte. Les autres rangées de choix ne changent pas.
