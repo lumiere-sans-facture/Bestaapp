@@ -37,7 +37,7 @@ export function InvoiceConsumptionFields({ facture, onChange, result }) {
       </div>
       <div className="chip-selector">
         <span className="chip-selector-label"><Sun size={13} /> Quand consomme-t-il le plus ?</span>
-        <div className="categories-scroll" style={{ marginBottom: 0 }}>
+        <div className="categories-scroll is-wrap" style={{ marginBottom: 0 }}>
           {REPARTITIONS.map((repartition) => (
             <button key={repartition.id} type="button" className={`category-chip ${facture.repartition === repartition.id ? 'active' : ''}`}
               onClick={() => onChange({ ...facture, repartition: repartition.id })}>

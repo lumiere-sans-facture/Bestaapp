@@ -31,6 +31,14 @@ await page.evaluate((u) => {
 const chiffres = (t) => Number(String(t || '').replace(/[^\d]/g, ''));
 const espaces = (t) => String(t || '').replace(/[\s  ]+/g, ' ').trim();
 const prixSimulateur = async () => chiffres(await page.locator('.roi-ligne.is-forte .roi-ligne-montant').first().innerText());
+// Les trois réponses de « Quand consomme-t-il le plus ? » tiennent dans leur
+// carte : elles passent à la ligne au lieu de défiler hors de vue.
+const reponsesVisibles = (p) => p.locator('.chip-selector', { hasText: 'Quand consomme-t-il le plus ?' }).locator('.categories-scroll').evaluate((el) => {
+  const boite = el.getBoundingClientRect();
+  const boutons = [...el.querySelectorAll('button')];
+  return boutons.length === 3 && el.scrollWidth <= el.clientWidth
+    && boutons.every((b) => b.getBoundingClientRect().right <= boite.right + 0.5);
+});
 
 // ---- 1. SIMULATEUR : l'écran d'avant ----
 await page.goto(B + '/plus/roi');
@@ -48,6 +56,7 @@ ok(await prixSimulateur() === 1851000, `même prix que le devis au Togo, main-d�
 await page.locator('button:has-text("D’après sa facture")').click();
 const question = page.locator('.chip-selector', { hasText: 'Quand consomme-t-il le plus ?' });
 ok(await question.count() === 1, 'facture : la question « Quand consomme-t-il le plus ? » est là');
+ok(await reponsesVisibles(page), 'Simulateur : les trois réponses visibles, à la ligne, sans défilement');
 ok(await question.locator('button.active').innerText() === 'Équilibré jour / nuit', 'réponse par défaut : équilibré, comme dans l’assistant');
 await page.locator('input[aria-label="Facture d’électricité"]').fill('330000');
 await page.waitForTimeout(400);
@@ -84,6 +93,7 @@ await page.locator('button:has-text("Facture CEET/SBEE")').click();
 await page.locator('.manual-consumption-grid input').nth(0).fill('330000');
 await page.locator('.manual-consumption-grid input').nth(1).fill('114');
 ok(await page.locator('.chip-selector button.active').innerText() === 'Équilibré jour / nuit', 'assistant : même réponse par défaut');
+ok(await reponsesVisibles(page), 'assistant : les trois réponses visibles, à la ligne, sans défilement');
 await suivant().click(); await page.waitForTimeout(900);
 await suivant().click(); await page.waitForSelector('.kit-summary');
 const resume = espaces(await page.locator('.kit-summary').first().innerText());
@@ -105,6 +115,8 @@ await mobile.locator('input[aria-label="Facture d’électricité"]').fill('3300
 await mobile.waitForTimeout(400);
 const debord = await mobile.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
 ok(debord <= 0, `téléphone : aucun défilement horizontal (${debord} px)`);
+ok(await reponsesVisibles(mobile), 'téléphone : les trois réponses visibles, à la ligne');
+await mobile.locator('.chip-selector', { hasText: 'Quand consomme-t-il le plus ?' }).screenshot({ path: `${CAPTURES}/simulateur-question-mobile.png` });
 await mobile.locator('.roi-kit').screenshot({ path: `${CAPTURES}/simulateur-kit-mobile.png` });
 await mobile.close();
 

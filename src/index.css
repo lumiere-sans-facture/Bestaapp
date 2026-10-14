@@ -1110,6 +1110,9 @@ form .login-link { width: 100%; margin-top: 4px; }
 .category-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
 
 .chip-selector { margin-top: 16px; }
+/* Réponses courtes qui passent à la ligne au lieu de défiler : toutes
+   restent visibles, sans glisser la rangée (« Quand consomme-t-il le plus ? »). */
+.categories-scroll.is-wrap { flex-wrap: wrap; overflow-x: visible; }
 .chip-selector-label {
   display: flex; align-items: center; gap: 6px;
   font-size: 0.8125rem; font-weight: 500; color: var(--text-secondary);

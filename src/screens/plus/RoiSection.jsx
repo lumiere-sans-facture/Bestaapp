@@ -243,7 +243,7 @@ export default function RoiSection() {
               <Curseur label="Facture d’électricité" value={facture} onChange={setFacture} min={0} max={2000000} step={5000} suffixe="F/mois" />
               <div className="chip-selector">
                 <span className="chip-selector-label"><Sun size={13} /> Quand consomme-t-il le plus ?</span>
-                <div className="categories-scroll" style={{ marginBottom: 0 }}>
+                <div className="categories-scroll is-wrap" style={{ marginBottom: 0 }}>
                   {REPARTITIONS.map((r) => (
                     <button key={r.id} type="button" className={`category-chip ${repartition === r.id ? 'active' : ''}`}
                       aria-pressed={repartition === r.id} onClick={() => setRepartition(r.id)}>
