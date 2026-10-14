@@ -262,10 +262,14 @@ export const formations = [
 
 export const productCategories = [
   { id: 'generateurs', label: 'Générateurs' },
+  // Ensembles prêts à poser vendus en boutique (kits congélateur…). C'est
+  // aussi la catégorie proposée par défaut à la création d'un produit.
+  { id: 'kits', label: 'Kits' },
   { id: 'onduleurs', label: 'Onduleurs' },
   { id: 'batteries', label: 'Batteries' },
   { id: 'panneaux', label: 'Panneaux' },
   { id: 'pompes', label: 'Pompes' },
+  { id: 'congelateurs', label: 'Congélateurs' },
   { id: 'controleurs', label: 'Contrôleurs' },
   { id: 'accessoires', label: 'Accessoires' },
 ];

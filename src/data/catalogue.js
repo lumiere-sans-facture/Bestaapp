@@ -166,4 +166,29 @@ export const catalogueProducts = [
   { id: 'pompe-p7r3', name: 'Kit Pompe Solaire 750W Shiyuan', description: 'Voltage DC 90V-120V · Panneaux 435 Wc, 2 pièces · Câble 3x2.5mm², un rouleau · Débit 4.5m³/h', basePrice: 330000, category: 'pompes', stock: 10, image: '/products/pompe-p7r3.jpg' },
   { id: 'pompe-p7r4', name: 'Pompe Solaire de surface 750W Shiyuan', description: 'Voltage DC 90V-120V · Profondeur max 14m · Puissance 750w · Débit 21m³/h', basePrice: 190000, category: 'pompes', stock: 10, image: '/products/pompe-p7r4.jpg' },
   { id: 'pompe-p7r5', name: 'Pompe Solaire de surface 1100W Shiyuan', description: 'Voltage DC 90V-120V · Profondeur max 15m · Puissance 1100w · Débit 26m³/h', basePrice: 205000, category: 'pompes', stock: 10, image: '/products/pompe-p7r5.jpg' },
+  // ---------------------------------------------------------------------
+  //  Froid solaire — brochure « Réfrigérateur & Congélateur solaire »
+  //  Besta Solar (10 pages). Une seule colonne de prix : traitée comme le
+  //  prix PARTENAIRE (`basePrice`), comme partout ailleurs ici — la
+  //  boutique affiche le prix public, +10 %.
+  //  Les congélateurs seuls vont dans « Congélateurs », les ensembles prêts
+  //  à poser (congélateur + batterie + panneaux + régulateur) dans « Kits ».
+  //  Ces kits-ci sont des articles de la BOUTIQUE, en courant continu
+  //  12/24 V sans onduleur : ils ne rejoignent pas « Mes kits », dont le
+  //  dimensionnement les proposerait à tort pour une maison.
+  //  Le 318L porte deux références dans la brochure (BD 004-318L sur la
+  //  fiche et le kit, 3HZ-BCD-318L sous la photo) : les deux sont gardées.
+  // ---------------------------------------------------------------------
+  { id: 'congel-bd198', name: 'Congélateur solaire vertical 198L', description: 'Modèle BD 198L · Capacité 198L · Alimentation 12/24V et 220V · Consommation 150W à 190W · Couleur gris', basePrice: 350000, category: 'congelateurs', stock: 10, image: '/products/congel-bd198.jpg' },
+  { id: 'congel-bcd202', name: 'Réfrigérateur-congélateur solaire 202L', description: 'Modèle BCD-202L · Congélo & frigo · Capacité 202L · Alimentation 12/24V et 220V · Consommation 100W · Couleur gris', basePrice: 340000, category: 'congelateurs', stock: 10, image: '/products/congel-bcd202.jpg' },
+  { id: 'congel-bd004-318', name: 'Congélateur solaire coffre 318L', description: 'Modèle BD 004-318L (3HZ-BCD-318L) · Capacité 318L · Alimentation 12/24V et 220V · Consommation 130W · Couleur gris', basePrice: 330000, category: 'congelateurs', stock: 10, image: '/products/congel-bd004-318.jpg' },
+  { id: 'congel-bd004-218', name: 'Congélateur solaire coffre 218L', description: 'Modèle BD 004-218L · Capacité 218L · Alimentation 12/24V et 220V · Consommation 120W · Couleur gris', basePrice: 250000, category: 'congelateurs', stock: 10, image: '/products/congel-bd004-218.jpg' },
+  { id: 'congel-bd004-168', name: 'Congélateur solaire coffre 168L', description: 'Modèle BD 004-168L · Capacité 168L · Alimentation 12/24V et 220V · Consommation 100W · Couleur gris', basePrice: 220000, category: 'congelateurs', stock: 10, image: '/products/congel-bd004-168.jpg' },
+  { id: 'congel-bd004-118', name: 'Congélateur solaire coffre 118L', description: 'Modèle BD 004-118L · Capacité 118L · Alimentation 12/24V et 220V · Consommation 90W · Couleur gris', basePrice: 190000, category: 'congelateurs', stock: 10, image: '/products/congel-bd004-118.jpg' },
+  { id: 'kit-congel-218', name: 'Kit congélateur solaire 218L', description: 'Congélateur coffre 218L (BD 004-218L) · Batterie lithium 12V 200Ah · 3 panneaux 250Wc · Régulateur MPPT 60A · Câble 6mm² · Coffret DC, moulure, cosses et attaches', basePrice: 670000, category: 'kits', stock: 10, image: '/products/kit-congel-218.jpg' },
+  { id: 'kit-congel-318', name: 'Kit congélateur solaire 318L', description: 'Congélateur coffre 318L (BD 004-318L) · Batterie lithium 12V 200Ah · 3 panneaux 250Wc · Régulateur MPPT 60A · Câble 6mm² · Coffret DC, moulure et cosses', basePrice: 775000, category: 'kits', stock: 10, image: '/products/kit-congel-318.jpg' },
+  { id: 'kit-congel-168', name: 'Kit congélateur solaire 168L', description: 'Congélateur coffre 168L (BD 004-168L) · Batterie lithium 12V 100Ah · 2 panneaux 250Wc · Régulateur MPPT 40A · Câble 6mm² · Coffret DC, moulure et cosses', basePrice: 460000, category: 'kits', stock: 10, image: '/products/kit-congel-168.jpg' },
+  { id: 'kit-congel-118', name: 'Kit congélateur solaire 118L', description: 'Congélateur coffre 118L (BD 004-118L) · Batterie lithium 12V 100Ah · 2 panneaux 250Wc · Régulateur MPPT 40A · Câble 6mm² · Coffret DC, moulure et cosses', basePrice: 435000, category: 'kits', stock: 10, image: '/products/kit-congel-118.jpg' },
+  { id: 'kit-congel-198', name: 'Kit congélateur solaire vertical 198L', description: 'Congélateur vertical 198L (BD 198L) · Batterie lithium 24V 100Ah · 4 panneaux 250Wc · Régulateur MPPT 60A · Câble 6mm² · Coffret DC, moulure et cosses', basePrice: 845000, category: 'kits', stock: 10, image: '/products/kit-congel-198.jpg' },
+  { id: 'kit-congel-202', name: 'Kit réfrigérateur-congélateur solaire 202L', description: 'Réfrigérateur-congélateur 202L (BCD-202L) · Batterie lithium 12V 200Ah · 4 panneaux 210Wc · Régulateur solaire 80A · Câble 6mm² · Coffret DC, moulure et cosses', basePrice: 695000, category: 'kits', stock: 10, image: '/products/kit-congel-202.jpg' },
 ];

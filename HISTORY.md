@@ -6,6 +6,18 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-14
+- **Boutique : les congélateurs solaires et leurs kits, repris de la brochure « Réfrigérateur & Congélateur solaire ».**
+  - **Deux nouvelles catégories** :
+    - **« Congélateurs »** : les 6 appareils seuls (vertical BD 198L, réfrigérateur-congélateur BCD-202L, coffres BD 004 de 318, 218, 168 et 118 L), avec capacité, alimentation 12/24 V et 220 V, et consommation ;
+    - **« Kits »** : les 6 kits prêts à poser. La fiche de chacun liste sa composition : congélateur, batterie lithium, panneaux, régulateur, câble 6 mm², coffret DC, moulure et cosses.
+  - **Prix** : la brochure n'a qu'une colonne de prix, traitée comme le **prix partenaire**, comme pour les pompes et le reste du catalogue. La boutique affiche le prix public, +10 % (ex. kit 218L : 670 000 F partenaire, 737 000 F public).
+  - **Photos** extraites du PDF, sur fond blanc.
+  - Ces kits restent des **articles de boutique**. Ils fonctionnent en courant continu, sans onduleur : ils ne rejoignent pas « Mes kits », dont le dimensionnement les proposerait à tort pour une maison.
+  - « Kits » était déjà la catégorie proposée par défaut à la création d'un produit, mais elle n'existait pas : un produit créé sans changer la catégorie n'apparaissait sous aucun filtre. Il apparaît désormais sous « Kits ».
+  - **En production, aucun script SQL n'est nécessaire.** Au premier lancement de l'application mise à jour sur un appareil BestaSolar déjà installé, les 12 produits rejoignent le catalogue partagé, comme les pompes avant eux.
+  - Vérification :
+    - test `catalogueDotation` : un appareil déjà installé reçoit les 12 produits, sans perdre un prix retouché par le gérant ;
+    - au navigateur : filtres, prix, photos, fiche, recherche « congélateur » (12 résultats), tableau de bord, téléphone de 360 px.
 - **Suivi des formations : recherche d'un apprenant, et statistiques de l'équipe dans « Mon profil » du gérant.**
   - **Recherche** dans Plus → « Suivi des formations » → Apprenants : par nom, e-mail ou numéro. Les accents et les majuscules sont ignorés, et chaque mot tapé doit correspondre. Elle se combine aux filtres et affiche « N apprenants sur M » ; quand rien ne correspond, l'écran le dit.
   - **« Mon profil » du gérant** : un bloc « Formation de mon équipe » donne les membres à former, la part qui a commencé, les actifs sur 30 jours, les modules terminés, les quiz et leur moyenne, et ceux qui ont terminé un cours. Il montre aussi les trois plus avancés et ceux qui n'ont pas encore commencé, avec un lien vers le suivi détaillé. Le profil d'un technicien ne change pas.
