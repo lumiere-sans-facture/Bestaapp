@@ -506,7 +506,10 @@ l'e-mail arrive, et c'est la page d'arrivée qui refuse.
    passe. S'il renvoie une erreur, c'est le § 10.4.
 
 Les textes des deux e-mails sont dans `supabase/emails/` — à coller dans
-*Authentication → Email Templates*, **dans les deux projets**.
+*Authentication → Emails* (ou *Email Templates* selon la version du tableau
+de bord), **dans les deux projets**. Ce sont des modèles HTML, **pas du SQL** :
+collés dans le SQL Editor, ils échouent sur « syntax error at or near "<" »,
+sans rien changer à la base.
 
 L'e-mail de confirmation (« Confirm signup ») porte un lien ET un code à
 6 chiffres (`{{ .Token }}`), que l'app fait saisir sur l'écran « Confirmer
