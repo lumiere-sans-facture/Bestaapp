@@ -46,8 +46,8 @@ export const normaliserKit = (brouillon) => ({
   // batterie (« Batterie lithium 24V … »). Elle décide des onduleurs
   // proposables pour ce kit.
   tension: lireTension(brouillon.tension) ?? tensionKit({ lines: brouillon.lines }),
-  // Modules batterie identiques acceptés en parallèle (boutons +/− du devis
-  // et du simulateur). Vide = la valeur par défaut (4, voir
+  // Modules batterie identiques acceptés en parallèle (boutons +/− de
+  // l'assistant de devis). Vide = la valeur par défaut (4, voir
   // utils/extensionBatterie.js) ; un kit haute tension suit son boîtier.
   modulesMax: entierPositif(brouillon.modulesMax),
   lines: (brouillon.lines || [])

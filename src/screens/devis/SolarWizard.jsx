@@ -40,16 +40,12 @@ const STEP_NAMES = ['Client', 'Consommation', 'Type de système', 'Résultat'];
  *   être ajustée. Le devis est alors MIS À JOUR, jamais dupliqué : le numéro,
  *   l'apporteur et la commission déjà calculée restent attachés au même
  *   document.
- * @param {object|null} etudeInitiale  proposition reprise du Simulateur ROI
- *   (format utils/dimensionnement.js) : un NOUVEAU devis, prérempli avec la
- *   même consommation, le même kit et les mêmes réglages.
  */
-export default function SolarWizard({ onDone, initialLeadId = null, devisAModifier = null, etudeInitiale = null }) {
+export default function SolarWizard({ onDone, initialLeadId = null, devisAModifier = null }) {
   // Lu une seule fois : rejouer la restauration à chaque rendu écraserait ce
   // que le technicien est en train de modifier.
   const [reprise] = useState(() => {
-    const r = restaurerDimensionnement(devisAModifier
-      || (etudeInitiale ? { type: 'solar', dimensionnement: etudeInitiale } : null));
+    const r = restaurerDimensionnement(devisAModifier);
     // Le compteur de lignes est global au module : le recaler au-dessus des
     // lignes restaurées évite qu'un appareil ajouté ensuite reprenne le
     // `rowId` d'une ligne existante — les deux se modifieraient ensemble.
@@ -348,12 +344,6 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
         {step === 1 && (
           <div>
             <div className="wizard-step-title">Sélectionnez un client</div>
-            {etudeInitiale && (
-              <div className="devis-client-note" role="status">
-                <Package size={17} />
-                <span>Proposition reprise du <strong>Simulateur ROI</strong> : consommation, kit et réglages sont déjà remplis. Choisissez le client, puis vérifiez le résultat.</span>
-              </div>
-            )}
             <LeadPicker leads={myLeads} selectedLeadId={selectedLeadId} onSelect={setSelectedLeadId} />
             {selectedLeadId && <PartnerField value={partnerId} />}
           </div>

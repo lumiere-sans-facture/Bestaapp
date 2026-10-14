@@ -25,9 +25,9 @@ function Pas({ icone: Icone, libelle, unite, valeur, moins, plus, onRegler, deta
 
 /**
  * Réglage de la proposition de kit : panneaux et modules batterie, un à un,
- * avec recalcul en direct. Le MÊME composant dans le Simulateur ROI et dans
- * l'assistant de devis, branché sur la même proposition
- * (utils/propositionKit.js) : ce qui est réglé ici part tel quel au devis.
+ * avec recalcul en direct, dans l'assistant de devis. Branché sur la
+ * proposition commune au Simulateur ROI (utils/propositionKit.js) : ce qui est
+ * réglé ici part tel quel au devis.
  *
  * @param {object} proposition  résultat de proposerKit()
  * @param {(quoi:'panneaux'|'modules', valeur:number) => void} onRegler

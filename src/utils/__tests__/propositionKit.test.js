@@ -1,10 +1,11 @@
 // Proposition de kit commune au Simulateur ROI et à l'assistant de devis.
 //
-// Le cœur de ces tests : POUR UN MÊME BESOIN, LE SIMULATEUR ET LE DEVIS
-// DONNENT LE MÊME RÉSULTAT. On construit l'étude exactement comme chaque
-// écran la construit (RoiSection, puis SolarWizard après le passage « Créer
-// le devis avec cette proposition »), et on compare kit, panneaux, modules,
-// lignes et total — au franc près.
+// Le cœur de ces tests : POUR UNE MÊME CONSOMMATION, LE SIMULATEUR ET LE
+// DEVIS COMPOSENT LE MÊME KIT — kit suggéré, panneaux complétés au besoin,
+// modules batterie ajoutés au besoin (60 kWh porté à 72 kWh…). On calcule
+// exactement comme chaque écran calcule (RoiSection d'un côté, SolarWizard de
+// l'autre), et on compare kit, panneaux, modules, lignes et total — au franc
+// près. Les boutons +/−, eux, n'existent que dans l'assistant de devis.
 import { describe, it, expect } from 'vitest';
 import { SOLAR_KITS } from '../../data/kits';
 import { INVERTER_MODELS } from '../../data/inverters';
@@ -15,11 +16,10 @@ import {
 } from '../propositionKit';
 import { capturerDimensionnement, restaurerDimensionnement } from '../dimensionnement';
 import { factureVersConsommation } from '../factureConso';
+import { consommationDepuisFacture } from '../roi';
 import { coefficientMainOeuvre } from '../mainOeuvre';
 import { tarifPays } from '../../data/tarifsUemoa';
-import {
-  DEFAULT_PEAK_SUN_HOURS, DEFAULT_AUTONOMY_NIGHTS, DEFAULT_MOUNTING_TYPE, SYSTEM_TYPES,
-} from '../solarSizing';
+import { DEFAULT_PEAK_SUN_HOURS, SYSTEM_TYPES, phasesDuKit } from '../solarSizing';
 import { modulesDuKit, modulesMaxKit, MODULES_MAX_DEFAUT, poserBatterie } from '../extensionBatterie';
 import { normaliserKit } from '../kits';
 
@@ -33,39 +33,33 @@ const DEPART = [
   { rowId: 4, ...appareil('standfan', 2) },
 ];
 
-/** L'étude telle que RoiSection la calcule, et la proposition qui en sort. */
-const simulateur = ({ mode = 'appareils', rows = DEPART, facture = 60000, tarif = 114, repartition = 'equilibre', pays = 'tg', kitId = null, reglages = null } = {}) => {
-  const lieu = { name: tarifPays(pays)?.pays || '', lat: null, lon: null, country: pays };
-  const consoFacture = factureVersConsommation(facture, tarif, repartition);
-  const etudeCalcul = {
-    consoMode: mode === 'facture' && consoFacture.day + consoFacture.night > 0 ? 'facture' : 'appareils',
-    appareils: rows, manuel: {}, facture: { montant: facture, prixKwh: tarif, repartition },
-    systemType: SYSTEM_TYPES[0].id, autonomyNights: DEFAULT_AUTONOMY_NIGHTS, sunHours: DEFAULT_PEAK_SUN_HOURS,
-    mountingType: DEFAULT_MOUNTING_TYPE, includeMounting: true, phases: null, kitId, reglages,
-  };
-  const proposition = propositionDepuisEtude(etudeCalcul, { ...CATALOGUE, coefMainOeuvre: coefficientMainOeuvre({ ville: lieu.name, pays }) });
-  // « Créer le devis avec cette proposition » : l'étude transmise au devis.
-  const transmise = capturerDimensionnement({
-    consoMode: etudeCalcul.consoMode, rows, facture: { montant: String(facture), prixKwh: tarif, repartition },
-    systemType: etudeCalcul.systemType, autonomyNights: etudeCalcul.autonomyNights, sunHours: etudeCalcul.sunHours,
-    mountingType: etudeCalcul.mountingType, includeMounting: true, phases: proposition.phases,
-    location: lieu, kitId: proposition.kit.id, reglages: proposition.reglages,
+/** Le kit tel que RoiSection le calcule : sans réglage, sauf devis repris. */
+const simulateur = ({ mode = 'appareils', rows = DEPART, facture = 60000, tarif = 114, pays = 'tg', kitRepris = null } = {}) => {
+  const consoFacture = consommationDepuisFacture(facture, tarif);
+  const conso = mode === 'facture' && consoFacture.total > 0
+    ? { day: consoFacture.jour, night: consoFacture.nuit, peakLoad: 0 }
+    : consommationDimensionnement({ consoMode: 'appareils', appareils: rows });
+  return proposerKit({
+    consumption: conso, peakLoad: conso.peakLoad,
+    systemType: SYSTEM_TYPES[0].id, sunHours: DEFAULT_PEAK_SUN_HOURS,
+    ...CATALOGUE, coefMainOeuvre: coefficientMainOeuvre({ pays }),
+    kitId: kitRepris?.kitId, reglages: kitRepris?.reglages,
   });
-  return { proposition, transmise };
 };
 
-/** L'assistant de devis ouvert sur cette étude (SolarWizard, sans client). */
-const assistant = (etudeTransmise) => {
-  const r = restaurerDimensionnement({ type: 'solar', dimensionnement: etudeTransmise });
-  const etude = capturerDimensionnement({
-    consoMode: r.consoMode, rows: r.appareils, manual: r.manuel, facture: r.facture,
-    systemType: r.systemType, autonomyNights: r.autonomyNights, mountingType: r.mountingType,
-    includeMounting: r.includeMounting, phases: r.phases, sunHours: Number(r.sunHours) || DEFAULT_PEAK_SUN_HOURS,
-    location: r.location, solar: r.solarSource ? { source: r.solarSource } : null,
-    kitId: r.kitId, reglages: r.reglages,
-  });
-  const coef = coefficientMainOeuvre({ ville: r.location?.name || '', pays: r.location?.country || '', telephone: '' });
-  return propositionDepuisEtude(etude, { ...CATALOGUE, coefMainOeuvre: coef });
+/**
+ * L'assistant de devis (SolarWizard) sur la même saisie, avec ses réglages
+ * par défaut. Comme à l'écran, le « Réseau électrique » se cale sur
+ * l'onduleur du kit retenu.
+ */
+const assistant = ({ consoMode = 'appareils', rows = DEPART, manual = {}, facture = {}, pays = 'tg', kitId = null, reglages = null } = {}) => {
+  const location = { name: tarifPays(pays)?.pays || '', lat: null, lon: null, country: pays };
+  const coef = coefficientMainOeuvre({ ville: location.name, pays, telephone: '' });
+  const defauts = restaurerDimensionnement(null);
+  const calculer = (phases) => propositionDepuisEtude(capturerDimensionnement({
+    ...defauts, consoMode, rows, manual, facture, phases, location, kitId, reglages,
+  }), { ...CATALOGUE, coefMainOeuvre: coef });
+  return calculer(phasesDuKit(calculer(1).kit, INVERTER_MODELS));
 };
 
 /** Ce qu'on compare entre les deux écrans. */
@@ -79,62 +73,81 @@ const empreinte = (p) => ({
   total: p.total,
 });
 
-describe('Simulateur = Devis : même besoin, même résultat', () => {
+/** La facture convertie par le Simulateur, saisie en kWh dans l'assistant. */
+const memeConsommation = (facture, tarif) => {
+  const c = consommationDepuisFacture(facture, tarif);
+  return { consoMode: 'direct', manual: { day: c.jour, night: c.nuit } };
+};
+
+const F250_BJ = { consoMode: 'facture', facture: { montant: '250000', prixKwh: 115, repartition: 'equilibre' }, pays: 'bj' };
+
+describe('Simulateur = Devis : même consommation, même kit', () => {
   it('les 4 appareils de départ au Togo : Kit 10 kWh, 1 851 000 F des deux côtés', () => {
-    const { proposition, transmise } = simulateur();
-    const devis = assistant(transmise);
-    expect(proposition.kit.id).toBe('kit-10kwh-taico');
+    const sim = simulateur();
+    expect(sim.kit.id).toBe('kit-10kwh-taico');
     // L'écart mesuré avant : 1 771 000 F au Simulateur (main-d'œuvre du Togo
     // oubliée) contre 1 851 000 F au Devis.
-    expect(proposition.total).toBe(1851000);
-    expect(empreinte(devis)).toEqual(empreinte(proposition));
+    expect(sim.total).toBe(1851000);
+    expect(sim.manuel).toBe(false);
+    expect(empreinte(assistant())).toEqual(empreinte(sim));
   });
 
   it('au Bénin, la main-d’œuvre n’est pas doublée — des deux côtés', () => {
     const togo = simulateur({ pays: 'tg' });
     const benin = simulateur({ pays: 'bj' });
-    expect(benin.proposition.total).toBeLessThan(togo.proposition.total);
-    expect(empreinte(assistant(benin.transmise))).toEqual(empreinte(benin.proposition));
+    expect(benin.total).toBeLessThan(togo.total);
+    expect(empreinte(assistant({ pays: 'bj' }))).toEqual(empreinte(benin));
   });
 
-  it('facture de 250 000 F : la même conversion — Kit 48 kWh, plus le 60 kWh', () => {
-    const { proposition, transmise } = simulateur({ mode: 'facture', facture: 250000, tarif: 115, pays: 'bj' });
-    expect(proposition.kit.id).toBe('kit-48kwh');
-    expect(empreinte(assistant(transmise))).toEqual(empreinte(proposition));
+  it('kit 60 kWh porté à 72 kWh par un module, panneaux ajustés au besoin : la même composition', () => {
+    // Facture de 300 000 F à 114 F le kWh (CEET).
+    const sim = simulateur({ mode: 'facture', facture: 300000, tarif: 114 });
+    expect(sim.kit.id).toBe('kit-60kwh-deye-hv');
+    expect(sim.batterie).toMatchObject({ base: 5, modules: 6, capacite: 72 });
+    expect(sim.panneaux.poses).toBeLessThan(sim.kit.panels);
+    expect(empreinte(assistant(memeConsommation(300000, 114)))).toEqual(empreinte(sim));
   });
 
-  it('kit haute tension étendu au besoin : mêmes modules des deux côtés', () => {
-    const { proposition, transmise } = simulateur({ mode: 'facture', facture: 370000, tarif: 115, pays: 'bj' });
-    expect(proposition.kit.id).toBe('kit-60kwh-deye-hv');
-    expect(proposition.batterie.modules).toBeGreaterThan(proposition.batterie.base);
-    expect(empreinte(assistant(transmise))).toEqual(empreinte(proposition));
+  it('plus de besoin : plus de modules ET panneaux complétés au-delà du kit, des deux côtés', () => {
+    const sim = simulateur({ mode: 'facture', facture: 370000, tarif: 114 });
+    expect(sim.kit.id).toBe('kit-60kwh-deye-hv');
+    expect(sim.batterie.capacite).toBe(96);
+    expect(sim.panneaux.poses).toBeGreaterThan(sim.kit.panels);
+    expect(empreinte(assistant(memeConsommation(370000, 114)))).toEqual(empreinte(sim));
   });
 
-  it('réglages +/− faits au Simulateur : repris tels quels dans le devis', () => {
-    let s = simulateur();
-    let r = reglerProposition(s.proposition, 'modules', s.proposition.batterie.plus);
-    s = simulateur({ reglages: r });
-    r = reglerProposition(s.proposition, 'panneaux', s.proposition.panneaux.plus);
-    s = simulateur({ reglages: r });
-    expect(s.proposition.manuel).toBe(true);
-    expect(s.proposition.batterie.modules).toBe(2);
-    expect(s.proposition.panneaux.poses).toBe(s.proposition.panneaux.auto + 1);
-    expect(s.transmise.reglages).toMatchObject({ modules: 2, panneaux: s.proposition.panneaux.poses });
-    expect(empreinte(assistant(s.transmise))).toEqual(empreinte(s.proposition));
+  it('le Simulateur n’a pas de réglage : sa proposition est l’automatique de l’assistant', () => {
+    const sim = simulateur({ mode: 'facture', facture: 250000, tarif: 115, pays: 'bj' });
+    expect(sim.reglages).toBeNull();
+    expect(sim.panneaux.poses).toBe(sim.panneaux.auto);
+    expect(sim.batterie.modules).toBe(sim.batterie.auto);
   });
 
-  it('variante choisie au Simulateur : la même dans le devis', () => {
-    // Facture d'un ménage de Parakou (25 000 F) : le besoin tombe sur les deux kits 5 kWh.
-    const besoin5 = simulateur({ mode: 'facture', facture: 25000, tarif: 115, pays: 'bj' });
-    expect(besoin5.proposition.suggeres.length).toBeGreaterThan(1);
-    const autre = besoin5.proposition.suggeres[1];
-    const { proposition, transmise } = simulateur({ mode: 'facture', facture: 25000, tarif: 115, pays: 'bj', kitId: autre.id });
-    expect(proposition.kit.id).toBe(autre.id);
-    expect(empreinte(assistant(transmise))).toEqual(empreinte(proposition));
+  it('devis repris au Simulateur : son kit et ses réglages, la même composition', () => {
+    let d = assistant();
+    d = assistant({ reglages: reglerProposition(d, 'modules', d.batterie.plus) });
+    d = assistant({ reglages: reglerProposition(d, 'panneaux', d.panneaux.plus) });
+    expect(d.manuel).toBe(true);
+    // « Reprendre l'étude d'un devis » : ce que le devis a enregistré.
+    const enregistree = capturerDimensionnement({ rows: DEPART, kitId: d.kit.id, reglages: d.reglages });
+    const etude = restaurerDimensionnement({ type: 'solar', dimensionnement: enregistree });
+    const sim = simulateur({ rows: etude.appareils, kitRepris: { kitId: etude.kitId, reglages: etude.reglages } });
+    expect(sim.batterie.modules).toBe(2);
+    expect(empreinte(sim)).toEqual(empreinte(d));
+  });
+
+  it('variante retenue dans un devis repris : la même au Simulateur', () => {
+    // Facture d'un ménage de Parakou (20 000 F) : le besoin tombe sur les deux kits 5 kWh.
+    const besoin5 = simulateur({ mode: 'facture', facture: 20000, tarif: 115, pays: 'bj' });
+    expect(besoin5.suggeres.map((k) => k.id)).toEqual(['kit-5kwh', 'kit-5kwh-deye']);
+    const autre = besoin5.suggeres[1];
+    const sim = simulateur({ mode: 'facture', facture: 20000, tarif: 115, pays: 'bj', kitRepris: { kitId: autre.id } });
+    expect(sim.kit.id).toBe(autre.id);
+    expect(empreinte(assistant({ ...memeConsommation(20000, 115), pays: 'bj', kitId: autre.id }))).toEqual(empreinte(sim));
   });
 });
 
-describe('consommation : une seule conversion', () => {
+describe('consommation de l’assistant', () => {
   it('appareils : kWh jour/nuit au centième et pic de charge', () => {
     const c = consommationDimensionnement({ consoMode: 'appareils', appareils: DEPART });
     const somme = (h) => DEPART.reduce((s, r) => s + r.power * r.quantity * r[h], 0) / 1000;
@@ -190,67 +203,67 @@ describe('modules batterie : comme les panneaux, dans les limites', () => {
   });
 
   it('+/− dans la proposition : bouton « + » désactivé au maximum, « − » à un module', () => {
-    let s = simulateur({ mode: 'facture', facture: 250000, tarif: 115, pays: 'bj' });
-    expect(s.proposition.batterie).toMatchObject({ modules: 3, max: 4, plus: 4, moins: 2 });
-    s = simulateur({ mode: 'facture', facture: 250000, tarif: 115, pays: 'bj', reglages: reglerProposition(s.proposition, 'modules', 4) });
-    expect(s.proposition.batterie.plus).toBeNull();
-    expect(s.proposition.batterie.capacite).toBe(64);
-    s = simulateur({ mode: 'facture', facture: 250000, tarif: 115, pays: 'bj', reglages: reglerProposition(s.proposition, 'modules', 1) });
-    expect(s.proposition.batterie.moins).toBeNull();
+    let s = assistant(F250_BJ);
+    expect(s.batterie).toMatchObject({ modules: 3, max: 4, plus: 4, moins: 2 });
+    s = assistant({ ...F250_BJ, reglages: reglerProposition(s, 'modules', 4) });
+    expect(s.batterie.plus).toBeNull();
+    expect(s.batterie.capacite).toBe(64);
+    s = assistant({ ...F250_BJ, reglages: reglerProposition(s, 'modules', 1) });
+    expect(s.batterie.moins).toBeNull();
   });
 
   it('sous le besoin : permis, avec l’alerte « autonomie insuffisante », et moins cher', () => {
-    const auto = simulateur().proposition;
-    const s = simulateur({ mode: 'facture', facture: 250000, tarif: 115, pays: 'bj' });
-    const reduit = simulateur({ mode: 'facture', facture: 250000, tarif: 115, pays: 'bj', reglages: reglerProposition(s.proposition, 'modules', 2) }).proposition;
+    const auto = assistant();
+    const s = assistant(F250_BJ);
+    const reduit = assistant({ ...F250_BJ, reglages: reglerProposition(s, 'modules', 2) });
     expect(auto.alertes).toEqual([]);
     expect(reduit.alertes.map((a) => a.type)).toContain('autonomie');
     expect(reduit.batterie.autonomieNuits).toBeLessThan(1);
-    expect(reduit.total).toBeLessThan(s.proposition.total);
+    expect(reduit.total).toBeLessThan(s.total);
     // Le devis peut partir : rien n'est bloqué.
     expect(reduit.quotation.configurationImpossible).toBe(false);
   });
 
   it('chaque module ajouté se paie : module + supplément de main-d’œuvre', () => {
-    const s = simulateur({ pays: 'bj' });
-    const plus = simulateur({ pays: 'bj', reglages: reglerProposition(s.proposition, 'modules', 2) }).proposition;
+    const s = assistant({ pays: 'bj' });
+    const plus = assistant({ pays: 'bj', reglages: reglerProposition(s, 'modules', 2) });
     const ligne = (p) => p.quotation.components.find((c) => /^Batterie/i.test(c.name));
     expect(ligne(plus).quantity).toBe(2);
-    expect(plus.total - s.proposition.total).toBeGreaterThan(ligne(s.proposition).unitPrice);
+    expect(plus.total - s.total).toBeGreaterThan(ligne(s).unitPrice);
   });
 });
 
 describe('panneaux : +/− en direct', () => {
   it('« + » ajoute un panneau et recalcule puissance et prix ; « − » ne descend pas sous le minimum', () => {
-    const s = simulateur();
-    const p = s.proposition.panneaux;
+    const s = assistant();
+    const p = s.panneaux;
     expect(p.plus).toBe(p.poses + 1);
-    const plus = simulateur({ reglages: reglerProposition(s.proposition, 'panneaux', p.plus) }).proposition;
+    const plus = assistant({ reglages: reglerProposition(s, 'panneaux', p.plus) });
     expect(plus.panneaux.poses).toBe(p.poses + 1);
     expect(plus.panneaux.kwc).toBeGreaterThan(p.kwc);
-    expect(plus.total).toBeGreaterThan(s.proposition.total);
+    expect(plus.total).toBeGreaterThan(s.total);
     expect(p.moins == null || p.moins >= p.min).toBe(true);
   });
 
   it('moins de panneaux que le besoin : alerte « production insuffisante »', () => {
-    const s = simulateur();
-    const moins = simulateur({ reglages: reglerProposition(s.proposition, 'panneaux', s.proposition.panneaux.moins) }).proposition;
+    const s = assistant();
+    const moins = assistant({ reglages: reglerProposition(s, 'panneaux', s.panneaux.moins) });
     expect(moins.alertes.map((a) => a.type)).toContain('production');
   });
 });
 
 describe('réglages : seulement pour le besoin qui les a vus naître', () => {
   it('le besoin change : on repart de la proposition automatique', () => {
-    const s = simulateur();
-    const r = reglerProposition(s.proposition, 'modules', 2);
-    const autreBesoin = simulateur({ rows: [...DEPART, { rowId: 9, ...appareil('ledlamp', 20) }], reglages: r }).proposition;
+    const s = assistant();
+    const r = reglerProposition(s, 'modules', 2);
+    const autreBesoin = assistant({ rows: [...DEPART, { rowId: 9, ...appareil('ledlamp', 20) }], reglages: r });
     expect(autreBesoin.manuel).toBe(false);
   });
 
   it('une autre variante de kit ne reçoit pas les réglages d’une autre', () => {
-    const s = simulateur();
-    const r = reglerProposition(s.proposition, 'modules', 2);
-    expect(reglagesApplicables({ ...r, kitId: 'autre-kit' }, s.proposition.kit, s.proposition.quotation))
+    const s = assistant();
+    const r = reglerProposition(s, 'modules', 2);
+    expect(reglagesApplicables({ ...r, kitId: 'autre-kit' }, s.kit, s.quotation))
       .toEqual({ panneaux: null, modules: null });
   });
 

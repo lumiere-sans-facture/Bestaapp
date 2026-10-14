@@ -54,13 +54,10 @@ export default function Devis() {
   const location = useLocation();
   const fromCart = Boolean(location.state?.fromCart);
   const initialLeadId = location.state?.leadId || null;
-  // Arrivée depuis le Simulateur ROI : sa proposition (consommation, kit,
-  // réglages +/−) ouvre l'assistant solaire, prête à devenir un devis.
-  const etudeSimulateur = location.state?.etude || null;
   const { items: cartItems, clearCart } = useCart();
 
   // 'list' | 'create'  (le choix du type + les assistants vivent dans DevisCreator)
-  const [view, setView] = useState(fromCart || initialLeadId || etudeSimulateur ? 'create' : 'list');
+  const [view, setView] = useState(fromCart || initialLeadId ? 'create' : 'list');
   const [search, setSearch] = useState('');
   // all | brouillon | en-cours | converti | expire | sans-suite | solar | manual
   // Arrivée depuis le tableau de bord (pastille « Devis sans suite ») : le filtre est présélectionné.
@@ -128,10 +125,7 @@ export default function Devis() {
       return sortBy === 'ancien' ? -diff : diff;
     });
 
-  // La proposition du Simulateur ne sert qu'une fois : un « Nouveau devis »
-  // ultérieur repart d'un assistant vierge.
-  const [etudeEnCours, setEtudeEnCours] = useState(etudeSimulateur);
-  const backToList = () => { setEtudeEnCours(null); setView('list'); };
+  const backToList = () => setView('list');
 
   // ---- Liste des devis ----
   if (view === 'list') {
@@ -364,7 +358,6 @@ export default function Devis() {
           initialManualItems={fromCart ? cartItems : undefined}
           initialLeadId={devisAModifier ? devisAModifier.leadId : initialLeadId}
           devisAModifier={devisAModifier}
-          etudeInitiale={devisAModifier ? null : etudeEnCours}
           onDone={() => { if (fromCart) clearCart(); setDevisAModifier(null); backToList(); }}
         />
       </div>

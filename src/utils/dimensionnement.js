@@ -123,9 +123,9 @@ export function capturerDimensionnement(etat = {}) {
       ...(etat.location.country ? { country: String(etat.location.country) } : {}),
     } : null,
     solarSource: etat.solar?.source ? String(etat.solar.source) : null,
-    // Kit retenu parmi les variantes suggérées, et réglages +/− : c'est ce qui
-    // permet de reprendre une proposition du Simulateur telle quelle dans un
-    // devis, et de rouvrir un devis sur exactement la même composition.
+    // Kit retenu parmi les variantes suggérées, et réglages +/− : rouvrir le
+    // devis, ou le reprendre au Simulateur ROI, redonne exactement la même
+    // composition.
     kitId: etat.kitId ? String(etat.kitId) : null,
     reglages: reglagesPropres(etat.reglages),
   };

@@ -194,7 +194,7 @@ export default function KitsSection({ onBack }) {
               la consommation calculée du client. Toute valeur décimale est acceptée (ex. 1,2 ou 5,12 kWh).
               La tension batterie garantit qu'un onduleur de remplacement sera de la même tension.
               « Modules batterie max » : combien de modules identiques à celui du kit l'onduleur accepte en
-              parallèle ({MODULES_MAX_DEFAUT} si vide) — c'est la limite du bouton « + » des modules, dans le devis et le simulateur.
+              parallèle ({MODULES_MAX_DEFAUT} si vide) — c'est la limite du bouton « + » des modules, dans l'assistant de devis.
             </div>
 
             <div className="sheet-section-title">Composition</div>

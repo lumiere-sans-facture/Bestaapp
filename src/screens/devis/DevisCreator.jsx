@@ -16,18 +16,16 @@ import SolarWizard from './SolarWizard';
  *                                       l'étape de sélection du client est sautée
  * @param {object}     devisAModifier    étude solaire déjà enregistrée, rouverte
  *                                       pour ajustement (le devis est mis à jour)
- * @param {object}     etudeInitiale     proposition reprise du Simulateur ROI :
- *                                       l'assistant solaire s'ouvre prérempli
  */
-export default function DevisCreator({ onDone, startManual = false, initialManualItems, initialLeadId = null, devisAModifier = null, etudeInitiale = null }) {
+export default function DevisCreator({ onDone, startManual = false, initialManualItems, initialLeadId = null, devisAModifier = null }) {
   const { getLeadById } = useData();
-  const [mode, setMode] = useState(devisAModifier || etudeInitiale ? 'solar' : startManual ? 'manual' : 'choose'); // choose | solar | manual
+  const [mode, setMode] = useState(devisAModifier ? 'solar' : startManual ? 'manual' : 'choose'); // choose | solar | manual
   const initialLead = initialLeadId ? getLeadById(initialLeadId) : null;
 
   // Le dimensionnement par facture n'a plus sa carte : c'est un simple
   // mode de saisie de la consommation, proposé DANS l'assistant solaire
   // (appareils / saisie directe / facture) — une entrée de moins à choisir.
-  if (mode === 'solar') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} devisAModifier={devisAModifier} etudeInitiale={etudeInitiale} />;
+  if (mode === 'solar') return <SolarWizard onDone={onDone} initialLeadId={initialLeadId} devisAModifier={devisAModifier} />;
   if (mode === 'manual') return <ManualWizard onDone={onDone} initialItems={initialManualItems} initialLeadId={initialLeadId} />;
 
   return (

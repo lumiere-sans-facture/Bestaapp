@@ -1,18 +1,15 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Lightbulb, Banknote, Package, Sun, CalendarCheck, Sprout, Plus as PlusIcon, X, FileText } from 'lucide-react';
+import { Lightbulb, Banknote, Package, Sun, CalendarCheck, Sprout, Plus as PlusIcon, X } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import ReglageKit from '../../components/ReglageKit';
 import { formatCFA, formatCFACourt } from '../../utils/format';
 import { TARIFS_UEMOA, PAYS_DEFAUT, tarifPays, operateurPays } from '../../data/tarifsUemoa';
 import { applianceCategories, appliances } from '../../data/appliances';
-import { DEFAULT_PEAK_SUN_HOURS, DEFAULT_AUTONOMY_NIGHTS, DEFAULT_MOUNTING_TYPE, SYSTEM_TYPES } from '../../utils/solarSizing';
-import { dimensionnementRejouable, restaurerDimensionnement, resumeDimensionnement, capturerDimensionnement } from '../../utils/dimensionnement';
-import { propositionDepuisEtude, reglerProposition } from '../../utils/propositionKit';
-import { REPARTITIONS, DEFAULT_REPARTITION, JOURS_PAR_MOIS, partJourDe } from '../../utils/factureConso';
+import { DEFAULT_PEAK_SUN_HOURS, SYSTEM_TYPES } from '../../utils/solarSizing';
+import { dimensionnementRejouable, restaurerDimensionnement, resumeDimensionnement } from '../../utils/dimensionnement';
+import { proposerKit, consommationDimensionnement } from '../../utils/propositionKit';
 import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
 import {
-  simulerRoi, consommationDepuisFacture,
+  simulerRoi, consommationDepuisFacture, PART_JOUR_FACTURE, PART_NUIT_FACTURE,
   DUREE_SYSTEME_ANS, DUREES_SYSTEME, HAUSSE_TARIF_DEFAUT,
   DEGRADATION_ANNUELLE, KWH_PAR_LITRE_GAZOLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../../utils/roi';
@@ -32,6 +29,8 @@ const COUPURES_PAR_JOUR = 6;  // heures de coupure quotidiennes, valeur de terra
 const FACTURE_MENSUELLE = 60000; // F CFA — facture CEET d'un petit commerce
 
 const dec = (n, d = 1) => Number(n || 0).toFixed(d).replace('.', ',');
+// Capacité batterie : 72, 5,12 — sans zéros inutiles.
+const kwh = (n) => Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 const ans = (n) => `${String(n).replace('.', ',')} an${n >= 2 ? 's' : ''}`;
 
 /** Curseur avec sa valeur à droite. */
@@ -103,19 +102,12 @@ function Projection({ lignes, investissement, retourAns }) {
 
 export default function RoiSection() {
   const { devis, kits, inverters, products } = useData();
-  const navigate = useNavigate();
   // Deux façons d'estimer la consommation, comme dans l'assistant de devis :
   // par les appareils, ou par la facture quand le client ne sait pas dire ce
   // qu'il fait tourner mais sait très bien ce qu'il paie.
   const [mode, setMode] = useState('appareils');
   const [rows, setRows] = useState(DEPART);
   const [facture, setFacture] = useState(FACTURE_MENSUELLE);
-  // « Quand consomme-t-il le plus ? » — la même question, et la même
-  // conversion, que l'assistant de devis (utils/factureConso.js).
-  const [repartition, setRepartition] = useState(DEFAULT_REPARTITION);
-  // Variante de kit retenue et réglages +/− (null = proposition automatique).
-  const [kitId, setKitId] = useState(null);
-  const [reglages, setReglages] = useState(null);
   const [pays, setPays] = useState(PAYS_DEFAUT);
   const [duree, setDuree] = useState(DUREE_SYSTEME_ANS);
   const [coupures, setCoupures] = useState(COUPURES_PAR_JOUR);
@@ -124,6 +116,9 @@ export default function RoiSection() {
   const [carburant, setCarburant] = useState(PRIX_CARBURANT);
   // Prix retenu pour l'installation : celui du kit, sauf si un devis est repris.
   const [prixDevis, setPrixDevis] = useState(null);
+  // Devis repris : son kit (variante retenue) et ses réglages de panneaux et
+  // de modules, pour retrouver exactement sa composition.
+  const [kitRepris, setKitRepris] = useState(null);
 
   // Changer de pays recale le prix du kWh sur celui de son opérateur ; le
   // curseur reste libre ensuite (les tranches varient d'un abonné à l'autre).
@@ -158,17 +153,16 @@ export default function RoiSection() {
     if (!d) return;
     const etude = restaurerDimensionnement(d);
     if (etude.appareils?.length) setRows(etude.appareils.map((a, i) => ({ ...a, rowId: a.rowId || i + 1 })));
-    // Même kit et mêmes réglages que le devis repris.
-    setKitId(etude.kitId || null);
-    setReglages(etude.reglages || null);
+    setKitRepris({ kitId: etude.kitId || null, reglages: etude.reglages || null });
     setPrixDevis(Math.round(Number(d.total)));
   };
 
-  // Coût de la facture : douze factures par an (le chiffre que le client a
-  // sous les yeux), réparties jour/nuit comme il l'a dit.
+  // Consommation retenue : les appareils, ou la facture convertie en kWh par
+  // `utils/roi.js` (douze factures par an, 60 % la nuit). L'assistant de
+  // devis, lui, demande au client quand il consomme le plus.
   const consoFacture = useMemo(
-    () => consommationDepuisFacture(facture, tarif, partJourDe(repartition)),
-    [facture, tarif, repartition]
+    () => consommationDepuisFacture(facture, tarif),
+    [facture, tarif]
   );
   // Mémorisée : recréer l'objet à chaque rendu relancerait le calcul du kit et
   // la simulation entière sans qu'aucune saisie ait bougé.
@@ -177,61 +171,39 @@ export default function RoiSection() {
     [mode, consoFacture]
   );
 
-  // Le pays du client : il fixe le prix du kWh ET la main-d'œuvre (doublée au
-  // Togo, comme dans l'assistant de devis). Il voyage avec l'étude jusqu'au
-  // devis.
-  const lieu = useMemo(() => ({ name: tarifPays(pays)?.pays || '', lat: null, lon: null, country: pays }), [pays]);
-  const coefMainOeuvre = coefficientMainOeuvre({ ville: lieu.name, pays });
-
-  // L'étude, au format de l'assistant de devis (utils/dimensionnement.js) :
-  // la proposition en sort par la MÊME fonction que dans l'assistant
-  // (utils/propositionKit.js) — même kit, mêmes panneaux, mêmes modules, même
-  // prix. Système autonome, une nuit d'autonomie, ensoleillement par défaut :
-  // les réglages par défaut de l'assistant.
-  const etudeCalcul = useMemo(() => ({
-    consoMode: consoRetenue ? 'facture' : 'appareils',
-    appareils: rows,
-    manuel: {},
-    facture: { montant: facture, prixKwh: tarif, repartition },
-    systemType: SYSTEM_TYPES[0].id,
-    autonomyNights: DEFAULT_AUTONOMY_NIGHTS,
-    sunHours: DEFAULT_PEAK_SUN_HOURS,
-    mountingType: DEFAULT_MOUNTING_TYPE,
-    includeMounting: true,
-    phases: null, // celui de l'onduleur du kit, comme l'assistant le règle
-    kitId,
-    reglages,
-  }), [consoRetenue, rows, facture, tarif, repartition, kitId, reglages]);
-  const proposition = useMemo(
-    () => propositionDepuisEtude(etudeCalcul, { kits: kits || [], inverters: inverters || [], products: products || [], coefMainOeuvre }),
-    [etudeCalcul, kits, inverters, products, coefMainOeuvre]
-  );
-  const kit = proposition?.kit ? proposition : null;
-  const regler = (quoi, valeur) => setReglages(reglerProposition(proposition, quoi, valeur));
-  const choisirKit = (id) => { setKitId(id); setReglages(null); };
-
-  // « Créer le devis avec cette proposition » : l'assistant de devis s'ouvre
-  // avec cette étude — même consommation, même kit, mêmes réglages, même pays.
-  const creerDevis = () => {
-    if (!proposition?.kit) return;
-    const etude = capturerDimensionnement({
-      consoMode: etudeCalcul.consoMode,
-      rows,
-      facture: { montant: String(facture), prixKwh: tarif, repartition },
-      systemType: etudeCalcul.systemType,
-      autonomyNights: etudeCalcul.autonomyNights,
-      sunHours: etudeCalcul.sunHours,
-      mountingType: etudeCalcul.mountingType,
-      includeMounting: true,
-      phases: proposition.phases,
-      location: lieu,
-      kitId: proposition.kit.id,
-      reglages: proposition.reglages,
+  // Le kit que l'assistant de devis de l'app proposerait pour cette
+  // consommation, composé par la MÊME fonction (utils/propositionKit.js) :
+  // le kit suggéré, ses panneaux complétés au besoin, ses modules batterie
+  // ajoutés au besoin (60 kWh porté à 72 kWh…), son onduleur, et la
+  // main-d'œuvre du pays (doublée au Togo) — donc la même composition et le
+  // même prix que le dimensionnement du devis.
+  const coefMainOeuvre = coefficientMainOeuvre({ pays });
+  const kit = useMemo(() => {
+    // Appareils : jour, nuit et pic arrondis comme dans l'assistant. Une
+    // facture ne dit rien du pic de charge : l'onduleur se cale alors sur la
+    // seule puissance photovoltaïque, exactement comme dans l'assistant.
+    const conso = consoRetenue
+      ? { day: consoRetenue.jour, night: consoRetenue.nuit, peakLoad: 0 }
+      : consommationDimensionnement({ consoMode: 'appareils', appareils: rows });
+    // Système autonome — le même choix par défaut que l'assistant de devis
+    // (`utils/dimensionnement.js`), et l'hypothèse qui a du sens ici : le
+    // client vient pour cesser de dépendre du réseau et du groupe.
+    const proposition = proposerKit({
+      consumption: conso,
+      peakLoad: conso.peakLoad,
+      systemType: SYSTEM_TYPES[0].id,
+      sunHours: DEFAULT_PEAK_SUN_HOURS,
+      kits: kits || [],
+      inverters: inverters || [],
+      products: products || [],
+      coefMainOeuvre,
+      kitId: kitRepris?.kitId,
+      reglages: kitRepris?.reglages,
     });
-    navigate('/devis', { state: { etude } });
-  };
+    return proposition?.kit ? proposition : null;
+  }, [rows, consoRetenue, kits, inverters, products, coefMainOeuvre, kitRepris]);
 
-  const investissement = prixDevis ?? proposition?.total ?? 0;
+  const investissement = prixDevis ?? kit?.total ?? 0;
 
   const sim = useMemo(() => simulerRoi({
     appareils: rows,
@@ -265,21 +237,12 @@ export default function RoiSection() {
             <>
               <p className="roi-aide">La facture divisée par le prix du kWh donne la consommation — le même calcul que l’assistant de devis.</p>
               <Curseur label="Facture d’électricité" value={facture} onChange={setFacture} min={0} max={2000000} step={5000} suffixe="F/mois" />
-              <div className="chip-selector">
-                <span className="chip-selector-label"><Sun size={13} /> Quand consomme-t-il le plus ?</span>
-                <div className="categories-scroll" style={{ marginBottom: 0 }}>
-                  {REPARTITIONS.map((r) => (
-                    <button key={r.id} type="button" className={`category-chip ${repartition === r.id ? 'active' : ''}`}
-                      aria-pressed={repartition === r.id} onClick={() => setRepartition(r.id)}>
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
               <p className="roi-note">
                 {formatCFA(facture)} par mois à {formatCFA(tarif)} le kWh, soit
-                {' '}{dec(consoFacture.kwhMois, 0)} kWh par mois, dont {Math.round((1 - partJourDe(repartition)) * 100)} % la nuit :
-                c’est la part de nuit qui dimensionne la batterie.
+                {' '}{dec(consoFacture.kwhMois, 0)} kWh par mois. Une facture ne dit pas QUAND
+                le client consomme : on retient {Math.round(PART_NUIT_FACTURE * 100)} % la nuit
+                et {Math.round(PART_JOUR_FACTURE * 100)} % en journée, la part nocturne étant
+                celle qui dimensionne la batterie.
               </p>
             </>
           ) : (
@@ -370,33 +333,25 @@ export default function RoiSection() {
           <div className="sheet-section-title"><Package size={13} style={{ verticalAlign: -2, marginRight: 5 }} />L’installation</div>
           {kit ? (
             <>
-              <p className="roi-aide">Le kit que votre assistant de devis propose pour cette consommation, au prix de votre catalogue — ajustable panneau par panneau, module par module.</p>
-              {/* Variantes de même capacité : le vendeur choisit la marque ou
-                  la composition, comme dans l'assistant de devis. */}
-              {kit.suggeres.length > 1 && (
-                <div className="categories-scroll roi-variantes" role="group" aria-label="Kits suggérés">
-                  {kit.suggeres.map((k) => (
-                    <button key={k.id} type="button" className={`category-chip ${k.id === kit.kit.id ? 'active' : ''}`}
-                      aria-pressed={k.id === kit.kit.id} onClick={() => choisirKit(k.id)}>
-                      {k.name}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <p className="roi-aide">Le kit que votre assistant de devis propose pour cette consommation, au prix de votre catalogue.</p>
               <div className="roi-kit">
                 <div className="roi-kit-nom">{kit.kit.name}</div>
+                {/* La composition réellement chiffrée, décrite comme dans
+                    l'assistant de devis : modules et panneaux ajoutés au
+                    besoin, onduleur de remplacement s'il y a lieu. */}
                 <div className="roi-kit-spec">
-                  {kit.batterie.capacite.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} kWh de batterie · {kit.panneaux.poses} panneaux de {kit.kit.panelW} Wc · onduleur{' '}
-                  {kit.quotation.inverterSuggested
+                  {kwh(kit.batterie.capacite)} kWh de batterie
+                  {kit.batterie.capacite > Number(kit.kit.battery) && ` (étendue depuis ${kwh(kit.kit.battery)})`}
+                  {kit.batterie.capacite < Number(kit.kit.battery) && ` (réduite depuis ${kwh(kit.kit.battery)})`}
+                  {' '}· {kit.panneaux.poses} panneaux de {kit.kit.panelW} Wc
+                  {kit.panneaux.poses > kit.kit.panels && ` (complétés depuis ${kit.kit.panels})`}
+                  {kit.panneaux.poses < kit.kit.panels && ` (ajustés au besoin, au lieu de ${kit.kit.panels})`}
+                  {' '}· onduleur {kit.quotation.inverterSuggested
                     ? `${kit.quotation.inverterSuggested.quantite > 1 ? `${kit.quotation.inverterSuggested.quantite} × ` : ''}${kit.quotation.inverterSuggested.capacity} kVA`
                     : `${kit.kit.inverter} kVA`}
                 </div>
               </div>
-              <ReglageKit proposition={kit} onRegler={regler} onReinitialiser={() => setReglages(null)} />
               <Ligne label="Prix de l’installation" detail="pose comprise" montant={investissement} fort />
-              <button type="button" className="btn btn-primary btn-block roi-creer-devis" onClick={creerDevis}>
-                <FileText size={16} /> Créer le devis avec cette proposition
-              </button>
 
               {/* Sur quelle durée raisonner : 25 ans, c'est la garantie de
                   production des panneaux ; un client prudent préfère souvent
@@ -499,8 +454,7 @@ export default function RoiSection() {
             <li>Le kit étant dimensionné pour ces appareils, il les alimente : l’économie, c’est tout ce qui est payé aujourd’hui pour les faire tourner.</li>
             <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(sim.maintenance)}/an) suit la même hausse.</li>
             <li>Les panneaux perdent {dec(DEGRADATION_ANNUELLE * 100)} % de rendement par an (garantie constructeur : {DUREE_SYSTEME_ANS} ans).</li>
-            <li>Estimation par facture : comme dans l’assistant de devis, la facture est convertie sur des mois de {JOURS_PAR_MOIS} jours et répartie selon « Quand consomme-t-il le plus ? » ({REPARTITIONS.find((r) => r.id === repartition)?.label.toLowerCase()}) — la part de nuit dimensionne la batterie. Le coût annuel, lui, reprend exactement douze factures. Le mode « appareils » garde les heures réelles de chacun.</li>
-            <li>Le kit est celui que l’assistant de devis propose pour la même consommation, au même prix : main-d’œuvre doublée au Togo, structure sur tôle, une nuit d’autonomie.</li>
+            <li>Estimation par facture : {Math.round(PART_NUIT_FACTURE * 100)} % de la consommation la nuit, {Math.round(PART_JOUR_FACTURE * 100)} % en journée — la part nocturne dimensionne la batterie, la sous-estimer donnerait un kit qui s’éteint avant le matin. Le mode « appareils », lui, garde les heures réelles de chacun.</li>
             <li>Les prix du kWh proposés par pays sont des ordres de grandeur de la tranche domestique, pas des tarifs officiels : c’est la facture du client qui fait foi.</li>
             <li>La projection porte sur {duree} ans — au-delà, l’installation continue d’économiser, mais ce n’est plus compté ici.</li>
             <li>CO₂ : {dec(CO2_PAR_LITRE_GAZOLE, 2)} kg par litre de gazole, {dec(CO2_PAR_KWH_RESEAU, 2)} kg par kWh réseau — ordres de grandeur, pas une mesure.</li>

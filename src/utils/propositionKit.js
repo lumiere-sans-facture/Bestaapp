@@ -2,13 +2,17 @@
 // de devis solaire.
 //
 // Les deux écrans appelaient déjà les fonctions de calcul, mais chacun avec
-// ses propres réglages : pour un même besoin, ils ne proposaient pas le même
-// kit ni le même prix (main-d'œuvre du Togo oubliée, facture convertie
-// autrement). Ils passent désormais tous deux par ce module, avec les mêmes
-// entrées : même kit, mêmes panneaux, mêmes modules, même total.
+// ses propres réglages : pour un même besoin, ils ne composaient pas le kit
+// de la même façon (modules batterie ajoutés invisibles au Simulateur,
+// main-d'œuvre du Togo oubliée). Ils passent désormais tous deux par ce
+// module : pour une même consommation, même kit, mêmes panneaux, mêmes
+// modules, même total.
 //
 // Les kits préconfigurés restent le point de départ (le plus petit kit dont la
-// batterie couvre le besoin). Le vendeur ajuste ensuite à la main, en direct :
+// batterie couvre le besoin), complétés au besoin en panneaux et en modules
+// batterie. Le Simulateur ROI affiche cette proposition sans réglage (un
+// devis repris y garde les siens). Dans l'assistant de devis, le vendeur
+// l'ajuste ensuite à la main :
 //   - les PANNEAUX (+/−) : jamais sous la chaîne minimale de l'onduleur ; au
 //     dessus du kit, l'onduleur suit la règle habituelle (parallèle, puis un
 //     autre modèle), et une configuration impossible bloque le « + » ;
@@ -24,8 +28,8 @@ import {
 import { factureVersConsommation } from './factureConso';
 
 /**
- * Consommation à dimensionner, depuis la saisie de l'écran — la MÊME
- * conversion dans les deux écrans (c'était l'un des deux écarts mesurés) :
+ * Consommation à dimensionner, depuis la saisie de l'assistant de devis (le
+ * Simulateur ROI s'en sert pour ses appareils, arrondis de la même façon) :
  *   - appareils : puissance × quantité × heures, jour et nuit, arrondis au
  *     centième ; le pic = tout allumé en même temps ;
  *   - facture : montant ÷ prix du kWh, sur 30 jours, réparti selon « Quand
