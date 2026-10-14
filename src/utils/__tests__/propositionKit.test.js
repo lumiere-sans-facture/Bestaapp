@@ -1,7 +1,8 @@
 // Proposition de kit commune au Simulateur ROI et à l'assistant de devis.
 //
-// Le cœur de ces tests : POUR UNE MÊME CONSOMMATION, LE SIMULATEUR ET LE
-// DEVIS COMPOSENT LE MÊME KIT — kit suggéré, panneaux complétés au besoin,
+// Le cœur de ces tests : POUR UN MÊME BESOIN (mêmes appareils, ou même
+// facture et même réponse à « Quand consomme-t-il le plus ? »), LE SIMULATEUR
+// ET LE DEVIS COMPOSENT LE MÊME KIT — kit suggéré, panneaux complétés au besoin,
 // modules batterie ajoutés au besoin (60 kWh porté à 72 kWh…). On calcule
 // exactement comme chaque écran calcule (RoiSection d'un côté, SolarWizard de
 // l'autre), et on compare kit, panneaux, modules, lignes et total — au franc
@@ -34,10 +35,10 @@ const DEPART = [
 ];
 
 /** Le kit tel que RoiSection le calcule : sans réglage, sauf devis repris. */
-const simulateur = ({ mode = 'appareils', rows = DEPART, facture = 60000, tarif = 114, pays = 'tg', kitRepris = null } = {}) => {
+const simulateur = ({ mode = 'appareils', rows = DEPART, facture = 60000, tarif = 114, repartition = 'equilibre', pays = 'tg', kitRepris = null } = {}) => {
   const consoFacture = consommationDepuisFacture(facture, tarif);
   const conso = mode === 'facture' && consoFacture.total > 0
-    ? { day: consoFacture.jour, night: consoFacture.nuit, peakLoad: 0 }
+    ? consommationDimensionnement({ consoMode: 'facture', facture: { montant: facture, prixKwh: tarif, repartition } })
     : consommationDimensionnement({ consoMode: 'appareils', appareils: rows });
   return proposerKit({
     consumption: conso, peakLoad: conso.peakLoad,
@@ -73,15 +74,14 @@ const empreinte = (p) => ({
   total: p.total,
 });
 
-/** La facture convertie par le Simulateur, saisie en kWh dans l'assistant. */
-const memeConsommation = (facture, tarif) => {
-  const c = consommationDepuisFacture(facture, tarif);
-  return { consoMode: 'direct', manual: { day: c.jour, night: c.nuit } };
-};
+/** La même facture, saisie dans l'assistant (montant, prix du kWh, répartition). */
+const memeFacture = (montant, prixKwh, repartition = 'equilibre') => (
+  { consoMode: 'facture', facture: { montant: String(montant), prixKwh, repartition } }
+);
 
 const F250_BJ = { consoMode: 'facture', facture: { montant: '250000', prixKwh: 115, repartition: 'equilibre' }, pays: 'bj' };
 
-describe('Simulateur = Devis : même consommation, même kit', () => {
+describe('Simulateur = Devis : même besoin, même kit', () => {
   it('les 4 appareils de départ au Togo : Kit 10 kWh, 1 851 000 F des deux côtés', () => {
     const sim = simulateur();
     expect(sim.kit.id).toBe('kit-10kwh-taico');
@@ -99,21 +99,31 @@ describe('Simulateur = Devis : même consommation, même kit', () => {
     expect(empreinte(assistant({ pays: 'bj' }))).toEqual(empreinte(benin));
   });
 
-  it('kit 60 kWh porté à 72 kWh par un module, panneaux ajustés au besoin : la même composition', () => {
-    // Facture de 300 000 F à 114 F le kWh (CEET).
-    const sim = simulateur({ mode: 'facture', facture: 300000, tarif: 114 });
-    expect(sim.kit.id).toBe('kit-60kwh-deye-hv');
-    expect(sim.batterie).toMatchObject({ base: 5, modules: 6, capacite: 72 });
-    expect(sim.panneaux.poses).toBeLessThan(sim.kit.panels);
-    expect(empreinte(assistant(memeConsommation(300000, 114)))).toEqual(empreinte(sim));
+  it('même facture, même réponse « Quand consomme-t-il le plus ? » : la même conversion', () => {
+    for (const repartition of ['jour', 'equilibre', 'soir']) {
+      const sim = simulateur({ mode: 'facture', facture: 300000, tarif: 114, repartition });
+      const devis = assistant(memeFacture(300000, 114, repartition));
+      expect([sim.sizing.batteryCapacity, sim.sizing.requiredPanelPower]).toEqual([devis.sizing.batteryCapacity, devis.sizing.requiredPanelPower]);
+      expect(empreinte(devis)).toEqual(empreinte(sim));
+    }
   });
 
-  it('plus de besoin : plus de modules ET panneaux complétés au-delà du kit, des deux côtés', () => {
-    const sim = simulateur({ mode: 'facture', facture: 370000, tarif: 114 });
+  it('kit 60 kWh porté à 72 kWh par un module, panneaux complétés : la même composition', () => {
+    // Facture de 330 000 F à 114 F le kWh (CEET), consommation équilibrée.
+    const sim = simulateur({ mode: 'facture', facture: 330000, tarif: 114 });
     expect(sim.kit.id).toBe('kit-60kwh-deye-hv');
-    expect(sim.batterie.capacite).toBe(96);
+    expect(sim.batterie).toMatchObject({ base: 5, modules: 6, capacite: 72 });
     expect(sim.panneaux.poses).toBeGreaterThan(sim.kit.panels);
-    expect(empreinte(assistant(memeConsommation(370000, 114)))).toEqual(empreinte(sim));
+    expect(empreinte(assistant(memeFacture(330000, 114)))).toEqual(empreinte(sim));
+  });
+
+  it('consommation surtout le soir : plus de nuit, plus de modules — des deux côtés', () => {
+    const equilibre = simulateur({ mode: 'facture', facture: 300000, tarif: 114 });
+    const soir = simulateur({ mode: 'facture', facture: 300000, tarif: 114, repartition: 'soir' });
+    expect(equilibre.batterie.capacite).toBe(60);
+    expect(equilibre.panneaux.poses).toBeLessThan(equilibre.kit.panels);
+    expect(soir.batterie).toMatchObject({ modules: 7, capacite: 84 });
+    expect(empreinte(assistant(memeFacture(300000, 114, 'soir')))).toEqual(empreinte(soir));
   });
 
   it('le Simulateur n’a pas de réglage : sa proposition est l’automatique de l’assistant', () => {
@@ -137,13 +147,13 @@ describe('Simulateur = Devis : même consommation, même kit', () => {
   });
 
   it('variante retenue dans un devis repris : la même au Simulateur', () => {
-    // Facture d'un ménage de Parakou (20 000 F) : le besoin tombe sur les deux kits 5 kWh.
-    const besoin5 = simulateur({ mode: 'facture', facture: 20000, tarif: 115, pays: 'bj' });
+    // Facture d'un ménage de Parakou (25 000 F) : le besoin tombe sur les deux kits 5 kWh.
+    const besoin5 = simulateur({ mode: 'facture', facture: 25000, tarif: 115, pays: 'bj' });
     expect(besoin5.suggeres.map((k) => k.id)).toEqual(['kit-5kwh', 'kit-5kwh-deye']);
     const autre = besoin5.suggeres[1];
-    const sim = simulateur({ mode: 'facture', facture: 20000, tarif: 115, pays: 'bj', kitRepris: { kitId: autre.id } });
+    const sim = simulateur({ mode: 'facture', facture: 25000, tarif: 115, pays: 'bj', kitRepris: { kitId: autre.id } });
     expect(sim.kit.id).toBe(autre.id);
-    expect(empreinte(assistant({ ...memeConsommation(20000, 115), pays: 'bj', kitId: autre.id }))).toEqual(empreinte(sim));
+    expect(empreinte(assistant({ ...memeFacture(25000, 115), pays: 'bj', kitId: autre.id }))).toEqual(empreinte(sim));
   });
 });
 

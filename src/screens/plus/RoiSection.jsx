@@ -8,8 +8,9 @@ import { DEFAULT_PEAK_SUN_HOURS, SYSTEM_TYPES } from '../../utils/solarSizing';
 import { dimensionnementRejouable, restaurerDimensionnement, resumeDimensionnement } from '../../utils/dimensionnement';
 import { proposerKit, consommationDimensionnement } from '../../utils/propositionKit';
 import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
+import { REPARTITIONS, DEFAULT_REPARTITION, JOURS_PAR_MOIS, partJourDe } from '../../utils/factureConso';
 import {
-  simulerRoi, consommationDepuisFacture, PART_JOUR_FACTURE, PART_NUIT_FACTURE,
+  simulerRoi, consommationDepuisFacture,
   DUREE_SYSTEME_ANS, DUREES_SYSTEME, HAUSSE_TARIF_DEFAUT,
   DEGRADATION_ANNUELLE, KWH_PAR_LITRE_GAZOLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../../utils/roi';
@@ -108,6 +109,9 @@ export default function RoiSection() {
   const [mode, setMode] = useState('appareils');
   const [rows, setRows] = useState(DEPART);
   const [facture, setFacture] = useState(FACTURE_MENSUELLE);
+  // « Quand consomme-t-il le plus ? » — la même question, et la même
+  // conversion, que l'assistant de devis (utils/factureConso.js).
+  const [repartition, setRepartition] = useState(DEFAULT_REPARTITION);
   const [pays, setPays] = useState(PAYS_DEFAUT);
   const [duree, setDuree] = useState(DUREE_SYSTEME_ANS);
   const [coupures, setCoupures] = useState(COUPURES_PAR_JOUR);
@@ -157,12 +161,11 @@ export default function RoiSection() {
     setPrixDevis(Math.round(Number(d.total)));
   };
 
-  // Consommation retenue : les appareils, ou la facture convertie en kWh par
-  // `utils/roi.js` (douze factures par an, 60 % la nuit). L'assistant de
-  // devis, lui, demande au client quand il consomme le plus.
+  // Coût de la facture : douze factures par an (le chiffre que le client a
+  // sous les yeux), réparties jour/nuit comme il l'a dit.
   const consoFacture = useMemo(
-    () => consommationDepuisFacture(facture, tarif),
-    [facture, tarif]
+    () => consommationDepuisFacture(facture, tarif, partJourDe(repartition)),
+    [facture, tarif, repartition]
   );
   // Mémorisée : recréer l'objet à chaque rendu relancerait le calcul du kit et
   // la simulation entière sans qu'aucune saisie ait bougé.
@@ -179,11 +182,12 @@ export default function RoiSection() {
   // même prix que le dimensionnement du devis.
   const coefMainOeuvre = coefficientMainOeuvre({ pays });
   const kit = useMemo(() => {
-    // Appareils : jour, nuit et pic arrondis comme dans l'assistant. Une
-    // facture ne dit rien du pic de charge : l'onduleur se cale alors sur la
-    // seule puissance photovoltaïque, exactement comme dans l'assistant.
+    // La consommation convertie comme dans l'assistant : appareils arrondis
+    // au centième, facture sur des mois de 30 jours répartie selon « Quand
+    // consomme-t-il le plus ? ». Une facture ne dit rien du pic de charge :
+    // l'onduleur se cale alors sur la seule puissance photovoltaïque.
     const conso = consoRetenue
-      ? { day: consoRetenue.jour, night: consoRetenue.nuit, peakLoad: 0 }
+      ? consommationDimensionnement({ consoMode: 'facture', facture: { montant: facture, prixKwh: tarif, repartition } })
       : consommationDimensionnement({ consoMode: 'appareils', appareils: rows });
     // Système autonome — le même choix par défaut que l'assistant de devis
     // (`utils/dimensionnement.js`), et l'hypothèse qui a du sens ici : le
@@ -201,7 +205,7 @@ export default function RoiSection() {
       reglages: kitRepris?.reglages,
     });
     return proposition?.kit ? proposition : null;
-  }, [rows, consoRetenue, kits, inverters, products, coefMainOeuvre, kitRepris]);
+  }, [rows, consoRetenue, facture, tarif, repartition, kits, inverters, products, coefMainOeuvre, kitRepris]);
 
   const investissement = prixDevis ?? kit?.total ?? 0;
 
@@ -237,12 +241,21 @@ export default function RoiSection() {
             <>
               <p className="roi-aide">La facture divisée par le prix du kWh donne la consommation — le même calcul que l’assistant de devis.</p>
               <Curseur label="Facture d’électricité" value={facture} onChange={setFacture} min={0} max={2000000} step={5000} suffixe="F/mois" />
+              <div className="chip-selector">
+                <span className="chip-selector-label"><Sun size={13} /> Quand consomme-t-il le plus ?</span>
+                <div className="categories-scroll" style={{ marginBottom: 0 }}>
+                  {REPARTITIONS.map((r) => (
+                    <button key={r.id} type="button" className={`category-chip ${repartition === r.id ? 'active' : ''}`}
+                      aria-pressed={repartition === r.id} onClick={() => setRepartition(r.id)}>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <p className="roi-note">
                 {formatCFA(facture)} par mois à {formatCFA(tarif)} le kWh, soit
-                {' '}{dec(consoFacture.kwhMois, 0)} kWh par mois. Une facture ne dit pas QUAND
-                le client consomme : on retient {Math.round(PART_NUIT_FACTURE * 100)} % la nuit
-                et {Math.round(PART_JOUR_FACTURE * 100)} % en journée, la part nocturne étant
-                celle qui dimensionne la batterie.
+                {' '}{dec(consoFacture.kwhMois, 0)} kWh par mois, dont {Math.round((1 - partJourDe(repartition)) * 100)} % la nuit :
+                c’est la part de nuit qui dimensionne la batterie.
               </p>
             </>
           ) : (
@@ -454,7 +467,7 @@ export default function RoiSection() {
             <li>Le kit étant dimensionné pour ces appareils, il les alimente : l’économie, c’est tout ce qui est payé aujourd’hui pour les faire tourner.</li>
             <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(sim.maintenance)}/an) suit la même hausse.</li>
             <li>Les panneaux perdent {dec(DEGRADATION_ANNUELLE * 100)} % de rendement par an (garantie constructeur : {DUREE_SYSTEME_ANS} ans).</li>
-            <li>Estimation par facture : {Math.round(PART_NUIT_FACTURE * 100)} % de la consommation la nuit, {Math.round(PART_JOUR_FACTURE * 100)} % en journée — la part nocturne dimensionne la batterie, la sous-estimer donnerait un kit qui s’éteint avant le matin. Le mode « appareils », lui, garde les heures réelles de chacun.</li>
+            <li>Estimation par facture : comme dans l’assistant de devis, la facture est convertie sur des mois de {JOURS_PAR_MOIS} jours et répartie selon « Quand consomme-t-il le plus ? » ({REPARTITIONS.find((r) => r.id === repartition)?.label.toLowerCase()}) — la part de nuit dimensionne la batterie. Le coût annuel, lui, reprend exactement douze factures. Le mode « appareils » garde les heures réelles de chacun.</li>
             <li>Les prix du kWh proposés par pays sont des ordres de grandeur de la tranche domestique, pas des tarifs officiels : c’est la facture du client qui fait foi.</li>
             <li>La projection porte sur {duree} ans — au-delà, l’installation continue d’économiser, mais ce n’est plus compté ici.</li>
             <li>CO₂ : {dec(CO2_PAR_LITRE_GAZOLE, 2)} kg par litre de gazole, {dec(CO2_PAR_KWH_RESEAU, 2)} kg par kWh réseau — ordres de grandeur, pas une mesure.</li>

@@ -1,9 +1,10 @@
 /* Simulateur ROI et assistant de devis : le même kit, composé de la même
    façon. Le Simulateur garde son écran d'avant (ni boutons +/−, ni « Créer le
-   devis ») ; il décrit la composition réellement chiffrée : modules batterie
-   ajoutés au besoin (60 kWh porté à 72 kWh), panneaux ajustés au besoin,
-   onduleur — et l'assistant, pour la même consommation, donne le même kit,
-   les mêmes panneaux et le même total.
+   devis »), avec la question « Quand consomme-t-il le plus ? » sur la
+   facture ; il décrit la composition réellement chiffrée : modules batterie
+   ajoutés au besoin (60 kWh porté à 72 kWh), panneaux complétés au besoin,
+   onduleur — et l'assistant, pour la même facture et la même réponse, donne
+   le même kit, les mêmes panneaux et le même total.
    Nécessite `npm run dev` à côté. */
 import { chromium } from '@playwright/test';
 
@@ -43,28 +44,32 @@ const kitSim = await page.locator('.roi-kit-nom').innerText();
 ok(/10 kWh/.test(kitSim), `appareils de départ : le kit de l’assistant [${kitSim}]`);
 ok(await prixSimulateur() === 1851000, `même prix que le devis au Togo, main-d’œuvre doublée [${(await prixSimulateur()).toLocaleString('fr-FR')} F]`);
 
-// ---- 2. FACTURE DE 300 000 F : 60 kWh porté à 72 kWh, comme au devis ----
+// ---- 2. FACTURE DE 330 000 F : 60 kWh porté à 72 kWh, comme au devis ----
 await page.locator('button:has-text("D’après sa facture")').click();
-ok(await page.locator(':text("Quand consomme-t-il le plus ?")').count() === 0, 'facture : l’écran d’avant, sans question jour/nuit');
-await page.locator('input[aria-label="Facture d’électricité"]').fill('300000');
+const question = page.locator('.chip-selector', { hasText: 'Quand consomme-t-il le plus ?' });
+ok(await question.count() === 1, 'facture : la question « Quand consomme-t-il le plus ? » est là');
+ok(await question.locator('button.active').innerText() === 'Équilibré jour / nuit', 'réponse par défaut : équilibré, comme dans l’assistant');
+await page.locator('input[aria-label="Facture d’électricité"]').fill('330000');
 await page.waitForTimeout(400);
-const spec = espaces(await page.locator('.roi-kit-spec').innerText());
+let spec = espaces(await page.locator('.roi-kit-spec').innerText());
 ok(/60 kWh/.test(await page.locator('.roi-kit-nom').innerText()), `kit 60 kWh [${await page.locator('.roi-kit-nom').innerText()}]`);
 ok(/^72 kWh de batterie \(étendue depuis 60\)/.test(spec), `batterie portée à 72 kWh par un module [${spec}]`);
 const panneauxSim = Number(/· (\d+) panneaux/.exec(spec)?.[1]);
-ok(/\(ajustés au besoin, au lieu de 42\)/.test(spec), `panneaux ajustés au besoin [${panneauxSim}]`);
+ok(/\(complétés depuis 42\)/.test(spec), `panneaux complétés au besoin [${panneauxSim}]`);
 const prixFacture = await prixSimulateur();
 await page.locator('.roi-kit').screenshot({ path: `${CAPTURES}/simulateur-kit-72kwh.png` });
 
-// La même consommation, en kWh, pour l'assistant : la facture convertie par
-// le Simulateur (12 factures sur 365 jours, 40 % le jour, 60 % la nuit).
-const conso = await page.evaluate(async () => {
-  const { consommationDepuisFacture } = await import('/src/utils/roi.js');
-  const c = consommationDepuisFacture(300000, 114);
-  return { jour: String(c.jour), nuit: String(c.nuit) };
-});
+// La réponse change la part de nuit, donc la batterie.
+await question.locator('button:has-text("Surtout le soir")').click();
+await page.waitForTimeout(300);
+spec = espaces(await page.locator('.roi-kit-spec').innerText());
+ok(/^96 kWh de batterie \(étendue depuis 60\)/.test(spec) && /70 % la nuit/.test(await page.locator('.roi-note').first().innerText()),
+  `« Surtout le soir » : 70 % la nuit, 96 kWh de batterie [${spec.slice(0, 40)}…]`);
+await question.locator('button:has-text("Équilibré")').click();
+await page.waitForTimeout(300);
+ok(await prixSimulateur() === prixFacture, 'retour à « Équilibré » : la proposition de départ');
 
-// ---- 3. ASSISTANT DE DEVIS : la même consommation, le même kit ----
+// ---- 3. ASSISTANT DE DEVIS : la même facture, le même kit ----
 await page.goto(B + '/devis');
 await page.waitForTimeout(1500);
 await page.locator('button:has-text("Créer un devis"), button:has-text("Nouveau devis")').first().click();
@@ -75,9 +80,10 @@ await page.locator('.page-content button').nth(1).click(); // un client de Lomé
 await page.waitForTimeout(400);
 const suivant = () => page.locator('button:has-text("Suivant")').first();
 await suivant().click(); await page.waitForTimeout(700);
-await page.locator('button:has-text("Saisie directe")').click();
-await page.locator('.manual-consumption-grid input').nth(0).fill(conso.jour);
-await page.locator('.manual-consumption-grid input').nth(1).fill(conso.nuit);
+await page.locator('button:has-text("Facture CEET/SBEE")').click();
+await page.locator('.manual-consumption-grid input').nth(0).fill('330000');
+await page.locator('.manual-consumption-grid input').nth(1).fill('114');
+ok(await page.locator('.chip-selector button.active').innerText() === 'Équilibré jour / nuit', 'assistant : même réponse par défaut');
 await suivant().click(); await page.waitForTimeout(900);
 await suivant().click(); await page.waitForSelector('.kit-summary');
 const resume = espaces(await page.locator('.kit-summary').first().innerText());
@@ -95,7 +101,7 @@ await mobile.evaluate((u) => { localStorage.setItem('bestasolar_user', JSON.stri
 await mobile.goto(B + '/plus/roi');
 await mobile.waitForSelector('.roi-kit');
 await mobile.locator('button:has-text("D’après sa facture")').click();
-await mobile.locator('input[aria-label="Facture d’électricité"]').fill('300000');
+await mobile.locator('input[aria-label="Facture d’électricité"]').fill('330000');
 await mobile.waitForTimeout(400);
 const debord = await mobile.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
 ok(debord <= 0, `téléphone : aucun défilement horizontal (${debord} px)`);
