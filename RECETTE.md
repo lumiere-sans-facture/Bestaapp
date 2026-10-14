@@ -26,6 +26,13 @@ Ces écrans n'existent pas en production aujourd'hui : tout est neuf.
       courrier qui part enferme tout le monde dehors.
 - [ ] **Inscription** d'un compte d'essai (adresse réelle) → l'e-mail de
       confirmation arrive, et le lien ouvre l'app connectée.
+- [ ] **Confirmer avec le code** : nouvelle inscription, l'écran « Confirmer
+      votre adresse » s'ouvre ; recopier le code à 6 chiffres de l'e-mail →
+      l'app s'ouvre connectée, entreprise et code de parrainage gardés.
+      Vérifier aussi « Renvoyer l'e-mail » (seul le code du DERNIER e-mail
+      vaut) et « J'ai reçu un code de confirmation » depuis la connexion.
+      Sans code dans l'e-mail : le modèle « Confirm signup » n'a pas été
+      recollé (`supabase/emails/confirmation-inscription.html`).
 - [ ] **Confirmer depuis un AUTRE appareil** que celui de l'inscription
       (s'inscrire sur l'ordinateur, ouvrir le mail sur le téléphone). C'est le
       cas le plus courant dans la vraie vie, et le plus fragile : les

@@ -3,7 +3,13 @@
        Confirmez votre compte BestaSolar Pro
 
      Les variables entre accolades sont remplies par Supabase. Ne pas les
-     traduire ni les reformater : {{ .ConfirmationURL }} est le lien signé.
+     traduire ni les reformater : {{ .ConfirmationURL }} est le lien signé,
+     {{ .Token }} le code à saisir dans l'application (écran « Confirmer votre
+     adresse »). Les deux confirment le compte ; le code sert quand l'e-mail
+     est lu sur un autre appareil, ou que le lien ne s'ouvre pas dans l'app.
+     Longueur et durée du code : Authentication → Providers → Email,
+     « Email OTP Length » (6) et « Email OTP Expiration » — la même durée
+     que le lien.
 
      Pas de police distante, pas d'image hébergée ailleurs : une messagerie
      bloque presque toujours l'un et l'autre, et le message doit rester lisible
@@ -35,14 +41,20 @@
                 </td>
               </tr>
             </table>
+            <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#3a3a3a">
+              Ou saisissez ce code dans l'application, sur l'écran
+              « Confirmer votre adresse » :
+            </p>
+            <div style="display:inline-block;margin:0 0 22px;padding:12px 22px;background:#f3f5fa;border:1px solid #d9deea;border-radius:6px;font-size:28px;font-weight:700;letter-spacing:8px;color:#0a2472;font-family:Consolas,'Courier New',monospace">{{ .Token }}</div>
             <p style="margin:0 0 6px;font-size:13px;color:#6b6b6b">
               Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigateur :
             </p>
             <p style="margin:0 0 20px;font-size:12px;color:#0a2472;word-break:break-all">{{ .ConfirmationURL }}</p>
             <p style="margin:0;font-size:13px;line-height:1.6;color:#6b6b6b">
-              Ce lien expire au bout de 24 heures. Si vous n'êtes pas à l'origine
-              de cette inscription, ignorez ce message : aucun compte ne sera
-              activé sans ce clic.
+              Ce lien et ce code expirent au bout de 24 heures. Si vous n'êtes pas
+              à l'origine de cette inscription, ignorez ce message : aucun compte
+              ne sera activé sans ce clic ou ce code. Ne communiquez ce code à
+              personne : BestaSolar ne vous le demandera jamais.
             </p>
           </td>
         </tr>

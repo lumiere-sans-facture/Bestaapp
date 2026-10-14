@@ -301,7 +301,9 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (error) return false;
+      // Adresse jamais confirmée : Supabase ne le dit qu'avec le BON mot de
+      // passe (aucune énumération possible) — l'écran propose alors le code.
+      if (error) return error.code === 'email_not_confirmed' || /not confirmed/i.test(error.message || '') ? 'unconfirmed' : false;
       touchSession();
       // Profil et organisation lus EN MÊME TEMPS : la connexion enchaînait
       // trois allers-retours (identifiants, profil, organisation), soit une à
@@ -408,6 +410,60 @@ export function AuthProvider({ children }) {
     return { ok: true };
   };
 
+  /**
+   * Confirme l'inscription avec le CODE reçu par e-mail, en plus du lien.
+   * Le lien ouvre la session dans le navigateur qui le reçoit — souvent celui
+   * du téléphone, ni l'application ni l'ordinateur de l'inscription. Le code
+   * se tape ici, sur l'appareil où attendent l'entreprise et le code de
+   * parrainage (PENDING_KEY). Sa longueur suit le réglage Supabase « Email
+   * OTP Length » (6 chiffres par défaut, jusqu'à 10).
+   * Retourne { ok, incomplete?, error? } ; `incomplete` : adresse confirmée,
+   * profil à terminer à l'écran (inscription commencée sur un autre appareil).
+   */
+  const confirmerCodeInscription = async (email, code) => {
+    if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
+    const token = String(code || '').replace(/\D/g, '');
+    if (token.length < 6 || token.length > 10) return { ok: false, error: 'Saisissez le code à 6 chiffres reçu par e-mail.' };
+    const { data, error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: 'email' });
+    if (error || !data?.session) {
+      return {
+        ok: false,
+        error: estCoupureReseauAuth(error)
+          ? 'Pas de connexion Internet : le code n’a pas pu être vérifié. Réessayez dès le retour du réseau.'
+          : 'Code incorrect ou expiré. Vérifiez le dernier e-mail reçu, ou demandez-en un nouveau.',
+      };
+    }
+    touchSession();
+    const orgEnCours = fetchMyOrg();
+    const authUser = data.user || data.session.user;
+    const { profile: existant, injoignable } = await fetchProfile(authUser);
+    if (injoignable && !existant) {
+      return { ok: false, error: 'Adresse confirmée, mais le serveur ne répond pas. Connectez-vous dans un instant avec votre mot de passe.' };
+    }
+    const profile = existant || (await provisionProfile(authUser));
+    if (!profile) return { ok: true, incomplete: true };
+    // Profil tout juste créé : l'organisation aussi, on la relit.
+    await adoptProfile(profile, existant ? orgEnCours : null);
+    return { ok: true };
+  };
+
+  /**
+   * Renvoie l'e-mail de confirmation (nouveau lien, nouveau code). Supabase
+   * limite les envois : un par minute et par adresse.
+   */
+  const renvoyerCodeInscription = async (email) => {
+    if (!isSupabaseConfigured) return { ok: false, error: 'Backend non configuré.' };
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+    if (!error) return { ok: true };
+    const attendre = error.status === 429 || /seconds|security purposes|rate limit/i.test(error.message || '');
+    return {
+      ok: false,
+      error: attendre
+        ? 'Un e-mail vient déjà de partir. Patientez une minute avant d’en demander un autre.'
+        : 'Envoi impossible pour le moment. Réessayez dans un instant.',
+    };
+  };
+
   /** Envoie l'email de réinitialisation (le lien ramène vers l'app). */
   const resetPassword = async (email) => {
     if (!isSupabaseConfigured) return { ok: false };
@@ -467,7 +523,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signInWithGoogle, logout, signUp, completeSignup, resetPassword, updatePassword, refreshOrg, recovery, pendingAuthUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, signInWithGoogle, logout, signUp, confirmerCodeInscription, renvoyerCodeInscription, completeSignup, resetPassword, updatePassword, refreshOrg, recovery, pendingAuthUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -506,7 +506,15 @@ l'e-mail arrive, et c'est la page d'arrivée qui refuse.
    passe. S'il renvoie une erreur, c'est le § 10.4.
 
 Les textes des deux e-mails sont dans `supabase/emails/` — à coller dans
-*Authentication → Email Templates*.
+*Authentication → Email Templates*, **dans les deux projets**.
+
+L'e-mail de confirmation (« Confirm signup ») porte un lien ET un code à
+6 chiffres (`{{ .Token }}`), que l'app fait saisir sur l'écran « Confirmer
+votre adresse ». Tant que l'ancien modèle reste collé, l'e-mail n'a que le
+lien : l'écran du code s'affiche quand même, et le lien continue de marcher.
+La longueur du code et sa durée de validité se règlent dans *Authentication →
+Providers → Email* (« Email OTP Length » à 6, « Email OTP Expiration » — la
+même durée pour le lien et le code).
 
 ## 11. Deux environnements — comment les tenir alignés
 

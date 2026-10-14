@@ -65,7 +65,7 @@ function CountryFlag({ country }) {
  * /inscription, où mènent les appels à l'action de la page d'accueil publique.
  */
 export default function Login({ vueInitiale = 'login' }) {
-  const { login, signInWithGoogle, signUp, completeSignup, resetPassword, updatePassword, logout, recovery, pendingAuthUser } = useAuth();
+  const { login, signInWithGoogle, signUp, confirmerCodeInscription, renvoyerCodeInscription, completeSignup, resetPassword, updatePassword, logout, recovery, pendingAuthUser } = useAuth();
   // Lien de parrainage (?ref=NOM-XXXXXX) actif sur cet appareil : on ouvre
   // directement l'inscription, code partenaire prérempli.
   const [refCode, setRefCode] = useState(() => (isSupabaseConfigured ? getActiveRef()?.code || '' : ''));
@@ -79,8 +79,10 @@ export default function Login({ vueInitiale = 'login' }) {
   // Formule retenue sur la page d'accueil : annoncée ici pour que la suite ne
   // surprenne pas — le paiement arrive juste après la création du compte.
   const [formuleChoisie] = useState(() => lireFormuleChoisie());
-  const [view, setView] = useState(refCode || teamCode ? 'signup' : vueInitiale); // login | signup | forgot | complete
+  const [view, setView] = useState(refCode || teamCode ? 'signup' : vueInitiale); // login | signup | code | forgot | complete
   const [email, setEmail] = useState('');
+  // Code de confirmation reçu par e-mail, en plus du lien (vue « code »).
+  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -170,6 +172,16 @@ export default function Login({ vueInitiale = 'login' }) {
       setLoading(false);
       return;
     }
+    if (ok === 'unconfirmed') {
+      // Bon mot de passe, adresse jamais confirmée : le code reçu par e-mail
+      // (ou son lien) termine l'inscription — ce n'est pas un échec.
+      clearAttempts(email);
+      setLoading(false);
+      setError('');
+      setNotice('Votre adresse n’est pas encore confirmée. Saisissez le code reçu par e-mail, ou cliquez sur son lien.');
+      setView('code');
+      return;
+    }
     if (ok === 'incomplete') {
       // Compte valide mais inscription jamais terminée (profil absent) :
       // on propose de la finir ici, sans repasser par la création de compte.
@@ -226,10 +238,38 @@ export default function Login({ vueInitiale = 'login' }) {
       // que l'email soit neuf ou déjà pris (anti-énumération des comptes,
       // voir AuthContext.sanitizeSignupError) — impossible de savoir lequel
       // s'est produit, donc le message couvre les deux sans jamais trancher.
+      // L'e-mail porte un lien ET un code : la saisie du code s'ouvre tout de
+      // suite, sur cet appareil — celui où l'entreprise et le code de
+      // parrainage attendent.
       setNotice('Si cette adresse est nouvelle, un e-mail de confirmation vient d’être envoyé. Si vous avez déjà un compte, connectez-vous directement ou utilisez « Mot de passe oublié ».');
-      setView('login');
+      setCode('');
+      setView('code');
     }
     // Sinon : la session est ouverte, l'app monte toute seule.
+  };
+
+  const handleCode = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    const res = await confirmerCodeInscription(email, code);
+    setLoading(false);
+    if (!res.ok) { setError(res.error || 'Code incorrect ou expiré.'); return; }
+    // Adresse confirmée mais profil absent (inscription commencée ailleurs) :
+    // la dernière étape se fait ici. Sinon, l'app monte toute seule.
+    if (res.incomplete) switchView('complete');
+  };
+
+  const handleResend = async () => {
+    setError('');
+    setNotice('');
+    if (!email.trim()) { setError('Saisissez d’abord votre adresse e-mail.'); return; }
+    setLoading(true);
+    const res = await renvoyerCodeInscription(email);
+    setLoading(false);
+    if (!res.ok) { setError(res.error); return; }
+    setCode('');
+    setNotice('Nouvel e-mail envoyé : utilisez le code du DERNIER message reçu, les précédents ne valent plus.');
   };
 
   const handleForgot = async (e) => {
@@ -481,6 +521,31 @@ export default function Login({ vueInitiale = 'login' }) {
                 <ChevronLeft size={14} /> J'ai déjà un compte — me connecter
               </button>
             </form>
+          ) : view === 'code' && isSupabaseConfigured ? (
+            <form className="login-form" onSubmit={handleCode}>
+              <h2 className="login-form-title">Confirmer votre adresse</h2>
+              {notice && <div className="login-notice">{notice}</div>}
+              {error && <div className="login-error">{error}</div>}
+              <p className="text-sm text-secondary" style={{ marginBottom: 14 }}>
+                Saisissez le code à 6 chiffres de l’e-mail de confirmation — ou cliquez
+                simplement sur son lien.
+              </p>
+              {emailField}
+              <div className="input-group">
+                <label className="input-label" htmlFor="code-confirmation">Code de confirmation</label>
+                <input id="code-confirmation" className="input input-code" required
+                  inputMode="numeric" autoComplete="one-time-code" maxLength={10}
+                  value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="••••••" />
+              </div>
+              <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+                {loading ? 'Vérification…' : 'Confirmer et entrer'}
+              </button>
+              <div className="login-links">
+                <button type="button" className="login-link" disabled={loading} onClick={handleResend}>Renvoyer l’e-mail</button>
+                <button type="button" className="login-link" onClick={() => switchView('login')}>Retour à la connexion</button>
+              </div>
+            </form>
           ) : view === 'forgot' && isSupabaseConfigured ? (
             <form className="login-form" onSubmit={handleForgot}>
               <h2 className="login-form-title">Mot de passe oublié</h2>
@@ -508,10 +573,15 @@ export default function Login({ vueInitiale = 'login' }) {
                 {loading ? 'Connexion…' : 'Se connecter'}
               </button>
               {isSupabaseConfigured ? (
-                <div className="login-links">
-                  <button type="button" className="login-link" onClick={() => switchView('forgot')}>Mot de passe oublié ?</button>
-                  <button type="button" className="login-link" onClick={() => switchView('signup')}>Créer un compte</button>
-                </div>
+                <>
+                  <div className="login-links">
+                    <button type="button" className="login-link" onClick={() => switchView('forgot')}>Mot de passe oublié ?</button>
+                    <button type="button" className="login-link" onClick={() => switchView('signup')}>Créer un compte</button>
+                  </div>
+                  <button type="button" className="login-link" onClick={() => { setCode(''); switchView('code'); }}>
+                    J’ai reçu un code de confirmation
+                  </button>
+                </>
               ) : (
                 <div className="login-help">Mot de passe oublié ? Contactez votre gérant.</div>
               )}
