@@ -141,10 +141,11 @@ ok(debordAssistant <= 0, `téléphone, assistant : aucun défilement horizontal 
 await mobile.screenshot({ path: `${CAPTURES}/assistant-question-mobile.png` });
 await mobile.close();
 
-// ---- 5. ABONNEMENT : aucun bandeau « Renouveler », nulle part ----
-// Les écrans se montrent au client : le rappel d'abonnement n'est plus un
+// ---- 5. ABONNEMENT : pas de bandeau « Renouveler » dans l'espace principal ----
+// Ses écrans se montrent au client : le rappel d'abonnement n'y est plus un
 // bandeau en tête de page (décision du gérant). L'échéance proche reste
 // annoncée, discrètement, dans les alertes du tableau de bord et la cloche.
+// L'espace Pro, lui, garde son rappel sur Devis & Factures.
 const abo = await nav.newPage({ viewport: { width: 375, height: 800 } });
 abo.on('pageerror', (e) => jsErr.push(String(e)));
 await abo.goto(B + '/');
@@ -181,8 +182,9 @@ ok(/Abonnement Devis Pro expire dans 2 j/.test(await abo.locator('.page-content'
 await abonnement(2, 'pro');
 await abo.goto(B + '/pro/documents'); await abo.waitForTimeout(1500);
 ok(await abo.locator('h1, .page-title', { hasText: 'Devis & Factures' }).count() > 0, 'espace Pro : l’écran Devis & Factures est bien ouvert');
-ok(await abo.locator('.pro-alert', { hasText: 'expire dans' }).count() === 0 && await renouveler().count() === 0,
-  'espace Pro, Devis & Factures : aucun bandeau « Renouveler »');
+ok(await abo.locator('.pro-alert', { hasText: 'expire dans 2 jour' }).count() === 1 && await renouveler().count() === 1,
+  'espace Pro, Devis & Factures : le rappel « expire dans 2 jours — Renouveler » est gardé');
+await abo.locator('.pro-alert', { hasText: 'expire dans' }).screenshot({ path: `${CAPTURES}/pro-rappel-abonnement.png` });
 await abo.close();
 
 console.log('\n' + R.join('\n'));
