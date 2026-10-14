@@ -64,7 +64,10 @@ await p.locator('button:has-text("Créer le devis")').first().click(); await p.w
 const devis = await p.evaluate(() => JSON.parse(localStorage.getItem('bestasolar_data')).devis.find((d) => d.type === 'solar'));
 
 // ---- 2. Simulateur ROI : l'étude du même devis ----
-await p.goto(B + '/plus/roi'); await p.locator('#roi-etude').waitFor({ timeout: 15000 });
+await p.goto(B + '/plus/roi');
+// Le Simulateur s'ouvre sur la facture : la reprise d'étude est côté appareils.
+await p.locator('button:has-text("D’après ses appareils")').click();
+await p.locator('#roi-etude').waitFor({ timeout: 15000 });
 const option = await p.locator('#roi-etude option', { hasText: devis.devisNumber }).getAttribute('value');
 await p.locator('#roi-etude').selectOption(option); await p.waitForTimeout(1200);
 const entretien = p.locator('.roi-ligne', { hasText: 'Entretien de l’installation' });

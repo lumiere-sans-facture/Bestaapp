@@ -105,8 +105,9 @@ export default function RoiSection() {
   const { devis, kits, inverters, products } = useData();
   // Deux façons d'estimer la consommation, comme dans l'assistant de devis :
   // par les appareils, ou par la facture quand le client ne sait pas dire ce
-  // qu'il fait tourner mais sait très bien ce qu'il paie.
-  const [mode, setMode] = useState('appareils');
+  // qu'il fait tourner mais sait très bien ce qu'il paie. La facture d'abord
+  // (décision du gérant) : c'est le chiffre que le client a en main.
+  const [mode, setMode] = useState('facture');
   const [rows, setRows] = useState(DEPART);
   const [facture, setFacture] = useState(FACTURE_MENSUELLE);
   // « Quand consomme-t-il le plus ? » — la même question, et la même

@@ -48,6 +48,9 @@ await page.waitForTimeout(300);
 ok(await page.locator('.reglage-kit').count() === 0, 'pas de boutons +/− au Simulateur');
 ok(await page.locator('button:has-text("Créer le devis")').count() === 0, 'pas de « Créer le devis » au Simulateur');
 ok(await page.locator(':text("Kits suggérés"), .roi-variantes').count() === 0, 'pas de choix de variante au Simulateur');
+ok(await page.locator('.roi-mode.is-actif').innerText() === 'D’après sa facture', 'le Simulateur s’ouvre sur « D’après sa facture »');
+await page.locator('button:has-text("D’après ses appareils")').click();
+await page.waitForTimeout(300);
 const kitSim = await page.locator('.roi-kit-nom').innerText();
 ok(/10 kWh/.test(kitSim), `appareils de départ : le kit de l’assistant [${kitSim}]`);
 ok(await prixSimulateur() === 1851000, `même prix que le devis au Togo, main-d’œuvre doublée [${(await prixSimulateur()).toLocaleString('fr-FR')} F]`);
@@ -118,6 +121,24 @@ ok(debord <= 0, `téléphone : aucun défilement horizontal (${debord} px)`);
 ok(await reponsesVisibles(mobile), 'téléphone : les trois réponses visibles, à la ligne');
 await mobile.locator('.chip-selector', { hasText: 'Quand consomme-t-il le plus ?' }).screenshot({ path: `${CAPTURES}/simulateur-question-mobile.png` });
 await mobile.locator('.roi-kit').screenshot({ path: `${CAPTURES}/simulateur-kit-mobile.png` });
+
+// L'assistant de devis sur téléphone : les réponses à la ligne.
+await mobile.goto(B + '/devis');
+await mobile.waitForTimeout(1500);
+await mobile.locator('button:has-text("Créer un devis"), button:has-text("Nouveau devis")').first().click();
+await mobile.waitForTimeout(800);
+await mobile.locator(':text("Dimensionnement solaire")').first().click();
+await mobile.waitForTimeout(900);
+await mobile.locator('.page-content button').nth(1).click();
+await mobile.waitForTimeout(400);
+await mobile.locator('button:has-text("Suivant")').first().click();
+await mobile.waitForTimeout(700);
+await mobile.locator('button:has-text("Facture CEET/SBEE")').click();
+await mobile.waitForTimeout(300);
+ok(await reponsesVisibles(mobile), 'téléphone, assistant : les trois réponses visibles, à la ligne');
+const debordAssistant = await mobile.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
+ok(debordAssistant <= 0, `téléphone, assistant : aucun défilement horizontal (${debordAssistant} px)`);
+await mobile.screenshot({ path: `${CAPTURES}/assistant-question-mobile.png` });
 await mobile.close();
 
 console.log('\n' + R.join('\n'));
