@@ -103,14 +103,25 @@ export const protectionAc = (onduleur, phases = 1) => {
 };
 
 /**
+ * Une ligne du kit (ou un produit boutique) est-elle l'équivalent de cette
+ * règle ? Elle doit correspondre à `re`, sans tomber sous `exclure` — un
+ * coffret « + Ensemble fusible » n'est pas un fusible, un « Lot de petites
+ * fournitures (moulure…) » n'est pas une gaine — et n'être jamais un coffret
+ * DC : son prix, facturé à chaque chaîne, multipliait le devis.
+ */
+const equivalent = (regle, texte = '') => !!regle.re && regle.re.test(texte)
+  && !(regle.exclure && regle.exclure.test(texte)) && !COFFRET_JONCTION.re.test(texte);
+
+/**
  * Prix et désignation d'un élément à ajouter : la ligne équivalente du kit
  * fait foi (même fournisseur, même tarif) ; à défaut un produit boutique au
  * prix public (règle de marge : utils/price.js) ; sinon le prix par défaut.
  */
-const tarifer = ({ re, designation, prixDefaut }, lignesKit, products) => {
-  const duKit = re && lignesKit.find((l) => re.test(l.designation || ''));
+const tarifer = (regle, lignesKit, products) => {
+  const { re, designation, prixDefaut } = regle;
+  const duKit = re && lignesKit.find((l) => equivalent(regle, l.designation));
   if (duKit) return { designation: duKit.designation, pu: resolveLignePrice(duKit, products), source: 'kit' };
-  const produit = re && (products || []).find((p) => re.test(p.name || ''));
+  const produit = re && (products || []).find((p) => equivalent(regle, p.name));
   if (produit) {
     return {
       designation: produit.name, pu: prixPublic(produit.basePrice), productId: produit.id,
@@ -119,6 +130,9 @@ const tarifer = ({ re, designation, prixDefaut }, lignesKit, products) => {
   }
   return { designation, pu: prixDefaut, source: 'règle' };
 };
+
+/** « Deye Onduleur PCS 125 kW », ou sa puissance faute de nom. */
+const nomOnduleur = (o) => [o?.brand, o?.model].filter(Boolean).join(' ') || `Onduleur ${o?.capacity ?? '?'} kVA`;
 
 /**
  * Évalue `quantite` exemplaires d'un onduleur pour `panneaux` panneaux :
@@ -185,6 +199,9 @@ export const ordreEscalade = (onduleurKit, autres = []) => {
  * @param {Array}  p.lignesKit         lignes du kit (batterie étendue comprise)
  * @param {number} p.panneauxDemandes  panneaux exigés par la proposition
  * @param {object|null} p.onduleurKit  spec configurée de l'onduleur du kit
+ *   (ou celle qui le remplace d'office, triphasé demandé)
+ * @param {object|null} [p.onduleurOrigine]  onduleur PROPRE au kit, quand
+ *   `onduleurKit` lui a été substitué (triphasé) ; par défaut, le même
  * @param {Array}  p.candidats         onduleurs de même tension batterie
  * @param {object} p.outils            { controlePic(modele, q) → {ok, raison},
  *   limitePv(modele) → Wc, puissanceSortie(modele) → W }
@@ -192,7 +209,7 @@ export const ordreEscalade = (onduleurKit, autres = []) => {
  * @returns {object} synthèse des ajustements (voir le retour ci-dessous)
  */
 export const ajusterKit = ({
-  kit, lignesKit = kit?.lines || [], panneauxDemandes = 0, panneauxRetenus = null, onduleurKit = null, candidats = [],
+  kit, lignesKit = kit?.lines || [], panneauxDemandes = 0, panneauxRetenus = null, onduleurKit = null, onduleurOrigine, candidats = [],
   batterieFinale = null,
   outils, products = [], tarifs = MAIN_OEUVRE_EXTENSION, site = CONDITIONS_SITE,
 }) => {
@@ -221,7 +238,7 @@ export const ajusterKit = ({
     kwcBase: kwc(base, wc), kwcFinal: kwc(final, wc), kwcAjoutes: kwc(ajoutes, wc), kwcRetires: kwc(retires, wc),
   };
   if (ajoutes === 0 && retires === 0 && batterie.ajoutes === 0 && batterie.retires === 0) {
-    return { actif: false, panneaux, batterie, verification: null, onduleur: null, chaines: null, lignes: [], mainOeuvre: null, alertes: [] };
+    return { actif: false, panneaux, batterie, verification: null, onduleur: null, chaines: null, lignes: [], mainOeuvre: null, alertes: [], diagnostic: [] };
   }
 
   const baseMo = lignesKit.filter((l) => l.labor).reduce((s, l) => s + (Number(l.qty) || 0) * resolveLignePrice(l, products), 0);
@@ -260,7 +277,7 @@ export const ajusterKit = ({
         };
       }
     }
-    return { actif: true, panneaux, batterie, verification: null, onduleur: null, chaines, lignes: lignesMo, mainOeuvre, alertes: [] };
+    return { actif: true, panneaux, batterie, verification: null, onduleur: null, chaines, lignes: lignesMo, mainOeuvre, alertes: [], diagnostic: [] };
   }
 
   const panneau = specPanneau(wc);
@@ -272,19 +289,49 @@ export const ajusterKit = ({
   // Sans caractéristiques électriques (panneau ou onduleur du kit), les
   // chaînes ne peuvent pas être calculées : on le DIT, sans rien supposer.
   if (!panneau || !onduleurKit || !elecKit) {
+    // Aucun onduleur de « Mes onduleurs » ne correspond à celui du kit (même
+    // puissance, même tension) : c'est cela qu'il faut dire, pas « des
+    // caractéristiques non renseignées » d'un onduleur introuvable.
     const manque = !panneau
       ? `panneau de ${wc} Wc absent des références électriques`
-      : 'caractéristiques électriques de l’onduleur du kit non renseignées (Plus › Onduleurs)';
+      : !onduleurKit
+        ? `aucun onduleur de « Mes onduleurs » ne correspond à celui du kit (${kit.inverter} kVA, même tension batterie)`
+        : 'caractéristiques électriques de l’onduleur du kit non renseignées (Plus › Onduleurs)';
     return {
       actif: true, panneaux, batterie, verification: 'non-verifie',
       onduleur: { statut: 'non-verifie', ancien, nouveau: null, quantite: 1, raisons: [manque] },
       chaines: null, lignes: lignesMo, mainOeuvre,
+      diagnostic: [{ modele: ancien.designation, quantite: 1, raisons: [manque] }],
       alertes: [`Chaînes non vérifiées : ${manque}. Câbles et protections des chaînes ajoutées à prévoir sur place.`],
     };
   }
 
-  // Chaînes du kit de base, sur son propre onduleur.
-  const cfgBase = configurerChaines(base, panneau, elecKit, { site });
+  // Chaînes du kit de base, sur son PROPRE onduleur : c'est pour lui que le
+  // kit a été composé (câbles, connecteurs). Un onduleur substitué d'office
+  // (triphasé) peut, lui, exiger plus de panneaux que le kit n'en a.
+  const origine = onduleurOrigine === undefined ? onduleurKit : onduleurOrigine;
+  const substitue = origine !== onduleurKit;
+  const elecOrigine = substitue ? lireElectrique(origine) : elecKit;
+  const cfgBase = configurerChaines(base, panneau, elecOrigine || elecKit, { site });
+  // Les caractéristiques saisies pour l'onduleur du kit ne permettent même
+  // pas le kit de BASE (« chaînes par MPPT » vide → 1 chaîne par entrée, par
+  // exemple) : c'est une incohérence de saisie, pas une impossibilité. Pas
+  // d'escalade, pas de remplacement, pas de matériel de chaînes calculé sur
+  // des données fausses — le devis reste possible, et l'écran dit quoi
+  // corriger.
+  if (!cfgBase.ok && !substitue) {
+    const raison = cfgBase.raisons[0] || 'aucune répartition des chaînes possible';
+    return {
+      actif: true, panneaux, batterie, verification: 'incoherent',
+      onduleur: { statut: 'non-verifie', ancien, nouveau: null, quantite: 1, raisons: [raison] },
+      chaines: null, lignes: lignesMo, mainOeuvre,
+      incoherence: { onduleur: ancien.designation, panneaux: base, raison },
+      diagnostic: [{ modele: ancien.designation, quantite: 1, raisons: [`kit de base (${base} panneaux) : ${raison}`] }],
+      alertes: [`Les caractéristiques saisies pour ${ancien.designation} ne permettent pas le kit de base (${base} panneaux) : ${raison}. Vérifiez nombre de MPPT, chaînes par MPPT et tension DC max dans Plus › Onduleurs.`],
+    };
+  }
+  // Onduleur substitué sur lequel le kit de base ne tient pas (ou onduleur
+  // d'origine sans caractéristiques) : une chaîne, une entrée de référence.
   const chainesBase = cfgBase.ok ? cfgBase.chaines.length : 1;
   const mpptBase = cfgBase.ok ? cfgBase.mppt.length : 1;
 
@@ -302,11 +349,21 @@ export const ajusterKit = ({
   const contexte = { panneaux: final, panneau, wc, outils, site };
   const evalKit = evaluer({ ...contexte, modele: onduleurKit, quantite: 1, equilibreSeulement: true });
   let retenu = null;
+  // Chaque étape essayée, et pourquoi elle a échoué (la raison de l'essai le
+  // plus permissif, chaînes inégales admises) : l'écran l'affiche sous
+  // « Pourquoi ? ».
+  const diagnostic = [];
   for (const { modele, quantite } of escalade) {
+    let echec = null;
     for (const equilibreSeulement of [true, false]) {
       const r = evaluer({ ...contexte, modele, quantite, equilibreSeulement });
       if (r.ok) { retenu = { modele, quantite, ...r }; break; }
+      echec = r;
     }
+    diagnostic.push({
+      id: modele.id ?? null, modele: nomOnduleur(modele), quantite, max: maxEnParallele(modele),
+      retenu: !!retenu, raisons: retenu ? [] : (echec?.raisons || []).slice(0, 1),
+    });
     if (retenu) break;
   }
 
@@ -315,7 +372,7 @@ export const ajusterKit = ({
       actif: true, panneaux, batterie, verification: 'impossible',
       onduleur: { statut: 'impossible', ancien, nouveau: null, quantite: 1, raisons: evalKit.raisons },
       chaines: { base: cfgBase.ok ? cfgBase : null, final: [], libelle: '—' },
-      lignes: lignesMo, mainOeuvre,
+      lignes: lignesMo, mainOeuvre, diagnostic,
       alertes: [`Configuration impossible : aucun onduleur du catalogue, même en parallèle, n'accepte ${final} panneaux de ${wc} Wc dans ses limites électriques.`],
     };
   }
@@ -340,18 +397,30 @@ export const ajusterKit = ({
     });
   };
   const motifChaines = `${chainesAjoutees} chaîne${chainesAjoutees > 1 ? 's' : ''} ajoutée${chainesAjoutees > 1 ? 's' : ''}`;
+  // Coffret DC du kit : son nombre d'entrées, et s'il porte déjà les fusibles.
+  const coffret = lignesKit.find((l) => COFFRET_JONCTION.re.test(l.designation || ''));
+  const entrees = Number(/(\d+)\s*entr/i.exec(coffret?.designation || '')?.[1]) || COFFRET_JONCTION.entreesParDefaut;
+  const auDelaDuCoffret = (chaines) => Math.max(0, chaines - entrees);
+  const fusiblesDansCoffret = !!coffret && COFFRET_JONCTION.fusiblesIntegres.test(coffret.designation);
   for (const regle of MATERIEL_PAR_CHAINE) {
     if (regle.cle === 'cable-pv') {
       const requise = sectionCablePv(panneau);
-      const duKit = lignesKit.find((l) => regle.re.test(l.designation || ''));
+      const duKit = lignesKit.find((l) => equivalent(regle, l.designation));
       // La section du kit est gardée si elle suffit (jamais réduite) ;
       // sinon, câble à la section calculée.
       const regleCable = duKit && sectionDe(duKit.designation) >= requise.section
-        ? { re: regle.re }
+        ? { re: regle.re, exclure: regle.exclure }
         : { re: null, designation: `Câble PV 1x${requise.section}mm²`, prixDefaut: requise.prixDefaut };
       // Câble jumelé (« 2x10mm² ») : un seul câble fait l'aller et le retour.
       const jumele = regleCable.re && /\b2\s*[x×*]/i.test(duKit?.designation || '');
       ajouter({ ...regleCable, unit: regle.unit }, (regle.quantite / (jumele ? 2 : 1)) * chainesAjoutees, motifChaines);
+    } else if (regle.cle === 'fusible' && fusiblesDansCoffret) {
+      // Le coffret DC du kit porte déjà les fusibles de ses entrées : seules
+      // les chaînes AU-DELÀ en reçoivent, moins celles du kit de base déjà
+      // au-delà (comptées dans le kit tel qu'il est vendu).
+      const sansFusible = Math.max(0, auDelaDuCoffret(chainesFinal) - auDelaDuCoffret(chainesBase));
+      ajouter(regle, regle.quantite * sansFusible,
+        `${sansFusible} chaîne${sansFusible > 1 ? 's' : ''} au-delà des ${entrees} entrées du coffret DC`);
     } else {
       ajouter(regle, regle.quantite * chainesAjoutees, motifChaines);
     }
@@ -359,11 +428,11 @@ export const ajusterKit = ({
   const motifMppt = `${mpptAjoutes} entrée${mpptAjoutes > 1 ? 's' : ''} MPPT ajoutée${mpptAjoutes > 1 ? 's' : ''}`;
   for (const regle of MATERIEL_PAR_MPPT) ajouter(regle, regle.quantite * mpptAjoutes, motifMppt);
 
-  // Coffret de jonction : seulement si le coffret DC du kit est dépassé.
-  const coffret = lignesKit.find((l) => COFFRET_JONCTION.re.test(l.designation || ''));
-  const entrees = Number(/(\d+)\s*entr/i.exec(coffret?.designation || '')?.[1]) || COFFRET_JONCTION.entreesParDefaut;
+  // Coffrets de jonction : seulement si le coffret DC du kit est dépassé,
+  // un par tranche de `entreesParCoffret` chaînes en trop.
   if (chainesFinal > entrees && chainesAjoutees > 0) {
-    ajouter({ ...COFFRET_JONCTION, re: null }, 1, `${chainesFinal} chaînes pour un coffret de ${entrees} entrées`);
+    const nbCoffrets = Math.ceil(auDelaDuCoffret(chainesFinal) / COFFRET_JONCTION.entreesParCoffret);
+    ajouter({ ...COFFRET_JONCTION, re: null }, nbCoffrets, `${chainesFinal} chaînes pour un coffret de ${entrees} entrées`);
   }
 
   // Protections AC : une par onduleur remplacé ou ajouté, au calibre du modèle.
@@ -382,7 +451,7 @@ export const ajusterKit = ({
   const raisons = statut === 'conserve' ? [] : evalKit.raisons;
   const alertes = configs.flatMap((c) => c.alertes);
   if (!configs.every((c) => c.equilibre)) {
-    alertes.push('Chaînes de longueurs différentes, chacune sur sa propre entrée MPPT : aucune configuration équilibrée possible.');
+    alertes.push('Chaînes de longueurs différentes, chacune sur sa propre entrée MPPT : aucun découpage en chaînes égales ne tient sans multiplier les chaînes.');
   }
 
   return {
@@ -404,6 +473,7 @@ export const ajusterKit = ({
     },
     lignes: [...lignes, ...lignesMo],
     mainOeuvre,
+    diagnostic,
     alertes,
   };
 };

@@ -13,7 +13,7 @@
 //   - être de MÊME longueur ;
 //   - ne pas dépasser le courant de court-circuit admis par l'entrée
 //     (k × Isc ≤ iscMaxMppt), à défaut son courant max (k × Imp ≤ iMaxMppt).
-import { CONDITIONS_SITE, PANNEAUX_REFERENCE } from '../config/extensionKit';
+import { CONDITIONS_SITE, PANNEAUX_REFERENCE, TOLERANCE_CHAINES } from '../config/extensionKit';
 
 const nombre = (v) => {
   const n = Number(String(v ?? '').replace(',', '.'));
@@ -110,15 +110,17 @@ const repartir = (longueurs, nbMppt, kMax) => {
 
 /**
  * Configuration des chaînes pour `nbPanneaux` panneaux sur UN onduleur.
- * Chaînes ÉQUILIBRÉES d'abord (toutes de même longueur), avec le moins de
- * chaînes possible. Si `equilibreSeulement` est faux et qu'aucune ne
- * convient, des chaînes de longueurs n et n+1 sont admises, chacune sur des
- * entrées MPPT distinctes (jamais deux longueurs sur la même entrée).
+ * Le nombre de chaînes reste près du MINIMUM possible (`sMin`, chaînes égales
+ * ou de n et n+1 panneaux) : des chaînes ÉQUILIBRÉES (toutes de même
+ * longueur) sont préférées tant qu'elles n'en comptent pas plus de
+ * sMin + `tolerance`. Sinon — et si `equilibreSeulement` est faux — des
+ * chaînes de n et n+1 panneaux au nombre minimal, chacune sur des entrées
+ * MPPT distinctes (jamais deux longueurs sur la même entrée).
  *
  * @returns {{ok:boolean, equilibre:boolean, chaines:number[], mppt:number[][],
  *   nMin:number, nMax:number, vocChaine:number, raisons:string[], alertes:string[]}}
  */
-export const configurerChaines = (nbPanneaux, panneau, elec, { site = CONDITIONS_SITE, equilibreSeulement = false } = {}) => {
+export const configurerChaines = (nbPanneaux, panneau, elec, { site = CONDITIONS_SITE, equilibreSeulement = false, tolerance = TOLERANCE_CHAINES } = {}) => {
   const N = Math.max(0, Math.floor(Number(nbPanneaux) || 0));
   const lim = limitesChaine(panneau, elec, site);
   const kMax = chainesMaxParMppt(panneau, elec);
@@ -156,27 +158,39 @@ export const configurerChaines = (nbPanneaux, panneau, elec, { site = CONDITIONS
     return echec([`au plus ${capacite} chaîne(s) de ${lim.nMax} panneaux, soit ${capacite * lim.nMax} panneaux (tension DC max ${elec.vocMax} V, ${elec.nbMppt} MPPT)`]);
   }
 
-  // 1. Chaînes équilibrées, le moins possible.
-  for (let s = 1; s <= capacite; s += 1) {
-    if (N % s !== 0) continue;
-    const n = N / s;
-    if (n < lim.nMin || n > lim.nMax) continue;
-    const mppt = repartir(Array(s).fill(n), elec.nbMppt, kMax);
-    if (mppt) return reussite(Array(s).fill(n), mppt, true);
-  }
-  if (equilibreSeulement) {
-    return echec([`${N} panneaux ne se répartissent pas en chaînes égales de ${lim.nMin} à ${lim.nMax} panneaux sur ${elec.nbMppt} MPPT`]);
-  }
-  // 2. Longueurs n et n+1, sur des entrées distinctes.
-  for (let s = 2; s <= capacite; s += 1) {
+  // s chaînes de n et n+1 panneaux (toutes de n si le compte tombe juste),
+  // chaque longueur sur ses propres entrées : la configuration, ou null.
+  const essayer = (s) => {
     const n = Math.floor(N / s);
     const r = N % s;
-    if (n < lim.nMin || (r > 0 ? n + 1 : n) > lim.nMax) continue;
+    if (n < lim.nMin || (r > 0 ? n + 1 : n) > lim.nMax) return null;
     const longueurs = [...Array(r).fill(n + 1), ...Array(s - r).fill(n)];
     const mppt = repartir(longueurs, elec.nbMppt, kMax);
-    if (mppt) return reussite(longueurs, mppt, r === 0);
+    return mppt ? { longueurs, mppt, equilibre: r === 0 } : null;
+  };
+
+  // 1. Le plus petit nombre de chaînes possible.
+  let sMin = 0;
+  let auMinimum = null;
+  for (let s = 1; s <= capacite && !auMinimum; s += 1) {
+    auMinimum = essayer(s);
+    if (auMinimum) sMin = s;
   }
-  return echec([`aucune répartition sûre de ${N} panneaux sur ${elec.nbMppt} MPPT (${lim.nMin} à ${lim.nMax} panneaux par chaîne)`]);
+  if (!auMinimum) {
+    return echec([`aucune répartition sûre de ${N} panneaux sur ${elec.nbMppt} MPPT (${lim.nMin} à ${lim.nMax} panneaux par chaîne)`]);
+  }
+  // 2. Chaînes égales, à condition de ne pas multiplier les chaînes : au
+  //    plus `tolerance` de plus que le minimum.
+  const plafond = Math.min(capacite, sMin + Math.max(0, Math.floor(Number(tolerance) || 0)));
+  for (let s = sMin; s <= plafond; s += 1) {
+    const c = s === sMin ? auMinimum : essayer(s);
+    if (c?.equilibre) return reussite(c.longueurs, c.mppt, true);
+  }
+  if (equilibreSeulement) {
+    return echec([`${N} panneaux ne se répartissent pas en chaînes égales de ${lim.nMin} à ${lim.nMax} panneaux sur ${elec.nbMppt} MPPT sans multiplier les chaînes (${plafond} au plus)`]);
+  }
+  // 3. Sinon, n et n+1 panneaux au nombre minimal de chaînes.
+  return reussite(auMinimum.longueurs, auMinimum.mppt, auMinimum.equilibre);
 };
 
 /** « 2 chaînes de 7 panneaux », « 1 chaîne de 8 + 1 chaîne de 7 ». */

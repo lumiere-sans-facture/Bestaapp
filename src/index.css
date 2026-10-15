@@ -829,6 +829,13 @@ form .login-link { width: 100%; margin-top: 4px; }
 .pending-banner-text { display: flex; align-items: center; gap: 7px; font-size: 0.8438rem; color: var(--warning-dark); }
 .pending-banner-actions { display: flex; gap: 8px; }
 
+/* Détail « Pourquoi ? » sous une alerte d'onduleur de kit. */
+.pourquoi-onduleur { margin-top: 8px; font-size: 0.8125rem; }
+.pourquoi-onduleur summary { cursor: pointer; font-weight: 600; }
+.pourquoi-onduleur .pourquoi-titre { margin-top: 8px; font-weight: 600; }
+.pourquoi-onduleur ul { margin: 4px 0 0; padding-left: 18px; }
+.pourquoi-onduleur li { margin-top: 3px; line-height: 1.45; }
+
 .select-filter {
   width: auto; padding: 9px 12px; font-size: 0.875rem;
   border: none; border-radius: 10px; background: var(--bg-card);

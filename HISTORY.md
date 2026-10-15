@@ -5,6 +5,23 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-10-15
+- **Kits étendus : plus de coffrets ni de lots facturés à chaque chaîne, des chaînes au plus près du minimum, et un « Pourquoi ? » sous les alertes d'onduleur.**
+  - **Accessoires reconnus correctement.**
+    - Un « Coffret de protection DC + Ensemble fusible » n'est plus pris pour un fusible, ni un « Lot de petites fournitures » pour une gaine. Coffrets et lots ne sont jamais tarifés comme accessoire de chaîne, que ce soit depuis le kit ou depuis la boutique.
+    - Les fusibles ne s'ajoutent qu'aux chaînes au-delà des entrées d'un coffret qui les contient déjà.
+    - Il faut un coffret de jonction par tranche de 8 chaînes en trop, au lieu d'un seul quel que soit le dépassement.
+  - **Chaînes.**
+    - Des chaînes égales ne sont retenues que si elles en comptent au plus une de plus que le minimum possible ; sinon, chaînes de n et n+1 panneaux au minimum.
+    - Kit 208 kWh à 190 panneaux (PCS 125 kW) : 12 chaînes de 15 ou 16 panneaux au lieu de 19 de 10. Le total passe de 61 005 000 à 51 573 500 F.
+  - **Caractéristiques d'onduleur incohérentes avec le kit de base** (ex. 2 MPPT et « chaînes par MPPT » vide) : ce n'est plus une « configuration impossible ».
+    - L'onduleur du kit est gardé et le devis reste possible.
+    - L'assistant dit quoi corriger dans Plus › Onduleurs.
+  - **« Pourquoi ? »**, sous « Configuration impossible » et sous « Onduleur à vérifier » :
+    - les onduleurs essayés, chacun avec la raison de son échec ;
+    - les onduleurs écartés d'office : autre tension, sans tension (donc HV) pour un kit 12/24/48 V, non triphasé, caractéristiques manquantes, parallèle insuffisant.
+  - Aucun onduleur enregistré ni aucun kit n'est modifié : seule la logique change.
+
 ## 2026-10-14
 - **Boutique : les congélateurs solaires et leurs kits, repris de la brochure « Réfrigérateur & Congélateur solaire ».**
   - **Deux nouvelles catégories** :

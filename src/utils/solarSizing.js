@@ -1,7 +1,7 @@
 // Dimensionnement et chiffrage d'une installation solaire.
 // Logique portée depuis l'application besta-solar (calculations + pricing).
 // Toutes les valeurs monétaires sont en F CFA (XOF).
-import { maxEnParallele, PARALLELE_PAR_DEFAUT, estTriphase } from './inverters';
+import { maxEnParallele, PARALLELE_PAR_DEFAUT, estTriphase, electriqueManquante } from './inverters';
 import { prixPublic } from './price';
 import { resolveLignePrice } from './kits';
 import { calculMaintenanceAnnuelle } from './maintenance';
@@ -469,7 +469,7 @@ export const calculateSystemSize = (
 // ---- Chiffrage (devis) ----
 
 import { TVA_RATE } from '../config/company';
-import { tensionKit, onduleursCompatibles, estKitHauteTension } from './tension';
+import { tensionKit, onduleursCompatibles, estKitHauteTension, tensionOnduleur } from './tension';
 import { capacitePourBesoin, capaciteMaxKit, poserBatterie } from './extensionBatterie';
 import { ajusterKit, ordreEscalade, panneauxPourKit, panneauxMinimumOnduleur } from './ajustementsKit';
 
@@ -662,8 +662,10 @@ const ONDULEUR_LINE_RE = /onduleur/i;
  */
 export const onduleurDuKit = (kit, inverters = []) => {
   const ligne = (kit?.lines || []).find((l) => ONDULEUR_LINE_RE.test(l.designation || '')) || null;
+  // Comparaison NUMÉRIQUE : une puissance revenue de la synchronisation en
+  // chaîne (« 125 ») doit retrouver le kit à 125.
   const memeCalibre = onduleursCompatibles(inverters, tensionKit(kit), { hauteTension: estKitHauteTension(kit) })
-    .filter((o) => o.capacity === kit?.inverter);
+    .filter((o) => Number(o.capacity) === Number(kit?.inverter));
   const spec = memeCalibre.find((o) => o.brand
     && new RegExp(`\\b${String(o.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(ligne?.designation || ''))
     || memeCalibre[0] || null;
@@ -700,6 +702,57 @@ export const onduleurPourPanneaux = (onduleurKit, candidats = [], { pvPower = 0,
   // Rien ne suffit : l'ensemble qui admet le plus de PV, signalé insuffisant.
   const pv = (e) => limitePv(ensemble(e), configures);
   return { ...escalade.reduce((best, e) => (pv(e) > pv(best) ? e : best)), suffisant: false };
+};
+
+/**
+ * Onduleurs de « Mes onduleurs » qui n'ont pas pu servir pour ce kit, et
+ * pourquoi : tension batterie différente, sans tension (donc haute tension)
+ * pour un kit 12/24/48 V ou l'inverse, non triphasé alors que le triphasé
+ * est demandé, caractéristiques électriques manquantes, ou mise en parallèle
+ * insuffisante (essayé au maximum autorisé, sans succès). Les onduleurs
+ * retenus pour le devis n'y figurent pas.
+ * `type` (tension, phases, electrique, parallele) permet à l'écran de ne pas
+ * répéter ce que les étapes essayées disent déjà.
+ * @returns {Array<{designation:string, motif:string, type:string}>}
+ */
+export const onduleursEcartesPourKit = ({ inverters = [], tension = null, hauteTension = false, triphase = false, candidats = [], utilises = [], diagnostic = [] }) => {
+  const ecart = (o) => {
+    if (!candidats.includes(o)) {
+      // Absent des candidats : la tension d'abord — sauf si elle est la
+      // bonne (alors c'est le triphasé qui l'écarte, plus bas).
+      const t = tensionOnduleur(o);
+      if (tension && t !== tension) {
+        return {
+          type: 'tension',
+          motif: t
+            ? `tension ${t} V, différente de celle du kit (${tension} V)`
+            : `sans tension batterie saisie, donc considéré haute tension (HV) : incompatible avec un kit ${tension} V`,
+        };
+      }
+      if (!tension && hauteTension && t) return { type: 'tension', motif: `onduleur ${t} V : incompatible avec un kit haute tension (HV)` };
+    }
+    if (triphase && !estTriphase(o)) return { type: 'phases', motif: 'non triphasé, alors que le triphasé est demandé' };
+    const manque = electriqueManquante(o);
+    if (manque.length) {
+      return { type: 'electrique', motif: `caractéristiques électriques manquantes (${manque.join(', ')}) : à compléter dans Plus › Onduleurs` };
+    }
+    const max = maxEnParallele(o);
+    const auMax = diagnostic.find((d) => d.id != null && d.id === o.id && d.quantite === max && !d.retenu && d.raisons?.length);
+    if (auMax) {
+      return {
+        type: 'parallele',
+        motif: max > 1
+          ? `parallèle insuffisant : même ${max} en parallèle, ${auMax.raisons[0]}`
+          : `parallèle insuffisant (un seul appareil autorisé) : ${auMax.raisons[0]}`,
+      };
+    }
+    return null;
+  };
+  return (inverters || [])
+    .filter((o) => o && !utilises.includes(o))
+    .map((o) => ({ o, e: ecart(o) }))
+    .filter(({ e }) => e)
+    .map(({ o, e }) => ({ designation: designationOnduleur(o) || `Onduleur ${o.capacity} kVA`, ...e }));
 };
 
 /**
@@ -880,6 +933,9 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     panneauxRetenus: neededPanels,
     batterieFinale: batterie.capacite,
     onduleurKit: onduleurBase,
+    // Onduleur propre au kit : référence des chaînes du kit de base, même
+    // quand le triphasé en impose un autre.
+    onduleurOrigine: currentSpec || null,
     candidats: candidatsRetenus,
     products,
     outils: {
@@ -889,6 +945,10 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   });
   const verifie = ajustements.verification === 'verifie';
   const impossible = ajustements.verification === 'impossible';
+  // Caractéristiques saisies incohérentes avec le kit de base : l'onduleur
+  // du kit est conservé tel quel, sans substitution sur la seule puissance PV
+  // (le devis reste possible ; l'écran dit quoi corriger).
+  const incoherent = ajustements.verification === 'incoherent';
   let retenu = null;
   if (verifie) {
     const nouveau = ajustements.onduleur.nouveau;
@@ -897,7 +957,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
       quantite: ajustements.onduleur.quantite,
       suffisant: true,
     };
-  } else if (!impossible && onduleurBase && (neededPanels > kit.panels || remplacePourTri)) {
+  } else if (!impossible && !incoherent && onduleurBase && (neededPanels > kit.panels || remplacePourTri)) {
     // KIT DE BASE (aucun panneau ajouté) : son onduleur n'est jamais remplacé
     // (règle du gérant) — il a été choisi pour ces panneaux-là. Seul le
     // triphasé, demandé explicitement, le fait changer.
@@ -1046,6 +1106,13 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     // Kit étendu dont AUCUN onduleur (même doublé) ne tient les limites
     // électriques : le devis ne doit pas partir en l'état.
     configurationImpossible: impossible,
+    // Onduleurs configurés qui n'ont pas pu servir, et pourquoi (détail
+    // « Pourquoi ? » de l'écran).
+    onduleursEcartes: onduleursEcartesPourKit({
+      inverters, tension, hauteTension: estKitHauteTension(kit), triphase,
+      candidats: candidatsRetenus, utilises: [onduleurBase, retenu?.modele].filter(Boolean),
+      diagnostic: ajustements.diagnostic || [],
+    }),
     // Section « Ajustements du kit » (null quand le kit est posé tel quel).
     ajustements: synthese.actif ? synthese : null,
     tension,

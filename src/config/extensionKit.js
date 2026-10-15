@@ -57,14 +57,28 @@ export const SECTIONS_CABLE_PV = [
 ];
 export const COEF_COURANT_CABLE = 1.25;
 
+// ---- Nombre de chaînes ----
+// Chaînes ÉQUILIBRÉES (toutes de même longueur) préférées, mais pas à tout
+// prix : un découpage égal n'est retenu que s'il compte au plus
+// TOLERANCE_CHAINES chaîne(s) de plus que le minimum possible. Au-delà, des
+// chaînes de n et n+1 panneaux au nombre minimal — sans quoi 190 panneaux
+// donnaient 19 chaînes de 10 au lieu de 12 chaînes de 15 ou 16, et le câble,
+// les connecteurs et les protections suivaient.
+export const TOLERANCE_CHAINES = 1;
+
 // ---- Matériel ajouté par CHAÎNE supplémentaire ----
 // `re` reconnaît la ligne équivalente du kit : son prix fait alors foi (même
 // fournisseur, même tarif). À défaut, un produit de la boutique dont le nom
 // correspond, au prix public ; sinon `prixDefaut`.
+// `exclure` écarte les lignes (et produits) que `re` attraperait à tort : un
+// coffret complet ou un lot de fournitures n'est pas un fusible ni une gaine,
+// et facturer son prix à chaque chaîne multipliait le devis. Les lignes de
+// coffret DC (COFFRET_JONCTION.re) sont, elles, toujours écartées.
 export const MATERIEL_PAR_CHAINE = [
   {
     cle: 'cable-pv',
     re: /c[âa]ble\s+(pv|solaire)/i,
+    exclure: null,
     // Aller et retour de la chaîne jusqu'au coffret.
     quantite: 30, unit: 'm',
     // La désignation et le prix suivent la section (voir SECTIONS_CABLE_PV).
@@ -72,6 +86,7 @@ export const MATERIEL_PAR_CHAINE = [
   {
     cle: 'mc4',
     re: /mc4/i,
+    exclure: null,
     designation: 'Connecteurs MC4 (paire)',
     // Une paire en tête de chaîne, une au coffret.
     quantite: 2, unit: 'pcs', prixDefaut: 1000,
@@ -79,13 +94,19 @@ export const MATERIEL_PAR_CHAINE = [
   {
     cle: 'fusible',
     re: /fusible/i,
+    // « Coffret de protection DC + Ensemble fusible … » est un coffret.
+    exclure: /coffret|ensemble/i,
     designation: 'Fusible DC et porte-fusible',
-    // Un sur le + et un sur le − de la chaîne.
+    // Un sur le + et un sur le − de la chaîne. Quand le coffret DC du kit
+    // intègre déjà les fusibles (sa désignation le dit), seules les chaînes
+    // au-delà de ses entrées en reçoivent (utils/ajustementsKit.js).
     quantite: 2, unit: 'pcs', prixDefaut: 4000,
   },
   {
     cle: 'gaine',
     re: /gaine|moulure/i,
+    // « Lot de petites fournitures (moulure, …) » est un forfait du kit.
+    exclure: /lot|fournitures/i,
     designation: 'Gaine et accessoires de pose DC',
     quantite: 1, unit: 'pcs', prixDefaut: 5500,
   },
@@ -97,12 +118,14 @@ export const MATERIEL_PAR_MPPT = [
     cle: 'sectionneur-dc',
     // Pas les disjoncteurs « compacts » de batterie, qui sont aussi en DC.
     re: /sectionneur|disjoncteur\s+dc\b/i,
+    exclure: null,
     designation: 'Disjoncteur/sectionneur DC',
     quantite: 1, unit: 'pcs', prixDefaut: 8000,
   },
   {
     cle: 'parafoudre-dc',
     re: /parafoudre\s+dc/i,
+    exclure: null,
     designation: 'Parafoudre DC',
     quantite: 1, unit: 'pcs', prixDefaut: 9000,
   },
@@ -111,10 +134,16 @@ export const MATERIEL_PAR_MPPT = [
 // ---- Coffret de jonction (combiner box) ----
 // Le coffret DC du kit accepte un nombre d'entrées de chaînes : lu dans sa
 // désignation (« 4 entrée et 4 sortie »), sinon `entreesParDefaut`. Au-delà,
-// un coffret de jonction s'ajoute, une seule fois.
+// des coffrets de jonction s'ajoutent : un par tranche de `entreesParCoffret`
+// chaînes qui dépassent.
+// `fusiblesIntegres` : le coffret du kit contient-il déjà les fusibles de
+// ses entrées ? Oui quand sa désignation le dit (« + Ensemble fusible »,
+// « (fusibles, parafoudre…) »).
 export const COFFRET_JONCTION = {
   re: /coffret[^,]*\bdc\b/i,
   entreesParDefaut: 2,
+  entreesParCoffret: 8,
+  fusiblesIntegres: /fusible/i,
   designation: 'Coffret de jonction DC (combiner box)',
   prixDefaut: 45000,
 };

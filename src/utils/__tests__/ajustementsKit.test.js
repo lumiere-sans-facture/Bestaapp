@@ -415,3 +415,114 @@ describe('onduleur décrit par sa seule tension max et son nombre de MPPT', () =
     expect(q.ajustements.chaines.final[0].chaines).toEqual([7, 7]);
   });
 });
+
+// ---- Kits étendus : accessoires, nombre de chaînes, diagnostic ----
+// Onduleur PCS du kit 208 kWh tel que saisi par le gérant : haute tension
+// (tension vide), 10 MPPT de 2 chaînes, 40 A de court-circuit par entrée.
+const PCS_125 = {
+  id: 'pcs-125', brand: 'Deye', model: 'Onduleur PCS 125 kW', capacity: 125, maxPvPower: 200000, price: 4150000,
+  tension: null, maxParallele: 2,
+  electrique: { vocMax: 1000, mpptMin: 200, mpptMax: 850, nbMppt: 10, chainesParMppt: 2, iscMaxMppt: 40, phases: 3 },
+};
+const KIT_208 = SOLAR_KITS.find((k) => k.id === 'kit-208kwh-deye-hv');
+const kit208 = (panneaux, onduleurs = [PCS_125], products = []) =>
+  buildKitQuotation(KIT_208, 'tole', true, null, onduleurs, products, 1, { panneaux });
+const extensions = (q) => q.components.filter((c) => / — extension$/.test(c.name));
+
+describe('kit 208 kWh posé à 190 panneaux : accessoires d’extension', () => {
+  const q = kit208(190);
+  const chaines = q.ajustements.chaines.final[0].chaines.length;
+
+  it('ni coffret de protection ni lot de fournitures facturés comme accessoires de chaîne', () => {
+    expect(extensions(q).filter((c) => /Coffret de protection|Lot de petites fournitures/.test(c.name))).toEqual([]);
+  });
+
+  it('fusibles au prix de la règle, pour les seules chaînes au-delà du coffret du kit', () => {
+    const fusibles = ligne(q, /^Fusible.*extension/);
+    expect(fusibles.unitPrice).toBe(4000);
+    // Coffret du kit : 8 entrées, fusibles compris ; kit de base 11 chaînes.
+    const auDela = (n) => Math.max(0, n - 8);
+    expect(fusibles.quantity).toBe(2 * (auDela(chaines) - auDela(q.ajustements.chaines.base.chaines.length)));
+  });
+
+  it('coffrets de jonction : un par tranche de 8 chaînes au-delà du coffret du kit', () => {
+    expect(ligne(q, /combiner box/).quantity).toBe(Math.ceil((chaines - 8) / 8));
+  });
+
+  it('pas de chaînes multipliées : au plus une de plus que le minimum possible', () => {
+    const { nMax } = limitesChaine(specPanneau(620), lireElectrique(PCS_125));
+    expect(chaines).toBeLessThanOrEqual(Math.ceil(190 / nMax) + 1);
+    expect(q.ajustements.chaines.final[0].chaines.reduce((s, n) => s + n, 0)).toBe(190);
+    expect(q.ajustements.onduleur.statut).toBe('conserve');
+  });
+
+  it('un produit boutique « coffret » ou « lot » n’est jamais pris pour un fusible ou une gaine', () => {
+    const pieges = [
+      { id: 'p1', name: 'Coffret DC 4 entrées avec fusibles', basePrice: 100000, category: 'accessoires' },
+      { id: 'p2', name: 'Lot de fournitures (moulure, gaine)', basePrice: 90000, category: 'accessoires' },
+    ];
+    const r = kit208(190, [PCS_125], pieges);
+    expect(ligne(r, /^Fusible.*extension/).unitPrice).toBe(4000);
+    expect(ligne(r, /^Gaine.*extension/).unitPrice).toBe(5500);
+  });
+});
+
+describe('caractéristiques saisies incohérentes avec le kit de base', () => {
+  // 2 MPPT et « chaînes par MPPT » vide (donc 1) : au plus 2 chaînes, loin
+  // des 175 panneaux du kit — une erreur de saisie, pas une impossibilité.
+  const pcsMalSaisi = { ...PCS_125, electrique: { ...PCS_125.electrique, nbMppt: 2, chainesParMppt: '' } };
+  const q = kit208(176, [pcsMalSaisi]);
+
+  it('verification « incoherent », jamais « configuration impossible »', () => {
+    expect(q.ajustements.verification).toBe('incoherent');
+    expect(q.configurationImpossible).toBe(false);
+    expect(q.inverterInsuffisant).toBe(false);
+  });
+
+  it('onduleur du kit conservé, aucun matériel de chaînes', () => {
+    expect(q.inverterSuggested).toBeNull();
+    expect(ligne(q, /^Onduleur/).quantity).toBe(1);
+    expect(extensions(q)).toEqual([]);
+  });
+
+  it('alerte claire : l’onduleur, le kit de base, la raison, où corriger', () => {
+    const alerte = q.ajustements.alertes.join(' ');
+    expect(alerte).toMatch(/Deye Onduleur PCS 125 kW ne permettent pas le kit de base \(175 panneaux\)/);
+    expect(alerte).toMatch(/Plus › Onduleurs/);
+    expect(q.ajustements.incoherence).toMatchObject({ panneaux: 175 });
+  });
+});
+
+describe('diagnostic : pourquoi aucun onduleur ne convient', () => {
+  it('configuration réellement impossible (kit 48 V) : diagnostic de chaque étape', () => {
+    const seul = { ...OND_5K, parallele: false };
+    const q = devis(KIT_5K, 14, [seul]);
+    expect(q.configurationImpossible).toBe(true);
+    expect(q.ajustements.diagnostic.length).toBeGreaterThan(0);
+    expect(q.ajustements.diagnostic[0]).toMatchObject({ modele: 'Petit Onduleur hybride 5kVA', quantite: 1 });
+    expect(q.ajustements.diagnostic[0].raisons[0]).toBeTruthy();
+  });
+
+  it('onduleur 48 V sans tension saisie : écarté, motif haute tension (HV)', () => {
+    const sansTension = { ...OND_8K, id: 'sans-tension', brand: 'Autre', model: 'Onduleur hybride 8kVA', tension: null };
+    const q = devis(KIT_8K, 14, [OND_8K, sansTension]);
+    const ecarte = q.onduleursEcartes.find((e) => /Autre/.test(e.designation));
+    expect(ecarte).toBeDefined();
+    expect(ecarte.motif).toMatch(/haute tension \(HV\)/);
+    // L'onduleur retenu n'est jamais listé comme écarté.
+    expect(q.onduleursEcartes.some((e) => /Test/.test(e.designation))).toBe(false);
+  });
+
+  it('triphasé demandé : un monophasé de la bonne tension est écarté pour ses phases, pas sa tension', () => {
+    const mono = { ...OND_8K, id: 'mono-10k', brand: 'Mono', model: 'Onduleur hybride 10kVA', capacity: 10 };
+    const q = buildKitQuotation(KIT_8K, 'tole', true, besoin(14), [OND_8K, mono], [], 1, { phases: 3 });
+    const ecarte = q.onduleursEcartes.find((e) => /Mono/.test(e.designation));
+    expect(ecarte).toMatchObject({ type: 'phases' });
+    expect(ecarte.motif).toMatch(/non triphasé/);
+  });
+
+  it('onduleur du kit retrouvé même si sa puissance revient en texte de la synchronisation', () => {
+    const q = kit208(190, [{ ...PCS_125, capacity: '125' }]);
+    expect(q.ajustements.verification).toBe('verifie');
+  });
+});

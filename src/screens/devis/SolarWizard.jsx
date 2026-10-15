@@ -18,6 +18,7 @@ import Field from '../../components/Field';
 import EmptyState from '../../components/EmptyState';
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../components/SolarConsumptionControls';
 import AjustementsKit from '../../components/AjustementsKit';
+import PourquoiOnduleur from '../../components/PourquoiOnduleur';
 import ReglageKit from '../../components/ReglageKit';
 import { TVA_PCT } from '../../config/company';
 import { signalerErreur } from '../../lib/rapportErreur';
@@ -679,6 +680,22 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                   aucun onduleur du catalogue, même en parallèle, n'accepte {installedPanels} panneaux de{' '}
                   {selectedKit.panelW} Wc dans ses limites électriques. Choisissez un kit plus grand ou ajoutez
                   un onduleur adapté dans <strong>Plus › Onduleurs</strong> — le devis ne peut pas être créé en l'état.
+                  <PourquoiOnduleur diagnostic={displayQuotation.ajustements?.diagnostic} ecartes={displayQuotation.onduleursEcartes} />
+                </div>
+              </div>
+            )}
+            {/* Caractéristiques saisies qui ne permettent même pas le kit de
+                base : incohérence de saisie, pas une impossibilité — le devis
+                reste possible, l'onduleur du kit est gardé. */}
+            {displayQuotation?.ajustements?.verification === 'incoherent' && (
+              <div className="storage-alert abo-alert is-warning" role="status" style={{ marginBottom: 12 }}>
+                <div>
+                  <Cpu size={13} style={{ verticalAlign: -2 }} /> <strong>Onduleur à vérifier</strong> : les caractéristiques
+                  saisies pour {displayQuotation.ajustements.incoherence?.onduleur} ne permettent pas le kit de base
+                  ({displayQuotation.ajustements.incoherence?.panneaux} panneaux) : {displayQuotation.ajustements.incoherence?.raison}.
+                  Vérifiez nombre de MPPT, chaînes par MPPT et tension DC max dans <strong>Plus › Onduleurs</strong>.
+                  Le devis reste possible ; les chaînes ajoutées ne sont pas vérifiées.
+                  <PourquoiOnduleur diagnostic={displayQuotation.ajustements.diagnostic} ecartes={displayQuotation.onduleursEcartes} />
                 </div>
               </div>
             )}
