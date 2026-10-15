@@ -222,6 +222,22 @@ img { max-width: 100%; }
 .page-title { font-size: 1.25rem; font-weight: 700; }
 .page-subtitle { font-size: 0.8125rem; opacity: 0.75; margin-top: 2px; }
 .page-header-actions { display: flex; align-items: center; gap: 10px; }
+/* Complément d'en-tête : rangée pleine largeur sous le titre et les actions.
+   Ses éléments (chiffres, filtre) se suivent sur une ligne quand la largeur
+   le permet — sur ordinateur — et passent l'un sous l'autre sur téléphone.
+   La marge négative rapproche les chiffres du titre : l'écart entre rangées,
+   12 px, convient aux boutons, pas à une ligne de texte. */
+.page-header-extra {
+  flex-basis: 100%; margin-top: -2px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px;
+}
+/* Petits téléphones (360 px) : quelques pixels gagnés sur les écarts et le
+   bouton suffisent à garder titre, action et cloche sur une seule rangée. */
+@media (max-width: 380px) {
+  .page-header-inner { column-gap: 8px; }
+  .page-header-actions { gap: 8px; }
+  .page-header-actions .btn { padding-inline: 12px; }
+}
 
 /* Cloche de notifications (dans le bandeau d'en-tête). Sur mobile, l'en-tête
    est sur fond --primary (icône blanche) ; sur desktop, il passe en blanc
@@ -246,7 +262,7 @@ img { max-width: 100%; }
 @media (min-width: 1024px) { .notif-badge { border-color: var(--bg-card); } }
 .sidebar .notif-badge { border-color: var(--primary-dark); }
 
-.pipeline-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 0.8125rem; opacity: 0.9; }
+.pipeline-stats { display: flex; gap: 16px; font-size: 0.8125rem; opacity: 0.9; }
 .pipeline-stat strong { font-weight: 600; }
 
 /* ============ Barre latérale (desktop) ============ */
@@ -902,7 +918,6 @@ form .login-link { width: 100%; margin-top: 4px; }
 /* L'absence de devis n'est pas un montant : style discret. */
 .kanban-card-value.none { color: var(--text-muted); font-weight: 500; }
 /* Filtre du gérant : sa propre ligne dans l'en-tête. */
-.pipeline-filter-row { margin-top: 10px; }
 
 /* Sélecteur d'étape (déplacement sans glisser) */
 .stage-picker { display: flex; flex-direction: column; gap: 8px; }

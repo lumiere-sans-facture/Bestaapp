@@ -5,6 +5,14 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-10-15
+- **Suivi clients : un en-tête plus court sur téléphone, pour voir les affaires plus tôt.**
+  - « Nouvelle piste » et la cloche passent sur la ligne du titre. Les chiffres (en cours, gagné) et le filtre « Toute l'équipe » restent dessous.
+  - Sur téléphone, l'en-tête passe de 4 rangées à 3 : 194 → 156 px pour le gérant, 140 → 102 px pour un technicien. C'est vrai à 360 comme à 412 px de large.
+  - Sur ordinateur, le filtre se range à côté des chiffres : 146 → 127 px pour le gérant. Le bouton s'aligne sur le titre, comme sur les autres pages, ce qui coûte 11 px à l'en-tête d'un technicien.
+  - Avec une très grande police (+20 %), le bouton repasse à la ligne sans rien faire déborder.
+  - Les autres pages ne changent pas : en-têtes mesurés avant et après sur 7 écrans, 2 rôles et 3 largeurs.
+
 ## 2026-10-14
 - **Boutique : les congélateurs solaires et leurs kits, repris de la brochure « Réfrigérateur & Congélateur solaire ».**
   - **Deux nouvelles catégories** :
