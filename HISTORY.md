@@ -6,6 +6,12 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-16
+- **Script de synchronisation des produits Deye, prêt à tourner** (`scripts/scrape_deye.py`). Il fonctionne en dry-run et ne touche pas à la boutique.
+  - Il parcourt une catégorie en ligne, ne garde que les produits Deye et convertit les prix (NGN × 0,6, arrondi à la centaine supérieure).
+  - Il rédige les descriptions en français à partir des caractéristiques et écrit `deye_import/products.csv`, `products.json` et `rapport.md`.
+  - Il respecte le robots.txt du site.
+  - Une seconde commande passe sur fond bleu BestaSolar, sans liseré, des photos que l'entreprise a le droit d'utiliser.
+  - Pas encore lancé sur le site source, inaccessible depuis l'environnement de travail.
 - **Kits étendus : un onduleur n'est plus écarté pour un seul panneau.**
   - Sur un onduleur, deux chaînes d'une même entrée MPPT ont la même longueur. Certains nombres de panneaux ne se câblent donc pas alors que le suivant, oui. Exemple : un 80 kW à 6 entrées de 2 chaînes, avec 17 panneaux de 620 Wc au plus par chaîne, refuse 201 panneaux mais accepte 202.
   - Avant, l'app écartait cet onduleur : deux 50 kW en parallèle à la place, ou « Configuration impossible » s'il n'y avait pas d'autre modèle. Cela arrivait alors même que sa puissance PV max (126 kWc) suffisait pour les 124,6 kWc demandés.

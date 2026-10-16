@@ -1,0 +1,7 @@
+playwright>=1.45
+beautifulsoup4>=4.12
+Pillow>=10
+numpy>=1.26
+scipy>=1.11
+requests>=2.31
+# Facultatif, détourage sur fond chargé : rembg[cpu]
