@@ -6,6 +6,11 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-16
+- **Photos officielles Deye pour 14 produits importés, sur le fond bleu BestaSolar.**
+  - Prises sur les sites du fabricant (deye.com, deyeinverter.com), jamais chez un revendeur. Chaque source est notée dans `deye_import/photos-sources.json`.
+  - Produits concernés : 11 onduleurs, et les batteries SE-F5, SE-F16 et SE-G5.1 Pro-B. Pour cette dernière, un seul module est recadré, la photo officielle en montrant quatre empilés.
+  - Les 15 autres gardent « Photo à venir » : modules haute tension, boîtiers BMS, racks, module MPPT, STS 500 kW, PCS 125 kW, onduleur OG02. Le fabricant ne montre que des systèmes complets ou une autre version.
+  - Détourage : sur une photo à fond blanc, un boîtier blanc n'est plus rendu à moitié transparent (teinté de bleu). Le masque est plein à l'intérieur et adouci au seul contour.
 - **Photos Deye : les PNG à fond transparent passent sur le fond bleu BestaSolar sans virer au noir.** Le détourage du fabricant sert de masque (`scrape_deye.py images`), en préparation des photos officielles.
 - **Brouillons de la boutique : visibles dès l'arrivée du gérant.**
   - Un bandeau en tête de boutique annonce « 29 produits en brouillon », avec un bouton « Voir ».

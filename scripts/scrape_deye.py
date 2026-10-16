@@ -931,12 +931,17 @@ def masque_produit(rgb):
     # produit Deye n'a ce vert, et il ne doit pas en rester sur le bleu.
     vert = fond[1] > fond[0] + 20 and fond[1] > fond[2] + 20
     if not vert:
+        # Fond clair (photo fabricant sur blanc) : un boîtier blanc s'écarte à
+        # peine du fond, et un alpha progressif le laisserait à moitié
+        # transparent — teinté de bleu. Le masque est donc PLEIN : est fond
+        # ce qui touche le bord sans s'écarter du fond plus que le bruit de
+        # compression ; tout le reste est produit, adouci au seul contour.
         from scipy import ndimage
-        candidats = alpha < 0.5
-        etiquettes, _ = ndimage.label(candidats)
+        proche = ecart < max(6.0, bruit * 2)
+        etiquettes, _ = ndimage.label(proche)
         au_bord = set(np.unique(np.concatenate([etiquettes[0], etiquettes[-1], etiquettes[:, 0], etiquettes[:, -1]]))) - {0}
         relie = np.isin(etiquettes, list(au_bord))
-        alpha = np.where(candidats & ~relie, 1.0, alpha)
+        alpha = ndimage.uniform_filter((~relie).astype(np.float32), 3)
     return alpha, fond
 
 
