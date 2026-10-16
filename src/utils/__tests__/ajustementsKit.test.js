@@ -526,3 +526,67 @@ describe('diagnostic : pourquoi aucun onduleur ne convient', () => {
     expect(q.ajustements.verification).toBe('verifie');
   });
 });
+
+// ---- Panneaux d'équilibrage : un nombre qui ne se câble pas, le suivant oui ----
+// Onduleur 80 kW à 6 MPPT de 2 chaînes : deux chaînes d'une même entrée ont la
+// même longueur, et 17 panneaux de 620 Wc au plus par chaîne. 201 panneaux ne
+// se répartissent pas (nombre impair au-delà de 187), 202 si.
+const OND_80 = {
+  id: 'ond-80', brand: 'Deye', model: 'SUN-80K-SG02HP3', capacity: 80, maxPvPower: 126000, price: 6000000, tension: null, maxParallele: 2,
+  electrique: { vocMax: 1000, mpptMin: 180, mpptMax: 850, nbMppt: 6, chainesParMppt: 2, iMaxMppt: 36, iscMaxMppt: 55, phases: 3 },
+};
+const OND_50 = {
+  id: 'ond-50', brand: 'Deye', model: 'SUN-50K-SG01HP3', capacity: 50, maxPvPower: 65000, price: 3650000, tension: null,
+  electrique: { vocMax: 1000, mpptMin: 200, mpptMax: 850, nbMppt: 4, chainesParMppt: 2, iscMaxMppt: 55, phases: 3 },
+};
+const KIT_128 = SOLAR_KITS.find((k) => k.id === 'kit-128kwh-deye-hv');
+const KIT_80 = {
+  ...KIT_128, id: 'kit-80', name: 'Kit maison 80 kW', inverter: 80, panels: 160,
+  lines: KIT_128.lines.map((l) => (/onduleur/i.test(l.designation) ? { ...l, designation: 'Onduleur Deye SUN-80K-SG02HP3' }
+    : /^Panneaux/.test(l.designation) ? { ...l, qty: 160 } : l)),
+};
+const poser = (k, panneaux, onduleurs) => buildKitQuotation(k, 'tole', true, null, onduleurs, [], 1, { panneaux, phases: 3 });
+
+describe('panneaux d’équilibrage : jamais un onduleur écarté pour un panneau', () => {
+  it('l’onduleur de 80 kW ne câble pas 201 panneaux, mais 202', () => {
+    const e = lireElectrique(OND_80);
+    expect(configurerChaines(201, specPanneau(620), e).ok).toBe(false);
+    expect(configurerChaines(202, specPanneau(620), e).ok).toBe(true);
+  });
+
+  it('kit à 80 kW, 201 panneaux demandés : onduleur GARDÉ, 202 posés, et l’écran dit pourquoi', () => {
+    const q = poser(KIT_80, 201, [OND_80]);
+    expect(q.configurationImpossible).toBe(false);
+    expect(q.ajustements.onduleur.statut).toBe('conserve');
+    expect(q.inverterSuggested).toBeNull();
+    expect(q.panelsIncluded).toBe(202);
+    expect(ligne(q, /^Panneaux/).quantity).toBe(202);
+    expect(ligne(q, /Structure de montage/).quantity).toBe(202);
+    expect(q.ajustements.panneaux).toMatchObject({ demande: 201, final: 202 });
+    expect(q.ajustements.alertes[0]).toMatch(/1 panneau ajouté pour câbler les chaînes : 201 panneaux ne se répartissent pas sur Deye SUN-80K-SG02HP3.*202 oui/);
+  });
+
+  it('sans autre modèle ni parallèle, plus de « configuration impossible » à 201 panneaux', () => {
+    const q = poser(KIT_80, 201, [{ ...OND_80, parallele: false }]);
+    expect(q.configurationImpossible).toBe(false);
+    expect(q.panelsIncluded).toBe(202);
+  });
+
+  it('kit 128 kWh : un seul 80 kW avec 202 panneaux, plutôt que deux 50 kW pour 201', () => {
+    const q = poser(KIT_128, 201, [OND_50, OND_80]);
+    expect(q.inverterSuggested).toMatchObject({ id: 'ond-80', quantite: 1 });
+    expect(q.panelsIncluded).toBe(202);
+  });
+
+  it('jamais au-delà de la puissance PV admise : 203 panneaux (204 dépasseraient 126 kWc) restent sur deux 50 kW', () => {
+    const q = poser(KIT_128, 203, [OND_50, OND_80]);
+    expect(q.inverterSuggested).toMatchObject({ id: 'ond-50', quantite: 2 });
+    expect(q.panelsIncluded).toBe(203);
+  });
+
+  it('nombre exact câblable : aucun panneau ajouté', () => {
+    const q = poser(KIT_80, 200, [OND_80]);
+    expect(q.panelsIncluded).toBe(200);
+    expect(q.ajustements.equilibrage).toBeNull();
+  });
+});

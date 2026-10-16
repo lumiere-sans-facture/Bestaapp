@@ -295,3 +295,32 @@ describe('proposerKit : cas limites', () => {
     expect(p.sizing.batteryCapacity).toBeGreaterThan(0);
   });
 });
+
+describe('bouton « + » des panneaux : au nombre câblable suivant', () => {
+  // Onduleur 80 kW à 6 MPPT de 2 chaînes : de 200 panneaux, 201 ne se câble
+  // pas, 202 si — le « + » y va directement au lieu d'annoncer « maximum ».
+  const OND_80 = {
+    id: 'ond-80', brand: 'Deye', model: 'SUN-80K-SG02HP3', capacity: 80, maxPvPower: 126000, price: 6000000, tension: null,
+    electrique: { vocMax: 1000, mpptMin: 180, mpptMax: 850, nbMppt: 6, chainesParMppt: 2, iMaxMppt: 36, iscMaxMppt: 55, phases: 3 },
+  };
+  const base = SOLAR_KITS.find((k) => k.id === 'kit-128kwh-deye-hv');
+  const KIT_80 = {
+    ...base, id: 'kit-80', inverter: 80, panels: 160,
+    lines: base.lines.map((l) => (/onduleur/i.test(l.designation) ? { ...l, designation: 'Onduleur Deye SUN-80K-SG02HP3' }
+      : /^Panneaux/.test(l.designation) ? { ...l, qty: 160 } : l)),
+  };
+  const proposer = (reglages = null) => proposerKit({
+    consumption: { day: 300, night: 152 }, kits: [KIT_80], inverters: [OND_80], products: [], reglages,
+  });
+
+  it('de 200 panneaux, le « + » mène à 202 ; le « − » de 202 revient à 200', () => {
+    let p = proposer();
+    p = proposer({ kitId: 'kit-80', autoPanneaux: p.panneaux.auto, autoModules: p.quotation.batterie?.modules ?? null, panneaux: 200, modules: null });
+    expect(p.panneaux.poses).toBe(200);
+    expect(p.panneaux.plus).toBe(202);
+    const apres = proposer(reglerProposition(p, 'panneaux', p.panneaux.plus));
+    expect(apres.panneaux.poses).toBe(202);
+    expect(apres.panneaux.moins).toBe(200);
+    expect(apres.quotation.configurationImpossible).toBe(false);
+  });
+});

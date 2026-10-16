@@ -126,8 +126,11 @@ export const proposerKit = ({
   const plafond = Math.max(kit.panels || 0, auto.panelsIncluded) * PANNEAUX_MAX_FACTEUR;
   let plus = null;
   if (poses < plafond) {
+    // Le « + » va au nombre câblable suivant : un panneau de plus peut ne
+    // pas se répartir en chaînes égales quand deux de plus le permettent
+    // (panneaux d'équilibrage, voir utils/ajustementsKit.js).
     const essai = devis({ ...choix, panneaux: poses + 1 });
-    if (essai.panelsIncluded === poses + 1 && !essai.configurationImpossible && !essai.inverterInsuffisant) plus = poses + 1;
+    if (essai.panelsIncluded > poses && !essai.configurationImpossible && !essai.inverterInsuffisant) plus = essai.panelsIncluded;
   }
   // Sous le kit, toutes les longueurs de chaîne ne démarrent pas l'onduleur :
   // le « − » saute au nombre valide inférieur le plus proche.

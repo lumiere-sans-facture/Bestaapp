@@ -5,6 +5,14 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-10-16
+- **Kits étendus : un onduleur n'est plus écarté pour un seul panneau.**
+  - Sur un onduleur, deux chaînes d'une même entrée MPPT ont la même longueur. Certains nombres de panneaux ne se câblent donc pas alors que le suivant, oui. Exemple : un 80 kW à 6 entrées de 2 chaînes, avec 17 panneaux de 620 Wc au plus par chaîne, refuse 201 panneaux mais accepte 202.
+  - Avant, l'app écartait cet onduleur : deux 50 kW en parallèle à la place, ou « Configuration impossible » s'il n'y avait pas d'autre modèle. Cela arrivait alors même que sa puissance PV max (126 kWc) suffisait pour les 124,6 kWc demandés.
+  - Désormais, jusqu'à 2 panneaux sont posés en plus quand cela permet de câbler les chaînes, jamais moins que le dimensionnement. L'écran l'explique : « 1 panneau ajouté pour câbler les chaînes : 201 panneaux ne se répartissent pas sur … ; 202 oui. »
+  - Le bouton « + » va au nombre câblable suivant, au lieu d'annoncer « Maximum atteint ».
+  - La puissance PV max de l'onduleur reste respectée : 203 panneaux demandés exigeraient 204 (126,48 kWc, au-delà de 126 kWc), et l'onduleur passe alors en parallèle comme avant.
+
 ## 2026-10-15
 - **Kits étendus : plus de coffrets ni de lots facturés à chaque chaîne, des chaînes au plus près du minimum, et un « Pourquoi ? » sous les alertes d'onduleur.**
   - **Accessoires reconnus correctement.**

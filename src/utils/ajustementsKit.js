@@ -9,7 +9,7 @@
 // ne pas créer de dépendance circulaire avec utils/solarSizing.js.
 import {
   MAIN_OEUVRE_EXTENSION, CONDITIONS_SITE, SECTIONS_CABLE_PV, COEF_COURANT_CABLE,
-  MATERIEL_PAR_CHAINE, MATERIEL_PAR_MPPT, COFFRET_JONCTION, PROTECTION_AC,
+  MATERIEL_PAR_CHAINE, MATERIEL_PAR_MPPT, COFFRET_JONCTION, PROTECTION_AC, PANNEAUX_EQUILIBRAGE_MAX,
 } from '../config/extensionKit';
 import { specPanneau, lireElectrique, configurerChaines, libelleChaines, limitesChaine } from './chainesPv';
 import { maxEnParallele } from './inverters';
@@ -206,12 +206,15 @@ export const ordreEscalade = (onduleurKit, autres = []) => {
  * @param {object} p.outils            { controlePic(modele, q) → {ok, raison},
  *   limitePv(modele) → Wc, puissanceSortie(modele) → W }
  * @param {Array}  p.products          catalogue boutique (prix des ajouts)
+ * @param {number} [p.equilibrageMax]  panneaux qu'on peut poser en plus pour
+ *   que les chaînes se câblent (PANNEAUX_EQUILIBRAGE_MAX par défaut)
  * @returns {object} synthèse des ajustements (voir le retour ci-dessous)
  */
 export const ajusterKit = ({
   kit, lignesKit = kit?.lines || [], panneauxDemandes = 0, panneauxRetenus = null, onduleurKit = null, onduleurOrigine, candidats = [],
   batterieFinale = null,
   outils, products = [], tarifs = MAIN_OEUVRE_EXTENSION, site = CONDITIONS_SITE,
+  equilibrageMax = PANNEAUX_EQUILIBRAGE_MAX, equilibrage = null,
 }) => {
   // Batterie : capacité du kit et capacité posée (modules ajoutés compris,
   // voir utils/extensionBatterie.js).
@@ -353,18 +356,40 @@ export const ajusterKit = ({
   // plus permissif, chaînes inégales admises) : l'écran l'affiche sous
   // « Pourquoi ? ».
   const diagnostic = [];
+  // Panneaux en plus admis pour équilibrer les chaînes (voir
+  // PANNEAUX_EQUILIBRAGE_MAX) : à chaque étape, le nombre exact d'abord.
+  const marge = Math.max(0, Math.floor(Number(equilibrageMax) || 0));
   for (const { modele, quantite } of escalade) {
     let echec = null;
-    for (const equilibreSeulement of [true, false]) {
-      const r = evaluer({ ...contexte, modele, quantite, equilibreSeulement });
-      if (r.ok) { retenu = { modele, quantite, ...r }; break; }
-      echec = r;
+    for (let k = 0; k <= marge && !retenu; k += 1) {
+      for (const equilibreSeulement of [true, false]) {
+        const r = evaluer({ ...contexte, panneaux: final + k, modele, quantite, equilibreSeulement });
+        if (r.ok) { retenu = { modele, quantite, ...r, enPlus: k, echecExact: echec }; break; }
+        if (k === 0) echec = r;
+      }
     }
     diagnostic.push({
       id: modele.id ?? null, modele: nomOnduleur(modele), quantite, max: maxEnParallele(modele),
       retenu: !!retenu, raisons: retenu ? [] : (echec?.raisons || []).slice(0, 1),
     });
     if (retenu) break;
+  }
+
+  // Retenu au prix de quelques panneaux en plus : le calcul est refait sur
+  // ce nombre (chaînes, matériel, main-d'œuvre), et l'écran dit pourquoi.
+  if (retenu?.enPlus > 0) {
+    return ajusterKit({
+      kit, lignesKit, panneauxDemandes, panneauxRetenus: final + retenu.enPlus, onduleurKit, onduleurOrigine, candidats,
+      batterieFinale, outils, products, tarifs, site, equilibrageMax: 0,
+      equilibrage: {
+        demandes: final, poses: final + retenu.enPlus, onduleur: nomOnduleur(retenu.modele),
+        quantite: retenu.quantite,
+        // Ce qui l'impose, en clair : entrées, chaînes par entrée, longueur max.
+        raison: `${retenu.elec.nbMppt} entrée${retenu.elec.nbMppt > 1 ? 's' : ''} MPPT`
+          + `${retenu.elec.chainesParMppt > 1 ? ` de ${retenu.elec.chainesParMppt} chaînes de même longueur` : ''}`
+          + `, ${retenu.configs[0].nMax} panneaux au plus par chaîne`,
+      },
+    });
   }
 
   if (!retenu) {
@@ -450,6 +475,10 @@ export const ajusterKit = ({
   // Raison technique du remplacement, en clair.
   const raisons = statut === 'conserve' ? [] : evalKit.raisons;
   const alertes = configs.flatMap((c) => c.alertes);
+  if (equilibrage) {
+    const n = equilibrage.poses - equilibrage.demandes;
+    alertes.unshift(`${n} panneau${n > 1 ? 'x' : ''} ajouté${n > 1 ? 's' : ''} pour câbler les chaînes : ${equilibrage.demandes} panneaux ne se répartissent pas sur ${equilibrage.quantite > 1 ? `${equilibrage.quantite} × ` : ''}${equilibrage.onduleur} (${equilibrage.raison}) ; ${equilibrage.poses} oui.`);
+  }
   if (!configs.every((c) => c.equilibre)) {
     alertes.push('Chaînes de longueurs différentes, chacune sur sa propre entrée MPPT : aucun découpage en chaînes égales ne tient sans multiplier les chaînes.');
   }
@@ -474,6 +503,7 @@ export const ajusterKit = ({
     lignes: [...lignes, ...lignesMo],
     mainOeuvre,
     diagnostic,
+    equilibrage,
     alertes,
   };
 };

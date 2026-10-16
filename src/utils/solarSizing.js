@@ -905,9 +905,6 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // Modules batterie : ceux du besoin (kit étendu au besoin), ou ceux choisis
   // à la main — toujours des modules identiques à ceux du kit.
   const batterie = poserBatterie(kit, kit.lines, sizing?.batteryCapacity, options?.modules);
-  const withPanels = batterie.lignes.map((l) => (
-    PANEL_LINE_RE.test(l.designation) && neededPanels !== l.qty ? { ...l, qty: neededPanels } : l
-  ));
 
   // Puissance PV RÉELLEMENT posée : les panneaux du devis (ceux du
   // dimensionnement), pas seulement ceux du besoin calculé — un kit peut
@@ -945,6 +942,13 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   });
   const verifie = ajustements.verification === 'verifie';
   const impossible = ajustements.verification === 'impossible';
+  // Panneaux POSÉS : ceux du dimensionnement, plus d'éventuels panneaux
+  // d'équilibrage quand le nombre exact ne se câble pas sur l'onduleur
+  // retenu (voir PANNEAUX_EQUILIBRAGE_MAX) — jamais moins.
+  const panneauxPoses = verifie ? Math.max(neededPanels, ajustements.panneaux.final) : neededPanels;
+  const withPanels = batterie.lignes.map((l) => (
+    PANEL_LINE_RE.test(l.designation) && panneauxPoses !== l.qty ? { ...l, qty: panneauxPoses } : l
+  ));
   // Caractéristiques saisies incohérentes avec le kit de base : l'onduleur
   // du kit est conservé tel quel, sans substitution sur la seule puissance PV
   // (le devis reste possible ; l'écran dit quoi corriger).
@@ -1014,7 +1018,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
   // sol » sans effet, et le devis sortait sans structure.
   const ligneSupport = {
     designation: `Structure de montage PV rails galvanisé (${mounting.label})`,
-    qty: neededPanels,
+    qty: panneauxPoses,
     unit: 'pcs',
     pu: mounting.pricePerPanel,
     productId: null,
@@ -1084,7 +1088,7 @@ export const buildKitQuotation = (kit, mountingType = DEFAULT_MOUNTING_TYPE, inc
     subtotalHT: total,
     tva: 0,
     mountingType: mounting.id,
-    panelsIncluded: neededPanels,
+    panelsIncluded: panneauxPoses,
     inverterSuggested: inverterSuggested
       ? {
           id: inverterSuggested.id, brand: inverterSuggested.brand, model: inverterSuggested.model,

@@ -66,6 +66,15 @@ export const COEF_COURANT_CABLE = 1.25;
 // les connecteurs et les protections suivaient.
 export const TOLERANCE_CHAINES = 1;
 
+// ---- Panneaux d'équilibrage ----
+// Deux chaînes sur une même entrée MPPT ont la même longueur : sur certains
+// onduleurs, un nombre de panneaux ne se câble pas alors que le suivant, oui
+// (6 MPPT de 2 chaînes, 17 panneaux au plus par chaîne : 201 panneaux
+// impossibles, 202 possibles). Plutôt que d'écarter un onduleur qui convient,
+// on pose jusqu'à ce nombre de panneaux EN PLUS pour équilibrer les chaînes —
+// jamais moins que le dimensionnement.
+export const PANNEAUX_EQUILIBRAGE_MAX = 2;
+
 // ---- Matériel ajouté par CHAÎNE supplémentaire ----
 // `re` reconnaît la ligne équivalente du kit : son prix fait alors foi (même
 // fournisseur, même tarif). À défaut, un produit de la boutique dont le nom
