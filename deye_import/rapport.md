@@ -7,7 +7,7 @@
 | Module MPPT Deye 200 kW, 8 entrées MPPT (SUN-MPPT-L01-EU-AM8) | 2 520 000 | 1 512 000 F | — | 3 |
 | Batterie lithium LiFePO4 Deye 7,68 kWh, haute tension (BOS-A) | 1 708 000 | 1 024 800 F | — | 4 |
 | Batterie lithium LiFePO4 Deye 5,12 kWh, basse tension (48 V) (SE-G5.1PRO-B) | 1 138 500 | 683 100 F | — | 3 |
-| Batterie lithium LiFePO4 Deye 5,12 kWh, basse tension (48 V) (SE-F5L) | 963 200 | 578 000 F | — | 2 |
+| Batterie lithium LiFePO4 Deye 5,12 kWh, basse tension (48 V) (SE-F5L) | 949 000 | 569 400 F | — | 2 |
 | Rack standard 14 niveaux pour batteries haute tension Deye BOS-A | 639 000 | 383 400 F | — | 2 |
 | Module batterie haute tension Deye 16 kWh (BOS-B-PACK16-A3) | 2 604 000 | 1 562 400 F | — | 5 |
 | Boîtier de contrôle BMS pour batteries haute tension Deye BOS-B (BOS-B-PDU-2-A) | 2 184 000 | 1 310 400 F | — | 4 |

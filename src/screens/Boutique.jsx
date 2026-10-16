@@ -15,12 +15,23 @@ import Field from '../components/Field';
 import EmptyState from '../components/EmptyState';
 import { useToast } from '../components/Toast';
 import { prixPublic, PUBLIC_MARKUP } from '../utils/price';
+import { estBrouillon, produitsBoutique, voitLesBrouillons } from '../utils/publication';
 
-const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', suiviStock: false, category: 'kits', image: '' };
+const EMPTY_FORM = { name: '', description: '', basePrice: '', stock: '', suiviStock: false, category: 'kits', image: '', brouillon: false };
+// Filtre « Brouillons » du gérant, à côté des catégories.
+const BROUILLONS = '__brouillons';
 
 export default function Boutique() {
   const { user } = useAuth();
-  const { products, productCategories, addProduct, updateProduct, deleteProduct, addOrder, marquerCommandePayee } = useData();
+  const { catalogueComplet, productCategories, addProduct, updateProduct, deleteProduct, addOrder, marquerCommandePayee } = useData();
+  // Brouillons (produits importés, pas encore publiés) : visibles du seul
+  // gérant du catalogue, signalés comme tels et jamais vendus.
+  const brouillonsVisibles = voitLesBrouillons(user);
+  const products = useMemo(
+    () => produitsBoutique(catalogueComplet, { brouillons: brouillonsVisibles }),
+    [catalogueComplet, brouillonsVisibles],
+  );
+  const nbBrouillons = useMemo(() => products.filter(estBrouillon).length, [products]);
   const { items: cartItems, addItem, setQty, removeItem, clearCart, count } = useCart();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -64,7 +75,7 @@ export default function Boutique() {
 
   const cartProducts = Object.entries(cartItems)
     .map(([id, qty]) => ({ product: products.find((p) => p.id === id), qty }))
-    .filter((e) => e.product);
+    .filter((e) => e.product && !estBrouillon(e.product));
   const cartTotal = cartProducts.reduce((s, e) => s + getPrice(e.product.basePrice) * e.qty, 0);
 
   const goToDevis = () => {
@@ -86,6 +97,7 @@ export default function Boutique() {
       suiviStock: Boolean(product.suiviStock),
       category: product.category,
       image: product.image,
+      brouillon: estBrouillon(product),
     });
     setEditing(product.id);
   };
@@ -112,6 +124,7 @@ export default function Boutique() {
       suiviStock: form.suiviStock,
       category: form.category,
       image: form.image,
+      brouillon: form.brouillon,
     };
     if (editing === 'new') addProduct(data);
     else updateProduct(editing, data);
@@ -128,7 +141,8 @@ export default function Boutique() {
     const priceFilter = PRICE_RANGES.find((r) => r.id === priceRange);
     const powerFilter = POWER_RANGES.find((r) => r.id === powerRange);
     return products
-      .filter((p) => !selectedCategory || p.category === selectedCategory)
+      .filter((p) => !selectedCategory
+        || (selectedCategory === BROUILLONS ? estBrouillon(p) : p.category === selectedCategory))
       .filter((p) => !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
       .filter((p) => {
         if (priceRange === 'all') return true;
@@ -173,7 +187,9 @@ export default function Boutique() {
     // La commande est créée AVANT le paiement : le serveur a besoin d'une
     // commande en base pour connaître le montant à exiger.
     const order = addOrder({
-      items: Object.entries(cartItems).map(([productId, qty]) => ({ productId, qty })),
+      // Les lignes facturées, pas le panier brut : un article retiré du
+      // catalogue (ou repassé en brouillon) n'est ni compté ni commandé.
+      items: cartProducts.map(({ product, qty }) => ({ productId: product.id, qty })),
       total: cartTotal,
       operator: payForm.operator,
       phone: payForm.phone.trim(),
@@ -220,6 +236,15 @@ export default function Boutique() {
               {cat.label}
             </button>
           ))}
+          {nbBrouillons > 0 && (
+            <button
+              className={`category-chip category-chip-brouillon ${selectedCategory === BROUILLONS ? 'active' : ''}`}
+              aria-pressed={selectedCategory === BROUILLONS}
+              onClick={() => setSelectedCategory(BROUILLONS)}
+            >
+              Brouillons ({nbBrouillons})
+            </button>
+          )}
         </div>
         <div className="list-toolbar boutique-filters">
           <select className="input sort-select" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} aria-label="Filtrer par prix">
@@ -232,8 +257,9 @@ export default function Boutique() {
         <div className="products-grid">
           {filtered.map((product) => {
             const outOfStock = product.suiviStock && product.stock === 0;
+            const brouillon = estBrouillon(product);
             return (
-              <div key={product.id} className={`product-card ${outOfStock ? 'product-unavailable' : ''}`}>
+              <div key={product.id} className={`product-card ${outOfStock ? 'product-unavailable' : ''} ${brouillon ? 'product-brouillon' : ''}`}>
                 <button className="product-top product-open" onClick={() => setDetailId(product.id)}>
                   <div className="product-name">{product.name}</div>
                   <div className="product-category">{categoryLabel(product.category)}</div>
@@ -247,7 +273,9 @@ export default function Boutique() {
                       <Pencil size={15} />
                     </button>
                   )}
-                  {outOfStock && <span className="oos-badge">Rupture</span>}
+                  {brouillon
+                    ? <span className="brouillon-badge">Brouillon</span>
+                    : outOfStock && <span className="oos-badge">Rupture</span>}
                 </div>
                 <div className="product-description">{product.description}</div>
                 <div className="product-footer">
@@ -259,7 +287,7 @@ export default function Boutique() {
                   </div>
                   <button
                     className={`cart-add-btn ${justAdded === product.id ? 'added' : ''}`}
-                    disabled={outOfStock}
+                    disabled={outOfStock || brouillon}
                     onClick={() => handleAddToCart(product)}
                     aria-label={`Ajouter ${product.name} au panier`}
                   >
@@ -353,6 +381,15 @@ export default function Boutique() {
         {detailProduct && (
           <>
             <img src={detailProduct.image} alt={detailProduct.name} className="detail-image" />
+            {estBrouillon(detailProduct) && (
+              <div className="brouillon-note">
+                <span><strong>Brouillon</strong> — visible de vous seul, absent des devis et de la boutique des clients.</span>
+                <button className="btn btn-sm btn-primary" onClick={() => updateProduct(detailProduct.id, { brouillon: false })}>
+                  <Check size={15} /> Publier
+                </button>
+              </div>
+            )}
+            {detailProduct.presentation && <p className="product-presentation">{detailProduct.presentation}</p>}
             <div className="sheet-section">
               <div className="sheet-section-title">Caractéristiques</div>
               <ul className="spec-list">
@@ -386,7 +423,7 @@ export default function Boutique() {
               )}
               <button
                 className="btn btn-accent btn-block"
-                disabled={detailProduct.suiviStock && detailProduct.stock === 0}
+                disabled={(detailProduct.suiviStock && detailProduct.stock === 0) || estBrouillon(detailProduct)}
                 onClick={() => { handleAddToCart(detailProduct); setDetailId(null); }}
               >
                 <ShoppingCart size={17} /> Ajouter au panier
@@ -523,6 +560,13 @@ export default function Boutique() {
               onChange={(e) => setForm({ ...form, suiviStock: e.target.checked })} />
             <span>Suivre le stock de ce produit</span>
           </label>
+          {brouillonsVisibles && (
+            <label className="checkbox-row">
+              <input type="checkbox" checked={form.brouillon}
+                onChange={(e) => setForm({ ...form, brouillon: e.target.checked })} />
+              <span>Brouillon — visible de vous seul jusqu'à publication</span>
+            </label>
+          )}
           <Field label="Catégorie">
             <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               {productCategories.map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}

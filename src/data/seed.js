@@ -1,4 +1,5 @@
 import { catalogueProducts } from './catalogue';
+import { produitsDeye } from './catalogueDeye';
 import { FORMATIONS_ACADEMIE } from './formationsAcademie';
 
 // v5 : réseau de partenaires à deux niveaux (sponsorId = parrain du partenaire)
@@ -44,7 +45,9 @@ export const leads = [
   { id: 'l8', clientType: 'entreprise', name: 'Benz-Benz Radio', contact: 'Felix Sossa', phone: '+228 94 22 33 44', address: 'Centre-Ville, Lomé', stage: 'gagne', estimatedValue: 890000, assignedTo: 'u2', parrainL1: 'p1', parrainL2: null, createdAt: '2025-03-15', notes: 'Studio radio', lastActivity: '2025-05-20', wonAt: '2025-05-20' },
 ];
 
-export const products = catalogueProducts;
+// Catalogue officiel, puis les produits Deye importés (en brouillon jusqu'à
+// publication par le gérant — utils/publication.js).
+export const products = [...catalogueProducts, ...produitsDeye];
 
 export const commissions = [
   { id: 'c1', partnerId: 'p1', leadId: 'l3', amount: 29400, level: 1, status: 'payée', paidAt: '2025-06-10', createdAt: '2025-06-09' },

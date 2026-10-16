@@ -9,6 +9,7 @@ import { createActions, newReferral, COMMISSION_RATES } from './dataActions';
 import { useRemoteSync } from './useRemoteSync';
 import { contactsGoogleAEnvoyer, issueSyncGoogle, prochaineRepriseGoogle } from '../utils/contactsGoogle';
 import { useReseau } from './useReseau';
+import { produitsPublies } from '../utils/publication';
 
 // Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
 // (le contexte est lisible depuis tous les écrans).
@@ -278,8 +279,13 @@ export function DataProvider({ children }) {
     },
   }), [actions, state.partners, user.id, user.name]);
 
+  // Catalogue : `products` ne contient que les produits PUBLIÉS — devis,
+  // dimensionnement, kits et panier ignorent ainsi les brouillons sans le
+  // savoir. La boutique lit `catalogueComplet` pour les montrer au gérant.
+  const produitsVisibles = useMemo(() => produitsPublies(state.products), [state.products]);
+
   return (
-    <DataContext.Provider value={{ ...state, ...actions, ...helpers, ...reseau, ...clientActions, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
+    <DataContext.Provider value={{ ...state, products: produitsVisibles, catalogueComplet: state.products, ...actions, ...helpers, ...reseau, ...clientActions, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
       {children}
     </DataContext.Provider>
   );

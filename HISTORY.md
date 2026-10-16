@@ -6,6 +6,15 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-16
+- **29 produits Deye en boutique, en brouillon : le gérant les relit et les publie un par un.**
+  - Nouveau statut « Brouillon ». Le produit n'est visible que du gérant de BestaSolar. Il porte un badge et a sa propre puce « Brouillons (N) », et le bouton « Publier » se trouve sur sa fiche.
+  - Un brouillon n'existe nulle part ailleurs : boutique des techniciens et des entreprises Pro, devis, dimensionnement, panier.
+  - Prix : le prix client affiché est le prix converti du dry-run. L'arrondi du +10 % saute certains montants : 3 produits s'affichent alors à 1 F de plus (897 001 F au lieu de 897 000 F).
+  - Catégories existantes : 13 onduleurs, 7 batteries, 8 accessoires, 1 contrôleur. Chaque fiche affiche une présentation en français au-dessus des caractéristiques.
+  - Pas de doublon. Trois modèles déjà vendus par BestaSolar (SUN-20K-SG05LP3, BOS-G-PDU-2, BOS-G PRO 5 kWh) ne sont pas réimportés, et leur prix du catalogue est conservé.
+  - Relancer l'import (`scrape_deye.py importer`) met à jour un SKU existant au lieu de le créer. Le journal (`deye_import/import.md`) compte créés, mis à jour et échecs.
+  - Photos : un visuel provisoire « Photo à venir » porte déjà le nom définitif de chaque image. Les photos officielles Deye le remplaceront sans toucher aux données.
+  - Textes corrigés à la relance : les onduleurs réseau 100 et 136 kW ne se disent plus « batterie haute tension ». Les plages et dimensions s'écrivent à la française (« -20 à 55 °C », « 601,5 × 520 × 135 mm »).
 - **Script de synchronisation des produits Deye, prêt à tourner** (`scripts/scrape_deye.py`). Il fonctionne en dry-run et ne touche pas à la boutique.
   - Il parcourt une catégorie en ligne, ne garde que les produits Deye et convertit les prix (NGN × 0,6, arrondi à la centaine supérieure).
   - Il rédige les descriptions en français à partir des caractéristiques et écrit `deye_import/products.csv`, `products.json` et `rapport.md`.

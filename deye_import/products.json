@@ -64,7 +64,7 @@
       "capacite_kwh": "7.68",
       "capacite_ah": "200",
       "tension_nominale_v": "38.4",
-      "temperature": "from -20°C to 55°C",
+      "temperature": "-20~55",
       "dimensions": "576 x 601 x 135",
       "poids_kg": "65"
     },
@@ -74,8 +74,8 @@
       "Capacité 7,68 kWh",
       "Capacité 200 Ah",
       "Tension nominale 38,4 V",
-      "Température de fonctionnement from -20°C to 55°C °C",
-      "Dimensions 576 x 601 x 135 mm",
+      "Température de fonctionnement -20 à 55 °C",
+      "Dimensions 576 × 601 × 135 mm",
       "Poids 65 kg"
     ]
   },
@@ -121,7 +121,7 @@
       "Énergie utile 4,6 kWh",
       "Capacité 100 Ah",
       "Tension nominale 51,2 V",
-      "Plage de tension 43.2~57.6 V",
+      "Plage de tension 43,2 à 57,6 V",
       "Jusqu’à 64 batteries en parallèle",
       "Indice de protection IP20"
     ]
@@ -134,9 +134,9 @@
     "modele": "SE-F5L",
     "sku": "DEYE-SE-F5L",
     "categorie": "batteries",
-    "prix_ngn": 963200,
+    "prix_ngn": 949000,
     "prix_barre_ngn": null,
-    "prix_fcfa": 578000,
+    "prix_fcfa": 569400,
     "prix_barre_fcfa": null,
     "disponibilite": "en stock",
     "description_fr": "Batterie lithium Deye de 5,12 kWh, technologie LiFePO4 (lithium fer phosphate), basse tension (48 V). Elle stocke l’énergie solaire de la journée pour la nuit et les coupures, avec une longue durée de vie et une recharge rapide. Points forts : jusqu’à 32 batteries en parallèle ; BMS intégré avec fusible actif ; supervision à distance. Conseil, installation et service après-vente par BestaSolar au Bénin, au Togo et en Côte d’Ivoire.",
@@ -198,7 +198,7 @@
       "Batterie haute tension",
       "Accueille 13 batteries",
       "Communication CAN",
-      "Dimensions 610x610x2350 mm",
+      "Dimensions 610 × 610 × 2 350 mm",
       "Poids 55 kg"
     ]
   },
@@ -313,7 +313,7 @@
       "Batterie haute tension",
       "Accueille 10 batteries",
       "Communication CAN",
-      "Dimensions 610x610x1900 mm",
+      "Dimensions 610 × 610 × 1 900 mm",
       "Poids 47 kg"
     ]
   },
@@ -347,10 +347,10 @@
     "caracteristiques_fr": [
       "Modèle HVB750V-100A",
       "Batterie haute tension",
-      "Plage de tension 120～750 V",
+      "Plage de tension 120 à 750 V",
       "Courant de charge / décharge 100 A",
       "Indice de protection IP20",
-      "Température de fonctionnement -20~65 °C"
+      "Température de fonctionnement -20 à 65 °C"
     ]
   },
   {
@@ -486,11 +486,11 @@
       "Modèle BOS-A-PDU-2",
       "Batterie haute tension",
       "Capacité 7,68 kWh",
-      "Plage de tension 235.2～306.6 V",
+      "Plage de tension 235,2 à 306,6 V",
       "Courant de charge / décharge 100 A",
       "Indice de protection IP20",
-      "Température de fonctionnement 0~35 °C",
-      "Dimensions 601.5x520x135 mm",
+      "Température de fonctionnement 0 à 35 °C",
+      "Dimensions 601,5 × 520 × 135 mm",
       "Poids 70 kg"
     ]
   },
@@ -619,11 +619,11 @@
     "caracteristiques_fr": [
       "Modèle BOS-G-PDU-2",
       "Batterie haute tension",
-      "Plage de tension 200～1000 V",
+      "Plage de tension 200 à 1 000 V",
       "Courant de charge / décharge 100 A",
       "Indice de protection IP20",
-      "Température de fonctionnement -20~65 °C",
-      "Dimensions 440*570*150 mm",
+      "Température de fonctionnement -20 à 65 °C",
+      "Dimensions 440 × 570 × 150 mm",
       "Poids 19 kg"
     ]
   },
@@ -764,7 +764,6 @@
       "puissance_kw": "136",
       "phases": 3,
       "mppt": 8,
-      "batterie": "haute tension",
       "rendement": "98.8",
       "pv_max_kw": "204",
       "tension_pv_max_v": "1100",
@@ -784,15 +783,14 @@
       "Puissance 136 kW",
       "Puissance de sortie nominale 136 kW",
       "Triphasé",
-      "Batterie haute tension",
       "8 entrées MPPT",
       "Puissance PV max 204 kW",
-      "Plage MPPT 200 V to 1000 V",
+      "Plage MPPT 200 à 1 000 V",
       "Tension PV max 1 100 V",
       "Tension de démarrage 250 V",
       "Rendement max 98,8 %",
       "Indice de protection IP65",
-      "Dimensions 1006 x 516 x 325.5 mm",
+      "Dimensions 1 006 × 516 × 325,5 mm",
       "Poids 103 kg"
     ]
   },
@@ -898,7 +896,7 @@
       "2 entrées MPPT",
       "Puissance PV max 10,4 kW",
       "Tension PV nominale 550 V",
-      "Plage MPPT 160~800 V",
+      "Plage MPPT 160 à 800 V",
       "Tension de démarrage 160 V",
       "Courant de charge / décharge 240 A",
       "Jusqu’à 10 appareils en parallèle"
@@ -1075,7 +1073,7 @@
       "capacite_kwh": "5.12",
       "capacite_ah": "100",
       "tension_nominale_v": "51.2",
-      "temperature": "from -20°C to 55°C",
+      "temperature": "-20~55",
       "communication": "Wi-Fi, CAN"
     },
     "caracteristiques_fr": [
@@ -1084,7 +1082,7 @@
       "Capacité 5,12 kWh",
       "Capacité 100 Ah",
       "Tension nominale 51,2 V",
-      "Température de fonctionnement from -20°C to 55°C °C",
+      "Température de fonctionnement -20 à 55 °C",
       "Communication Wi-Fi, CAN"
     ]
   },
@@ -1115,7 +1113,6 @@
       "puissance_kw": "100",
       "phases": 3,
       "mppt": 6,
-      "batterie": "haute tension",
       "rendement": "98.8",
       "pv_max_kw": "150",
       "plage_mppt": "200-850",
@@ -1135,15 +1132,14 @@
       "Puissance 100 kW",
       "Puissance de sortie nominale 100 kW",
       "Triphasé",
-      "Batterie haute tension",
       "6 entrées MPPT",
       "Puissance PV max 150 kW",
-      "Plage MPPT 200-850 V",
+      "Plage MPPT 200 à 850 V",
       "Tension de sortie 220/380V, 230/400V",
       "Rendement max 98,8 %",
       "Indice de protection IP65",
       "Communication Wi-Fi, Bluetooth, 4G, GPRS, LAN, RS485, RS232",
-      "Dimensions 824×516×312.7 mm",
+      "Dimensions 824 × 516 × 312,7 mm",
       "Poids 81 kg"
     ]
   },
@@ -1179,7 +1175,7 @@
       "Batterie haute tension",
       "Accueille 12 batteries",
       "Communication CAN",
-      "Dimensions 589*590*2240 mm",
+      "Dimensions 589 × 590 × 2 240 mm",
       "Poids 85 kg"
     ]
   },
@@ -1224,7 +1220,7 @@
       "Capacité 100 Ah",
       "Tension nominale 51,2 V",
       "Courant de charge / décharge 100 A",
-      "Dimensions 440*570*133 mm",
+      "Dimensions 440 × 570 × 133 mm",
       "Poids 45 kg"
     ]
   },
@@ -1441,10 +1437,10 @@
     "caracteristiques_fr": [
       "Modèle GB-W-PDU-2",
       "Batterie haute tension",
-      "Plage de tension 200~1000 V",
+      "Plage de tension 200 à 1 000 V",
       "Courant de charge / décharge 230 A",
       "Indice de protection IP20",
-      "Température de fonctionnement -20~55 °C"
+      "Température de fonctionnement -20 à 55 °C"
     ]
   }
 ]

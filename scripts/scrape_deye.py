@@ -4,6 +4,7 @@ Synchronisation des produits Deye d'un catalogue en ligne → BestaSolar.
 
   python3 scripts/scrape_deye.py scrape  [--url URL] [--out deye_import] [--delai 1.5] [--debug]
   python3 scripts/scrape_deye.py images  [--sources deye_import/sources] [--out deye_import/images]
+  python3 scripts/scrape_deye.py importer [--produits deye_import/products.json] [--photos deye_import/images]
 
 `scrape` (dry-run, ne touche pas à la boutique) :
   - parcourt TOUTES les pages de la catégorie : sur un site Next.js, les
@@ -26,6 +27,18 @@ sur les contours), carré 1000×1000 produit centré, export WebP + JPG nommés
 deye-<modele>-<n>. Le script ne retire aucun filigrane ni logo, et ne
 télécharge pas les photos du site source : il en note seulement les adresses
 dans le CSV, pour savoir quelles photos réunir.
+
+`importer` : écrit les produits dans la boutique BestaSolar, c'est-à-dire le
+catalogue de l'application (src/data/catalogueDeye.js), en BROUILLON :
+  - SKU DEYE-<modèle> ; un SKU déjà importé est mis à jour, jamais doublé ;
+  - un modèle déjà vendu dans le catalogue officiel (src/data/catalogue.js)
+    n'est ni doublé ni modifié : il est signalé au journal ;
+  - prix partenaire calculé pour que le prix client affiché soit le prix
+    converti ; catégories de la boutique (onduleurs, batteries…) ;
+  - photo : celle de la commande images (deye-<modèle>-1.jpg), sinon un
+    visuel provisoire « Photo à venir » au même nom ;
+  - journal créés / mis à jour / échecs dans deye_import/import.md.
+  Aucune clé ni API : l'application reçoit le catalogue à sa mise à jour.
 
 Dépendances : pip install -r scripts/requirements-deye.txt
 Chromium : celui de Playwright, ou PLAYWRIGHT_CHROMIUM=/chemin/vers/chrome.
@@ -230,6 +243,17 @@ def _n(v: str) -> str:
     return s.replace('.', ',')
 
 
+def _plage(v: str) -> str:
+    """« 43.2~57.6 », « 120～750 », « 200 V to 1000 », « 200-850 » → « 43,2 à 57,6 »."""
+    m = re.fullmatch(r'\s*(-?[\d.]+)\s*V?\s*(?:~|～|to|à|(?<=\d)-)\s*(-?[\d.]+)\s*', str(v))
+    return f"{_n(m.group(1))} à {_n(m.group(2))}" if m else str(v)
+
+
+def _dimensions(v: str) -> str:
+    """« 601.5x520x135 » → « 601,5 × 520 × 135 »."""
+    return ' × '.join(_n(x.strip()) for x in re.split(r'\s*[x×*]\s*', str(v)))
+
+
 def faits_techniques(nom: str, md: str) -> dict:
     t = f"{nom}\n{md or ''}".replace('ﬁ', 'fi').replace('ﬀ', 'ff')
     f: dict = {}
@@ -246,7 +270,9 @@ def faits_techniques(nom: str, md: str) -> dict:
         or cherche(r'(\d+)\s*(?:power point tracking|\(MPPT\))')
     if mppt:
         f['mppt'] = int(mppt)
-    if re.search(r'\bLV\b battery|low voltage|48\s*V low voltage', t, re.I):
+    if re.search(r'string inverter|on.?grid|grid.?tie', nom, re.I):
+        pass  # onduleur réseau : son « HV » désigne l'entrée PV, il n'a pas de batterie
+    elif re.search(r'\bLV\b battery|low voltage|48\s*V low voltage', t, re.I):
         f['batterie'] = 'basse tension (48 V)'
     elif re.search(r'\bHV\b|high.?voltage', t, re.I):
         f['batterie'] = 'haute tension'
@@ -275,7 +301,7 @@ def faits_techniques(nom: str, md: str) -> dict:
     f['cycles'] = cherche(r'(?:over|≥)\s*(\d{4})\s*(?:charge\s*)?cycles') or cherche(r'EOL\s*≥\s*(\d{4})')
     f['dod'] = cherche(r'Depth of Discharge:\s*(\d+)\s*%')
     f['temperature'] = cherche(r'(?:Operating|Working) Temperature(?: Range)?(?:\s*\(°C\))?:?\s*(-?\d+\s*[~-]\s*-?\d+)\s*[°℃]') \
-        or cherche(r'from\s*(-\d+)\s*°C to\s*(\d+)\s*°C', 0)
+        or ((m := re.search(r'from\s*(-?\d+)\s*°C to\s*(-?\d+)\s*°C', t, re.I)) and f"{m.group(1)}~{m.group(2)}")
     f['dimensions'] = cherche(r'Dimensions?[^:\n]*?:?\s*(\d[\d.]*\s*[x×*]\s*\d[\d.]*\s*[x×*]\s*\d[\d.]*)\s*mm')
     f['poids_kg'] = cherche(r'Weight[^0-9\n]{0,20}(\d+(?:\.\d+)?)\s*kg') or cherche(r'approximately\s*(\d+)\s*kg')
     f['garantie'] = cherche(r'Warranty:\s*(\d+)\s*years?')
@@ -378,7 +404,13 @@ def caracteristiques_fr(p: 'Produit') -> list[str]:
         if cle == 'parallele':
             lignes.append(gabarit.format(v, 'batteries' if p.categorie == 'batteries' else 'appareils'))
             continue
-        lignes.append(gabarit.format(_n(v) if cle not in ('dimensions', 'temperature', 'plage_mppt', 'plage_tension', 'communication', 'tension_sortie', 'ip', 'batterie', 'surdimensionnement_pv') else v))
+        if cle in ('plage_mppt', 'plage_tension', 'temperature'):
+            v = _plage(v)
+        elif cle == 'dimensions':
+            v = _dimensions(v)
+        elif cle not in ('communication', 'tension_sortie', 'ip', 'batterie', 'surdimensionnement_pv'):
+            v = _n(v)
+        lignes.append(gabarit.format(v))
     return [INTERDITS.sub('', l).strip() for l in lignes if l.strip()]
 
 
@@ -987,6 +1019,238 @@ def commande_images(args) -> None:
     print(f"{total} image(s) → {out} (WebP + JPG, {TAILLE_IMAGE}×{TAILLE_IMAGE}, fond #0D3483)")
 
 
+# --------------------------------------------------------------------------
+#  Import dans la boutique BestaSolar (catalogue de l'application)
+# --------------------------------------------------------------------------
+# La boutique est l'application elle-même : pas d'API marchande, pas de clé.
+# Un produit officiel entre par le catalogue du code (src/data/), que chaque
+# appareil reçoit une fois à la mise à jour et que l'organisation interne
+# réplique vers le serveur (context/dataState.js, loadState). L'import écrit
+# donc src/data/catalogueDeye.js, en BROUILLON : le gérant publie ensuite
+# chaque produit depuis la boutique.
+
+MARGE_PUBLIQUE = 1.1          # utils/price.js (PUBLIC_MARKUP)
+CATEGORIES_BOUTIQUE = {'onduleurs', 'batteries', 'accessoires', 'controleurs', 'kits'}
+RACINE = Path(__file__).resolve().parent.parent
+
+# Même produit Deye, référence écrite autrement dans le catalogue BestaSolar :
+# « BOS-G RPO 5KWH » (sic) y désigne le module 5 kWh de la série BOS-G PRO.
+EQUIVALENCES = {'BOS-G-PACK5.1': 'BOS-G RPO 5KWH'}
+
+
+def prix_public(base: int) -> int:
+    """Prix public affiché par l'app : Math.round(basePrice × 1,1)."""
+    return math.floor(base * MARGE_PUBLIQUE + 0.5)
+
+
+def prix_partenaire(prix_client: int) -> int:
+    """Plus petit prix partenaire (basePrice) dont le prix public affiché
+    atteint le prix client converti. Exact le plus souvent ; l'arrondi du
+    +10 % saute toutefois certains montants (578 000 F : 525 454 donne
+    577 999, 525 455 donne 578 001) — on prend alors 1 F au-dessus, jamais
+    en dessous du prix converti."""
+    b = max(1, math.floor(prix_client / MARGE_PUBLIQUE) - 2)
+    while prix_public(b) < prix_client:
+        b += 1
+    return b
+
+
+def _cle_modele(m: str) -> str:
+    return re.sub(r'[\s_]+', '', (m or '').upper())
+
+
+def modeles_catalogue_officiel(chemin: Path) -> dict:
+    """Référence « Modèle … » de chaque produit du catalogue officiel →
+    (id, prix partenaire). Lu par Node : le fichier est un module JavaScript."""
+    import subprocess
+    js = ("const m = await import(process.argv[1]);"
+          "console.log(JSON.stringify(m.catalogueProducts.map(p => [p.id, p.description || '', p.basePrice])));")
+    sortie = subprocess.run(['node', '--input-type=module', '-e', js, chemin.resolve().as_uri()],
+                            capture_output=True, text=True, check=True).stdout
+    modeles = {}
+    for pid, desc, base in json.loads(sortie):
+        m = re.search(r'Mod[èe]le\s+([^·]+)', desc)
+        if m:
+            modeles[_cle_modele(m.group(1))] = (pid, base)
+    return modeles
+
+
+def lire_catalogue_deye(chemin: Path) -> list[dict]:
+    """Produits déjà importés : le tableau du fichier généré est du JSON."""
+    if not chemin.exists():
+        return []
+    texte = chemin.read_text(encoding='utf-8')
+    debut = texte.index('[', texte.index('produitsDeye'))
+    return json.loads(re.sub(r',\s*\]$', ']', texte[debut:texte.rindex(']') + 1]))
+
+
+def ecrire_catalogue_deye(chemin: Path, produits: list[dict]) -> None:
+    entete = (
+        "// Produits Deye — GÉNÉRÉ par scripts/scrape_deye.py (commande « importer »)\n"
+        "// depuis deye_import/products.json : relancer l'import plutôt que de\n"
+        "// modifier ce fichier à la main. Importés en BROUILLON (utils/publication.js) :\n"
+        "// le gérant les publie un par un depuis la boutique.\n"
+        "// `basePrice` = prix partenaire, calculé pour que le prix public affiché\n"
+        "// (utils/price.js, +10 %) soit exactement le prix converti. `sku` =\n"
+        "// DEYE-<modèle>, clé de l'anti-doublon. Photo : /products/<id>.jpg.\n"
+        "// Chaque objet est écrit en JSON : l'import relit ce tableau.\n"
+    )
+    corps = ',\n'.join('  ' + json.dumps(p, ensure_ascii=False) for p in produits)
+    chemin.write_text(f"{entete}export const produitsDeye = [\n{corps}\n];\n", encoding='utf-8')
+
+
+COTE_ATTENTE = 600
+
+
+def est_image_attente(chemin: Path) -> bool:
+    """Le visuel provisoire fait 600 px de côté ; une photo traitée, 1000."""
+    from PIL import Image
+    try:
+        with Image.open(chemin) as img:
+            return img.size == (COTE_ATTENTE, COTE_ATTENTE)
+    except OSError:
+        return False
+
+
+def image_attente(chemin: Path, modele: str) -> None:
+    """Visuel provisoire, au nom définitif du produit : la vraie photo le
+    remplacera sans toucher aux données déjà réparties sur les appareils."""
+    from PIL import Image, ImageDraw, ImageFont
+    cote = COTE_ATTENTE
+    img = Image.new('RGB', (cote, cote), BLEU_BESTASOLAR)
+    d = ImageDraw.Draw(img)
+    cx, cy, r = cote // 2, 230, 58
+    soleil = (0xF5, 0xA6, 0x23)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=soleil, width=10)
+    for k in range(8):
+        a = k * math.pi / 4
+        d.line([cx + math.cos(a) * (r + 22), cy + math.sin(a) * (r + 22),
+                cx + math.cos(a) * (r + 52), cy + math.sin(a) * (r + 52)], fill=soleil, width=10)
+
+    def police(taille, gras=False):
+        nom = 'DejaVuSans-Bold.ttf' if gras else 'DejaVuSans.ttf'
+        for dossier in ('/usr/share/fonts/truetype/dejavu', '/Library/Fonts', 'C:/Windows/Fonts'):
+            try:
+                return ImageFont.truetype(f"{dossier}/{nom}", taille)
+            except OSError:
+                continue
+        return ImageFont.load_default()
+
+    texte, taille = modele or 'Deye', 40
+    while taille > 18 and d.textlength(texte, font=police(taille, True)) > cote - 60:
+        taille -= 2
+    d.text((cx, 395), texte, font=police(taille, True), fill='white', anchor='mm')
+    d.text((cx, 455), 'Photo à venir', font=police(28), fill=(0xC9, 0xD4, 0xF0), anchor='mm')
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    img.save(chemin, 'JPEG', quality=82, optimize=True, progressive=True)
+
+
+def produit_boutique(p: dict, photos: Path, public: Path) -> tuple[dict | None, str]:
+    """products.json → produit de la boutique. Renvoie (produit, motif
+    d'échec). Photo : celle de la commande images si elle existe, sinon le
+    visuel provisoire (jamais par-dessus une photo déjà en place)."""
+    textes = ' '.join([p.get('nom_fr') or '', p.get('description_fr') or '', *(p.get('caracteristiques_fr') or [])])
+    if not p.get('sku') or not p.get('nom_fr'):
+        return None, 'référence ou nom manquant'
+    if not p.get('prix_fcfa'):
+        return None, 'prix manquant'
+    if p.get('categorie') not in CATEGORIES_BOUTIQUE:
+        return None, f"catégorie inconnue « {p.get('categorie')} »"
+    if INTERDITS.search(textes):
+        return None, 'texte mentionnant la source, le pays ou sa monnaie'
+    base = prix_partenaire(p['prix_fcfa'])
+    pid = 'deye-' + slug(p['sku'].removeprefix('DEYE-'))
+    cible = public / f"{pid}.jpg"
+    photo = photos / f"{pid}-1.jpg"
+    if photo.exists():
+        import shutil
+        shutil.copyfile(photo, cible)
+    elif not cible.exists():
+        image_attente(cible, p.get('modele') or '')
+    return {
+        'id': pid,
+        'sku': p['sku'],
+        'name': p['nom_fr'],
+        'description': ' · '.join(p.get('caracteristiques_fr') or []),
+        'presentation': p.get('description_fr') or '',
+        'basePrice': base,
+        'category': p['categorie'],
+        'stock': 0,
+        'image': f"/products/{pid}.jpg",
+        'brouillon': True,
+    }, ''
+
+
+def commande_importer(args) -> None:
+    source = Path(args.produits)
+    if not source.exists():
+        raise SystemExit(f"{source} introuvable : lancer d'abord la commande scrape (dry-run).")
+    produits = json.loads(source.read_text(encoding='utf-8'))
+    cible, photos, public = Path(args.catalogue), Path(args.photos), Path(args.public)
+    officiels = modeles_catalogue_officiel(Path(args.officiel))
+    existants = {p['sku']: p for p in lire_catalogue_deye(cible)}
+
+    sortie, crees, maj, inchanges, deja, echecs, attente, ajustes = [], [], [], [], [], [], [], []
+    for p in produits:
+        modele = p.get('modele') or ''
+        officiel = officiels.get(_cle_modele(modele)) or officiels.get(_cle_modele(EQUIVALENCES.get(modele, '')))
+        if officiel:
+            deja.append((p, officiel))
+            continue
+        prod, motif = produit_boutique(p, photos, public)
+        if not prod:
+            echecs.append((p, motif))
+            continue
+        if est_image_attente(public / f"{prod['id']}.jpg"):
+            attente.append(prod)
+        if prix_public(prod['basePrice']) != p['prix_fcfa']:
+            ajustes.append((prod, p['prix_fcfa']))
+        ancien = existants.pop(p['sku'], None)
+        if ancien is None:
+            crees.append(prod)
+        elif ancien == prod:
+            inchanges.append(prod)
+        else:
+            maj.append((prod, sorted(k for k in set(prod) | set(ancien) if prod.get(k) != ancien.get(k))))
+        sortie.append(prod)
+    # Jamais de suppression par absence : un produit disparu de la source
+    # reste au catalogue (le gérant le retire s'il le souhaite).
+    absents = list(existants.values())
+    sortie += absents
+    ecrire_catalogue_deye(cible, sortie)
+
+    def ligne(prod):
+        return f"| {prod['name']} | {prod['sku']} | {format_fcfa(prix_public(prod['basePrice']))} | {format_fcfa(prod['basePrice'])} |"
+    lignes = ['# Import Deye — journal', '',
+              f"- Créés : {len(crees)}", f"- Mis à jour : {len(maj)}", f"- Inchangés : {len(inchanges)}",
+              f"- Déjà au catalogue BestaSolar (non modifiés) : {len(deja)}", f"- Échecs : {len(echecs)}",
+              f"- Absents de la source (conservés) : {len(absents)}",
+              f"- Photo à venir (visuel provisoire) : {len(attente)}",
+              f"- Prix client ajusté de 1 F (arrondi) : {len(ajustes)}", '',
+              'Tous importés en brouillon : visibles du seul gérant, à publier depuis la boutique.', '']
+    if crees:
+        lignes += ['## Créés', '', '| Nom | SKU | Prix client | Prix partenaire |', '|---|---|---:|---:|'] + [ligne(x) for x in crees] + ['']
+    if ajustes:
+        lignes += ['## Prix client ajustés de 1 F', '',
+                   'Le +10 % de l’app est arrondi au franc : ces montants ne peuvent pas tomber pile.', '']
+        lignes += [f"- {x['name']} : {format_fcfa(prix_public(x['basePrice']))} au lieu de {format_fcfa(v)}" for x, v in ajustes] + ['']
+    if maj:
+        lignes += ['## Mis à jour', ''] + [f"- {x['name']} ({x['sku']}) : {', '.join(champs)}" for x, champs in maj] + ['']
+    if deja:
+        lignes += ['## Déjà au catalogue BestaSolar — non modifiés', '',
+                   'Même modèle déjà vendu sous un autre identifiant : pas de doublon, et le prix du catalogue officiel est conservé.', '']
+        lignes += [f"- {p['nom_fr']} ({p['sku']}) → produit `{pid}` : prix client {format_fcfa(prix_public(base))} "
+                   f"au catalogue, {format_fcfa(p['prix_fcfa'])} converti" for p, (pid, base) in deja] + ['']
+    if echecs:
+        lignes += ['## Échecs', ''] + [f"- {p.get('nom_fr') or p.get('nom')} ({p.get('sku')}) : {motif}" for p, motif in echecs] + ['']
+    if absents:
+        lignes += ['## Absents de la source, conservés', ''] + [f"- {x['name']} ({x['sku']})" for x in absents] + ['']
+    Path(args.journal).write_text('\n'.join(lignes), encoding='utf-8')
+    print(f"Créés {len(crees)} · mis à jour {len(maj)} · inchangés {len(inchanges)} · "
+          f"déjà au catalogue {len(deja)} · échecs {len(echecs)} · absents conservés {len(absents)}")
+    print(f"→ {cible} ; journal {args.journal}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[1])
     sous = ap.add_subparsers(dest='commande', required=True)
@@ -998,8 +1262,15 @@ def main() -> None:
     i = sous.add_parser('images', help='photos autorisées → fond bleu BestaSolar')
     i.add_argument('--sources', default='deye_import/sources')
     i.add_argument('--out', default='deye_import/images')
+    m = sous.add_parser('importer', help='products.json → catalogue de la boutique, en brouillon')
+    m.add_argument('--produits', default='deye_import/products.json')
+    m.add_argument('--catalogue', default=str(RACINE / 'src/data/catalogueDeye.js'))
+    m.add_argument('--officiel', default=str(RACINE / 'src/data/catalogue.js'))
+    m.add_argument('--photos', default='deye_import/images', help='sortie de la commande images')
+    m.add_argument('--public', default=str(RACINE / 'public/products'))
+    m.add_argument('--journal', default='deye_import/import.md')
     args = ap.parse_args()
-    {'scrape': commande_scrape, 'images': commande_images}[args.commande](args)
+    {'scrape': commande_scrape, 'images': commande_images, 'importer': commande_importer}[args.commande](args)
 
 
 if __name__ == '__main__':
