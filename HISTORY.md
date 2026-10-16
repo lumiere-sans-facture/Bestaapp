@@ -6,6 +6,7 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-16
+- **Photos Deye : les PNG à fond transparent passent sur le fond bleu BestaSolar sans virer au noir.** Le détourage du fabricant sert de masque (`scrape_deye.py images`), en préparation des photos officielles.
 - **Brouillons de la boutique : visibles dès l'arrivée du gérant.**
   - Un bandeau en tête de boutique annonce « 29 produits en brouillon », avec un bouton « Voir ».
   - La puce « Brouillons » vient juste après « Tous ».

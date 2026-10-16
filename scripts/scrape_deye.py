@@ -961,10 +961,18 @@ def _flou3(a):
 def sur_fond_bleu(chemin_src: Path, sortie_base: Path) -> None:
     import numpy as np
     from PIL import Image
-    img = Image.open(chemin_src).convert('RGB')
-    rgb = np.asarray(img)
-    res = masque_produit(rgb)
-    alpha, fond = (res if isinstance(res, tuple) else (res, None))
+    src = Image.open(chemin_src)
+    alpha = None
+    # PNG détouré par le fabricant (fond transparent) : sa transparence est le
+    # masque, rien à deviner. Sans conversion, le transparent virerait au noir.
+    if src.mode in ('RGBA', 'LA') or (src.mode == 'P' and 'transparency' in src.info):
+        rgba = np.asarray(src.convert('RGBA'))
+        if rgba[..., 3].min() < 230:
+            rgb, alpha, fond = rgba[..., :3], rgba[..., 3].astype(np.float32) / 255.0, None
+    if alpha is None:
+        rgb = np.asarray(src.convert('RGB'))
+        res = masque_produit(rgb)
+        alpha, fond = (res if isinstance(res, tuple) else (res, None))
     px = rgb.astype(np.float32)
     if fond is not None:
         fond_px = np.asarray(fond, dtype=np.float32)
