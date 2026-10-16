@@ -225,17 +225,20 @@ export default function Boutique() {
         }
       />
       <div className="page-content">
+        {/* Brouillons à relire : annoncés en tête de page. Rangés à leur place
+            dans le catalogue, ils finissent loin dans la liste, et une puce en
+            bout de rangée sort de l'écran d'un téléphone. */}
+        {nbBrouillons > 0 && selectedCategory !== BROUILLONS && (
+          <div className="brouillon-note">
+            <span>
+              <strong>{nbBrouillons} produit{nbBrouillons > 1 ? 's' : ''} en brouillon</strong>
+              {' '}— visible{nbBrouillons > 1 ? 's' : ''} de vous seul, à relire puis publier.
+            </span>
+            <button className="btn btn-sm btn-primary" onClick={() => setSelectedCategory(BROUILLONS)}>Voir</button>
+          </div>
+        )}
         <div className="categories-scroll">
           <button className={`category-chip ${!selectedCategory ? 'active' : ''}`} onClick={() => setSelectedCategory(null)}>Tous</button>
-          {productCategories.map((cat) => (
-            <button
-              key={cat.id}
-              className={`category-chip ${selectedCategory === cat.id ? 'active' : ''}`} aria-pressed={selectedCategory === cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-            >
-              {cat.label}
-            </button>
-          ))}
           {nbBrouillons > 0 && (
             <button
               className={`category-chip category-chip-brouillon ${selectedCategory === BROUILLONS ? 'active' : ''}`}
@@ -245,6 +248,15 @@ export default function Boutique() {
               Brouillons ({nbBrouillons})
             </button>
           )}
+          {productCategories.map((cat) => (
+            <button
+              key={cat.id}
+              className={`category-chip ${selectedCategory === cat.id ? 'active' : ''}`} aria-pressed={selectedCategory === cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
         <div className="list-toolbar boutique-filters">
           <select className="input sort-select" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} aria-label="Filtrer par prix">

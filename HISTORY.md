@@ -6,6 +6,11 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-16
+- **Brouillons de la boutique : visibles dès l'arrivée du gérant.**
+  - Un bandeau en tête de boutique annonce « 29 produits en brouillon », avec un bouton « Voir ».
+  - La puce « Brouillons » vient juste après « Tous ».
+  - Avant, elle fermait la rangée des catégories, hors de l'écran d'un téléphone. Dans « Tous », le premier brouillon arrivait en 158ᵉ position : le gérant ne les trouvait pas.
+  - Scénario `e2e/brouillons-boutique.mjs` : gérant BestaSolar et gérant d'une entreprise Pro, Supabase simulé.
 - **29 produits Deye en boutique, en brouillon : le gérant les relit et les publie un par un.**
   - Nouveau statut « Brouillon ». Le produit n'est visible que du gérant de BestaSolar. Il porte un badge et a sa propre puce « Brouillons (N) », et le bouton « Publier » se trouve sur sa fiche.
   - Un brouillon n'existe nulle part ailleurs : boutique des techniciens et des entreprises Pro, devis, dimensionnement, panier.
