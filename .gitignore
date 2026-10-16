@@ -32,3 +32,8 @@ coverage/
 .backup-output/
 __pycache__/
 .DS_Store
+
+# Synchro Deye : copie brute des fiches source, locale seulement
+deye_import/cache/
+deye_import/debug/
+deye_import/sources/

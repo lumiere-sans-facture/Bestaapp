@@ -6,8 +6,9 @@ Synchronisation des produits Deye d'un catalogue en ligne → BestaSolar.
   python3 scripts/scrape_deye.py images  [--sources deye_import/sources] [--out deye_import/images]
 
 `scrape` (dry-run, ne touche pas à la boutique) :
-  - parcourt TOUTES les pages de la catégorie (lien « suivant », ?page=N,
-    bouton « charger plus », défilement infini) avec un navigateur headless ;
+  - parcourt TOUTES les pages de la catégorie : sur un site Next.js, les
+    données embarquées (__NEXT_DATA__, pagination ?page=N) ; sinon un
+    navigateur headless (lien « suivant », « charger plus », défilement) ;
   - ne garde que les produits de marque Deye ;
   - ouvre chaque fiche : nom, modèle, prix NGN, prix barré, description,
     caractéristiques, catégorie, disponibilité, URL des images, URL source ;
@@ -97,12 +98,14 @@ RE_MODELE = re.compile(
     r'|SUN-M[0-9]+G[0-9]+(?:-[A-Z0-9]+)*)\b', re.I)
 
 CATEGORIES = [
-    # (catégorie BestaSolar, motif) — l'ordre compte : un « kit » contient
-    # souvent le mot « onduleur », un onduleur parle de « battery voltage ».
-    ('kits', re.compile(r'\bkit\b|\bbundle\b|\bpack\b', re.I)),
-    ('onduleurs', re.compile(r'inverter|onduleur|micro.?inverter|\bSUN-', re.I)),
-    ('batteries', re.compile(r'batter|lifepo4|lithium|\bkwh\b|\bBOS-|\bSE-G|\bRW-|\bAI-W|\bGB-', re.I)),
-    ('controleurs', re.compile(r'charge controller|contr[ôo]leur|mppt controller|r[ée]gulateur', re.I)),
+    # (catégorie BestaSolar, motif) — l'ordre compte : un boîtier « Battery
+    # Controller » est un accessoire, pas une batterie ; un onduleur parle de
+    # « battery voltage ».
+    ('kits', re.compile(r'\bkit\b', re.I)),
+    ('accessoires', re.compile(r'\brack\b|bracket|\bbms\b|control(?:ler)?\s*box|controller|\bpdu\b|\bsts\b|cluster', re.I)),
+    ('controleurs', re.compile(r'mppt\s+module|charge\s+controller|contr[ôo]leur de charge|r[ée]gulateur', re.I)),
+    ('onduleurs', re.compile(r'inverter|onduleur|\bpcs\b', re.I)),
+    ('batteries', re.compile(r'batter|lifepo4|lithium|\bkwh\b', re.I)),
 ]
 
 
@@ -213,6 +216,234 @@ def nom_fr(nom: str) -> str:
 
 
 # --------------------------------------------------------------------------
+#  Faits techniques → caractéristiques et textes français
+# --------------------------------------------------------------------------
+# On ne reprend JAMAIS les phrases d'origine : seuls des faits chiffrés ou
+# des fonctions reconnues (dictionnaire ci-dessous) sont relevés, puis
+# rédigés en français. Une ligne non reconnue est simplement ignorée.
+
+def _n(v: str) -> str:
+    """« 98.8 » → « 98,8 », « 6000 » → « 6 000 » (nombres à la française)."""
+    s = str(v)
+    if re.fullmatch(r'\d{4,}', s):
+        return f"{int(s):,}".replace(',', ' ')
+    return s.replace('.', ',')
+
+
+def faits_techniques(nom: str, md: str) -> dict:
+    t = f"{nom}\n{md or ''}".replace('ﬁ', 'fi').replace('ﬀ', 'ff')
+    f: dict = {}
+    def cherche(motif, groupe=1, flags=re.I):
+        m = re.search(motif, t, flags)
+        return m.group(groupe).strip() if m else None
+    f['puissance_kw'] = cherche(r'(\d+(?:\.\d+)?)\s*k[wW](?![hH])')
+    if re.search(r'three.?phase|3-?phase|triphas|HP3\b|LP3\b|G01P3', t, re.I):
+        f['phases'] = 3
+    elif re.search(r'single.?phase|monophas|LP1\b', t, re.I):
+        f['phases'] = 1
+    mots = {'two': 2, 'three': 3, 'four': 4, 'six': 6, 'eight': 8, 'ten': 10}
+    mppt = cherche(r'(\d+)\s*(?:MPPT|MPP\s*trackers?)\b') or (str(mots[m.lower()]) if (m := cherche(r'\b(two|three|four|six|eight|ten)\s+MPPT', 1)) else None) \
+        or cherche(r'(\d+)\s*(?:power point tracking|\(MPPT\))')
+    if mppt:
+        f['mppt'] = int(mppt)
+    if re.search(r'\bLV\b battery|low voltage|48\s*V low voltage', t, re.I):
+        f['batterie'] = 'basse tension (48 V)'
+    elif re.search(r'\bHV\b|high.?voltage', t, re.I):
+        f['batterie'] = 'haute tension'
+    f['parallele'] = cherche(r'max\.?\s*(\d+)\s*(?:pcs|units?)\s*(?:in\s*)?parallel') or cherche(r'up to\s*(\d+)\s*units?\s*in\s*parallel') \
+        or cherche(r'max\.?\s*(\d+)\s*units?\s*in\s*parallel')
+    f['courant_charge_a'] = cherche(r'charg(?:e|ing)\s*(?:/|and)\s*discharg(?:e|ing)\s*current\s*(?:of\s*|:\s*)?(?:up to\s*)?(\d+)\s*A') \
+        or cherche(r'(\d+)\s*A\s*charge\s*(?:/|and)\s*discharge') or cherche(r'Max\.?\s*Charge/Discharge Current:?\s*(\d+)\s*A')
+    f['courant_decharge_continu_a'] = cherche(r'continuous discharge current of\s*(\d+)\s*A')
+    f['rendement'] = cherche(r'efficiency(?:\s*up to|:\s*up to|\s*of)?\s*:?\s*(\d{2}(?:\.\d)?)\s*%') or cherche(r'(\d{2}(?:\.\d)?)\s*%\s*conversion efficiency')
+    f['pv_max_kw'] = cherche(r'Max\.?\s*DC Input Power \(kW\):\s*([\d.]+)') or cherche(r'Maximum PV Input Power:\s*up to\s*([\d.]+)\s*kW') \
+        or cherche(r'maximum PV input power is\s*([\d.]+)\s*kW')
+    if re.search(r'2\s*[×x]\s*PV Oversizing', t, re.I):
+        f['surdimensionnement_pv'] = '2 ×'
+    f['tension_pv_max_v'] = cherche(r'Max\.?\s*PV Input Voltage of\s*(\d+)\s*V')
+    f['tension_demarrage_v'] = cherche(r'start-?up voltage(?:\s*\(V\))?\s*(?:of|:)?\s*(\d+)\s*V?')
+    f['plage_mppt'] = cherche(r'MPPT Voltage Range:\s*(?:from\s*)?(\d+\s*(?:V\s*)?(?:-|to|~)\s*\d+)\s*V') or cherche(r'Rated PV Input Voltage \(V\):\s*\d+\s*\((\d+~\d+)\)')
+    f['tension_pv_nominale_v'] = cherche(r'Rated PV Input Voltage \(V\):\s*(\d+)') or cherche(r'Rated DC Input Voltage \(V\):\s*(\d+)')
+    f['sortie_kw'] = cherche(r'Rated AC Output and UPS Power \(kW\):\s*([\d.]+)') or cherche(r'Rated AC Output Active Power:\s*([\d.]+)\s*kW')
+    f['tension_sortie'] = cherche(r'Rated Output Voltage:\s*([\d/V, ]+)')
+    f['ip'] = cherche(r'\b(IP\d{2})\b', 1, 0)
+    f['capacite_kwh'] = cherche(r'(?:Module|Nominal|Rated)?\s*Energy(?:\s*\(kWh\))?:\s*([\d.]+)') or cherche(r'([\d.]+)\s*kWh', 1)
+    f['energie_utile_kwh'] = cherche(r'Usable Energy \(kWh\)\d?:\s*([\d.]+)')
+    f['capacite_ah'] = cherche(r'(\d+)\s*Ah\b') or cherche(r'Capacity \(Ah\):\s*(\d+)')
+    f['tension_nominale_v'] = cherche(r'(?:Module\s*)?Nominal Voltage(?:\s*\(V\))?:\s*([\d.]+)')
+    f['plage_tension'] = cherche(r'Operating Voltage(?:\s*\(V\))?:?\s*([\d.]+\s*[~～-]\s*[\d.]+)\s*V?')
+    f['cycles'] = cherche(r'(?:over|≥)\s*(\d{4})\s*(?:charge\s*)?cycles') or cherche(r'EOL\s*≥\s*(\d{4})')
+    f['dod'] = cherche(r'Depth of Discharge:\s*(\d+)\s*%')
+    f['temperature'] = cherche(r'(?:Operating|Working) Temperature(?: Range)?(?:\s*\(°C\))?:?\s*(-?\d+\s*[~-]\s*-?\d+)\s*[°℃]') \
+        or cherche(r'from\s*(-\d+)\s*°C to\s*(\d+)\s*°C', 0)
+    f['dimensions'] = cherche(r'Dimensions?[^:\n]*?:?\s*(\d[\d.]*\s*[x×*]\s*\d[\d.]*\s*[x×*]\s*\d[\d.]*)\s*mm')
+    f['poids_kg'] = cherche(r'Weight[^0-9\n]{0,20}(\d+(?:\.\d+)?)\s*kg') or cherche(r'approximately\s*(\d+)\s*kg')
+    f['garantie'] = cherche(r'Warranty:\s*(\d+)\s*years?')
+    coms = [c for c, motif in [('Wi-Fi', r'wi-?fi'), ('Bluetooth', r'bluetooth'), ('4G', r'\b4G\b'), ('GPRS', r'gprs'), ('LAN', r'\bLAN\b'),
+                               ('CAN', r'\bCAN\b|CAN2\.0'), ('RS485', r'RS485'), ('RS232', r'RS232')] if re.search(motif, t, re.I)]
+    if coms:
+        f['communication'] = ', '.join(coms)
+    f['batteries_par_rack'] = cherche(r'install\s*(\d+)\s*pcs\s*batter', 1) or cherche(r'install\s*(\d+)\s*pcs\s*Batteries')
+    f['niveaux'] = cherche(r'(\d+)\s*Layers')
+    fonctions = []
+    for motif, texte in [
+        (r'diesel generator', 'stocke aussi l’énergie d’un groupe électrogène'),
+        (r'AC couple', 'couplage AC pour compléter une installation solaire existante'),
+        (r'6 time periods', '6 plages horaires programmables de charge et de décharge'),
+        (r'unbalanced output', 'sortie déséquilibrée à 100 % : chaque phase alimente ses propres appareils'),
+        (r'zero.?export', 'mode « zéro injection » vers le réseau'),
+        (r'4\s*ms', 'bascule réseau / secours en 4 ms'),
+        (r'touch LCD', 'écran tactile couleur'),
+        (r'active fuse', 'BMS intégré avec fusible actif'),
+        (r'200%\s*Peak', 'pointe de puissance jusqu’à 200 %'),
+        (r'transformer.{0,4}isolation', 'conception à isolation par transformateur'),
+        (r'remote(?:ly)? monitoring|Smart Monitoring', 'supervision à distance'),
+        (r'Anti-PID|PID Mitigation', 'fonction anti-PID pour préserver les panneaux'),
+        (r'wall.{0,20}floor|rack-mounted, wall-mounted', 'pose murale, au sol ou en rack'),
+    ]:
+        if re.search(motif, t, re.I):
+            fonctions.append(texte)
+    if fonctions:
+        f['fonctions'] = fonctions
+    return {k: v for k, v in f.items() if v not in (None, '', [])}
+
+
+def sous_type(nom: str) -> str:
+    for cle, motif in [('hybride', r'hybrid inverter'), ('hors-reseau', r'off-?grid inverter'), ('string', r'string inverter'),
+                       ('pcs', r'\bPCS\b'), ('mppt', r'mppt module'), ('sts', r'\bSTS\b'), ('rack', r'\brack\b'),
+                       ('controle', r'bms|control\s*box|controller|\bpdu\b'), ('pack', r'battery pack'), ('batterie', r'batter')]:
+        if re.search(motif, nom, re.I):
+            return cle
+    return ''
+
+
+def serie_de(nom: str) -> str:
+    m = re.search(r'\b(BOS-[A-Z](?:\s*PRO)?|GB-W|SE-[A-Z0-9.]+)', nom, re.I)
+    return m.group(1).upper().replace(' ', ' ') if m else ''
+
+
+def nom_francais(p: 'Produit') -> str:
+    f, st, modele = p.faits, sous_type(p.nom), p.modele
+    kw = f"{_n(f['puissance_kw'])} kW" if f.get('puissance_kw') else ''
+    ph = {1: 'monophasé', 3: 'triphasé'}.get(f.get('phases'), '')
+    kwh = f"{_n(f['capacite_kwh'])} kWh" if f.get('capacite_kwh') else ''
+    bat = f.get('batterie', '')
+    serie = serie_de(p.nom)
+    ref = f" ({modele})" if modele else ''
+    morceaux = {
+        'hybride': f"Onduleur hybride Deye {kw} {ph}, batterie {bat}{ref}",
+        'hors-reseau': f"Onduleur hors réseau Deye {kw} {ph}, batterie {bat}{ref}",
+        'string': f"Onduleur réseau (string) Deye {kw} triphasé{ref}",
+        'pcs': f"Module de conversion PCS Deye {kw} triphasé{ref}",
+        'mppt': f"Module MPPT Deye {kw}, {f.get('mppt', '')} entrées MPPT{ref}",
+        'sts': f"Commutateur de transfert statique (STS) Deye {kw} triphasé{ref}",
+        'rack': f"Rack standard{' ' + f['niveaux'] + ' niveaux' if f.get('niveaux') else ' 3U' if '3U' in p.nom.upper() else ''} pour batteries haute tension Deye{' ' + serie if serie else ''}",
+        'controle': f"Boîtier de contrôle BMS pour batteries haute tension Deye{' ' + serie if serie else ''}{ref}",
+        'pack': f"Module batterie haute tension Deye {kwh}{ref}",
+        'batterie': f"Batterie lithium LiFePO4 Deye {kwh}{', ' + bat if bat else ''}{ref}" + (' — version avec écran' if re.search(r'display', p.nom, re.I) else ''),
+    }
+    texte = morceaux.get(st) or nom_fr(p.nom)
+    texte = re.sub(r'\s+,', ',', re.sub(r'\s{2,}', ' ', texte)).replace(', batterie ' + '(', ' (').strip()
+    return INTERDITS.sub('', texte).replace(', batterie (', ' (').strip(' ,')
+
+
+def caracteristiques_fr(p: 'Produit') -> list[str]:
+    f = p.faits
+    lignes = [f"Modèle {p.modele}"] if p.modele else []
+    libelles = [
+        ('puissance_kw', 'Puissance {} kW'), ('sortie_kw', 'Puissance de sortie nominale {} kW'),
+        ('phases', None), ('batterie', 'Batterie {}'), ('mppt', '{} entrées MPPT'),
+        ('pv_max_kw', 'Puissance PV max {} kW'), ('surdimensionnement_pv', 'Surdimensionnement PV jusqu’à {}'),
+        ('tension_pv_nominale_v', 'Tension PV nominale {} V'), ('plage_mppt', 'Plage MPPT {} V'),
+        ('tension_pv_max_v', 'Tension PV max {} V'), ('tension_demarrage_v', 'Tension de démarrage {} V'),
+        ('tension_sortie', 'Tension de sortie {}'), ('rendement', 'Rendement max {} %'),
+        ('capacite_kwh', 'Capacité {} kWh'), ('energie_utile_kwh', 'Énergie utile {} kWh'), ('capacite_ah', 'Capacité {} Ah'),
+        ('tension_nominale_v', 'Tension nominale {} V'), ('plage_tension', 'Plage de tension {} V'),
+        ('courant_charge_a', 'Courant de charge / décharge {} A'), ('courant_decharge_continu_a', 'Courant de décharge continu {} A'),
+        ('cycles', 'Plus de {} cycles'), ('dod', 'Profondeur de décharge conseillée {} %'),
+        ('parallele', 'Jusqu’à {} {} en parallèle'), ('batteries_par_rack', 'Accueille {} batteries'),
+        ('ip', 'Indice de protection {}'), ('temperature', 'Température de fonctionnement {} °C'),
+        ('communication', 'Communication {}'), ('dimensions', 'Dimensions {} mm'), ('poids_kg', 'Poids {} kg'),
+        ('garantie', 'Garantie {} ans'),
+    ]
+    for cle, gabarit in libelles:
+        v = f.get(cle)
+        if v in (None, ''):
+            continue
+        if cle == 'phases':
+            lignes.append('Triphasé' if v == 3 else 'Monophasé')
+            continue
+        if cle == 'temperature' and not isinstance(v, str):
+            continue
+        if cle == 'parallele':
+            lignes.append(gabarit.format(v, 'batteries' if p.categorie == 'batteries' else 'appareils'))
+            continue
+        lignes.append(gabarit.format(_n(v) if cle not in ('dimensions', 'temperature', 'plage_mppt', 'plage_tension', 'communication', 'tension_sortie', 'ip', 'batterie', 'surdimensionnement_pv') else v))
+    return [INTERDITS.sub('', l).strip() for l in lignes if l.strip()]
+
+
+def description_francaise(p: 'Produit') -> str:
+    f, st = p.faits, sous_type(p.nom)
+    kw = f"{_n(f['puissance_kw'])} kW" if f.get('puissance_kw') else ''
+    phases = {1: 'monophasé', 3: 'triphasé'}.get(f.get('phases'), '')
+    phrases = []
+    if st in ('hybride', 'hors-reseau'):
+        phrases.append(f"Onduleur {'hybride' if st == 'hybride' else 'hors réseau'} Deye de {kw}{', ' + phases if phases else ''}, pour batterie {f.get('batterie', '')}.".replace('batterie .', 'batterie.'))
+        phrases.append('Il fait travailler ensemble panneaux solaires, batteries et ' + ('réseau électrique' if st == 'hybride' else 'groupe électrogène')
+                       + ' : l’énergie solaire est consommée en priorité, et le courant reste disponible pendant les coupures.')
+    elif st == 'string':
+        phrases.append(f"Onduleur réseau triphasé Deye de {kw}, pour les centrales solaires d’entreprises, d’usines et de bâtiments publics : il injecte la production des panneaux directement dans l’installation électrique, sans batterie.")
+    elif st == 'pcs':
+        phrases.append(f"Module de conversion de puissance (PCS) Deye de {kw}, cœur des systèmes de stockage haute tension : il charge et décharge les batteries Deye et alimente le site en triphasé.")
+    elif st == 'mppt':
+        phrases.append(f"Module MPPT Deye de {kw} : il convertit la production des panneaux solaires en courant de charge pour les batteries haute tension, avec {f.get('mppt', 'plusieurs')} entrées MPPT indépendantes.")
+    elif st == 'sts':
+        phrases.append(f"Commutateur de transfert statique Deye de {kw} : il bascule le site entre réseau, groupe et stockage sans coupure perceptible, pour les installations de forte puissance.")
+    elif st in ('pack', 'batterie'):
+        phrases.append(f"Batterie lithium Deye{' de ' + _n(f['capacite_kwh']) + ' kWh' if f.get('capacite_kwh') else ''}, technologie LiFePO4 (lithium fer phosphate)"
+                       f"{', ' + f['batterie'] if f.get('batterie') else ''}.")
+        phrases.append('Elle stocke l’énergie solaire de la journée pour la nuit et les coupures, avec une longue durée de vie et une recharge rapide.')
+    elif st == 'controle':
+        phrases.append('Boîtier de contrôle (BMS) Deye pour batteries haute tension : il surveille et protège chaque module, gère la charge et la décharge et dialogue avec l’onduleur.')
+    elif st == 'rack':
+        phrases.append('Rack standard Deye pour monter proprement les modules de batterie haute tension et leur boîtier de contrôle.')
+    else:
+        phrases.append(f"Équipement Deye : {p.nom_fr}.")
+    atouts = []
+    if f.get('mppt') and st in ('hybride', 'hors-reseau', 'string'):
+        atouts.append(f"{f['mppt']} entrées MPPT")
+    if f.get('rendement'):
+        atouts.append(f"rendement jusqu’à {_n(f['rendement'])} %")
+    if f.get('parallele'):
+        atouts.append(f"jusqu’à {f['parallele']} {'batteries' if st in ('pack', 'batterie') else 'appareils'} en parallèle")
+    if f.get('courant_charge_a'):
+        atouts.append(f"courant de charge / décharge jusqu’à {f['courant_charge_a']} A")
+    if f.get('cycles'):
+        atouts.append(f"plus de {_n(f['cycles'])} cycles")
+    if f.get('ip'):
+        atouts.append(f"protection {f['ip']}")
+    atouts += f.get('fonctions', [])[:4]
+    if atouts:
+        phrases.append('Points forts : ' + ' ; '.join(atouts) + '.')
+    phrases.append('Conseil, installation et service après-vente par BestaSolar au Bénin, au Togo et en Côte d’Ivoire.')
+    return INTERDITS.sub('', ' '.join(phrases)).replace('  ', ' ').strip()
+
+
+def modele_produit(nom: str, md: str) -> str:
+    """Modèle Deye : la référence entre parenthèses (« (SUN-8K-SG04LP3-EU) »),
+    sinon celle reconnue dans le nom ; les racks portent leur nombre de
+    niveaux, pour ne pas partager la référence de la batterie."""
+    parentheses = [x for x in re.findall(r'\(([A-Za-z0-9][A-Za-z0-9 .\-/]+)\)', nom) if '-' in x or re.search(r'\d', x) and len(x) > 3]
+    modele = re.sub(r'\s+', '', parentheses[-1]).upper() if parentheses else modele_de(nom, md)
+    if m := re.search(r'\b(SE-F\d+)\((\w)\)', nom, re.I):
+        modele = (m.group(1) + m.group(2)).upper()
+    if re.search(r'\brack\b', nom, re.I):
+        niveaux = re.search(r'(\d+)\s*Layers', nom, re.I)
+        modele = f"{modele + '-' if modele else ''}RACK{('-' + niveaux.group(1)) if niveaux else ''}" if not re.search(r'3U', nom, re.I) else 'HV-RACK-3U'
+    return modele.replace('/', '-')
+
+
+# --------------------------------------------------------------------------
 #  Extraction d'une fiche produit (HTML rendu)
 # --------------------------------------------------------------------------
 
@@ -235,6 +466,10 @@ class Produit:
     specs: dict = field(default_factory=dict)
     specs_normalisees: dict = field(default_factory=dict)
     images_source: list = field(default_factory=list)
+    fiches_techniques: list = field(default_factory=list)
+    reference_source: str = ''
+    faits: dict = field(default_factory=dict)
+    caracteristiques_fr: list = field(default_factory=list)
 
 
 def _jsonld_produits(soup) -> list[dict]:
@@ -434,19 +669,151 @@ def parcourir_categorie(page, url: str, delai: float, journal) -> list[str]:
     return vus
 
 
+# ---- Sites Next.js (données embarquées dans __NEXT_DATA__) ----------------
+# La page catégorie et chaque fiche y portent leurs données complètes : nom,
+# description, prix, stock, images. Plus fiable que l'affichage, et sans
+# navigateur. À défaut (autre site), le parcours générique ci-dessus sert.
+
+def _get(session, url: str, delai: float) -> str:
+    time.sleep(delai)
+    r = session.get(url, headers={'User-Agent': AGENT, 'Accept-Language': 'fr,en;q=0.8'}, timeout=60)
+    r.raise_for_status()
+    return r.text
+
+
+def donnees_next(html: str) -> dict | None:
+    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+    return json.loads(m.group(1)) if m else None
+
+
+def _avec_page(url: str, n: int) -> str:
+    u = urlparse(url)
+    q = dict(parse_qsl(u.query))
+    q['page'] = str(n)
+    return urlunparse(u._replace(query=urlencode(q)))
+
+
+RE_SPEC_LIGNE = re.compile(r'^\s*[-*•]\s*(?:\*\*)?([^:*|]{2,60}?)(?:\*\*)?\s*[:：]\s*(.+?)\s*$')
+
+
+def specs_markdown(md: str) -> dict:
+    """« - **Capacité** : 16 kWh » et tableaux « | clé | valeur | »."""
+    specs = {}
+    for ligne in (md or '').splitlines():
+        if m := RE_SPEC_LIGNE.match(ligne):
+            specs.setdefault(m.group(1).strip(), re.sub(r'\*\*', '', m.group(2)).strip())
+            continue
+        cellules = [c.strip(' *') for c in ligne.strip().strip('|').split('|')] if ligne.count('|') >= 2 else []
+        if len(cellules) == 2 and cellules[0] and cellules[1] and not set(cellules[0]) <= set('-: '):
+            specs.setdefault(cellules[0], cellules[1])
+    return specs
+
+
+def _url_image(img: dict) -> str | None:
+    base = (img or {}).get('base_url')
+    nom = (img or {}).get('origin') or (img or {}).get('webp_image')
+    return f"{base}/{nom}" if base and nom else None
+
+
+def produit_depuis_next(d: dict, url: str) -> Produit:
+    p = Produit(url=url)
+    p.nom = (d.get('name') or '').strip()
+    p.marque = d.get('brand_name') or (d.get('brand') or {}).get('name') or ''
+    branche = d.get('product_branch') or {}
+    prix = lire_prix(branche.get('price') or d.get('display_price'))
+    remise = lire_prix(branche.get('discounted_price') or d.get('display_discounted_price'))
+    if remise and prix and remise < prix:
+        p.prix_ngn, p.prix_barre_ngn = remise, prix
+    else:
+        p.prix_ngn = prix
+    qte = branche.get('quantity', d.get('display_quantity'))
+    p.disponibilite = '' if qte is None else ('en stock' if int(qte) > 0 else 'rupture')
+    p.description_source = d.get('description') or ''
+    p.specs = specs_markdown(p.description_source)
+    for img in (d.get('images') or ([d['image']] if d.get('image') else [])):
+        if (u := _url_image(img)):
+            p.images_source.append(u)
+    p.fiches_techniques = [u for f in (d.get('files') or []) if (u := _url_image(f.get('image') or {}) or f.get('url'))]
+    p.reference_source = branche.get('sku') or ''
+    p.modele = modele_produit(p.nom, p.description_source)
+    texte_specs = ' '.join(f'{k} {v}' for k, v in p.specs.items())
+    p.specs_normalisees = lire_specs_texte(f"{p.nom} {texte_specs}")
+    p.faits = faits_techniques(p.nom, p.description_source)
+    p.categorie = categorie_de(p.nom, p.specs)
+    p.nom_fr = nom_francais(p)
+    p.caracteristiques_fr = caracteristiques_fr(p)
+    p.description_fr = description_francaise(p)
+    p.prix_fcfa = ngn_vers_fcfa(p.prix_ngn)
+    p.prix_barre_fcfa = ngn_vers_fcfa(p.prix_barre_ngn)
+    return p
+
+
+def scrape_next(args, journal) -> tuple[list[Produit], list[str]] | None:
+    import requests
+    session = requests.Session()
+    html = _get(session, args.url, 0)
+    data = donnees_next(html)
+    page_data = (((data or {}).get('props') or {}).get('pageProps') or {}).get('data') or {}
+    if not isinstance(page_data.get('data'), list):
+        return None
+    marques = {b['id']: b['name'] for b in data['props'].get('initialCatalogState', {}).get('brands', [])}
+    base = f"{urlparse(args.url).scheme}://{urlparse(args.url).netloc}"
+    prefixe = '/'.join(urlparse(args.url).path.split('/')[:2])  # « /nigeria-fr »
+    liste, n, dernier = list(page_data['data']), 1, int(page_data.get('last_page') or 1)
+    journal(f"  page 1/{dernier} : {len(liste)} produit(s) (total annoncé {page_data.get('total')})")
+    while n < dernier:
+        n += 1
+        suite = (donnees_next(_get(session, _avec_page(args.url, n), args.delai)) or {})
+        lot = suite.get('props', {}).get('pageProps', {}).get('data', {}).get('data') or []
+        journal(f"  page {n}/{dernier} : {len(lot)} produit(s)")
+        liste += lot
+    produits, ecartes = [], []
+    cache = Path(args.out) / 'cache'
+    cache.mkdir(parents=True, exist_ok=True)
+    for i, resume in enumerate(liste, 1):
+        marque = marques.get(resume.get('brand_id'), '')
+        url = f"{base}{prefixe}/product/{resume['id']}"
+        if marque.lower() != 'deye' and not re.search(r'\bdeye\b', resume.get('name') or '', re.I):
+            ecartes.append(f"{resume.get('name')} — marque {marque or 'inconnue'}, pas Deye")
+            continue
+        try:
+            fiche = donnees_next(_get(session, url, args.delai))
+            d = fiche['props']['pageProps']['data']['data']
+            (cache / f"{resume['id']}.json").write_text(json.dumps(d, ensure_ascii=False), encoding='utf-8')
+        except Exception as e:
+            ecartes.append(f"{url} — fiche illisible : {e}")
+            continue
+        p = produit_depuis_next(d, url)
+        if not est_deye(p):
+            ecartes.append(f"{p.nom} — pas Deye")
+            continue
+        produits.append(p)
+        journal(f"  [{i}/{len(liste)}] {p.nom[:70]} — {p.prix_ngn or '?'} NGN → {format_fcfa(p.prix_fcfa)}")
+    return produits, ecartes
+
+
 def commande_scrape(args) -> None:
-    from playwright.sync_api import sync_playwright
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     journal = lambda m: print(m, flush=True)
     if not robots_autorise(args.url):
         raise SystemExit('robots.txt interdit le parcours de cette catégorie : arrêt.')
+    journal(f"Catégorie : {args.url}")
+    resultat = scrape_next(args, journal)
+    if resultat is None:
+        journal('Pas de données embarquées : parcours générique au navigateur.')
+        resultat = scrape_navigateur(args, journal)
+    ecrire_sorties(*resultat, out)
+
+
+def scrape_navigateur(args, journal) -> tuple[list[Produit], list[str]]:
+    from playwright.sync_api import sync_playwright
+    out = Path(args.out)
     produits: list[Produit] = []
     ecartes: list[str] = []
     with sync_playwright() as pw:
         navigateur = pw.chromium.launch(executable_path=os.environ.get('PLAYWRIGHT_CHROMIUM') or None, headless=True)
         page = navigateur.new_page(user_agent=AGENT)
-        journal(f"Catégorie : {args.url}")
         liens = parcourir_categorie(page, args.url, args.delai, journal)
         journal(f"{len(liens)} fiche(s) à ouvrir")
         for i, lien in enumerate(liens, 1):
@@ -467,26 +834,36 @@ def commande_scrape(args) -> None:
             produits.append(p)
             journal(f"  [{i}/{len(liens)}] {p.nom} — {p.prix_ngn or '?'} NGN → {format_fcfa(p.prix_fcfa)}")
         navigateur.close()
-    ecrire_sorties(produits, ecartes, out)
+    return produits, ecartes
 
 
 def ecrire_sorties(produits: list[Produit], ecartes: list[str], out: Path) -> None:
+    vus: dict = {}
     for p in produits:
-        p.sku = f"DEYE-{p.modele or slug(p.nom).upper()}"
-    (out / 'products.json').write_text(json.dumps([asdict(p) for p in produits], ensure_ascii=False, indent=2), encoding='utf-8')
+        base_sku = f"DEYE-{p.modele or slug(p.nom).upper()}"
+        vus[base_sku] = vus.get(base_sku, 0) + 1
+        p.sku = base_sku if vus[base_sku] == 1 else f"{base_sku}-{vus[base_sku]}"
+        if vus[base_sku] > 1:
+            ecartes.append(f"{p.nom} — SKU {base_sku} déjà pris : {p.sku} (à vérifier)")
+    # Le texte d'origine du site n'est pas repris (il reste dans le cache local,
+    # hors dépôt) : seuls les faits et nos textes français sortent.
+    sortie = [{k: v for k, v in asdict(p).items() if k not in ('description_source', 'specs', 'specs_normalisees')} for p in produits]
+    (out / 'products.json').write_text(json.dumps(sortie, ensure_ascii=False, indent=2), encoding='utf-8')
     colonnes = ['sku', 'nom_fr', 'modele', 'categorie', 'prix_ngn', 'prix_barre_ngn', 'prix_fcfa', 'prix_barre_fcfa',
-                'disponibilite', 'description_fr', 'specs', 'nb_images', 'images_source', 'url']
+                'disponibilite', 'description_fr', 'caracteristiques_fr', 'specs', 'nb_images', 'images_source', 'fiches_techniques', 'url']
     with open(out / 'products.csv', 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.DictWriter(f, fieldnames=colonnes, delimiter=';')
         w.writeheader()
         for p in produits:
             w.writerow({**{k: getattr(p, k) for k in colonnes if hasattr(p, k)},
-                        'specs': json.dumps(p.specs, ensure_ascii=False), 'nb_images': len(p.images_source),
-                        'images_source': ' '.join(p.images_source)})
+                        'specs': json.dumps(p.faits, ensure_ascii=False), 'nb_images': len(p.images_source),
+                        'caracteristiques_fr': ' · '.join(p.caracteristiques_fr),
+                        'images_source': ' '.join(p.images_source), 'fiches_techniques': ' '.join(p.fiches_techniques)})
     lignes = ['# Import Deye — dry-run', '', f"{len(produits)} produit(s) Deye retenu(s), {len(ecartes)} écarté(s).", '',
               '| Nom | Prix NGN | Prix FCFA | Prix barré FCFA | Images |', '|---|---:|---:|---:|---:|']
     for p in produits:
-        lignes.append(f"| {p.nom_fr} | {p.prix_ngn or '—'} | {format_fcfa(p.prix_fcfa) or '—'} | {format_fcfa(p.prix_barre_fcfa) or '—'} | {len(p.images_source)} |")
+        ngn = f"{p.prix_ngn:,}".replace(',', ' ') if p.prix_ngn else '—'
+        lignes.append(f"| {p.nom_fr} | {ngn} | {format_fcfa(p.prix_fcfa) or '—'} | {format_fcfa(p.prix_barre_fcfa) or '—'} | {len(p.images_source)} |")
     if ecartes:
         lignes += ['', '## Écartés', ''] + [f"- {e}" for e in ecartes]
     (out / 'rapport.md').write_text('\n'.join(lignes) + '\n', encoding='utf-8')

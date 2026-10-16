@@ -11,7 +11,7 @@ pull requests correspondantes sur GitHub.
   - Il rédige les descriptions en français à partir des caractéristiques et écrit `deye_import/products.csv`, `products.json` et `rapport.md`.
   - Il respecte le robots.txt du site.
   - Une seconde commande passe sur fond bleu BestaSolar, sans liseré, des photos que l'entreprise a le droit d'utiliser.
-  - Pas encore lancé sur le site source, inaccessible depuis l'environnement de travail.
+  - Premier dry-run (`deye_import/`) : 32 produits Deye retenus sur les 34 de la catégorie (2 supports Pylontech écartés), prix convertis, noms et descriptions en français, caractéristiques au format de la boutique. Rien n'est encore importé.
 - **Kits étendus : un onduleur n'est plus écarté pour un seul panneau.**
   - Sur un onduleur, deux chaînes d'une même entrée MPPT ont la même longueur. Certains nombres de panneaux ne se câblent donc pas alors que le suivant, oui. Exemple : un 80 kW à 6 entrées de 2 chaînes, avec 17 panneaux de 620 Wc au plus par chaîne, refuse 201 panneaux mais accepte 202.
   - Avant, l'app écartait cet onduleur : deux 50 kW en parallèle à la place, ou « Configuration impossible » s'il n'y avait pas d'autre modèle. Cela arrivait alors même que sa puissance PV max (126 kWc) suffisait pour les 124,6 kWc demandés.
