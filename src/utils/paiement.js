@@ -1,8 +1,9 @@
-import { DAY_MS } from './date';
+import { DAY_MS, jourLocal } from './date';
 import { formatNombre as nf } from './format';
+import { echeancierEnRetard, joursRetardEcheancier } from './echeancier';
 
 // Suivi des encaissements & relances — logique métier pure, sans React.
-// Le statut stocké d'une facture reste { brouillon | emise | payee } ; les états
+// Le statut stocké d'une facture reste { brouillon | emise | payee | annulee } ; les états
 // « partiel » et « en retard » sont DÉRIVÉS ici (montant encaissé + échéance),
 // jamais stockés — invariant sync non-destructive préservé.
 
@@ -46,17 +47,27 @@ export const paiementEntries = (f) => {
   return paye > 0 ? [{ date: f.createdAt, montant: paye }] : [];
 };
 
-/** Une facture est en retard si elle n'est pas soldée et l'échéance est dépassée. */
+const aUnEcheancier = (f) => Array.isArray(f?.echeancier) && f.echeancier.length > 0;
+
+/**
+ * Une facture est en retard si elle n'est pas soldée et que son échéance est
+ * dépassée — avec un échéancier, dès qu'UNE échéance datée l'est sans être
+ * couverte par les paiements.
+ */
 export const isEnRetard = (f, now = Date.now()) => {
-  if (!f || f.statut === 'brouillon' || f.statut === 'payee') return false;
+  if (!f || f.statut === 'brouillon' || f.statut === 'payee' || f.statut === 'annulee') return false;
   if (resteAPayer(f) <= 0) return false;
+  if (aUnEcheancier(f)) return echeancierEnRetard(f.echeancier, montantPaye(f), jourLocal(new Date(now)));
   const ech = f.echeance ? new Date(f.echeance).getTime() : null;
   return ech != null && ech < now;
 };
 
 /** Nombre de jours de retard (0 si la facture n'est pas en retard). */
-export const joursRetard = (f, now = Date.now()) =>
-  isEnRetard(f, now) ? Math.floor((now - new Date(f.echeance).getTime()) / DAY_MS) : 0;
+export const joursRetard = (f, now = Date.now()) => {
+  if (!isEnRetard(f, now)) return 0;
+  if (aUnEcheancier(f)) return joursRetardEcheancier(f.echeancier, montantPaye(f), jourLocal(new Date(now)));
+  return Math.floor((now - new Date(f.echeance).getTime()) / DAY_MS);
+};
 
 /** Jours restants avant échéance (négatif si dépassé, null si pas d'échéance). */
 export const joursAvantEcheance = (f, now = Date.now()) =>
@@ -69,6 +80,7 @@ export const joursAvantEcheance = (f, now = Date.now()) =>
 export const statutEffectif = (f, now = Date.now()) => {
   if (!f) return 'emise';
   if (f.statut === 'brouillon') return 'brouillon';
+  if (f.statut === 'annulee') return 'annulee';
   if (f.statut === 'payee' || resteAPayer(f) <= 0) return 'payee';
   if (isEnRetard(f, now)) return 'retard';
   if (montantPaye(f) > 0) return 'partiel';
@@ -76,11 +88,11 @@ export const statutEffectif = (f, now = Date.now()) => {
 };
 
 export const STATUT_EFFECTIF_LABEL = {
-  brouillon: 'Brouillon', emise: 'Émise', partiel: 'Partiel', payee: 'Payée', retard: 'En retard',
+  brouillon: 'Brouillon', emise: 'Émise', partiel: 'Partiel', payee: 'Payée', retard: 'En retard', annulee: 'Annulée',
 };
 // Classe de couleur pour .flat-badge et .badge (suffixe partagé).
 export const STATUT_EFFECTIF_BADGE = {
-  payee: 'success', partiel: 'info', emise: 'warning', retard: 'danger', brouillon: 'muted',
+  payee: 'success', partiel: 'info', emise: 'warning', retard: 'danger', brouillon: 'muted', annulee: 'muted',
 };
 
 

@@ -5,6 +5,14 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-10-21
+- **Facturation, étape 1 : montant en lettres et échéancier de paiement (calculs seuls, sans écran pour l'instant).**
+  - Tout montant s'écrit en toutes lettres pour la mention « Arrêtée la présente facture… », selon les règles comptables : « soixante et onze », « quatre-vingts » mais « quatre-vingt mille », « deux cents » mais « deux cent un ». Exemple : « SOIXANTE-SIX MILLIONS HUIT CENT SOIXANTE-SEIZE MILLE (66 876 000) FRANCS CFA ».
+  - Échéancier : chaque échéance est payable à une date, sur une période (« Du 12 au 16/10/2026 ») ou à une étape (« À la réception / mise en service »). Les paiements les couvrent dans l'ordre. Statuts calculés : reçu, partiel, attendu (dans les 7 jours), en retard, à venir. L'émetteur peut forcer un statut à la main.
+  - Modèles prêts à l'emploi : comptant, acompte / solde, 3 tranches, personnalisé. Les tranches sont arrondies au millier et la dernière prend l'appoint, pour que la somme tombe toujours juste.
+  - Contrôles : écart entre l'échéancier et le total, trop-perçu signalé avant d'être accepté.
+  - Une facture à échéancier passe « en retard » dès qu'une échéance datée est dépassée sans être payée. Nouveau statut « Annulée ».
+
 ## 2026-10-16
 - **Photos officielles Deye pour 14 produits importés, sur le fond bleu BestaSolar.**
   - Prises sur les sites du fabricant (deye.com, deyeinverter.com), jamais chez un revendeur. Chaque source est notée dans `deye_import/photos-sources.json`.
