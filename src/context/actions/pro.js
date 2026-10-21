@@ -5,7 +5,24 @@ import { abonnementApresPaiement } from '../../utils/verificationPaiement';
 import { formule, FORMULE_DEFAUT } from '../../utils/subscription';
 import { abonnementApresCode, normaliserCode, joursDuCode } from '../../utils/codePromo';
 import { prochainNumeroFacture } from '../../utils/facture';
+import { joindrePaiements, nouveauPaiement, champsApresPaiement } from '../../utils/facturePaiements';
 import { appendClientSource, buildClientSource, canSyncClientContact, isSameClient, sourceHistoryFor } from '../../utils/clientContact';
+
+// Recalcule montant encaissé et statut de la facture `factureId` d'après ses
+// paiements ; `extra` ajoute des champs dépendant de la facture.
+function apresPaiements(factures = [], facturePaiements = [], factureId, extra = () => ({})) {
+  return factures.map((f) => {
+    if (f.id !== factureId) return f;
+    const [jointe] = joindrePaiements([f], facturePaiements);
+    const base = { ...f, ...extra(f) };
+    return { ...base, ...champsApresPaiement({ ...base, paiements: jointe.paiements || [] }) };
+  });
+}
+
+// Retire un ancien paiement de la liste rangée dans la facture.
+const retirerAncien = (factures = [], factureId, paiementId) => factures.map((f) => (f.id === factureId && (f.paiements || []).some((p) => p.id === paiementId)
+  ? { ...f, paiements: f.paiements.filter((p) => p.id !== paiementId) }
+  : f));
 
 export function createProActions(setState) {
   return {
@@ -238,31 +255,79 @@ export function createProActions(setState) {
         }),
       })),
 
-    // Encaissement (total ou partiel) : ajoute au détail, recalcule le solde et
-    // solde la facture dès que le total TTC est atteint.
-    addPaiement: (factureId, paiement) =>
+    // ---- Paiements d'une facture : une fiche par paiement ----
+    // (collection `facturePaiements`, voir utils/facturePaiements.js). Après
+    // chaque changement, la facture tient à jour son montant encaissé et son
+    // statut « payee » — calculés sur ses paiements, jamais saisis.
+    // Rend l'identifiant du paiement, tiré AVANT la mise à jour : React peut
+    // exécuter celle-ci plus tard, une valeur posée dedans arriverait trop tard.
+    addPaiement: (factureId, paiement) => {
+      const id = crypto.randomUUID();
+      setState((s) => {
+        const facture = (s.factures || []).find((f) => f.id === factureId);
+        if (!facture) return s;
+        const cree = { ...nouveauPaiement(facture, paiement), id };
+        const facturePaiements = [cree, ...(s.facturePaiements || [])];
+        return {
+          ...s,
+          facturePaiements,
+          factures: apresPaiements(s.factures, facturePaiements, factureId, (f) => ({
+            // Encaisser un brouillon l'émet ; l'échéance unique est fixée s'il n'y en a pas.
+            statut: f.statut === 'brouillon' ? 'emise' : f.statut,
+            echeance: f.echeance || defaultEcheance(f.createdAt),
+          })),
+        };
+      });
+      return id;
+    },
+
+    // Correction d'un paiement (montant, date, mode, référence, note). Un
+    // ancien paiement encore rangé dans la facture rejoint la collection.
+    updatePaiement: (paiementId, patch) =>
+      setState((s) => {
+        const liste = s.facturePaiements || [];
+        let paiement = liste.find((p) => p.id === paiementId);
+        let factures = s.factures || [];
+        if (!paiement) {
+          const [f] = joindrePaiements(factures.filter((x) => (x.paiements || []).some((p) => p.id === paiementId)), liste);
+          const ancien = f?.paiements.find((p) => p.id === paiementId);
+          if (!ancien) return s;
+          paiement = { ...ancien, factureId: f.id, userId: f.userId };
+          factures = retirerAncien(factures, f.id, paiementId);
+        }
+        const maj = {
+          ...paiement,
+          ...patch,
+          montant: Math.max(0, Math.round(Number(patch.montant ?? paiement.montant) || 0)),
+          majLe: new Date().toISOString(),
+        };
+        const facturePaiements = [maj, ...liste.filter((p) => p.id !== paiementId)];
+        return { ...s, facturePaiements, factures: apresPaiements(factures, facturePaiements, maj.factureId) };
+      }),
+
+    // Suppression d'un paiement : retiré de la collection (la réplication
+    // pose le tombstone) ET de la facture s'il y était encore rangé — sans
+    // quoi la recopie suivante le ferait revenir.
+    deletePaiement: (paiementId) =>
+      setState((s) => {
+        const liste = s.facturePaiements || [];
+        const dansListe = liste.find((p) => p.id === paiementId);
+        const facture = (s.factures || []).find((f) => f.id === dansListe?.factureId
+          || (f.paiements || []).some((p) => p.id === paiementId));
+        if (!facture) return s;
+        const facturePaiements = liste.filter((p) => p.id !== paiementId);
+        const factures = retirerAncien(s.factures, facture.id, paiementId);
+        return { ...s, facturePaiements, factures: apresPaiements(factures, facturePaiements, facture.id) };
+      }),
+
+    // Échéancier de la facture (seul l'émetteur le modifie) : la date de
+    // modification alimente la « Mise à jour » imprimée sur la facture.
+    setEcheancier: (factureId, echeancier) =>
       setState((s) => ({
         ...s,
-        factures: (s.factures || []).map((f) => {
-          if (f.id !== factureId) return f;
-          const entry = {
-            id: crypto.randomUUID(),
-            montant: Math.max(0, Number(paiement.montant) || 0),
-            mode: paiement.mode || 'momo',
-            note: (paiement.note || '').trim(),
-            date: new Date().toISOString(),
-          };
-          const paiements = [...(f.paiements || []), entry];
-          const paye = paiements.reduce((sum, p) => sum + (Number(p.montant) || 0), 0);
-          const solde = paye >= (Number(f.totalTTC) || 0);
-          return {
-            ...f,
-            paiements,
-            montantPaye: paye,
-            statut: solde ? 'payee' : f.statut === 'brouillon' ? 'emise' : f.statut,
-            echeance: f.echeance || defaultEcheance(f.createdAt),
-          };
-        }),
+        factures: (s.factures || []).map((f) => (f.id === factureId
+          ? { ...f, echeancier, echeancierMajLe: new Date().toISOString() }
+          : f)),
       })),
 
     // Trace une relance client (WhatsApp/SMS) pour l'historique et l'affichage.
@@ -276,10 +341,12 @@ export function createProActions(setState) {
         }),
       })),
 
+    // Ses paiements partent avec elle (chacun reçoit son tombstone).
     deleteFacture: (factureId) =>
       setState((s) => ({
         ...s,
         factures: (s.factures || []).filter((f) => f.id !== factureId),
+        facturePaiements: (s.facturePaiements || []).filter((p) => p.factureId !== factureId),
       })),
 
     // ---- Clients Pro (carnet propre à chaque technicien abonné) ----

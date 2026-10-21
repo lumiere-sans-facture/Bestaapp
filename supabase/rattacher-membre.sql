@@ -60,7 +60,7 @@ declare
   -- Tout ce qui existe dans l'ancienne entreprise : sert à l'INVENTAIRE.
   tables_metier text[] := array[
     'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders',
-    'formationProgress', 'factures', 'proClients', 'payoutRequests',
+    'formationProgress', 'factures', 'facturePaiements', 'proClients', 'payoutRequests',
     'kits', 'inverters', 'pompeKits', 'products', 'formations',
     'companies', 'subscriptions', 'subscriptionPayments'
   ];
@@ -71,7 +71,7 @@ declare
   -- abonnement qu'il n'a jamais souscrit.
   tables_personnelles text[] := array[
     'leads', 'partners', 'commissions', 'devis', 'referrals', 'orders',
-    'formationProgress', 'factures', 'proClients', 'payoutRequests'
+    'formationProgress', 'factures', 'facturePaiements', 'proClients', 'payoutRequests'
   ];
 begin
   select org_id into org_cible from public.profiles where lower(email) = lower(email_gerant);

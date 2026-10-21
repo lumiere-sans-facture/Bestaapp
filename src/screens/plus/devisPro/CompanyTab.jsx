@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Building2, Check, Camera, Palette, CreditCard, FileText, Eye, Globe } from 'lucide-react';
+import { Building2, Check, Camera, Palette, CreditCard, FileText, Eye, Globe, PenLine, Trash2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { logoDepuisFichier } from '../../../utils/image';
@@ -10,6 +10,7 @@ import ApercuDocument from '../../../components/ApercuDocument';
 import ChampCouleur from '../../../components/ChampCouleur';
 import { MODELES, EMPTY_COMPANY, normalizeModele } from './constants';
 import { PAYS, paysDeLEntreprise, paysDuTelephone, tvaPct, libelleDevise, indicationTva } from '../../../data/pays';
+import { modesPaiementProposes, modesPaiementAffiches, MENTIONS_FISCALES } from '../../../utils/facture';
 
 // Facture d'exemple pour l'aperçu PDF.
 const SAMPLE_LIGNES = [
@@ -31,6 +32,7 @@ export default function CompanyTab({ company }) {
   // Aperçu du modèle, dans l'application (avec retour), jamais dans un onglet.
   const [apercu, setApercu] = useState(null);
   const logoInputRef = useRef(null);
+  const cachetInputRef = useRef(null);
 
   const f = companyForm || { ...EMPTY_COMPANY, ...company };
   const set = (patch) => setCompanyForm({ ...f, ...patch });
@@ -65,6 +67,22 @@ export default function CompanyTab({ company }) {
     } catch { toast('Impossible de lire cette image.', { type: 'error' }); }
     e.target.value = '';
   };
+
+  // Signature et cachet : une image (scan ou photo), rognée de ses marges et
+  // gardée transparente comme le logo, posée dans le bloc du signataire.
+  const handleCachet = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try { set({ cachet: await logoDepuisFichier(file) }); } catch { toast('Impossible de lire cette image.', { type: 'error' }); }
+    e.target.value = '';
+  };
+  const modesProposes = modesPaiementProposes(pays);
+  const modesCoches = modesPaiementAffiches(f, pays);
+  const basculerMode = (mode) => set({
+    modesPaiement: modesCoches.includes(mode) ? modesCoches.filter((m) => m !== mode) : [...modesCoches, mode],
+  });
+  const mentions = MENTIONS_FISCALES(pays);
+  const mentionPreset = mentions.find((m) => m.texte === (f.mentionFiscale || ''))?.id || 'perso';
 
   // Logo enregistré avant le rognage automatique : recadré une fois, à
   // l'ouverture de l'écran (marges vides retirées, transparence gardée), et
@@ -195,6 +213,10 @@ export default function CompanyTab({ company }) {
             <div className="field-hint">Registre du commerce (OHADA)</div>
           </Field>
         </div>
+        <Field label="CNSS (optionnel)">
+          <input className="input" value={f.cnss || ''} onChange={(e) => set({ cnss: e.target.value })} placeholder="N° d’employeur à la caisse de sécurité sociale" />
+          <div className="field-hint">Affiché sur les factures, à côté de l’identifiant fiscal et du RCCM.</div>
+        </Field>
       </div>
 
       {/* Apparence */}
@@ -248,6 +270,60 @@ export default function CompanyTab({ company }) {
         <Field label="Mentions / conditions (bas de document)">
           <textarea className="input" rows="2" value={f.conditions} onChange={(e) => set({ conditions: e.target.value })} placeholder="Ex : Devis valable 30 jours. Acompte de 50 % à la commande…" />
         </Field>
+        <Field label="Mention fiscale (sous les totaux de la facture)">
+          <select className="input" value={mentionPreset}
+            onChange={(e) => { const m = mentions.find((x) => x.id === e.target.value); set({ mentionFiscale: m ? m.texte : (f.mentionFiscale || ' ') }); }}>
+            {mentions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            <option value="perso">Personnalisée…</option>
+          </select>
+          {mentionPreset === 'perso' && (
+            <input className="input" style={{ marginTop: 8 }} value={(f.mentionFiscale || '').trim()} placeholder="Votre mention"
+              onChange={(e) => set({ mentionFiscale: e.target.value })} />
+          )}
+        </Field>
+        <div className="form-row-2">
+          <Field label="Banque (virement)">
+            <input className="input" value={f.banque || ''} onChange={(e) => set({ banque: e.target.value })} placeholder="Ex : Ecobank" />
+          </Field>
+          <Field label="N° de compte / RIB">
+            <input className="input" value={f.compteBancaire || ''} onChange={(e) => set({ compteBancaire: e.target.value })} />
+          </Field>
+        </div>
+        <div className="input-group">
+          <span className="input-label" id="company-modes-label">Modes de paiement affichés sur la facture</span>
+          <div role="group" aria-labelledby="company-modes-label">
+            {modesProposes.map((mode) => (
+              <label key={mode} className="checkbox-row">
+                <input type="checkbox" checked={modesCoches.includes(mode)} onChange={() => basculerMode(mode)} />
+                <span>{mode}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="sheet-section-title"><PenLine size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Signataire des factures</div>
+        <div className="form-row-2">
+          <Field label="Titre">
+            <input className="input" value={f.signataireTitre || ''} onChange={(e) => set({ signataireTitre: e.target.value })} placeholder="Le Directeur Général" />
+          </Field>
+          <Field label="Nom">
+            <input className="input" value={f.signataireNom || ''} onChange={(e) => set({ signataireNom: e.target.value })} placeholder="Prénom Nom" />
+          </Field>
+        </div>
+        <div className="photo-field">
+          <button type="button" className="photo-preview cachet-preview" onClick={() => cachetInputRef.current?.click()}>
+            {f.cachet ? <img src={f.cachet} alt="Signature et cachet" /> : <span className="photo-placeholder"><PenLine size={22} /><span>Signature et cachet</span></span>}
+          </button>
+          <input ref={cachetInputRef} type="file" accept="image/*" onChange={handleCachet} hidden aria-label="Image de la signature et du cachet" />
+          <div className="photo-field-actions">
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => cachetInputRef.current?.click()}>
+              <Camera size={15} /> {f.cachet ? 'Changer l’image' : 'Ajouter une image'}
+            </button>
+            {f.cachet && (
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => set({ cachet: '' })}><Trash2 size={15} /> Retirer</button>
+            )}
+          </div>
+          <div className="field-hint">Scan ou photo de la signature et du cachet, sur fond blanc. Facultatif : sans image, la facture garde une zone à signer.</div>
+        </div>
         <div className="input-group" style={{ marginBottom: 0 }}>
           <span className="input-label" id="company-tva-label">TVA sur les nouveaux documents</span>
           <div className="segmented" role="group" aria-labelledby="company-tva-label">

@@ -10,6 +10,7 @@ import { useRemoteSync } from './useRemoteSync';
 import { contactsGoogleAEnvoyer, issueSyncGoogle, prochaineRepriseGoogle } from '../utils/contactsGoogle';
 import { useReseau } from './useReseau';
 import { produitsPublies } from '../utils/publication';
+import { joindrePaiements } from '../utils/facturePaiements';
 
 // Équipe du mode local : les utilisateurs du seed, SANS leurs mots de passe
 // (le contexte est lisible depuis tous les écrans).
@@ -283,9 +284,15 @@ export function DataProvider({ children }) {
   // dimensionnement, kits et panier ignorent ainsi les brouillons sans le
   // savoir. La boutique lit `catalogueComplet` pour les montrer au gérant.
   const produitsVisibles = useMemo(() => produitsPublies(state.products), [state.products]);
+  // Factures : chacune porte ses paiements (`paiements`), lus dans leur
+  // collection — les écrans n'ont pas à savoir où ils sont rangés.
+  const facturesJointes = useMemo(
+    () => joindrePaiements(state.factures || [], state.facturePaiements || []),
+    [state.factures, state.facturePaiements],
+  );
 
   return (
-    <DataContext.Provider value={{ ...state, products: produitsVisibles, catalogueComplet: state.products, ...actions, ...helpers, ...reseau, ...clientActions, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
+    <DataContext.Provider value={{ ...state, products: produitsVisibles, catalogueComplet: state.products, factures: facturesJointes, ...actions, ...helpers, ...reseau, ...clientActions, syncStatus, syncError, enAttente, synchroniserMaintenant, stages: seed.stages, lostStage: seed.LOST_STAGE, productCategories: seed.productCategories, monthlyData: seed.monthlyData, team, teamChargee, storageError }}>
       {children}
     </DataContext.Provider>
   );

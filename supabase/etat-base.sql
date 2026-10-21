@@ -39,6 +39,7 @@ with attendues(table_name, script) as (
     ('companies',          '3 · multitenant.sql'),
     ('subscriptions',      '3 · multitenant.sql'),
     ('factures',           '3 · multitenant.sql'),
+    ('facturePaiements',   'migrations/20261021_facture_paiements.sql — acomptes et paiements des factures'),
     ('paiementConfigs',    '4 · paiements.sql'),
     ('paiements_verifies', '4 · paiements.sql — verrou anti-rejeu des paiements'),
     ('erreurs',            '5 · erreurs.sql — journal des plantages'),

@@ -9,6 +9,7 @@ import { completerElectrique } from '../utils/inverters';
 import { POMPE_KITS } from '../data/pompeKits';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { generatePartnerCode, normaliseCode } from '../utils/referral';
+import { paiementsARecopier } from '../utils/facturePaiements';
 
 export const STORAGE_KEY = 'bestasolar_data';
 
@@ -75,6 +76,8 @@ export const buildInitialState = () => ({
   // seulement — les secrets vivent en variables d'environnement serveur).
   paiementConfigs: [],
   factures: [],
+  // Paiements des factures Pro : une fiche par paiement (utils/facturePaiements.js).
+  facturePaiements: [],
   proClients: [],
   // Demandes de paiement des commissions : vide au départ, alimentée par
   // les partenaires eux-mêmes.
@@ -141,6 +144,12 @@ export const loadState = (scope = null) => {
       // Migration « Kits pompage » : même principe, dotation une seule fois.
       if (!Array.isArray(saved.pompeKits)) saved.pompeKits = POMPE_KITS;
       if (!saved.payoutRequests) saved.payoutRequests = [];
+      // Paiements des factures : une fiche par paiement. Ceux encore rangés
+      // DANS une facture (versions précédentes) sont recopiés une fois, avec
+      // leur identifiant — la facture n'est pas modifiée.
+      if (!Array.isArray(saved.facturePaiements)) saved.facturePaiements = [];
+      const aRecopier = paiementsARecopier(saved.factures || [], saved.facturePaiements);
+      if (aRecopier.length) saved.facturePaiements = [...aRecopier, ...saved.facturePaiements];
       if (!Array.isArray(saved.codesPromo)) saved.codesPromo = [];
       if (!saved.formations) saved.formations = isSupabaseConfigured ? [] : seed.formations;
       if (!saved.formationProgress) saved.formationProgress = [];

@@ -27,7 +27,7 @@ export const SAUVEGARDES_GARDEES = 7;
 export const TABLES_METIER = [
   'products', 'kits', 'inverters', 'pompeKits', 'leads', 'partners', 'commissions',
   'devis', 'referrals', 'orders', 'formations', 'formationProgress', 'subscriptions',
-  'subscriptionPayments', 'companies', 'paiementConfigs', 'factures', 'proClients',
+  'subscriptionPayments', 'companies', 'paiementConfigs', 'factures', 'facturePaiements', 'proClients',
   'payoutRequests',
 ];
 

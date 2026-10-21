@@ -4,21 +4,26 @@ import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA } from '../../../utils/format';
 import { computeFactureTotals } from '../../../utils/facture';
-import { DAY_MS } from '../../../utils/date';
+import { DAY_MS, jourLocal } from '../../../utils/date';
+import { ecartEcheancier } from '../../../utils/echeancier';
+import { montantPaye } from '../../../utils/paiement';
 import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
 import LigneEditor from '../../../components/LigneEditor';
+import EcheancierEditor from './EcheancierEditor';
 import TvaToggle from '../../../components/TvaToggle';
 import { MODELES, EMPTY_LIGNE, normalizeModele } from './constants';
 import { paysDeLEntreprise, indicationTva } from '../../../data/pays';
 
 const emptyForm = (tvaActive, modele) => ({
-  clientName: '', clientPhone: '', clientVille: '', echeance: '',
-  tvaActive, modele, lignes: [{ ...EMPTY_LIGNE }],
+  clientName: '', clientPhone: '', clientVille: '', clientIfu: '', objet: '', echeance: '',
+  tvaActive, modele, lignes: [{ ...EMPTY_LIGNE }], echeancier: [],
 });
 const formFromFacture = (f, modeleDefaut) => ({
   clientName: f.clientName || '', clientPhone: f.clientPhone || '', clientVille: f.clientVille || '',
+  clientIfu: f.clientIfu || '', objet: f.objet || '',
   echeance: f.echeance ? f.echeance.slice(0, 10) : '',
+  echeancier: Array.isArray(f.echeancier) ? f.echeancier : [],
   // Une facture réglée sur un modèle retiré (« classique » → Sobre) s'ouvre
   // sur son remplaçant : sinon le menu, sans option correspondante, afficherait Studio.
   tvaActive: !!f.tvaActive, modele: f.modele ? normalizeModele(f.modele) : modeleDefaut,
@@ -42,6 +47,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
   const [form, setForm] = useState(() => emptyForm(defaultTvaActive, modeleDefaut));
   const [clientMode, setClientMode] = useState('existing'); // existing | new (création seulement)
   const [clientId, setClientId] = useState('');
+  const [erreur, setErreur] = useState('');
 
   // Réinitialise / pré-remplit le formulaire à chaque ouverture.
   useEffect(() => {
@@ -49,6 +55,7 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
     setForm(initial ? formFromFacture(initial, modeleDefaut) : emptyForm(defaultTvaActive, modeleDefaut));
     setClientMode(myClients.length ? 'existing' : 'new');
     setClientId(myClients[0]?.id || '');
+    setErreur('');
     // myClients volontairement hors dépendances : ne réinitialiser qu'à l'ouverture.
   }, [open, initial, defaultTvaActive, modeleDefaut]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -60,6 +67,15 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
       .filter((l) => l.designation.trim() && Number(l.pu) > 0)
       .map((l) => ({ designation: l.designation.trim(), qty: Math.max(1, Number(l.qty) || 1), pu: Number(l.pu) }));
     if (!lignes.length) return;
+    // Un échéancier qui n'égale pas le total ne part pas chez le client : le
+    // brouillon, lui, peut rester incomplet.
+    const totauxFinaux = computeFactureTotals(lignes, form.tvaActive, pays.tva);
+    const ecart = ecartEcheancier(form.echeancier, totauxFinaux.totalTTC);
+    if (statut !== 'brouillon' && form.echeancier.length && ecart !== 0) {
+      setErreur(`L’échéancier ne correspond pas au total : ${ecart > 0 ? `il manque ${formatCFA(ecart)}` : `${formatCFA(-ecart)} de trop`}.`);
+      return;
+    }
+    setErreur('');
 
     // Client : carnet existant, nouveau (ajouté au carnet), ou champs de la facture éditée.
     let client = { id: initial?.clientId, name: form.clientName.trim(), phone: form.clientPhone.trim(), ville: form.clientVille.trim() };
@@ -75,12 +91,17 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
       }
     }
 
-    const totals = computeFactureTotals(lignes, form.tvaActive, pays.tva);
+    const totals = totauxFinaux;
+    const echeancierModifie = JSON.stringify(form.echeancier) !== JSON.stringify(initial?.echeancier || []);
     onSubmit({
       clientId: client.id,
       clientName: client.name,
       clientPhone: client.phone,
       clientVille: client.ville,
+      clientIfu: form.clientIfu.trim(),
+      objet: form.objet.trim(),
+      echeancier: form.echeancier,
+      ...(echeancierModifie && initial ? { echeancierMajLe: new Date().toISOString() } : {}),
       echeance: form.echeance ? new Date(form.echeance).toISOString() : undefined,
       lignes,
       ...totals,
@@ -152,22 +173,37 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
           </>
         )}
 
-        <Field label="Échéance de paiement">
-          <input className="input" type="date" value={form.echeance}
-            onChange={(e) => setForm({ ...form, echeance: e.target.value })} />
+        <Field label={`${pays.fiscal?.sigle || 'NIF'} du client (facultatif)`}>
+          <input className="input" value={form.clientIfu} placeholder={pays.fiscal?.exemple || ''}
+            onChange={(e) => setForm({ ...form, clientIfu: e.target.value })} />
         </Field>
-        {/* Raccourcis d'échéance : les deux cas courants sans clavier. */}
-        <div className="pay-quick">
-          <button type="button" className="btn btn-sm btn-outline"
-            onClick={() => setForm({ ...form, echeance: new Date(Date.now() + 30 * DAY_MS).toISOString().slice(0, 10) })}>
-            30 jours
-          </button>
-          <button type="button" className="btn btn-sm btn-outline"
-            onClick={() => setForm({ ...form, echeance: new Date().toISOString().slice(0, 10) })}>
-            À réception
-          </button>
-        </div>
-        <div className="field-hint">Laisser vide pour appliquer le délai par défaut (30 jours).</div>
+        <Field label="Objet (facultatif)">
+          <textarea className="input" rows={3} value={form.objet}
+            placeholder="Ex. Fourniture et installation d’une centrale solaire hybride…"
+            onChange={(e) => setForm({ ...form, objet: e.target.value })} />
+        </Field>
+
+        {/* Sans échéancier : une seule échéance, la date de paiement de la facture. */}
+        {!form.echeancier.length && (
+          <>
+            <Field label="Échéance de paiement">
+              <input className="input" type="date" value={form.echeance}
+                onChange={(e) => setForm({ ...form, echeance: e.target.value })} />
+            </Field>
+            {/* Raccourcis d'échéance : les deux cas courants sans clavier. */}
+            <div className="pay-quick">
+              <button type="button" className="btn btn-sm btn-outline"
+                onClick={() => setForm({ ...form, echeance: new Date(Date.now() + 30 * DAY_MS).toISOString().slice(0, 10) })}>
+                30 jours
+              </button>
+              <button type="button" className="btn btn-sm btn-outline"
+                onClick={() => setForm({ ...form, echeance: new Date().toISOString().slice(0, 10) })}>
+                À réception
+              </button>
+            </div>
+            <div className="field-hint">Laisser vide pour appliquer le délai par défaut (30 jours).</div>
+          </>
+        )}
 
         <div className="sheet-section-title">Lignes de la facture *</div>
         <LigneEditor
@@ -190,6 +226,16 @@ export default function FactureSheet({ open, onClose, defaultTvaActive, modeleDe
           <div className="devis-summary-row"><span>TVA</span><span>{form.tvaActive ? formatCFA(preview.tva) : 'Exonérée'}</span></div>
           <div className="devis-summary-row total"><span>Total TTC</span><span>{formatCFA(preview.totalTTC)}</span></div>
         </div>
+
+        <div className="sheet-section-title">Échéancier de paiement (facultatif)</div>
+        <EcheancierEditor
+          echeancier={form.echeancier}
+          onChange={(echeancier) => { setForm((f) => ({ ...f, echeancier })); setErreur(''); }}
+          total={preview.totalTTC}
+          emission={initial?.createdAt ? jourLocal(new Date(initial.createdAt)) : jourLocal()}
+          paye={initial ? montantPaye(initial) : 0}
+        />
+        {erreur && <div className="field-error" role="alert">{erreur}</div>}
       </form>
     </Sheet>
   );

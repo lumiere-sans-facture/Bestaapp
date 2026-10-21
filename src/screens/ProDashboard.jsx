@@ -7,7 +7,7 @@ import { computeMonthlyRevenue } from '../utils/stats';
 import { isSameMonth } from '../utils/date';
 import { SEV_LABEL, buildAlertFeedPro } from '../utils/alerts';
 import {
-  paiementEntries, resteAPayer, montantPaye, isEnRetard,
+  paiementEntries, resteAPayer, montantPaye, isEnRetard, estActive, estImpayee,
   statutEffectif, STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE,
 } from '../utils/paiement';
 import PageHeader from '../components/PageHeader';
@@ -41,7 +41,7 @@ export default function ProDashboard() {
   // ---- Comptages par statut effectif (paiements + échéance) ----
   const brouillons = myFactures.filter((f) => f.statut === 'brouillon');
   const payees = myFactures.filter((f) => statutEffectif(f) === 'payee');
-  const impayees = myFactures.filter((f) => f.statut !== 'brouillon' && resteAPayer(f) > 0);
+  const impayees = myFactures.filter(estImpayee);
   const retards = impayees.filter((f) => isEnRetard(f));
   const facturesThisMonth = myFactures.filter((f) => isThisMonth(f.createdAt));
   const payeesThisMonth = payees.filter((f) => isThisMonth(f.createdAt));
@@ -55,7 +55,7 @@ export default function ProDashboard() {
   const resteTotal = impayees.reduce((s, f) => s + resteAPayer(f), 0);
   const retardTotal = retards.reduce((s, f) => s + resteAPayer(f), 0);
   const factureTotal = myFactures
-    .filter((f) => f.statut !== 'brouillon')
+    .filter(estActive)
     .reduce((s, f) => s + (f.totalTTC || 0), 0);
   const clientsCount = new Set(
     myFactures.map((f) => (f.clientName || '').trim().toLowerCase()).filter(Boolean)

@@ -10,6 +10,10 @@ export const EMPTY_COMPANY = {
   ifu: '', rccm: '', couleurPrimaire: '#0a2472', couleurSecondaire: '#f5a623',
   slogan: '', modeleDefaut: 'studio', facturePrefix: 'FAC', assujettieVAT: false,
   momo: '', momoNom: '', momoOperateur: '', conditions: '',
+  // Facture : CNSS, mention fiscale sous les totaux, virement, modes de
+  // paiement affichés (null = déduits des coordonnées), signataire et cachet.
+  cnss: '', mentionFiscale: '', banque: '', compteBancaire: '', modesPaiement: null,
+  signataireNom: '', signataireTitre: '', cachet: '',
   // Pays de l'entreprise (data/pays.js). Vide = déduit du téléphone, sinon Togo.
   pays: '',
 };

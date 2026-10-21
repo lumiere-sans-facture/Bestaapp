@@ -4,7 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
 import { formatCFA, formatDate } from '../../../utils/format';
 import {
-  resteAPayer, montantPaye, isEnRetard, statutEffectif,
+  resteAPayer, montantPaye, isEnRetard, statutEffectif, estActive, estImpayee,
   STATUT_EFFECTIF_LABEL, STATUT_EFFECTIF_BADGE, relanceMessage, whatsappLink,
 } from '../../../utils/paiement';
 import Sheet from '../../../components/Sheet';
@@ -49,7 +49,7 @@ export default function ClientsTab({ company }) {
     const m = new Map();
     myClients.forEach((c) => {
       const { factures: fs, devis: ds } = docsOf(c);
-      const emises = fs.filter((f) => f.statut !== 'brouillon');
+      const emises = fs.filter(estActive);
       m.set(c.id, {
         facture: emises.reduce((s, f) => s + (f.totalTTC || 0), 0),
         encaisse: emises.reduce((s, f) => s + montantPaye(f), 0),
@@ -84,7 +84,7 @@ export default function ClientsTab({ company }) {
   // La cible est calculée en amont pour que le bouton NOMME la facture visée
   // (le client reçoit un message sur une facture, pas sur tout le solde).
   const factureARelancer = (fs) => fs
-    .filter((f) => f.statut !== 'brouillon' && resteAPayer(f) > 0)
+    .filter(estImpayee)
     .sort((a, b) => (isEnRetard(b) - isEnRetard(a)) || (new Date(a.createdAt) - new Date(b.createdAt)))[0];
   const relancer = (client, cible) => {
     if (!cible) return;

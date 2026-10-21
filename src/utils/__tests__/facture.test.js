@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeFactureTotals, FACTURE_STATUT_LABEL, FACTURE_STATUT_BADGE } from '../facture';
+import { computeFactureTotals, FACTURE_STATUT_LABEL, FACTURE_STATUT_BADGE, modesPaiementProposes, modesPaiementAffiches, MENTIONS_FISCALES } from '../facture';
 
 describe('computeFactureTotals', () => {
   const lignes = [
@@ -42,5 +42,24 @@ describe('constantes de statut', () => {
   it('couvre les trois statuts', () => {
     expect(FACTURE_STATUT_LABEL).toEqual({ brouillon: 'Brouillon', emise: 'Émise', payee: 'Payée' });
     expect(FACTURE_STATUT_BADGE.payee[0]).toBe('badge-success');
+  });
+});
+
+describe('modes de paiement et mentions de la facture', () => {
+  const togo = { mobileMoney: ['T-Money (Yas)', 'Flooz (Moov)'], tva: 0.18 };
+
+  it('propose virement, opérateurs du pays, espèces et chèque', () => {
+    expect(modesPaiementProposes(togo)).toEqual(['Virement bancaire', 'T-Money (Yas)', 'Flooz (Moov)', 'Espèces', 'Chèque']);
+  });
+
+  it('affiche les modes cochés, sinon ceux que les coordonnées laissent deviner', () => {
+    expect(modesPaiementAffiches({ modesPaiement: ['Espèces'] }, togo)).toEqual(['Espèces']);
+    expect(modesPaiementAffiches({ banque: 'Ecobank', momo: '+228 90 00 00 00' }, togo)).toEqual(['Virement bancaire', 'T-Money (Yas)']);
+    expect(modesPaiementAffiches({}, togo)).toEqual([]);
+  });
+
+  it('mention du régime réel au taux du pays', () => {
+    expect(MENTIONS_FISCALES({ tva: 0.1925 }).find((m) => m.id === 'reel').texte).toContain('19,25 %');
+    expect(MENTIONS_FISCALES(togo).find((m) => m.id === 'non-assujettie').texte).toBe('Entreprise non assujettie à la TVA — montants nets.');
   });
 });

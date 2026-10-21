@@ -1518,6 +1518,9 @@ form .login-link { width: 100%; margin-top: 4px; }
    photo de produit doit rester entière (contain). */
 .photo-preview-cover { padding: 0; }
 .photo-preview-cover img { object-fit: cover; background: var(--bg); }
+/* Signature et cachet : plus large que haut, comme sur la facture. */
+.cachet-preview { width: 220px; height: 110px; }
+.photo-field-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .course-cover-apercu {
   width: 100%; height: 100%; border-radius: 10px;
   display: flex; align-items: center; justify-content: center; color: white;
@@ -2756,6 +2759,41 @@ form .login-link { width: 100%; margin-top: 4px; }
 .pay-history-mode { font-weight: 600; color: var(--text-primary); }
 .pay-history-date { margin-left: auto; font-size: 0.8125rem; }
 .pay-history-amount { font-weight: 700; color: var(--success-ink); min-width: 84px; text-align: right; }
+/* Paiements d'une facture : barre de progression, échéancier, historique modifiable. */
+.pay-progress { height: 8px; border-radius: var(--radius-pill); background: var(--border); overflow: hidden; margin-top: 10px; }
+.pay-progress > span { display: block; height: 100%; background: var(--success); border-radius: inherit; transition: width 0.3s ease; }
+.pay-echeancier { margin-top: 16px; }
+.pay-echeance-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+.pay-echeance-row:last-of-type { border-bottom: 0; }
+.pay-echeance-libelle { flex: 1; min-width: 0; font-weight: 600; display: flex; flex-direction: column; }
+.pay-echeance-libelle small { font-weight: 400; color: var(--text-secondary); font-size: 0.75rem; }
+.pay-echeance-montant { font-weight: 700; white-space: nowrap; }
+.pay-trop { align-items: flex-start; background: var(--warning-light); color: var(--warning-dark); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; }
+.pay-history-item { border-bottom: 1px solid var(--border); padding: 4px 0 8px; }
+.pay-history-item:last-child { border-bottom: 0; }
+.pay-history-detail { margin: -2px 0 6px 23px; }
+.pay-history-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: 23px; }
+.pay-history-actions .field-error { margin: 0 auto 0 0; }
+/* Éditeur d'échéancier (formulaire de facture). */
+.echeancier-editor { max-width: var(--form-max); }
+.echeancier-modele { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.echeancier-modele .doc-line-field:nth-child(2) { max-width: 110px; }
+.echeancier-modele:has(.doc-line-field:nth-child(2)) { grid-template-columns: 1fr 110px auto; }
+/* Téléphone : le bouton passe dessous, le nom du modèle reste lisible en entier. */
+@media (max-width: 480px) {
+  .echeancier-modele, .echeancier-modele:has(.doc-line-field:nth-child(2)) { grid-template-columns: 1fr; }
+  .echeancier-modele .doc-line-field:nth-child(2) { max-width: none; }
+}
+.echeance-ligne { margin-top: 10px; }
+.echeance-pied { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.echeance-pied .field-hint { margin-top: 0; }
+.echeance-ordre { margin-left: auto; display: inline-flex; gap: 6px; }
+.echeancier-total { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg); font-size: 0.875rem; }
+/* Couleurs posées explicitement : en thème sombre, le texte clair par défaut
+   serait illisible sur ce fond rose pâle (--error-light ne change pas). */
+.echeancier-total.ecart { background: var(--error-light); color: var(--error-text); }
+.echeancier-total .field-error { margin-top: 0; }
+.echeancier-total.ecart .field-error { color: var(--error-text); }
 
 .doc-toolbar { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
 .doc-toolbar .list-toolbar { margin-bottom: 0; }

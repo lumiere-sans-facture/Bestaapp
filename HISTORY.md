@@ -6,6 +6,15 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-21
+- **Facturation, étape 2 : acomptes et paiements enregistrés sur la facture, échéancier modifiable, réglages de l'entreprise.**
+  - Fiche « Paiements » d'une facture : total, déjà payé, reste à payer (ou trop-perçu), barre de progression, échéancier avec le statut de chaque échéance. La saisie propose d'office la prochaine échéance due. Date, mode (opérateur Mobile Money du pays), référence et note sont notés. Un paiement se corrige ou se supprime. Au-delà du reste dû, le trop-perçu doit être confirmé.
+  - Chaque paiement est une fiche à part, synchronisée seule : deux appareils qui encaissent la même facture ne s'écrasent plus. Les paiements déjà enregistrés dans les factures sont repris une fois, sans rien perdre.
+  - Convertir un devis ouvre une étape « Facturer » : objet pré-rempli depuis les lignes (« centrale solaire hybride : 262 panneaux 585 Wc (≈ 153 kWc)… ») et échéancier (comptant, acompte / solde, 3 tranches, personnalisé). La facture n'est pas créée tant que l'échéancier n'égale pas le total.
+  - Échéancier modifiable sur la facture : date, période ou étape, statut forcé, ordre. L'écart avec le total est affiché, avec « Ajuster la dernière échéance ».
+  - Liste des factures : « payé X · reste Y », filtres « Impayées » et « Annulées ». Une facture s'annule et se rétablit ; annulée, elle sort du chiffre et des relances.
+  - « Mon entreprise » : CNSS, mention fiscale (presets ou texte libre), banque et n° de compte, modes de paiement affichés sur la facture, signataire (titre, nom) et image de la signature et du cachet. Ils serviront au PDF de l'étape 3.
+  - Base de données : nouvelle table `facturePaiements` (`supabase/migrations/20261021_facture_paiements.sql`), à passer dans les DEUX projets Supabase. Tant qu'elle manque, les paiements restent sur l'appareil et le reste de la synchronisation continue.
+  - Scénarios `e2e/facture-acomptes.mjs` (32 vérifications) et `e2e/paiements-deux-appareils.mjs` (Supabase simulé, 10 vérifications).
 - **Facturation, étape 1 : montant en lettres et échéancier de paiement (calculs seuls, sans écran pour l'instant).**
   - Tout montant s'écrit en toutes lettres pour la mention « Arrêtée la présente facture… », selon les règles comptables : « soixante et onze », « quatre-vingts » mais « quatre-vingt mille », « deux cents » mais « deux cent un ». Exemple : « SOIXANTE-SIX MILLIONS HUIT CENT SOIXANTE-SEIZE MILLE (66 876 000) FRANCS CFA ».
   - Échéancier : chaque échéance est payable à une date, sur une période (« Du 12 au 16/10/2026 ») ou à une étape (« À la réception / mise en service »). Les paiements les couvrent dans l'ordre. Statuts calculés : reçu, partiel, attendu (dans les 7 jours), en retard, à venir. L'émetteur peut forcer un statut à la main.

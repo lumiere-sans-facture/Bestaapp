@@ -35,6 +35,12 @@ export const montantPaye = (f) => {
 /** Reste dû sur une facture (jamais négatif). */
 export const resteAPayer = (f) => Math.max(0, (Number(f?.totalTTC) || 0) - montantPaye(f));
 
+/** Facture qui compte (chiffre, impayés, relances) : ni brouillon, ni annulée. */
+export const estActive = (f) => !!f && f.statut !== 'brouillon' && f.statut !== 'annulee';
+
+/** Facture active pas encore soldée — en retard ou non. */
+export const estImpayee = (f) => estActive(f) && resteAPayer(f) > 0;
+
 /**
  * Encaissements datés d'une facture : [{ date, montant }].
  * Détail des paiements si présent ; sinon repli sur les factures soldées sans

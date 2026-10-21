@@ -4,7 +4,7 @@
 import { ageInDays } from './date';
 import { formatCFA } from './format';
 import { effectiveStatus, daysLeft } from './subscription';
-import { resteAPayer, isEnRetard, joursRetard, joursAvantEcheance } from './paiement';
+import { resteAPayer, isEnRetard, joursRetard, joursAvantEcheance, estImpayee } from './paiement';
 
 export const SEV_LABEL = { critique: 'CRITIQUE', alerte: 'ALERTE', info: 'INFO' };
 export const SEV_ORDER = { critique: 0, alerte: 1, info: 2 };
@@ -64,7 +64,7 @@ export function buildAlertFeedPro({ company = null, factures = [], sub = null, m
   if (!company?.nomEntreprise)
     feed.push({ id: 'company', sev: 'critique', label: 'Entreprise non configurée', entity: 'Onglet Entreprise → Mon entreprise', to: '/pro/entreprise' });
 
-  const impayees = factures.filter((f) => f.statut !== 'brouillon' && resteAPayer(f) > 0);
+  const impayees = factures.filter(estImpayee);
   // Factures en retard d'échéance : priorité maximale, du plus ancien retard au plus récent.
   impayees
     .filter((f) => isEnRetard(f, now))
