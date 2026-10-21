@@ -8,6 +8,7 @@ import { LOGO_BESTASOLAR } from '../../assets/logoBestaSolar';
 import { prixPublic } from '../price';
 import { paysDeLEntreprise } from '../../data/pays';
 import { compositionRetenue } from '../compositionKit';
+import { reglementDe } from './reglement';
 
 // ---------------------------------------------------------------------------
 // Formatage
@@ -91,6 +92,7 @@ export function emetteurDe(source = {}) {
         addressShort: source.adresse || '',
         rccm: source.rccm || '',
         ifu: source.ifu || '',
+        cnss: source.cnss || '',
         estPro: true,
         // Sigle de l'identifiant fiscal du pays de l'entreprise : IFU (Bénin,
         // Burkina), NIF (Togo, Niger, Mali), NCC (Côte d'Ivoire), NINEA
@@ -116,6 +118,7 @@ export function emetteurDe(source = {}) {
         addressShort: source.addressShort ?? COMPANY.addressShort,
         rccm: source.rccm ?? COMPANY.rccm,
         ifu: source.ifu ?? COMPANY.ifu,
+        cnss: source.cnss ?? COMPANY.cnss ?? '',
         fiscal: 'NIF', // BESTA SOLAR TOGO : numéro fiscal togolais
         logo: source.logo || LOGO_BESTASOLAR,
         bank: source.bank ?? COMPANY.bank,
@@ -124,6 +127,13 @@ export function emetteurDe(source = {}) {
         couleurSecondaire: COULEURS_DEFAUT.secondaire,
       };
 }
+
+/** Identifiants légaux de l'émetteur, dans l'ordre d'usage : NIF, RCCM, CNSS. */
+export const identifiantsDe = (e = {}) => [
+  e.ifu ? `${e.fiscal || 'NIF'} ${e.ifu}` : '',
+  e.rccm ? `RCCM ${e.rccm}` : '',
+  e.cnss ? `CNSS ${e.cnss}` : '',
+].filter(Boolean);
 
 /**
  * Catégorie d'une ligne (colonne « Cat. » du modèle Sobre) : celle portée par
@@ -260,12 +270,23 @@ export const piedApporteur = (data) => {
   };
 };
 
-/** Données de document depuis une facture Pro. */
-export function donneesDeFacture({ facture, company }) {
+/** Entreprise d'une facture : l'identité figée à l'émission, complétée des réglages apparus depuis. */
+export const sourceDeFacture = (facture = {}, company = null) =>
+  (facture.companySnapshot ? { ...(company || {}), ...facture.companySnapshot } : (company || {}));
+
+/**
+ * Données de document depuis une facture Pro (AVEC ses paiements, voir
+ * joindrePaiements). L'identité figée à l'émission (`companySnapshot`) fait
+ * foi ; les réglages apparus depuis (CNSS, signataire, modes de paiement…)
+ * viennent de l'entreprise actuelle, sans rien écraser de ce qui était figé.
+ * @param {string} [o.aujourdhui] « AAAA-MM-JJ » : statut des échéances à ce jour
+ */
+export function donneesDeFacture({ facture, company, aujourdhui }) {
   // Même règle que le devis : la composition retenue, sans « — extension ».
   const lignes = compositionRetenue((facture.lignes || []).map((l) => ({
     designation: l.designation, qty: Number(l.qty) || 0, pu: Number(l.pu) || 0, categorie: categorieLigne(l),
   })));
+  const source = sourceDeFacture(facture, company);
   return {
     numero: facture.numero || '',
     objet: facture.objet || '',
@@ -273,7 +294,7 @@ export function donneesDeFacture({ facture, company }) {
     paiement: facture.paiement || '',
     date: facture.createdAt,
     dateSecondaire: facture.echeance || null,
-    emetteur: emetteurDe(facture.companySnapshot || company || {}),
+    emetteur: emetteurDe(source),
     client: {
       name: facture.clientName || 'Client', societe: '', phone: facture.clientPhone || '', adresse: facture.clientVille || '',
       email: facture.clientEmail || '', ifu: facture.clientIfu || '', ref: facture.clientId || '',
@@ -281,6 +302,7 @@ export function donneesDeFacture({ facture, company }) {
     lignes,
     totaux: totauxDe(lignes, { tva: facture.tva || 0, tvaActive: !!facture.tvaActive }),
     apporteur: null,
+    reglement: reglementDe(facture, source, paysDeLEntreprise(source), aujourdhui),
   };
 }
 
@@ -299,11 +321,15 @@ export function donneesDeFacture({ facture, company }) {
  */
 export function paginer(lignes, { seule, premiere, suite, derniere }) {
   if (lignes.length <= seule) return [lignes];
-  const pages = [lignes.slice(0, premiere)];
-  let reste = lignes.slice(premiere);
-  while (reste.length > derniere) {
-    pages.push(reste.slice(0, suite));
-    reste = reste.slice(suite);
+  // La dernière page porte toujours au moins une ligne : les totaux et la
+  // signature ne partent jamais seuls sur une page.
+  const fin = Math.max(1, derniere);
+  const pages = [lignes.slice(0, Math.max(1, Math.min(premiere, lignes.length - 1)))];
+  let reste = lignes.slice(pages[0].length);
+  while (reste.length > fin) {
+    const n = Math.max(1, Math.min(suite, reste.length - 1));
+    pages.push(reste.slice(0, n));
+    reste = reste.slice(n);
   }
   pages.push(reste);
   return pages;

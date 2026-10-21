@@ -6,6 +6,16 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-10-21
+- **Facturation, étape 3 : la facture imprimée porte les acomptes, le reste à payer et l'échéancier ; reçu de paiement en PDF.**
+  - Sur les trois modèles (Studio, Vague, Sobre) : acomptes versés déduits du total, bandeau « Reste à payer », mention fiscale, « Arrêtée la présente facture à la somme de … » (total, et reste dû après un acompte), échéancier avec le statut de chaque échéance, modes de paiement avec leurs coordonnées (banque et compte, numéro Mobile Money), signataire avec l'image de la signature et du cachet. En-tête : NIF, RCCM, CNSS, et la date de « Mise à jour » quand un paiement ou l'échéancier a changé depuis l'émission.
+  - Sobre reste noir, blanc et gris, sans image : statuts distingués par la graisse, l'italique et un cadre ; la zone de signature reste à signer à la main.
+  - Mise en page : la place de chaque ligne est estimée selon la longueur de sa désignation, celle du règlement selon son contenu. Rien ne déborde, et les totaux ne partent jamais seuls sur une page. Seul cas limite, une facture d'une ligne avec un règlement très long : signature et conditions passent d'un bloc à la page suivante. Vérifié dans le navigateur : 3 modèles × 8 cas × 1 à 40 lignes. La facture Sobre de 9 lignes tient toujours sur une page.
+  - Devis aussi : un devis de 10 ou 11 lignes ne laisse plus ses totaux seuls en page 2.
+  - Reçu de paiement : une page, numéroté par paiement (`FAC-2026-016-R1`). Il donne le montant en lettres, le mode et la référence, et la situation de la facture après ce paiement (encaissé, reste, prochaine échéance). Téléchargé ou envoyé sur WhatsApp depuis la fiche « Paiements ».
+  - Messages WhatsApp de la facture et de la relance : la prochaine échéance (« Complément d'acompte de 30 000 000 F CFA, du 12 au 16/10/2026 ») plutôt qu'une date unique.
+  - Les factures émises avant ces réglages les reçoivent quand même (CNSS, signataire, modes de paiement) ; ce qui était figé à l'émission (nom, NIF, logo…) ne change pas.
+  - L'aperçu de « Mon entreprise » montre une facture d'exemple avec acompte et échéancier.
+  - Scénarios `e2e/facture-pdf.mjs` (30 vérifications) et `e2e/pagination-factures.mjs` (24 cas de 1 à 40 lignes).
 - **Facturation, étape 2 : acomptes et paiements enregistrés sur la facture, échéancier modifiable, réglages de l'entreprise.**
   - Fiche « Paiements » d'une facture : total, déjà payé, reste à payer (ou trop-perçu), barre de progression, échéancier avec le statut de chaque échéance. La saisie propose d'office la prochaine échéance due. Date, mode (opérateur Mobile Money du pays), référence et note sont notés. Un paiement se corrige ou se supprime. Au-delà du reste dû, le trop-perçu doit être confirmé.
   - Chaque paiement est une fiche à part, synchronisée seule : deux appareils qui encaissent la même facture ne s'écrasent plus. Les paiements déjà enregistrés dans les factures sont repris une fois, sans rien perdre.

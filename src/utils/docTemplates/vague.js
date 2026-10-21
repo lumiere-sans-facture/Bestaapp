@@ -3,11 +3,38 @@
 // couleur secondaire réservée aux traits de titre, au filet du total et au
 // montant du total. En Pro, les couleurs de l'abonné remplacent navy/orange ;
 // la vague claire est une teinte éclaircie de la primaire.
-import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, eclaircir } from './shared';
+import { nf, esc, dateFr, libelles, conditionsPour, paginer, documentHtml, piedApporteur, eclaircir, identifiantsDe } from './shared';
+import { phraseArretee, lignesTexte, paginerFacture, montantInsecable, cssStatuts, hauteurLigneArticle } from './reglement';
+import { jourFr } from '../date';
 import { styleLogo } from '../logo';
 
 // Capacités mesurées dans le navigateur (voir paginer).
 const CAPACITES = { seule: 9, premiere: 10, suite: 14, derniere: 8 };
+// Factures : découpe à la hauteur (voir paginerFacture).
+const AIRE = { premiere: 676, suite: 854 }; // place des lignes sous l'en-tête du tableau (px, mesurée)
+const HAUTEUR_LIGNE = hauteurLigneArticle({ base: 17, texte: 19.5, parLigne: 46 });
+
+const hauteurModes = (modes) => 27 + 19 + Math.max(1, modes.length) * 24
+  + modes.reduce((h, m) => h + (m.detail ? lignesTexte(m.detail, 50) * 18 : 0), 0);
+
+/** Place du règlement d'une facture (px, estimation prudente vérifiée dans le navigateur). */
+export function placeFactureVague(r, e, conditions) {
+  // Identifiants sous les coordonnées ; « Mise à jour » et « Reste à payer »
+  // sous l'échéance, quand la colonne de droite dépasse celle du client.
+  const meta = (3 + (r.miseAJour ? 1 : 0) + (r.paye > 0 ? 1 : 0)) * 28;
+  const haut = identifiantsDe(e).length * 17 + Math.max(0, meta - 124);
+  const totaux = 20 + 43 + r.versements.reduce((h, v) => h + 28 + (v.detail ? 17 : 0), 0)
+    + (r.paye > 0 ? 54 : 0) + (r.tropPercu > 0 ? 28 : 0) + (r.mention ? 8 + lignesTexte(r.mention, 44) * 17 : 0) + 28; // + remise / TVA éventuelles
+  const echeancier = r.echeances.length
+    ? 27 + 19 + 30 + r.echeances.reduce((h, x) => h + 14 + lignesTexte(x.libelle, 24) * 20 + (x.quand ? lignesTexte(x.quand, 30) * 17 : 0), 0)
+    : 0;
+  const gauche = r.echeances.length ? echeancier : hauteurModes(r.modes);
+  const arretee = 26 + phraseArretee(r).reduce((h, [a, b]) => h + lignesTexte(a + b, 88) * 20, 0);
+  const merci = Math.max(27 + (r.echeances.length ? 16 + hauteurModes(r.modes) : 0), 17 + (r.signataire?.cachet ? 84 : 64) + 5 + (r.signataire?.nom ? 24 : 0));
+  const blocConditions = 27 + 19 + lignesTexte(conditions, 104) * 17;
+  const partieTotaux = 16 + Math.max(gauche, totaux) + 16 + arretee;
+  return { haut, totaux: partieTotaux, bloc: partieTotaux + 16 + merci + 16 + blocConditions };
+}
 
 const cssPour = (p, s) => `
   .page { color: #3a3a3a; }
@@ -50,7 +77,102 @@ const cssPour = (p, s) => `
   .conditions { font-size: 11px; color: #6b6b6b; }
   .legal { display: flex; justify-content: space-between; gap: 24px; font-size: 11px; color: #6b6b6b; margin-top: 16px; }
   .filigrane { position: absolute; inset: 0; z-index: 0; opacity: 0.07; background-size: cover; background-position: center; }
+
+  /* ---- Facture : règlement ---- */
+  .insecable { white-space: nowrap; }
+  .maj { font-style: italic; }
+  .versement { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; margin-top: 8px; }
+  .versement small { display: block; font-size: 11px; color: #6b6b6b; }
+  .versement .navy { white-space: nowrap; }
+  .reste-final { display: flex; justify-content: space-between; align-items: center; gap: 16px;
+                 background: ${p}; padding: 10px 12px; margin-top: 8px; }
+  .reste-final .libelle { font-size: 13px; font-weight: 600; color: #fff; }
+  .reste-final .montant { font-size: 18px; font-weight: 600; color: #fff; }
+  .trop { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; font-weight: 600; margin-top: 8px; }
+  .mention { font-size: 11px; color: #6b6b6b; margin-top: 8px; }
+  .arretee { margin-top: 16px; padding: 12px 16px; border-left: 3px solid ${s}; background: #f7f8fb; font-size: 13px; }
+  .arretee strong { font-weight: 600; color: ${p}; }
+  .mode + .mode { margin-top: 4px; }
+  .mode .nom { font-size: 13px; font-weight: 600; color: ${p}; }
+  table.echeances { margin-top: 0; }
+  table.echeances th { background: #f2f3f7; color: ${p}; font-size: 11px; font-weight: 600; text-transform: uppercase;
+                       letter-spacing: 0.5px; text-align: left; padding: 8px; }
+  table.echeances th.num { text-align: right; }
+  table.echeances td { padding: 6px 8px; border-bottom: 1px solid #e5e5e5; font-size: 13px; vertical-align: middle; }
+  table.echeances td small { display: block; font-size: 11px; color: #6b6b6b; }
+  .statut { display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  ${cssStatuts()}
+  .fin-rang { display: grid; grid-template-columns: 1fr 288px; gap: 32px; margin-top: 16px; }
+  .signature { text-align: center; }
+  .signature .micro { font-weight: 600; color: ${p}; }
+  .signature img { display: block; max-width: 220px; max-height: 80px; margin: 4px auto 0; }
+  .signature-espace { height: 64px; }
+  .signature-filet { border-top: 1px solid #c9ccd4; margin-top: 4px; }
+  .signature-nom { font-size: 13px; font-weight: 600; color: ${p}; margin-top: 4px; }
 `;
+
+const listeModes = (r) => (r.modes.length
+  ? r.modes.map((m) => `<div class="mode"><div class="nom">${esc(m.nom)}</div>${m.detail ? `<div class="micro">${esc(m.detail)}</div>` : ''}</div>`).join('')
+  : '<div class="micro">Règlement à convenir avec l’émetteur.</div>');
+
+/** Bas de la dernière page d'une facture : `totaux` puis `fin` (voir paginerFacture). */
+function basFacture(kind, data) {
+  const e = data.emetteur;
+  const t = data.totaux;
+  const r = data.reglement;
+  const sig = r.signataire;
+  const totaux = `
+    <div class="bas">
+      <div>
+        ${r.echeances.length ? `
+        <div class="titre-bloc">Échéancier de paiement</div>
+        <div class="trait"></div>
+        <table class="echeances">
+          <colgroup><col><col style="width:104px"><col style="width:84px"></colgroup>
+          <thead><tr><th>Échéance</th><th class="num">Montant</th><th>Statut</th></tr></thead>
+          <tbody>${r.echeances.map((x) => `
+            <tr><td>${esc(x.libelle)}${x.quand ? `<small>${esc(x.quand)}</small>` : ''}</td><td class="num">${nf(x.montant)}</td><td><span class="statut statut-${x.statut}">${esc(x.statutLabel)}</span></td></tr>`).join('')}
+          </tbody>
+        </table>` : `
+        <div class="titre-bloc">Modes de paiement</div>
+        <div class="trait"></div>
+        ${listeModes(r)}`}
+      </div>
+      <div>
+        <div class="totaux-ligne"><span>Sous-total HT (F CFA)</span><span class="navy">${nf(t.totalHT)}</span></div>
+        ${t.remise ? `<div class="totaux-ligne"><span>Remise (F CFA)</span><span class="navy">− ${nf(t.remise)}</span></div>` : ''}
+        ${t.tvaActive ? `<div class="totaux-ligne"><span>TVA (F CFA)</span><span class="navy">${nf(t.tva)}</span></div>` : ''}
+        <div class="total-final"><span class="libelle">Total net à payer (F CFA)</span><span class="montant">${nf(t.totalTTC)}</span></div>
+        ${r.versements.map((v) => `
+        <div class="versement"><span>${esc(v.libelle)}${v.detail ? `<small>${esc(v.detail)}</small>` : ''}</span><span class="navy">− ${nf(v.montant)}</span></div>`).join('')}
+        ${r.paye > 0 ? `<div class="reste-final"><span class="libelle">Reste à payer (F CFA)</span><span class="montant">${nf(r.reste)}</span></div>` : ''}
+        ${r.tropPercu > 0 ? `<div class="trop"><span>Trop-perçu (F CFA)</span><span>${nf(r.tropPercu)}</span></div>` : ''}
+        ${r.mention ? `<div class="mention">${esc(r.mention)}</div>` : ''}
+      </div>
+    </div>
+
+    <div class="arretee">${phraseArretee(r).map(([texte, montant]) => `<div>${esc(texte)}<strong>${montantInsecable(montant)}</strong>.</div>`).join('')}</div>`;
+  const fin = `
+    <div class="fin-rang">
+      <div>
+        <div class="titre-bloc">Merci de votre confiance.</div>
+        ${r.echeances.length ? `<div style="margin-top:16px"><div class="titre-bloc">Modes de paiement</div><div class="trait"></div>${listeModes(r)}</div>` : ''}
+      </div>
+      <div class="signature">
+        <div class="micro">${esc(sig?.titre || 'Signature et cachet')}</div>
+        ${sig?.cachet ? `<img src="${esc(sig.cachet)}" alt="Signature et cachet">` : '<div class="signature-espace"></div>'}
+        <div class="signature-filet"></div>
+        ${sig?.nom ? `<div class="signature-nom">${esc(sig.nom)}</div>` : ''}
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="titre-bloc">Conditions générales</div>
+      <div class="trait"></div>
+      <div class="conditions">${esc(conditionsPour(kind, e))}</div>
+    </div>`;
+  return { totaux, fin };
+}
 
 /** Ruban supérieur : deux tracés pleins, teinte claire puis primaire par-dessus. */
 const vagueHaute = (titre, p, clair) => `
@@ -86,16 +208,21 @@ export function renderVague({ kind, data }) {
   const L = libelles(kind);
   const e = data.emetteur;
   const t = data.totaux;
-  const pages = paginer(data.lignes, CAPACITES);
+  const r = kind === 'facture' ? data.reglement : null;
+  const { pages, scinder } = r
+    ? paginerFacture(data.lignes, placeFactureVague(r, e, conditionsPour(kind, e)), { aire: AIRE, hauteurLigne: HAUTEUR_LIGNE })
+    : { pages: paginer(data.lignes, CAPACITES), scinder: false };
+  const bas = r ? basFacture(kind, data) : null;
+  const ids = identifiantsDe(e);
   const ref = piedApporteur(data);
-  const total = pages.length;
+  const total = pages.length + (scinder ? 1 : 0);
   // Vague claire : la primaire de l'émetteur éclaircie (le second tracé du ruban).
   const clair = eclaircir(e.couleurPrimaire, 0.24);
   let rang = 0;
 
   const corps = pages.map((lignes, i) => {
     const premiere = i === 0;
-    const derniere = i === total - 1;
+    const derniere = i === pages.length - 1; // dernière page de LIGNES (la page de fin éventuelle suit)
     const rows = lignes.map((l) => {
       rang += 1;
       return `
@@ -120,6 +247,7 @@ export function renderVague({ kind, data }) {
         <div>${esc(e.phone || '—')}</div>
         <div>${esc(e.email || '—')}</div>
         ${e.website ? `<div>${esc(e.website)}</div>` : ''}
+        ${r ? ids.map((x) => `<div>${esc(x)}</div>`).join('') : ''}
       </div>
       ${e.logo ? `<img src="${e.logo}" alt="${esc(e.name)}" style="${styleLogo(e.logo)}">` : `<div class="titre-bloc">${esc(e.name)}</div>`}
     </div>
@@ -137,6 +265,8 @@ export function renderVague({ kind, data }) {
         <div class="meta-ligne"><span class="libelle">${L.numeroLabel}</span><span>${esc(data.numero || '—')}</span></div>
         <div class="meta-ligne"><span class="libelle">Date</span><span>${dateFr(data.date)}</span></div>
         <div class="meta-ligne"><span class="libelle">${L.dateSecondaireLabel}</span><span>${data.dateSecondaire ? dateFr(data.dateSecondaire) : '—'}</span></div>
+        ${r?.miseAJour ? `<div class="meta-ligne maj"><span class="libelle">Mise à jour</span><span>${jourFr(r.miseAJour)}</span></div>` : ''}
+        ${r?.paye > 0 ? `<div class="meta-ligne"><span class="libelle">Reste à payer</span><span class="navy" style="font-weight:600">${nf(r.reste)} F CFA</span></div>` : ''}
       </div>
     </div>` : ''}
 
@@ -145,7 +275,8 @@ export function renderVague({ kind, data }) {
       <tbody>${rows}</tbody>
     </table>
 
-    ${derniere ? `
+    ${derniere && r ? `${bas.totaux}${scinder ? '' : bas.fin}` : ''}
+    ${derniere && !r ? `
     <div class="bas">
       <div>
         <div class="titre-bloc">Merci de votre confiance.</div>
@@ -176,12 +307,26 @@ export function renderVague({ kind, data }) {
     ${ref.ligne}
     <div class="legal ${ref.push}">
       <span>${esc(e.name)}${e.slogan ? ` — ${esc(e.slogan)}` : ''}</span>
-      <span>${[e.rccm ? `RCCM ${esc(e.rccm)}` : '', e.ifu ? `${esc(e.fiscal || 'NIF')} ${esc(e.ifu)}` : '', total > 1 ? `Page ${i + 1} / ${total}` : ''].filter(Boolean).join(' · ')}</span>
+      <span>${[e.rccm ? `RCCM ${esc(e.rccm)}` : '', e.ifu ? `${esc(e.fiscal || 'NIF')} ${esc(e.ifu)}` : '', e.cnss ? `CNSS ${esc(e.cnss)}` : '', total > 1 ? `Page ${i + 1} / ${total}` : ''].filter(Boolean).join(' · ')}</span>
     </div>
   </div>
   ${vagueBasse(e.couleurPrimaire, clair)}
 </section>`;
   });
+  if (scinder) {
+    corps.push(`
+<section class="page page-fin">
+  ${vagueHaute(`${L.titre} · ${esc(data.numero || '')}`, e.couleurPrimaire, clair)}
+  <div class="corps">
+    ${bas.fin}
+    <div class="legal">
+      <span>${esc(e.name)}${e.slogan ? ` — ${esc(e.slogan)}` : ''}</span>
+      <span>${[...ids.map(esc), `Page ${total} / ${total}`].join(' · ')}</span>
+    </div>
+  </div>
+  ${vagueBasse(e.couleurPrimaire, clair)}
+</section>`);
+  }
 
   return documentHtml({
     titre: `${L.titre} ${data.numero} — ${data.client.name}`,

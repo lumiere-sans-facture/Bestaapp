@@ -637,14 +637,17 @@ export default function DocumentsTab({ company, modeleDefaut, onGoTo }) {
       />
 
       <EnvoiPdfSheet envoi={docs.envoiPret}
-        titre={docs.envoiPret?.nature === 'facture' ? 'Envoyer la facture' : 'Envoyer le devis'}
-        libelle={docs.envoiPret?.nature === 'facture' ? 'de la facture' : 'du devis'}
+        titre={{ facture: 'Envoyer la facture', recu: 'Envoyer le reçu' }[docs.envoiPret?.nature] || 'Envoyer le devis'}
+        libelle={{ facture: 'de la facture', recu: 'du reçu' }[docs.envoiPret?.nature] || 'du devis'}
         onPartager={docs.partagerMaintenant} onFermer={docs.fermerEnvoi} />
 
       <PaiementSheet open={!!payFacture} onClose={() => setPayFacture(null)} facture={payFactureLive}
         operateurs={pays.mobileMoney || []} onSubmit={submitPaiement}
         onUpdate={(id, patch) => { updatePaiement(id, patch); toast('Paiement corrigé.'); }}
-        onDelete={(id) => { deletePaiement(id); toast('Paiement supprimé.'); }} />
+        onDelete={(id) => { deletePaiement(id); toast('Paiement supprimé.'); }}
+        onRecu={(p) => payFactureLive && docs.telechargerRecu(payFactureLive, p)}
+        onEnvoyerRecu={(p) => payFactureLive && docs.envoyerRecu(payFactureLive, p)}
+        recuOccupe={docs.occupeRecu} />
 
       {/* Conversion devis → facture : objet et échéancier avant création. */}
       <Sheet open={!!conversion} onClose={() => setConversion(null)}

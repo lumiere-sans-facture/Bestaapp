@@ -322,7 +322,7 @@ export default function CompanyTab({ company }) {
               <button type="button" className="btn btn-sm btn-outline" onClick={() => set({ cachet: '' })}><Trash2 size={15} /> Retirer</button>
             )}
           </div>
-          <div className="field-hint">Scan ou photo de la signature et du cachet, sur fond blanc. Facultatif : sans image, la facture garde une zone à signer.</div>
+          <div className="field-hint">Scan ou photo de la signature et du cachet, sur fond blanc. Facultatif : sans image, la facture garde une zone à signer — comme le modèle Sobre, imprimé sans aucune image.</div>
         </div>
         <div className="input-group" style={{ marginBottom: 0 }}>
           <span className="input-label" id="company-tva-label">TVA sur les nouveaux documents</span>

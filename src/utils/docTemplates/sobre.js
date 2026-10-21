@@ -6,6 +6,8 @@
 // moins 40 px. Le tableau garde sa largeur quoi qu'il arrive : une
 // désignation longue passe à la ligne dans sa cellule.
 import { nf, esc, libelles, conditionsPour, paginer, documentHtml, piedApporteur } from './shared';
+import { phraseArretee, paginerFacture, montantInsecable, hauteurLigneArticle } from './reglement';
+import { jourFr } from '../date';
 
 /** Les seules couleurs du modèle (vérifié par les tests). */
 export const COULEURS_SOBRE = ['#111111', '#222222', '#333333', '#444444', '#555555', '#666666', '#888888', '#e3e3e3', '#ffffff'];
@@ -37,6 +39,33 @@ function capacitesPour({ nom, conditions, pied, reference }) {
     suite: CAPACITES.suite,
     derniere: Math.max(0, CAPACITES.derniere - rangs(bas)),
   };
+}
+
+// Factures : découpe à la hauteur (voir paginerFacture). Le pied n'est
+// imprimé que sur la dernière page : il compte dans le règlement.
+const AIRE = { premiere: 740, suite: 952 }; // de l'en-tête du tableau au bas de la page (px, mesurée)
+const HAUTEUR_LIGNE = hauteurLigneArticle({ base: 14, texte: 19.5, parLigne: 42, min: 40 });
+
+/**
+ * Place du règlement d'une facture Sobre (px, estimation prudente vérifiée
+ * dans le navigateur). Le pied, imprimé sur la seule dernière page, en fait partie.
+ */
+export function placeFactureSobre(r, e, conditions, { pied = [], reference = false, remise = 0 } = {}) {
+  const haut = (lignesDe(e.name, 20) - 1) * 34 + (r.miseAJour ? 17 : 0);
+  const gauche = 24 + 23.5 + lignesDe(conditions, 50) * 16.5 + (r.mention ? 4 + lignesDe(r.mention, 50) * 16.5 : 0);
+  const droite = 24 + 19.5 + (remise ? 23.5 : 0) + 23.5 + 43
+    + r.versements.reduce((t, v) => t + 20.5 + (v.detail ? 16.5 : 0), 0) + (r.paye > 0 ? 43 : 0) + (r.tropPercu > 0 ? 20.5 : 0);
+  const cadre = 40 + 4 + Math.max(gauche, droite);
+  const echeancier = r.echeances.length
+    ? 24 + 23.5 + 33 + r.echeances.reduce((t, x) => t + 13 + 19.5 * Math.max(lignesDe(x.libelle, 34), lignesDe(x.quand, 22)), 0)
+    : 0;
+  // Dernier rang : montant en lettres et modes de paiement | signature.
+  const arretee = phraseArretee(r).reduce((t, [a, b]) => t + lignesDe(a + b, 58) * 19.5, 0);
+  const modes = r.modes.length ? 8 + 19.5 + r.modes.reduce((t, m) => t + lignesDe(`${m.nom} — ${m.detail}`, 64) * 16.5, 0) : 0;
+  const signature = lignesDe(r.signataire?.titre || e.name, 28) * 19.5 + 48 + 1 + 20.5;
+  const fin = 24 + Math.max(arretee + modes, signature);
+  const basDePage = pied.reduce((t, ligne) => t + lignesDe(ligne, 95) * 16.5, 0) + (reference ? 20 : 0);
+  return { haut, totaux: cadre + echeancier + basDePage, bloc: cadre + echeancier + fin + basDePage };
 }
 
 export const CSS_SOBRE = `
@@ -92,6 +121,34 @@ export const CSS_SOBRE = `
   .signature-libelle { font-size: 11px; color: #666666; margin-top: 4px; }
 
   .pied { text-align: center; font-size: 11px; color: #333333; }
+
+  /* ---- Facture : règlement (noir, blanc et gris, comme le reste) ---- */
+  .totaux .versement { font-size: 11px; color: #333333; }
+  .totaux .versement small { display: block; color: #666666; }
+  .totaux .reste { margin-top: 8px; padding-top: 8px; border-top: 2px solid #111111; align-items: baseline; }
+  .totaux .reste span:first-child { font-weight: 600; color: #111111; }
+  .conditions-texte.mention { margin-top: 4px; font-style: italic; }
+  .arretee { font-size: 13px; color: #222222; }
+  .arretee strong { font-weight: 600; color: #111111; }
+  .insecable { white-space: nowrap; }
+  .echeancier-titre { margin-top: 24px; font-size: 13px; font-weight: 600; text-transform: uppercase; color: #111111; }
+  table.echeances { margin-top: 4px; table-layout: fixed; border-collapse: collapse; width: 100%; }
+  table.echeances th { background: #e3e3e3; color: #111111; font-size: 11px; font-weight: 600; text-align: left;
+                       padding: 6px 8px; border-top: 2px solid #111111; border-bottom: 2px solid #111111; }
+  table.echeances th.num { text-align: right; }
+  table.echeances td { padding: 6px 8px; font-size: 13px; color: #222222; border-bottom: 1px dashed #555555; vertical-align: middle; }
+  /* Statuts distingués sans couleur : graisse, italique, cadre. */
+  .statut { font-size: 11px; white-space: nowrap; }
+  .statut-recu { font-weight: 600; color: #111111; }
+  .statut-partiel { font-style: italic; color: #222222; }
+  .statut-en_retard { font-weight: 600; text-transform: uppercase; color: #111111; border: 1px solid #111111; padding: 0 4px; }
+  .statut-attendu { color: #222222; border: 1px dashed #555555; padding: 0 4px; }
+  .statut-a_venir { color: #666666; }
+  .fin { display: grid; grid-template-columns: 1fr 232px; gap: 32px; margin-top: 24px; align-items: start; }
+  .fin .signature { margin: 0; }
+  .modes-titre { font-size: 13px; font-weight: 600; text-transform: uppercase; color: #111111; margin: 8px 0 0; }
+  .mode { font-size: 11px; color: #333333; }
+  .mode strong { font-weight: 600; color: #111111; }
 `;
 
 /** 09/10/2026 */
@@ -117,6 +174,56 @@ const enTeteTableau = () => `
     <tr><th>#</th><th>Cat.</th><th>Désignation</th><th>Qté</th><th>Prix unitaire</th><th>Prix total</th></tr>
   </thead>`;
 
+/** Bas de la dernière page d'une facture : `totaux` puis `fin` (voir paginerFacture). */
+function basFacture(data, { livraison, conditions }) {
+  const e = data.emetteur;
+  const t = data.totaux;
+  const r = data.reglement;
+  const sig = r.signataire;
+  const totaux = `
+  <div class="cadre">
+    <div class="conditions">
+      <div class="conditions-titre">Conditions</div>
+      <div class="conditions-texte"><strong>Livraison :</strong> ${esc(livraison)}. ${esc(conditions)}</div>
+      ${r.mention ? `<div class="conditions-texte mention">${esc(r.mention)}</div>` : ''}
+    </div>
+    <div class="totaux">
+      <div class="rang"><span>Sous-total HT</span><span class="num">${nf(t.totalHT)}</span></div>
+      ${t.remise ? `<div class="rang"><span>Remise</span><span class="num">− ${nf(t.remise)}</span></div>` : ''}
+      <div class="rang"><span>TVA</span><span class="num">${t.tvaActive ? nf(t.tva) : '—'}</span></div>
+      <div class="rang total"><span>TOTAL (F CFA)</span><span class="num montant">${nf(t.totalTTC)}</span></div>
+      ${r.versements.map((v) => `
+      <div class="rang versement"><span>${esc(v.libelle)}${v.detail ? `<small>${esc(v.detail)}</small>` : ''}</span><span class="num">− ${nf(v.montant)}</span></div>`).join('')}
+      ${r.paye > 0 ? `<div class="rang reste"><span>RESTE À PAYER</span><span class="num montant">${nf(r.reste)}</span></div>` : ''}
+      ${r.tropPercu > 0 ? `<div class="rang versement"><span>Trop-perçu</span><span class="num">${nf(r.tropPercu)}</span></div>` : ''}
+    </div>
+  </div>
+
+  ${r.echeances.length ? `
+  <div class="echeancier-titre">Échéancier de paiement</div>
+  <table class="echeances">
+    <colgroup><col><col style="width:184px"><col style="width:112px"><col style="width:88px"></colgroup>
+    <thead><tr><th>Échéance</th><th>Date</th><th class="num">Montant</th><th>Statut</th></tr></thead>
+    <tbody>${r.echeances.map((x) => `
+      <tr><td>${esc(x.libelle)}</td><td>${esc(x.quand || '—')}</td><td class="num">${nf(x.montant)}</td><td><span class="statut statut-${x.statut}">${esc(x.statutLabel)}</span></td></tr>`).join('')}
+    </tbody>
+  </table>` : ''}`;
+  const fin = `
+  <div class="fin">
+    <div>
+      <div class="arretee">${phraseArretee(r).map(([texte, montant]) => `<div>${esc(texte)}<strong>${montantInsecable(montant)}</strong>.</div>`).join('')}</div>
+      ${r.modes.length ? `<div class="modes-titre">Modes de paiement</div>${r.modes.map((m) => `<div class="mode"><strong>${esc(m.nom)}</strong>${m.detail ? ` — ${esc(m.detail)}` : ''}</div>`).join('')}` : ''}
+    </div>
+    <div class="signature">
+      <div class="signature-nom">${esc(sig?.titre || e.name)}</div>
+      <div class="signature-espace"></div>
+      <div class="signature-filet"></div>
+      <div class="signature-libelle">${esc(sig?.nom || 'Signature et cachet')}</div>
+    </div>
+  </div>`;
+  return { totaux, fin };
+}
+
 export function renderSobre({ kind, data }) {
   const L = libelles(kind);
   const e = data.emetteur;
@@ -124,16 +231,20 @@ export function renderSobre({ kind, data }) {
   const c = data.client || {};
   // Conditions de vente : livraison et paiement, « à convenir » faute de mieux.
   const livraison = String(data.livraison || '').trim() || 'À convenir';
-  const paiement = String(data.paiement || '').trim() || (e.bank?.name || 'À convenir');
+  const modesFacture = kind === 'facture' ? (data.reglement?.modes || []).map((m) => m.nom).join(', ') : '';
+  const paiement = String(data.paiement || '').trim() || modesFacture || (e.bank?.name || 'À convenir');
   const conditions = conditionsPour(kind, e);
   const pied = [
-    [e.name, e.rccm ? `RCCM ${e.rccm}` : '', e.ifu ? `${e.fiscal || 'NIF'} ${e.ifu}` : ''].filter(Boolean).join(' — '),
+    [e.name, e.rccm ? `RCCM ${e.rccm}` : '', e.ifu ? `${e.fiscal || 'NIF'} ${e.ifu}` : '', e.cnss ? `CNSS ${e.cnss}` : ''].filter(Boolean).join(' — '),
     e.address || '',
     [e.phone ? `Tél ${e.phone}` : '', e.email || '', e.website || ''].filter(Boolean).join(' · '),
   ];
   const ref = piedApporteur(data);
-  const pages = paginer(data.lignes, capacitesPour({ nom: e.name, conditions: `Livraison : ${livraison}. ${conditions}`, pied, reference: !!ref.ligne }));
-  const total = pages.length;
+  const r = kind === 'facture' ? data.reglement : null;
+  const { pages, scinder } = r
+    ? paginerFacture(data.lignes, placeFactureSobre(r, e, `Livraison : ${livraison}. ${conditions}`, { pied, reference: !!ref.ligne, remise: data.totaux.remise }), { aire: AIRE, hauteurLigne: HAUTEUR_LIGNE })
+    : { pages: paginer(data.lignes, capacitesPour({ nom: e.name, conditions: `Livraison : ${livraison}. ${conditions}`, pied, reference: !!ref.ligne })), scinder: false };
+  const total = pages.length + (scinder ? 1 : 0);
   const condition = kind === 'facture'
     ? (data.dateSecondaire ? `Payable au ${dateCourte(data.dateSecondaire)}` : 'Payable à réception')
     : (data.dateSecondaire ? `Valable jusqu’au ${dateCourte(data.dateSecondaire)}` : '');
@@ -142,7 +253,7 @@ export function renderSobre({ kind, data }) {
 
   const corps = pages.map((lignes, i) => {
     const premiere = i === 0;
-    const derniere = i === total - 1;
+    const derniere = i === pages.length - 1; // dernière page de LIGNES (la page de fin éventuelle suit)
     const rows = lignes.map((l) => {
       rang += 1;
       return `
@@ -169,6 +280,7 @@ export function renderSobre({ kind, data }) {
       <div class="meta">${L.numeroLabel} ${esc(data.numero || '—')}</div>
       ${condition ? `<div class="meta">${condition}</div>` : ''}
       <div class="meta">Date : ${dateCourte(data.date)}</div>
+      ${r?.miseAJour ? `<div class="meta">Mise à jour : ${jourFr(r.miseAJour)}</div>` : ''}
     </div>
   </div>
 
@@ -196,7 +308,10 @@ export function renderSobre({ kind, data }) {
     <tbody>${rows}</tbody>
   </table>` : ''}
 
-  ${derniere ? `
+  ${derniere && r ? `${basFacture(data, { livraison, conditions }).totaux}${scinder ? '' : basFacture(data, { livraison, conditions }).fin}
+  ${ref.ligne}
+  <div class="pied ${ref.push}">${pied.filter(Boolean).map((ligne) => `<div>${esc(ligne)}</div>`).join('')}</div>` : ''}
+  ${derniere && !r ? `
   <div class="cadre">
     <div class="conditions">
       <div class="conditions-titre">Conditions</div>
@@ -221,6 +336,15 @@ export function renderSobre({ kind, data }) {
   <div class="pied ${ref.push}">${pied.filter(Boolean).map((ligne) => `<div>${esc(ligne)}</div>`).join('')}</div>` : ''}
 </section>`;
   });
+
+  if (scinder) {
+    corps.push(`
+<section class="page page-fin">
+  <div class="suite">${L.titre} ${esc(data.numero || '')} — suite (page ${total} / ${total})</div>
+  ${basFacture(data, { livraison, conditions }).fin}
+  <div class="pied push">${pied.filter(Boolean).map((ligne) => `<div>${esc(ligne)}</div>`).join('')}</div>
+</section>`);
+  }
 
   return documentHtml({
     titre: `${L.titre} ${data.numero} — ${c.name || ''}`,

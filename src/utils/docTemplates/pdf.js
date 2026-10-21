@@ -7,6 +7,7 @@
 // les convertit telles quelles, une page HTML donnant une page PDF.
 import { buildDocHtml, MODEL_DEFAUT } from './index';
 import { donneesDeDevis, donneesDeFacture } from './shared';
+import { donneesDeRecu, buildRecuHtml } from './recu';
 import { pdfDepuisHtml } from '../sizingSheet/pdf';
 import { nomFichierPdf } from '../nomFichier';
 
@@ -48,5 +49,24 @@ export async function construireFacturePdf({ facture, company, model = MODEL_DEF
     sujet: 'Facture',
     auteur: company?.nomEntreprise || 'BestaSolar',
     nom: nomFichierPdf('Facture', data.numero, client),
+  });
+}
+
+/**
+ * Reçu d'un paiement en vrai PDF (une page).
+ * @param {object} o
+ * @param {object} o.facture   facture AVEC ses paiements
+ * @param {object} o.paiement
+ * @param {object} o.company
+ * @param {string} [o.model]   modèle de l'entreprise (Sobre : noir et gris)
+ */
+export async function construireRecuPdf({ facture, paiement, company, model = MODEL_DEFAUT }) {
+  const data = donneesDeRecu({ facture, paiement, company });
+  const client = data.client?.name && data.client.name !== 'Client' ? data.client.name : '';
+  return pdfDepuisHtml(buildRecuHtml({ data, model }), {
+    titre: `Reçu ${data.numero}${client ? ` — ${client}` : ''}`.trim(),
+    sujet: 'Reçu de paiement',
+    auteur: company?.nomEntreprise || 'BestaSolar',
+    nom: nomFichierPdf('Recu', data.numero, client),
   });
 }

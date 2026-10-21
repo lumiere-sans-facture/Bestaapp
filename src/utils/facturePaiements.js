@@ -11,8 +11,9 @@
 // (même identifiant), et lus en attendant. Les écrans, eux, ne voient qu'une
 // chose : `facture.paiements`, rempli par `joindrePaiements`.
 import { jourLocal } from './date';
-import { etatEcheancier } from './echeancier';
-import { montantPaye } from './paiement';
+import { etatEcheancier, quandEcheance } from './echeancier';
+import { montantPaye, PAIEMENT_MODE_LABEL } from './paiement';
+import { formatNombre } from './format';
 
 const entier = (v) => Math.max(0, Math.round(Number(v) || 0));
 
@@ -21,6 +22,12 @@ export const jourDuPaiement = (p) => {
   const d = p?.date;
   if (!d) return p?.createdAt ? jourLocal(new Date(p.createdAt)) : '';
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : jourLocal(new Date(d));
+};
+
+/** « Mobile Money (Flooz) », « Virement bancaire »… */
+export const libelleModePaiement = (p) => {
+  const mode = PAIEMENT_MODE_LABEL[p?.mode] || p?.mode || '';
+  return p?.operateur ? `${mode} (${p.operateur})` : mode;
 };
 
 const parJour = (a, b) => jourDuPaiement(a).localeCompare(jourDuPaiement(b))
@@ -135,4 +142,26 @@ export function dateMiseAJour(facture) {
   const jour = jourLocal(new Date(Math.max(...instants)));
   const emission = facture?.createdAt ? jourLocal(new Date(facture.createdAt)) : '';
   return jour > emission ? jour : '';
+}
+
+/**
+ * Message qui accompagne le reçu d'un paiement (PDF joint) : le montant
+ * reçu, ce qui reste à payer après lui et, s'il y en a une, la prochaine échéance.
+ */
+export function recuEnvoiMessage(facture, paiement, company) {
+  const paiements = facture?.paiements || [];
+  const rang = Math.max(0, paiements.findIndex((p) => p.id === paiement?.id));
+  const cumul = paiements.slice(0, rang + 1).reduce((s, p) => s + entier(p.montant), 0);
+  const reste = Math.max(0, entier(facture?.totalTTC) - cumul);
+  const etat = etatEcheancier({ ...facture, paiements: paiements.slice(0, rang + 1) }, cumul, jourDuPaiement(paiement) || jourLocal());
+  const lignes = [
+    facture?.clientName ? `Bonjour ${facture.clientName},` : 'Bonjour,',
+    `Nous avons bien reçu votre paiement de ${formatNombre(paiement?.montant || 0)} F CFA pour la facture ${facture?.numero || ''}. Votre reçu est joint.`,
+    reste > 0 ? `Reste à payer : ${formatNombre(reste)} F CFA.` : 'La facture est intégralement réglée.',
+  ];
+  if (reste > 0 && etat.prochaine) {
+    lignes.push(`Prochaine échéance : ${etat.prochaine.libelle || 'échéance'} de ${formatNombre(etat.prochaine.du)} F CFA (${quandEcheance(etat.prochaine)}).`);
+  }
+  lignes.push('Merci de votre confiance.', company?.nomEntreprise || 'BestaSolar');
+  return lignes.join('\n');
 }

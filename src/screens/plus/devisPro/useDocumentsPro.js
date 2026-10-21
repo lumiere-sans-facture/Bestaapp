@@ -7,6 +7,7 @@ import { useToast } from '../../../components/Toast';
 import { enregistrerFichePdf } from '../../../lib/fichiers';
 import { devisEnvoiMessage } from '../../../utils/affaires';
 import { factureEnvoiMessage } from '../../../utils/paiement';
+import { recuEnvoiMessage } from '../../../utils/facturePaiements';
 import { useEnvoiPdf } from '../../devis/useEnvoiPdf';
 import { normalizeModele } from './constants';
 import { paysDeLEntreprise, numeroInternational } from '../../../data/pays';
@@ -81,6 +82,27 @@ export function useDocumentsPro({ company, modeleDefaut }) {
     });
   }, { reference: f.numero });
 
+  // Reçu d'un paiement : au modèle de la facture (Sobre : noir et gris).
+  const pdfRecu = async (f, p) => {
+    const { construireRecuPdf } = await import('../../../utils/docTemplates/pdf');
+    const fichier = await construireRecuPdf({ facture: f, paiement: p, company, model: modeleDe(f) });
+    URL.revokeObjectURL(fichier.url);
+    return fichier;
+  };
+  const telechargerRecu = (f, p) => pdf.produire(p.id, 'recu', async () => {
+    await pdf.telecharger(await pdfRecu(f, p), `Reçu ${f.numero || ''}`.trim());
+  }, { reference: f.numero });
+  const envoyerRecu = (f, p) => pdf.produire(p.id, 'recu-whatsapp', async () => {
+    await pdf.envoyer({
+      ...(await pdfRecu(f, p)),
+      titre: `Reçu ${f.numero || ''}`.trim(),
+      texte: recuEnvoiMessage(f, p, company),
+      telephone: numeroInternational(f.clientPhone || '', indicatif),
+      confirmation: 'Reçu partagé.',
+      nature: 'recu',
+    });
+  }, { reference: f.numero });
+
   // Aperçu dans l'application : le document même que le PDF (même HTML,
   // même modèle), sans le produire.
   const htmlDevis = async (d, modele) => {
@@ -115,6 +137,7 @@ export function useDocumentsPro({ company, modeleDefaut }) {
     enCours: pdf.enCours,
     occupe: (doc, action) => pdf.occupe(doc?.id, action),
     telechargerDevis, envoyerDevis, telechargerFacture, envoyerFacture, telechargerFiche,
+    telechargerRecu, envoyerRecu, occupeRecu: (p, action) => pdf.occupe(p?.id, action),
     envoiPret: pdf.envoiPret, partagerMaintenant: pdf.partagerMaintenant, fermerEnvoi: pdf.fermerEnvoi,
   };
 }

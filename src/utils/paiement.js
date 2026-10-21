@@ -1,6 +1,6 @@
 import { DAY_MS, jourLocal } from './date';
 import { formatNombre as nf } from './format';
-import { echeancierEnRetard, joursRetardEcheancier } from './echeancier';
+import { echeancierEnRetard, joursRetardEcheancier, etatEcheancier, quandEcheance } from './echeancier';
 
 // Suivi des encaissements & relances — logique métier pure, sans React.
 // Le statut stocké d'une facture reste { brouillon | emise | payee | annulee } ; les états
@@ -103,6 +103,15 @@ export const STATUT_EFFECTIF_BADGE = {
 
 
 /** Message de relance pré-rempli (WhatsApp / SMS), en français. */
+/** Facture à échéancier : « Prochaine échéance : Complément d'acompte de 30 000 000 F CFA (Du 12 au 16/10/2026). » */
+const prochaineEcheance = (f) => {
+  if (!Array.isArray(f?.echeancier) || !f.echeancier.length) return '';
+  const { prochaine } = etatEcheancier(f, montantPaye(f));
+  return prochaine
+    ? `Prochaine échéance : ${prochaine.libelle || 'échéance'} de ${nf(prochaine.du)} F CFA (${quandEcheance(prochaine)}).`
+    : '';
+};
+
 export const relanceMessage = (f, company) => {
   const nom = f?.clientName || 'Cher client';
   const ent = company?.nomEntreprise || 'BestaSolar';
@@ -111,7 +120,9 @@ export const relanceMessage = (f, company) => {
     `Bonjour ${nom},`,
     `Nous vous rappelons que la facture ${f?.numero || ''} d'un montant de ${nf(reste)} F CFA reste à régler.`,
   ];
-  if (f?.echeance) lines.push(`Échéance : ${new Date(f.echeance).toLocaleDateString('fr-FR')}.`);
+  const prochaine = prochaineEcheance(f);
+  if (prochaine) lines.push(prochaine);
+  else if (f?.echeance) lines.push(`Échéance : ${new Date(f.echeance).toLocaleDateString('fr-FR')}.`);
   if (company?.momo)
     lines.push(`Règlement ${company.momoOperateur || 'Mobile Money'} : ${company.momo}${company.momoNom ? ` (${company.momoNom})` : ''}.`);
   lines.push('Merci de votre confiance.', ent);
@@ -131,7 +142,9 @@ export const factureEnvoiMessage = (f, company) => {
   if (f?.statut === 'payee' || (reste <= 0 && f?.statut !== 'brouillon')) lines.push('Elle est intégralement réglée.');
   else {
     if (reste < (Number(f?.totalTTC) || 0)) lines.push(`Reste à régler : ${nf(reste)} F CFA.`);
-    if (f?.echeance) lines.push(`À régler avant le ${new Date(f.echeance).toLocaleDateString('fr-FR')}.`);
+    const prochaine = prochaineEcheance(f);
+    if (prochaine) lines.push(prochaine);
+    else if (f?.echeance) lines.push(`À régler avant le ${new Date(f.echeance).toLocaleDateString('fr-FR')}.`);
     if (company?.momo) lines.push(`Règlement ${company.momoOperateur || 'Mobile Money'} : ${company.momo}${company.momoNom ? ` (${company.momoNom})` : ''}.`);
   }
   lines.push('Merci de votre confiance.', company?.nomEntreprise || 'BestaSolar');

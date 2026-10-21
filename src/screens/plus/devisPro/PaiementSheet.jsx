@@ -1,20 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, FileText, Pencil, Trash2, Wallet, X } from 'lucide-react';
+import { Check, FileText, Loader2, Pencil, Send, Trash2, Wallet, X } from 'lucide-react';
 import { formatCFA } from '../../../utils/format';
 import { jourLocal, jourFr } from '../../../utils/date';
-import { PAIEMENT_MODES, PAIEMENT_MODE_LABEL } from '../../../utils/paiement';
+import { PAIEMENT_MODES } from '../../../utils/paiement';
 import { STATUTS_ECHEANCE, STATUT_ECHEANCE_BADGE, quandEcheance, controlerPaiement } from '../../../utils/echeancier';
-import { etatPaiementFacture, jourDuPaiement } from '../../../utils/facturePaiements';
+import { etatPaiementFacture, jourDuPaiement, libelleModePaiement as libelleMode } from '../../../utils/facturePaiements';
 import Sheet from '../../../components/Sheet';
 import Field from '../../../components/Field';
 
 const formulaireVide = (montant) => ({ montant, date: jourLocal(), mode: 'momo', operateur: '', reference: '', note: '' });
 
-/** « Mobile Money (T-Money) », « Virement bancaire »… */
-export const libelleMode = (p) => {
-  const mode = PAIEMENT_MODE_LABEL[p?.mode] || p?.mode || '';
-  return p?.operateur ? `${mode} (${p.operateur})` : mode;
-};
 
 /**
  * Paiements d'une facture : récapitulatif (total, payé, reste), échéancier
@@ -23,8 +18,10 @@ export const libelleMode = (p) => {
  * Calculs : utils/facturePaiements.js et utils/echeancier.js.
  * @param {object} facture        facture AVEC ses paiements (contexte de données)
  * @param {string[]} [operateurs] opérateurs Mobile Money du pays de l'entreprise
+ * @param {(p) => void} [onRecu]        reçu du paiement en PDF
+ * @param {(p) => void} [onEnvoyerRecu] reçu envoyé au client (WhatsApp)
  */
-export default function PaiementSheet({ open, onClose, facture, operateurs = [], onSubmit, onUpdate, onDelete, onRecu }) {
+export default function PaiementSheet({ open, onClose, facture, operateurs = [], onSubmit, onUpdate, onDelete, onRecu, onEnvoyerRecu, recuOccupe = () => false }) {
   const etat = facture ? etatPaiementFacture(facture) : null;
   const montantPropose = etat ? (etat.prochaine?.du || etat.reste) : 0;
   const [form, setForm] = useState(() => formulaireVide(montantPropose));
@@ -199,7 +196,18 @@ export default function PaiementSheet({ open, onClose, facture, operateurs = [],
                 </div>
               ) : (
                 <div className="pay-history-actions">
-                  {onRecu && <button type="button" className="btn btn-sm btn-outline" onClick={() => onRecu(p)}><FileText size={14} /> Reçu</button>}
+                  {onRecu && (
+                    <button type="button" className="btn btn-sm btn-outline" disabled={recuOccupe(p, 'recu')} onClick={() => onRecu(p)}
+                      aria-label={`Reçu du paiement du ${jourFr(jourDuPaiement(p))} (PDF)`}>
+                      {recuOccupe(p, 'recu') ? <Loader2 size={14} className="tourne" /> : <FileText size={14} />} Reçu
+                    </button>
+                  )}
+                  {onEnvoyerRecu && (
+                    <button type="button" className="btn btn-sm btn-outline" disabled={recuOccupe(p, 'recu-whatsapp')} onClick={() => onEnvoyerRecu(p)}
+                      aria-label={`Envoyer le reçu du ${jourFr(jourDuPaiement(p))} sur WhatsApp`}>
+                      {recuOccupe(p, 'recu-whatsapp') ? <Loader2 size={14} className="tourne" /> : <Send size={14} />}
+                    </button>
+                  )}
                   {onUpdate && <button type="button" className="btn btn-sm btn-outline" onClick={() => modifier(p)} aria-label={`Modifier le paiement du ${jourFr(jourDuPaiement(p))}`}><Pencil size={14} /> Modifier</button>}
                   {onDelete && <button type="button" className="btn btn-sm btn-outline" onClick={() => setASupprimer(p.id)} aria-label={`Supprimer le paiement du ${jourFr(jourDuPaiement(p))}`}><Trash2 size={14} /></button>}
                 </div>
