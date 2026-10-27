@@ -95,8 +95,15 @@ return { ctx, page };
 let db = base(); let envois = [];
 let { ctx, page } = await appareil(db, envois);
 const ouvrirPaiements = async () => {
-  await page.goto(B + '/pro/documents');
-  await page.getByRole('button', { name: /Factures \(1\)/ }).click({ timeout: 15000 });
+  // Juste après la connexion, l'abonnement n'est pas encore relu : l'espace
+  // Pro n'est pas ouvert et l'adresse renvoie au tableau de bord. On réessaie.
+  const onglet = page.getByRole('button', { name: /Factures \(1\)/ });
+  for (let essai = 0; essai < 4; essai += 1) {
+    await page.goto(B + '/pro/documents');
+    if (await onglet.waitFor({ timeout: 8000 }).then(() => true, () => false)) break;
+    await page.waitForTimeout(1500);
+  }
+  await onglet.click({ timeout: 15000 });
   await page.locator('.flat-row', { hasText: NUMERO }).click();
   await page.getByRole('button', { name: /Enregistrer un paiement|Voir les paiements/ }).click();
   await page.locator('.pay-echeance-row').first().waitFor();

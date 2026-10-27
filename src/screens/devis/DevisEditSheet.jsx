@@ -50,8 +50,18 @@ export default function DevisEditSheet({ open, onClose, devis, editableClient = 
 
   useEffect(() => { lignesRef.current = lignes; }, [lignes]);
 
+  // Le devis se charge UNE fois par ouverture. Avant, l'éditeur se rechargeait
+  // à chaque synchronisation (le catalogue `products` reçu du serveur est un
+  // nouveau tableau à chaque relecture) depuis la copie du devis prise à
+  // l'ouverture : la ligne qu'on venait d'enregistrer reprenait son ancienne
+  // valeur quelques secondes plus tard, une ligne en cours de saisie se
+  // refermait, et l'enregistrement suivant renvoyait l'ancienne version au
+  // serveur. Après l'ouverture, ce sont les lignes de l'éditeur qui font foi.
+  const chargeRef = useRef(null); // id du devis chargé dans cette ouverture
   useEffect(() => {
-    if (!open || !devis) return;
+    if (!open) { chargeRef.current = null; return; }
+    if (!devis || chargeRef.current === devis.id) return;
+    chargeRef.current = devis.id;
     setClient({ clientName: devis.clientName || '', clientPhone: devis.clientPhone || '', clientVille: devis.clientVille || '' });
     setNote(devis.noteBasPage || '');
     setDateEnregistree(dateEmissionDevis(devis));

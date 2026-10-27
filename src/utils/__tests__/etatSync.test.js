@@ -1,7 +1,7 @@
 // L'invariant qui a coûté un voyant orange figé en production.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { peutEnvoyer, STATUTS_QUI_ENVOIENT } from '../etatSync';
+import { peutEnvoyer, STATUTS_QUI_ENVOIENT, relecturePerimee } from '../etatSync';
 
 describe('peutEnvoyer', () => {
   it('envoie depuis « online » et « error » — et de nulle part ailleurs', () => {
@@ -31,5 +31,18 @@ describe('le moteur de réplication ne se fige pas lui-même', () => {
     + 'initiale le fait', () => {
     const source = readFileSync(new URL('../../context/useRemoteSync.js', import.meta.url), 'utf8');
     expect(source).not.toMatch(/setSyncStatus\(\s*['"]connecting['"]\s*\)/);
+  });
+});
+
+describe('relecture périmée', () => {
+  it('appliquée quand aucun envoi ne l’a croisée', () => {
+    expect(relecturePerimee({ generationAvant: 4, generationApres: 4, envoiAuDepart: false, envoiALArrivee: false })).toBe(false);
+  });
+  it('jetée quand un envoi a commencé ou fini pendant la lecture', () => {
+    expect(relecturePerimee({ generationAvant: 4, generationApres: 6, envoiAuDepart: false, envoiALArrivee: false })).toBe(true);
+    expect(relecturePerimee({ generationAvant: 4, generationApres: 5, envoiAuDepart: false, envoiALArrivee: true })).toBe(true);
+  });
+  it('jetée quand un envoi était déjà en cours à son départ', () => {
+    expect(relecturePerimee({ generationAvant: 5, generationApres: 5, envoiAuDepart: true, envoiALArrivee: true })).toBe(true);
   });
 });

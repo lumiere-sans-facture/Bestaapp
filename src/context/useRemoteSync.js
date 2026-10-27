@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { pullAll, pushCollections, pushTombstone, resynchroniserOrg, subscribeToChanges, lignesRefuseesParTable, lireVersionsServeur, SYNCED_COLLECTIONS } from '../lib/remoteSync';
 import { estRefusRls, MESSAGE_REFUS_RLS, messageLignesRefusees } from '../utils/erreurSync';
-import { peutEnvoyer } from '../utils/etatSync';
+import { peutEnvoyer, relecturePerimee } from '../utils/etatSync';
 import { loadFileSync, persistFileSync, completerKits } from './dataState';
 import { fileEnAttente, unionFiles, totalEnAttente, enAttentePourTable, fusionnerCollection, idsModifies, rebaserSurServeur } from '../utils/fileSync';
 import { signalerErreur } from '../lib/rapportErreur';
@@ -35,6 +35,10 @@ const horsLigne = () => typeof navigator !== 'undefined' && navigator.onLine ===
 // tout seul — pas de quoi alerter.
 const ECHECS_AVANT_SIGNALEMENT = 3;
 
+// Délai avant de relire à nouveau quand une relecture a croisé un envoi
+// (voir relecturePerimee) : laisse l'envoi se terminer.
+const DELAI_RELECTURE_PERIMEE = 3000;
+
 // Relit sur le serveur les fiches modifiées ici qui y existaient déjà, et les
 // recale sur leur version actuelle (utils/fileSync.js › rebaserSurServeur).
 // `bases` : dernier état répliqué. Renvoie null s'il n'y a rien à recaler,
@@ -63,6 +67,10 @@ async function recalerSurServeur(changed, bases) {
 export function useRemoteSync(state, setState, stateRef, scope = null) {
   const syncedRef = useRef(null); // dernier état RÉELLEMENT répliqué, par collection
   const lastPushAt = useRef(0);
+  // Envois en cours, et compteur qui avance au début et à la fin de chacun :
+  // une relecture du serveur qui en a croisé un est jetée (relecturePerimee).
+  const envoisEnCours = useRef(0);
+  const generationEnvoi = useRef(0);
   const echecs = useRef(0);       // échecs consécutifs de push (délai croissant)
   // Second passage : écarter les lignes refusées une à une. Armé seulement
   // après un réalignement d'organisation resté sans effet — sinon on se
@@ -139,6 +147,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
     let timerConnexion = null;
     let echecsConnexion = 0;
     let enCours = false;
+    let timerRelecture = null;
 
     // Pull fusionné : les modifications locales en attente et les items créés
     // hors-ligne survivent à la réception (voir utils/fileSync.js).
@@ -169,11 +178,25 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
 
     const refreshFromRemote = async () => {
       try {
+        clearTimeout(timerRelecture);
+        const generationAvant = generationEnvoi.current;
+        const envoiAuDepart = envoisEnCours.current > 0;
         // Passer les tombstones est indispensable : sinon une suppression faite
         // sur un autre appareil n'est pas appliquée au merge (l'item local serait
         // traité comme « créé hors-ligne » puis ré-uploadé en zombie).
         const { collections, tombstones } = await pullAll();
-        if (!cancelled) applyRemote(collections, tombstones);
+        if (cancelled) return;
+        // Un envoi a croisé cette lecture : ce qu'elle rapporte peut être
+        // antérieur à ce qu'on vient d'écrire. On relit plus tard plutôt que
+        // de ramener l'ancienne version par-dessus la nouvelle.
+        if (relecturePerimee({
+          generationAvant, generationApres: generationEnvoi.current,
+          envoiAuDepart, envoiALArrivee: envoisEnCours.current > 0,
+        })) {
+          timerRelecture = setTimeout(refreshFromRemote, DELAI_RELECTURE_PERIMEE);
+          return;
+        }
+        applyRemote(collections, tombstones);
       } catch (e) {
         console.error('Synchronisation Supabase impossible :', e.message);
       }
@@ -244,6 +267,7 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
     return () => {
       cancelled = true;
       clearTimeout(timerConnexion);
+      clearTimeout(timerRelecture);
       unsubscribe();
       window.removeEventListener('online', reprendre);
       window.removeEventListener('focus', reprendre);
@@ -434,7 +458,14 @@ export function useRemoteSync(state, setState, stateRef, scope = null) {
       clearTimeout(retryTimer.current);
       retryTimer.current = setTimeout(() => setRetryTick((t) => t + 1), delaiReprise(echecs.current));
     };
-    doSync();
+    // Suivi de l'envoi, quelle que soit son issue : les relectures qui le
+    // croisent sont jetées (voir refreshFromRemote).
+    envoisEnCours.current += 1;
+    generationEnvoi.current += 1;
+    doSync().finally(() => {
+      envoisEnCours.current -= 1;
+      generationEnvoi.current += 1;
+    });
     return () => { annule = true; };
   }, [state, syncStatus, retryTick, majFile, stateRef, setState, signalerSiPersistant]); // stateRef et setState sont stables
 

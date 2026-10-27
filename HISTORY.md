@@ -5,6 +5,12 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-10-27
+- **Devis : une modification enregistrée ne « saute » plus quelques secondes après.**
+  - L'éditeur de devis (écran Devis et espace Pro) se rechargeait à chaque synchronisation : retour dans l'app, signal d'un autre appareil, relecture de chaque minute. Il repartait alors du devis tel qu'il était à l'ouverture : la ligne qu'on venait d'enregistrer reprenait son ancienne valeur, une ligne en cours de saisie se refermait, et l'enregistrement suivant renvoyait au serveur l'ancienne version — la modification précédente était perdue. Le devis se charge désormais une seule fois par ouverture.
+  - Synchronisation : une relecture du serveur partie juste avant un enregistrement, et revenue après, ramenait l'ancienne version par-dessus la nouvelle (le serveur, lui, avait la bonne). Une relecture qui croise un envoi est maintenant ignorée, et une autre repart trois secondes plus tard.
+  - Scénario `e2e/devis-modification.mjs` (Supabase simulé, 6 vérifications) : 4 échouaient avant la correction, toutes passent.
+
 ## 2026-10-21
 - **Facturation, étape 3 : la facture imprimée porte les acomptes, le reste à payer et l'échéancier ; reçu de paiement en PDF.**
   - Sur les trois modèles (Studio, Vague, Sobre) : acomptes versés déduits du total, bandeau « Reste à payer », mention fiscale, « Arrêtée la présente facture à la somme de … » (total, et reste dû après un acompte), échéancier avec le statut de chaque échéance, modes de paiement avec leurs coordonnées (banque et compte, numéro Mobile Money), signataire avec l'image de la signature et du cachet. En-tête : NIF, RCCM, CNSS, et la date de « Mise à jour » quand un paiement ou l'échéancier a changé depuis l'émission.
