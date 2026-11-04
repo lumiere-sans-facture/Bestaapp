@@ -5,6 +5,13 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-11-04
+- **Application Android : le bouton « retour » ramène à la page d'accueil avant de quitter.**
+  - Rien ne gérait ce bouton : Android fermait l'application à la première pression, quel que soit l'écran.
+  - Désormais, dans l'ordre : une fenêtre ouverte (fiche, confirmation, aperçu) se ferme ; hors de la page d'accueil, on y revient (tableau de bord, celui de l'espace Pro, ou l'écran de connexion sans compte) ; depuis l'accueil, l'application se ferme — elle passe en arrière-plan comme toute app Android et rouvre là où on l'a laissée.
+  - Nouveau module natif `@capacitor/app` (8.1.2) : il faut la prochaine version de l'APK. Le site web n'est pas concerné.
+  - Scénario `e2e/bouton-retour.mjs` (11 vérifications, pont natif simulé).
+
 ## 2026-10-27
 - **Devis : une modification enregistrée ne « saute » plus quelques secondes après.**
   - L'éditeur de devis (écran Devis et espace Pro) se rechargeait à chaque synchronisation : retour dans l'app, signal d'un autre appareil, relecture de chaque minute. Il repartait alors du devis tel qu'il était à l'ouverture : la ligne qu'on venait d'enregistrer reprenait son ancienne valeur, une ligne en cours de saisie se refermait, et l'enregistrement suivant renvoyait au serveur l'ancienne version — la modification précédente était perdue. Le devis se charge désormais une seule fois par ouverture.

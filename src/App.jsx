@@ -18,6 +18,7 @@ import Login from './screens/Login';
 import { installerFiletsGlobaux } from './lib/rapportErreur';
 import { installerAnalytique, suivrePage, signalerOuvertureApp } from './lib/analytique';
 import { installerBarreEtat } from './lib/barreEtat';
+import { installerBoutonRetour } from './lib/boutonRetour';
 import { codeParrainageInstallation } from './lib/parrainageInstallation';
 
 // Capture l'attribution d'affiliation (?ref=AMINATA, ou /r/AMINATA) dès le
@@ -121,6 +122,16 @@ function AppRoutes() {
   // retour de Google — qui atterrit sur la racine — tombait sur la page
   // d'accueil et l'inscription se perdait là, sans un mot.
   const ecran = ecranDentree({ isLoading, recovery, pendingAuthUser, user });
+
+  // Application Android : le bouton « retour » ferme la fenêtre ouverte, puis
+  // ramène à la page d'accueil ; c'est seulement depuis l'accueil qu'il fait
+  // quitter l'app (lib/boutonRetour.js). Situation lue au moment de la pression.
+  const etatRetour = useRef({ chemin: '/', connecte: false });
+  etatRetour.current = { chemin: pathname, connecte: ecran === 'application' };
+  useEffect(
+    () => installerBoutonRetour(() => etatRetour.current, (vers) => navigate(vers, { replace: true })),
+    [navigate]
+  );
   // Application Android installée par un lien partenaire : le code repris du
   // téléchargement (lib/parrainageInstallation.js) vaut un lien suivi — lu au
   // rendu, la reprise se terminant après le chargement de ce module.
