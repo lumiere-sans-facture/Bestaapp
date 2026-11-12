@@ -6,10 +6,16 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-11-12
+- **Académie : les exemples de facture SBEE recalculés à 145 F le kWh.**
+  - Les leçons, l'exercice de Parakou et les quiz comptaient 115 F. Avec 25 000 F par mois à 145 F : 172 kWh par mois (au lieu de 217), 5,7 kWh par jour (au lieu de 7,2), batterie conseillée de 3,8 kWh en « Équilibré » et 5,3 kWh en « Surtout le soir » (au lieu de 4,8 et 6,7). Avec les kits livrés par défaut, l'exercice aboutit au Kit 3,8 kWh (au lieu du Kit 5 kWh) puis au Kit 10 kWh. Les mauvaises réponses des quiz sont recalculées sur les mêmes erreurs qu'avant.
+  - Le kWh du groupe électrogène (250 F avec un gazole à 750 F) n'est plus « plus du double » du réseau à 145 F : la leçon dit désormais « bien plus cher ».
+  - Tous ces chiffres viennent des fonctions de l'application, et un test (`academieSbee.test.js`) les recalcule : si le prix ou le calcul change, il désigne la leçon à reprendre. Le scénario `e2e/academie-exemple-sbee.mjs` refait l'exercice dans les deux assistants (15 vérifications) et retrouve exactement les chiffres de la leçon.
+  - Base de données : les cours déjà en base ne sont jamais réécrits par `formations-academie.sql`. Nouveau script `supabase/academie-sbee-145.sql`, **à passer dans les deux projets Supabase**. Il met à jour les deux cours concernés sans toucher une leçon retouchée par le gérant (le tableau final la signale), et une deuxième exécution ne change rien. Il a été éprouvé sur un PostgreSQL local (`supabase/tests/academie-sbee-145.sql`) : en partant des cours de production, le résultat est identique à la nouvelle version.
+  - Remarque : les assistants affichent la batterie avec un point (« 3.8 kWh ») là où la leçon écrit « 3,8 ». C'est un affichage existant, non modifié ici.
 - **Simulateur ROI : au Bénin, le kWh part de 145 F.**
   - Le simulateur affichait 115 F le kWh SBEE par défaut, alors que la fiche de dimensionnement et l'espace Pro comptaient déjà 145 F : deux prix pour le même opérateur. Le tableau des tarifs UEMOA (`data/tarifsUemoa.js`) passe à 145 F pour le Bénin ; les autres pays ne changent pas, et le curseur reste modifiable.
   - Un test lie désormais les trois valeurs (simulateur, fiche, pays de l'espace Pro) : elles ne peuvent plus diverger.
-  - Les exercices de l'Académie gardent leur exemple à 115 F : l'élève y tape lui-même le prix.
+  - Les exemples de l'Académie suivent : voir l'entrée ci-dessus.
 - **Champs numériques : on peut enfin les vider pour retaper un autre nombre.**
   - Effacé, le champ redevenait aussitôt « 1 » ou « 0 » : le dernier chiffre ne partait jamais, et taper 3 donnait « 13 ». En cause, 14 champs qui convertissaient la saisie à chaque frappe : appareils des assistants de dimensionnement Pro et public (quantité, puissance, heures de jour et de nuit), devis modifiable de l'assistant Pro (quantité, prix), fiche d'une ligne de devis (quantité, prix), simulateur ROI (quantité), échéancier des factures (montant).
   - Un seul champ numérique partagé les remplace (`components/ChampNombre.jsx`) : vide pendant la frappe, la valeur précédente reste en vigueur et le calcul ne saute pas à zéro ; quitté vide, il réaffiche cette valeur. Quantité jamais sous 1, montants arrondis au franc.
