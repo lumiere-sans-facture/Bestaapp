@@ -15,6 +15,7 @@ import { isSupabaseConfigured } from '../../lib/supabase';
 import PartnerField from './PartnerField';
 import LeadPicker from './LeadPicker';
 import Field from '../../components/Field';
+import ChampNombre from '../../components/ChampNombre';
 import EmptyState from '../../components/EmptyState';
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../components/SolarConsumptionControls';
 import AjustementsKit from '../../components/AjustementsKit';
@@ -414,19 +415,19 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                           <div className="appliance-fields">
                             <label className="appliance-field">
                               <span>Qté</span>
-                              <input type="number" min="1" value={r.quantity} onChange={(e) => updateRow(r.rowId, 'quantity', Math.max(1, Number(e.target.value)))} />
+                              <ChampNombre min={1} value={r.quantity} onChange={(n) => updateRow(r.rowId, 'quantity', n)} />
                             </label>
                             <label className="appliance-field">
                               <span>Puiss. (W)</span>
-                              <input type="number" min="0" value={r.power} onChange={(e) => updateRow(r.rowId, 'power', Number(e.target.value))} />
+                              <ChampNombre min={0} value={r.power} onChange={(n) => updateRow(r.rowId, 'power', n)} />
                             </label>
                             <label className="appliance-field">
                               <span><Sun size={12} /> h jour</span>
-                              <input type="number" min="0" step="0.5" value={r.day} onChange={(e) => updateRow(r.rowId, 'day', Number(e.target.value))} />
+                              <ChampNombre min={0} step="0.5" value={r.day} onChange={(n) => updateRow(r.rowId, 'day', n)} />
                             </label>
                             <label className="appliance-field">
                               <span><Moon size={12} /> h nuit</span>
-                              <input type="number" min="0" step="0.5" value={r.night} onChange={(e) => updateRow(r.rowId, 'night', Number(e.target.value))} />
+                              <ChampNombre min={0} step="0.5" value={r.night} onChange={(n) => updateRow(r.rowId, 'night', n)} />
                             </label>
                           </div>
                           <div className="appliance-row-consumption">

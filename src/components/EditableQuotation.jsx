@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ChampNombre from './ChampNombre';
 import { Plus, Trash2 } from 'lucide-react';
 import { formatCFA } from '../utils/format';
 import { prixPublic } from '../utils/price';
@@ -64,13 +65,11 @@ export default function EditableQuotation({ lines, onChange, products = [] }) {
           <div className="editable-quotation-fields">
             <label>
               <span>Quantité</span>
-              <input type="number" min="1" step="1" value={line.qty}
-                onChange={(event) => update(line.id, { qty: Math.max(1, Number(event.target.value) || 1) })} />
+              <ChampNombre min={1} step="1" value={line.qty} onChange={(qty) => update(line.id, { qty })} />
             </label>
             <label>
               <span>Prix unitaire</span>
-              <input type="number" min="0" step="1" value={line.pu}
-                onChange={(event) => update(line.id, { pu: Math.max(0, Number(event.target.value) || 0) })} />
+              <ChampNombre min={0} step="1" inputMode="decimal" value={line.pu} onChange={(pu) => update(line.id, { pu })} />
             </label>
             <label>
               <span>Remplacer par</span>

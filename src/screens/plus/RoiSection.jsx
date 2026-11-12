@@ -8,6 +8,7 @@ import { DEFAULT_PEAK_SUN_HOURS, SYSTEM_TYPES } from '../../utils/solarSizing';
 import { dimensionnementRejouable, restaurerDimensionnement, resumeDimensionnement } from '../../utils/dimensionnement';
 import { proposerKit, consommationDimensionnement } from '../../utils/propositionKit';
 import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
+import ChampNombre from '../../components/ChampNombre';
 import { REPARTITIONS, DEFAULT_REPARTITION, JOURS_PAR_MOIS, partJourDe } from '../../utils/factureConso';
 import {
   simulerRoi, consommationDepuisFacture,
@@ -280,9 +281,9 @@ export default function RoiSection() {
               <div key={r.rowId} className="roi-appareil">
                 <span className="roi-appareil-nom">{r.name}</span>
                 <span className="roi-appareil-spec">{r.power} W · {r.day + r.night} h/j</span>
-                <input
-                  type="number" className="roi-appareil-qte" min="1" value={r.quantity}
-                  onChange={(e) => quantite(r.rowId, Number(e.target.value))}
+                <ChampNombre
+                  className="roi-appareil-qte" min={1} value={r.quantity}
+                  onChange={(n) => quantite(r.rowId, n)}
                   aria-label={`Quantité — ${r.name}`}
                 />
                 <button type="button" className="roi-appareil-retirer" onClick={() => retirer(r.rowId)}

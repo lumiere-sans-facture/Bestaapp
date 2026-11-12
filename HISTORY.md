@@ -5,6 +5,13 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-11-12
+- **Champs numériques : on peut enfin les vider pour retaper un autre nombre.**
+  - Effacé, le champ redevenait aussitôt « 1 » ou « 0 » : le dernier chiffre ne partait jamais, et taper 3 donnait « 13 ». En cause, 14 champs qui convertissaient la saisie à chaque frappe : appareils des assistants de dimensionnement Pro et public (quantité, puissance, heures de jour et de nuit), devis modifiable de l'assistant Pro (quantité, prix), fiche d'une ligne de devis (quantité, prix), simulateur ROI (quantité), échéancier des factures (montant).
+  - Un seul champ numérique partagé les remplace (`components/ChampNombre.jsx`) : vide pendant la frappe, la valeur précédente reste en vigueur et le calcul ne saute pas à zéro ; quitté vide, il réaffiche cette valeur. Quantité jamais sous 1, montants arrondis au franc.
+  - Les autres champs numériques de l'app (catalogue, kits, onduleurs, factures, paiements, rentabilité…) gardaient déjà le texte tapé : ils s'effaçaient normalement.
+  - Scénario `e2e/champs-nombres.mjs` (28 vérifications ; sur l'ancien code, le champ restait à « 1 » et taper 3 donnait « 13 »).
+
 ## 2026-11-04
 - **Application Android : le bouton « retour » ramène à la page d'accueil avant de quitter.**
   - Rien ne gérait ce bouton : Android fermait l'application à la première pression, quel que soit l'écran.

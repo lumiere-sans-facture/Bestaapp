@@ -21,6 +21,7 @@ import ClientIdentityFields, { contactEffectif } from '../../../components/Clien
 import TvaToggle from '../../../components/TvaToggle';
 import { paysDeLEntreprise, indicationTva } from '../../../data/pays';
 import EditableQuotation, { lignesDepuisDevisKit, lignesModifiables } from '../../../components/EditableQuotation';
+import ChampNombre from '../../../components/ChampNombre';
 import { ConsumptionModePicker, InvoiceConsumptionFields } from '../../../components/SolarConsumptionControls';
 import AjustementsKit from '../../../components/AjustementsKit';
 import PourquoiOnduleur from '../../../components/PourquoiOnduleur';
@@ -567,10 +568,10 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
                           <button className="appliance-delete" onClick={() => removeRow(r.rowId)} aria-label="Supprimer"><Trash2 size={15} /></button>
                         </div>
                         <div className="appliance-fields">
-                          <label className="appliance-field"><span>Quantité</span><input type="number" min="1" value={r.quantity} onChange={(e) => updateRow(r.rowId, 'quantity', Math.max(1, Number(e.target.value)))} /></label>
-                          <label className="appliance-field"><span>Puissance (W)</span><input type="number" min="0" value={r.power} onChange={(e) => updateRow(r.rowId, 'power', Number(e.target.value))} /></label>
-                          <label className="appliance-field"><span><Sun size={12} /> Heures de jour</span><input type="number" min="0" step="0.5" value={r.day} onChange={(e) => updateRow(r.rowId, 'day', Number(e.target.value))} /></label>
-                          <label className="appliance-field"><span><Moon size={12} /> Heures de nuit</span><input type="number" min="0" step="0.5" value={r.night} onChange={(e) => updateRow(r.rowId, 'night', Number(e.target.value))} /></label>
+                          <label className="appliance-field"><span>Quantité</span><ChampNombre min={1} value={r.quantity} onChange={(n) => updateRow(r.rowId, 'quantity', n)} /></label>
+                          <label className="appliance-field"><span>Puissance (W)</span><ChampNombre min={0} value={r.power} onChange={(n) => updateRow(r.rowId, 'power', n)} /></label>
+                          <label className="appliance-field"><span><Sun size={12} /> Heures de jour</span><ChampNombre min={0} step="0.5" value={r.day} onChange={(n) => updateRow(r.rowId, 'day', n)} /></label>
+                          <label className="appliance-field"><span><Moon size={12} /> Heures de nuit</span><ChampNombre min={0} step="0.5" value={r.night} onChange={(n) => updateRow(r.rowId, 'night', n)} /></label>
                         </div>
                       </div>
                     ))}

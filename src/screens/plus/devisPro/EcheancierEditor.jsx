@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Trash2, Wand2 } from 'lucide-react';
 import { formatCFA } from '../../../utils/format';
 import { jourLocal } from '../../../utils/date';
+import ChampNombre from '../../../components/ChampNombre';
 import {
   MODELES_ECHEANCIER, TYPES_ECHEANCE, STATUTS_ECHEANCE, STATUT_ECHEANCE_BADGE,
   echeancierDepuisModele, nouvelleEcheance, totalEcheancier, repartirPaiements,
@@ -83,8 +84,7 @@ export default function EcheancierEditor({ echeancier = [], onChange, total = 0,
             </label>
             <label className="doc-line-field">
               Montant (F CFA)
-              <input className="input" type="number" min="0" value={e.montant}
-                onChange={(ev) => maj(i, { montant: Math.max(0, Math.round(Number(ev.target.value) || 0)) })} />
+              <ChampNombre className="input" min={0} arrondi value={e.montant} onChange={(n) => maj(i, { montant: n })} />
             </label>
             {e.type === 'date' && (
               <label className="doc-line-field">

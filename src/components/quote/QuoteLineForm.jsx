@@ -1,5 +1,6 @@
 import { Minus, Plus } from 'lucide-react';
 import Field from '../Field';
+import ChampNombre from '../ChampNombre';
 import { formatQuoteCurrency, quoteLineTotals, QUOTE_UNITS, TAX_RATES } from '../../utils/quoteLines';
 import { tvaPct } from '../../data/pays';
 
@@ -8,8 +9,7 @@ export function QuantitySelector({ value, onChange }) {
   return (
     <div className="quote-quantity" role="group" aria-label="Quantité">
       <button type="button" onClick={() => onChange(Math.max(1, qty - 1))} aria-label="Diminuer la quantité"><Minus size={22} /></button>
-      <input type="number" min="1" step="1" inputMode="numeric" value={qty}
-        onChange={(event) => onChange(Math.max(1, Number(event.target.value) || 1))} aria-label="Quantité" />
+      <ChampNombre min={1} step="1" value={qty} onChange={onChange} aria-label="Quantité" />
       <button type="button" onClick={() => onChange(qty + 1)} aria-label="Augmenter la quantité"><Plus size={22} /></button>
     </div>
   );
@@ -26,8 +26,7 @@ export function UnitSelector({ value, onChange }) {
 export function CurrencyInput({ value, onChange, currency }) {
   return (
     <div className="quote-currency-input">
-      <input className="input" type="number" min="0" step="1" inputMode="decimal" value={value}
-        onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))} />
+      <ChampNombre className="input" min={0} step="1" inputMode="decimal" value={value} onChange={onChange} />
       <span>{currency}</span>
     </div>
   );
