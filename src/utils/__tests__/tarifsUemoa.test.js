@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TARIFS_UEMOA, PAYS_DEFAUT, tarifPays, operateurPays } from '../../data/tarifsUemoa';
+import { paysParId } from '../../data/pays';
+import { TARIF_ELECTRICITE_BENIN } from '../sizingSheet/compute';
 
 describe('tarifs UEMOA', () => {
   it('couvre les huit pays de l’union', () => {
@@ -27,6 +29,12 @@ describe('tarifs UEMOA', () => {
     expect(PAYS_DEFAUT).toBe('bj');
     expect(tarifPays(PAYS_DEFAUT).pays).toBe('Bénin');
     expect(tarifPays(PAYS_DEFAUT).operateur).toBe('SBEE');
+  });
+
+  it('Bénin : le simulateur part de 145 F le kWh, comme la fiche et l’espace Pro', () => {
+    expect(tarifPays('bj').prixKwh).toBe(145);
+    expect(tarifPays('bj').prixKwh).toBe(TARIF_ELECTRICITE_BENIN);
+    expect(tarifPays('bj').prixKwh).toBe(paysParId('bj').prixKwh);
   });
 
   it('un pays inconnu ne fait pas tomber l’écran', () => {

@@ -9,7 +9,9 @@
 // reste donc modifiable — ces valeurs ne sont qu'un point de départ, et c'est
 // la facture du client qui fait foi.
 export const TARIFS_UEMOA = [
-  { id: 'bj', pays: 'Bénin', operateur: 'SBEE', prixKwh: 115 },
+  // Bénin : 145 F, la valeur que la fiche de dimensionnement et l'espace Pro
+  // emploient déjà (TARIF_ELECTRICITE_BENIN) — un seul prix SBEE dans l'app.
+  { id: 'bj', pays: 'Bénin', operateur: 'SBEE', prixKwh: 145 },
   { id: 'bf', pays: 'Burkina Faso', operateur: 'SONABEL', prixKwh: 127 },
   { id: 'ci', pays: 'Côte d’Ivoire', operateur: 'CIE', prixKwh: 90 },
   { id: 'gw', pays: 'Guinée-Bissau', operateur: 'EAGB', prixKwh: 180 },

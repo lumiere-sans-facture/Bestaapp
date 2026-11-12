@@ -6,6 +6,10 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-11-12
+- **Simulateur ROI : au Bénin, le kWh part de 145 F.**
+  - Le simulateur affichait 115 F le kWh SBEE par défaut, alors que la fiche de dimensionnement et l'espace Pro comptaient déjà 145 F : deux prix pour le même opérateur. Le tableau des tarifs UEMOA (`data/tarifsUemoa.js`) passe à 145 F pour le Bénin ; les autres pays ne changent pas, et le curseur reste modifiable.
+  - Un test lie désormais les trois valeurs (simulateur, fiche, pays de l'espace Pro) : elles ne peuvent plus diverger.
+  - Les exercices de l'Académie gardent leur exemple à 115 F : l'élève y tape lui-même le prix.
 - **Champs numériques : on peut enfin les vider pour retaper un autre nombre.**
   - Effacé, le champ redevenait aussitôt « 1 » ou « 0 » : le dernier chiffre ne partait jamais, et taper 3 donnait « 13 ». En cause, 14 champs qui convertissaient la saisie à chaque frappe : appareils des assistants de dimensionnement Pro et public (quantité, puissance, heures de jour et de nuit), devis modifiable de l'assistant Pro (quantité, prix), fiche d'une ligne de devis (quantité, prix), simulateur ROI (quantité), échéancier des factures (montant).
   - Un seul champ numérique partagé les remplace (`components/ChampNombre.jsx`) : vide pendant la frappe, la valeur précédente reste en vigueur et le calcul ne saute pas à zéro ; quitté vide, il réaffiche cette valeur. Quantité jamais sous 1, montants arrondis au franc.
