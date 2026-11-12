@@ -14,6 +14,7 @@ import { factureVersConsommation } from '../../../utils/factureConso';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../../lib/solarData';
 import { computeFactureTotals } from '../../../utils/facture';
 import { provisionOnduleurDuDevis, tarifElectriciteParDefaut } from '../../../utils/sizingSheet/compute';
+import { paysTarifFacture, prixFactureSuivantPays } from '../../../utils/tarifElectricite';
 import { coefficientMainOeuvre } from '../../../utils/mainOeuvre';
 import { prixPublic } from '../../../utils/price';
 import Field from '../../../components/Field';
@@ -266,6 +267,26 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
     : (myClients.find((c) => c.id === clientId) || {});
   const villeDimensionnement = location?.name || clientSelectionne.ville || '';
   const tarifElecDefaut = tarifElectriciteParDefaut(villeDimensionnement, location?.country || '', pays.id);
+  // Prix du kWh de la facture : celui du pays du client — lieu du chantier,
+  // ville, numéro —, sinon celui du pays de l'entreprise (SBEE, 145 F, pour
+  // une entreprise au Bénin). Il suit le client tant qu'il n'a pas été saisi
+  // à la main ; une étude par facture rouverte garde le sien.
+  const paysTarif = paysTarifFacture({
+    ville: villeDimensionnement,
+    pays: location?.country || '',
+    telephone: clientSelectionne.phone || '',
+    paysEntreprise: pays.id,
+  });
+  const tarifSuivi = useRef(reprise.restaure && reprise.consoMode === 'facture' ? null : reprise.facture.prixKwh);
+  useEffect(() => {
+    if (tarifSuivi.current == null) return;
+    const ancien = tarifSuivi.current;
+    tarifSuivi.current = paysTarif.prixKwh;
+    setFacture((f) => {
+      const prixKwh = prixFactureSuivantPays(f.prixKwh, ancien, paysTarif.prixKwh);
+      return prixKwh === f.prixKwh ? f : { ...f, prixKwh };
+    });
+  }, [paysTarif.prixKwh]);
   // Maintenance de la fiche, champ laissé vide : la règle commune sur les
   // panneaux du dimensionnement (le nombre que la fiche annonce).
   const maintenanceDefaut = calculMaintenanceAnnuelle(sizing?.numberOfPanels);
@@ -521,7 +542,7 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
             <ConsumptionModePicker value={consoMode} onChange={setConsoMode} />
 
             {consoMode === 'facture' && (
-              <InvoiceConsumptionFields facture={facture} onChange={setFacture} result={factureConso} />
+              <InvoiceConsumptionFields facture={facture} onChange={setFacture} result={factureConso} tarifIndicatif={paysTarif} />
             )}
 
             {consoMode === 'direct' && (

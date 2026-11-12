@@ -9,6 +9,7 @@ import { buildKitQuotation, designationOnduleur, phasesDuKit, SYSTEM_TYPES, DEFA
 import { propositionDepuisEtude, consommationDimensionnement, reglerProposition } from '../../utils/propositionKit';
 import { coefficientMainOeuvre } from '../../utils/mainOeuvre';
 import { provisionOnduleurDuDevis } from '../../utils/sizingSheet/compute';
+import { paysTarifFacture, prixFactureSuivantPays } from '../../utils/tarifElectricite';
 import { geocodeCity, reverseGeocode, fetchSolarData } from '../../lib/solarData';
 import { resolveAutoPartner } from '../../utils/referral';
 import { isSupabaseConfigured } from '../../lib/supabase';
@@ -165,6 +166,26 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
   // Toute la liste des clients est proposée (un client gagné peut recommander).
   const myLeads = leadsForUser(user);
   const selectedLead = myLeads.find((l) => l.id === selectedLeadId);
+
+  // Prix du kWh de la facture : celui du pays du client — lieu du chantier,
+  // ville, numéro —, le Bénin à défaut (SBEE, 145 F). Il suit le client tant
+  // qu'il n'a pas été saisi à la main ; une étude par facture rouverte garde
+  // le sien (le devis a été chiffré avec).
+  const paysTarif = paysTarifFacture({
+    ville: location?.name || selectedLead?.address || '',
+    pays: location?.country || '',
+    telephone: selectedLead?.phone || '',
+  });
+  const tarifSuivi = useRef(reprise.restaure && reprise.consoMode === 'facture' ? null : reprise.facture.prixKwh);
+  useEffect(() => {
+    if (tarifSuivi.current == null) return;
+    const ancien = tarifSuivi.current;
+    tarifSuivi.current = paysTarif.prixKwh;
+    setFacture((f) => {
+      const prixKwh = prixFactureSuivantPays(f.prixKwh, ancien, paysTarif.prixKwh);
+      return prixKwh === f.prixKwh ? f : { ...f, prixKwh };
+    });
+  }, [paysTarif.prixKwh]);
 
   // Appareil du catalogue, ou appareil personnalisé (tout est saisi à la main).
   const addAppliance = () => {
@@ -358,7 +379,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
             <ConsumptionModePicker value={consoMode} onChange={setConsoMode} />
 
             {consoMode === 'facture' && (
-              <InvoiceConsumptionFields facture={facture} onChange={setFacture} result={factureConso} />
+              <InvoiceConsumptionFields facture={facture} onChange={setFacture} result={factureConso} tarifIndicatif={paysTarif} />
             )}
 
             {consoMode === 'direct' && (

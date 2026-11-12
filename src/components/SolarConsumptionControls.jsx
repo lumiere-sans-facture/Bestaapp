@@ -22,7 +22,11 @@ export function ConsumptionModePicker({ value, onChange }) {
   );
 }
 
-export function InvoiceConsumptionFields({ facture, onChange, result }) {
+/**
+ * @param {object} [tarifIndicatif]  pays dont le tarif est proposé par défaut
+ *   (utils/tarifElectricite.js) : la ligne d'aide dit d'où vient le prix.
+ */
+export function InvoiceConsumptionFields({ facture, onChange, result, tarifIndicatif = null }) {
   return (
     <>
       <div className="manual-consumption-grid">
@@ -35,6 +39,12 @@ export function InvoiceConsumptionFields({ facture, onChange, result }) {
             onChange={(event) => onChange({ ...facture, prixKwh: event.target.value })} />
         </Field>
       </div>
+      {tarifIndicatif && (
+        <div className="field-hint facture-tarif-indicatif">
+          Tarif indicatif {tarifIndicatif.operateurElec} {tarifIndicatif.dans} : {tarifIndicatif.prixKwh} F le kWh.
+          {' '}Vérifiez-le sur la facture du client.
+        </div>
+      )}
       <div className="chip-selector">
         <span className="chip-selector-label"><Sun size={13} /> Quand consomme-t-il le plus ?</span>
         <div className="categories-scroll is-wrap" style={{ marginBottom: 0 }}>

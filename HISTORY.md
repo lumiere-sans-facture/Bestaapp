@@ -6,6 +6,11 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-11-12
+- **Dimensionnement par facture : au Bénin, le kWh part de 145 F.**
+  - Les deux assistants (espace public et espace Pro) proposaient 114 F, le prix CEET du Togo, quel que soit le client. Le prix proposé est maintenant celui du pays du client, dans l'ordre : le lieu géocodé, une ville togolaise reconnue, le numéro du client (+229, +228, ou un numéro à 8 chiffres au Togo, comme pour la main-d'œuvre), le pays de l'entreprise dans l'espace Pro, et le Bénin à défaut. Au Bénin, c'est 145 F (SBEE). Une adresse comme « Quartier Zongo, Lomé » n'est pas reconnue comme ville, mais le « +228 » du client l'est : il garde 114 F.
+  - Une ligne d'aide sous le champ dit d'où vient le prix : « Tarif indicatif SBEE au Bénin : 145 F le kWh. Vérifiez-le sur la facture du client. »
+  - Le prix suit le client choisi tant qu'il n'a pas été saisi. Un prix tapé à la main n'est jamais écrasé. Un devis par facture rouvert garde le prix avec lequel il a été chiffré.
+  - Règle pure dans `utils/tarifElectricite.js` (8 tests). Scénario `e2e/facture-tarif-pays.mjs` (10 vérifications), qui échoue sur l'ancien code (114 F au lieu de 145).
 - **Simulateur ROI : gain net détaillé, avec le remplacement de l'onduleur tous les 5 ans.**
   - Nouvelle carte « Bilan sur N ans » : économies sur la durée (ce que le client ne paie plus au réseau et au groupe), moins le prix de l'installation, moins l'entretien, moins le remplacement de l'onduleur = gain net. Les lignes s'additionnent au franc près, et c'est le gain de la tuile, rebaptisée « Gain net sur N ans ».
   - Onduleur : durée de vie de 5 ans, comme sur la fiche de dimensionnement. Il est remplacé au bout de 5, 10, 15 et 20 ans, jamais la dernière année : 1 remplacement sur 10 ans (comme la fiche), 2 sur 15 ans, 4 sur 25 ans. Prix : celui de l'onduleur du kit proposé, au prix d'aujourd'hui, sans hausse, comme la fiche. Le forfait de la fiche (320 000 F) sert de repli si le kit n'a pas de ligne d'onduleur.
