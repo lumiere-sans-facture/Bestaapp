@@ -30,9 +30,8 @@ const saisirFacture = async (repartition) => {
   await page.getByRole('button', { name: repartition, exact: true }).click();
   return plat(await page.locator('.field-hint[role="status"]').innerText());
 };
-// Les assistants affichent « 3.8 kWh » (point) quand la leçon écrit « 3,8 » :
-// c'est la valeur qu'on compare, pas le séparateur.
-const batterie = async () => plat(await page.locator('.sizing-card', { hasText: 'Batterie conseillée' }).locator('.sizing-value').innerText()).replace('.', ',');
+// Affichée à la française, comme dans la leçon : « 3,8 kWh ».
+const batterie = async () => plat(await page.locator('.sizing-card', { hasText: 'Batterie conseillée' }).locator('.sizing-value').innerText());
 const kits = async () => (await page.locator('.kit-option-name').allInnerTexts()).map((t) => plat(t).replace(/ Suggéré$/, '').trim());
 const etape = async (n) => page.locator('.steps-label', { hasText: `Étape ${n}` }).waitFor({ timeout: 10000 });
 

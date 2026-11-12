@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   consommationAppareils, consommationRetenue, consommationDepuisFacture, coutActuel, economieAnnee, projection, retourInvestissement,
-  co2EviteAn, simulerRoi,
+  co2EviteAn, simulerRoi, anneesRemplacementOnduleur, DUREE_VIE_ONDULEUR_ANS,
   JOURS_PAR_AN, MOIS_PAR_AN, DUREE_SYSTEME_ANS, DUREES_SYSTEME, KWH_PAR_LITRE_GAZOLE,
   PART_JOUR_FACTURE, PART_NUIT_FACTURE,
   HAUSSE_TARIF_DEFAUT, DEGRADATION_ANNUELLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../roi';
 import { appliances } from '../../data/appliances';
+import { DUREES_VIE, RENTA_DEFAUTS } from '../sizingSheet/compute';
 
 // Petit commerce de Lomé : 10 lampes LED la nuit, un réfrigérateur et un
 // téléviseur — pris tels quels dans le catalogue d'appareils de l'app.
@@ -370,5 +371,85 @@ describe('consommationDepuisFacture — estimer depuis ce que le client paie', (
   it('une part de jour absurde est ramenée entre 0 et 1', () => {
     expect(consommationDepuisFacture(60000, 114, 5).nuit).toBe(0);
     expect(consommationDepuisFacture(60000, 114, -2).jour).toBe(0);
+  });
+});
+
+describe('onduleur remplacé tous les 5 ans — comme la fiche de dimensionnement', () => {
+  it('même durée de vie que la fiche', () => {
+    expect(DUREES_VIE.find((d) => d.equipement === 'Onduleur').duree).toBe(`${DUREE_VIE_ONDULEUR_ANS} ans`);
+  });
+
+  it('remplacé au bout de 5, 10, 15, 20 ans — jamais la dernière année', () => {
+    expect(anneesRemplacementOnduleur(10)).toEqual([5]); // la fiche : « 1 × sur 10 ans »
+    expect(anneesRemplacementOnduleur(15)).toEqual([5, 10]);
+    expect(anneesRemplacementOnduleur(25)).toEqual([5, 10, 15, 20]);
+    expect(anneesRemplacementOnduleur(5)).toEqual([]);
+  });
+
+  it('la projection le déduit l’année où il tombe, au prix d’aujourd’hui', () => {
+    const p = projection({ coutAnnuel: 1000000, maintenance: 30000, hausse: 0.05, duree: 25, prixOnduleur: 330000 });
+    expect(p.filter((l) => l.onduleur > 0).map((l) => l.annee)).toEqual([5, 10, 15, 20]);
+    expect(p.filter((l) => l.onduleur > 0).every((l) => l.onduleur === 330000)).toBe(true);
+    expect(p[4].cumul).toBe(p[3].cumul + p[4].economie - 330000);
+    // Chaque ligne : économie = ce qu'il ne paie plus − entretien.
+    expect(p.every((l) => l.economie === l.brute - l.entretien)).toBe(true);
+    expect(p[0].entretien).toBe(30000);
+  });
+
+  it('sans prix d’onduleur, rien n’est déduit (comportement d’avant)', () => {
+    const p = projection({ coutAnnuel: 1000000, duree: 25 });
+    expect(p.every((l) => l.onduleur === 0)).toBe(true);
+  });
+
+  it('remboursée POUR DE BON : un remplacement qui refait passer sous le prix repousse le remboursement', () => {
+    const base = { coutAnnuel: 1000000, maintenance: 0, hausse: 0, duree: 25 };
+    const sans = projection(base);
+    const avec = projection({ ...base, prixOnduleur: 800000 });
+    // Sans onduleur, 4 500 000 F sont récupérés pendant la 5e année…
+    expect(retourInvestissement(sans, 4500000)).toBe(4.5);
+    // … mais le remplacement de fin d'année 5 refait passer sous la mise :
+    // le client ne l'a récupérée qu'au cours de la 6e année.
+    expect(avec[3].cumul).toBeLessThan(4500000);
+    expect(avec[4].cumul).toBeLessThan(4500000);
+    const flux6 = avec[5].cumul - avec[4].cumul;
+    expect(retourInvestissement(avec, 4500000)).toBe(Math.round((5 + (4500000 - avec[4].cumul) / flux6) * 10) / 10);
+    expect(retourInvestissement(avec, 4500000)).toBeGreaterThan(5);
+  });
+});
+
+describe('bilan : économies − installation − entretien − onduleurs = gain', () => {
+  const commun = {
+    appareils: CLIENT, investissement: 2500000, heuresCoupureJour: 6,
+    tarifKwh: 114, prixCarburant: 750, groupeActif: true, nbPanneaux: 11,
+  };
+
+  for (const duree of DUREES_SYSTEME) {
+    it(`sur ${duree} ans, les postes retombent au franc près sur le gain`, () => {
+      const s = simulerRoi({ ...commun, duree, prixOnduleur: 330000 });
+      const b = s.bilan;
+      expect(b.economies - b.investissement - b.entretien - b.onduleur.total).toBe(b.gain);
+      expect(b.gain).toBe(s.gainDuree);
+      expect(b.onduleur.annees).toEqual(anneesRemplacementOnduleur(duree));
+      expect(b.onduleur.total).toBe(330000 * anneesRemplacementOnduleur(duree).length);
+      expect(b.onduleur.prix).toBe(330000);
+    });
+  }
+
+  it('compter l’onduleur réduit le gain d’exactement son coût', () => {
+    const sans = simulerRoi({ ...commun, duree: 25 });
+    const avec = simulerRoi({ ...commun, duree: 25, prixOnduleur: 330000 });
+    expect(sans.gainDuree - avec.gainDuree).toBe(4 * 330000);
+    expect(avec.roiPct).toBe(Math.round((avec.gainDuree / 2500000) * 100));
+    // La 1re année ne change pas : rien n'est remplacé avant la 5e.
+    expect(avec.economieAn1).toBe(sans.economieAn1);
+  });
+
+  it('entretien du bilan : celui de chaque année, hausse comprise', () => {
+    const s = simulerRoi({ ...commun, duree: 10, hausse: 0 });
+    expect(s.bilan.entretien).toBe(10 * s.maintenance);
+  });
+
+  it('prix de repli de la fiche disponible quand le kit n’a pas de ligne d’onduleur', () => {
+    expect(RENTA_DEFAUTS.provisionOnduleur).toBe(320000);
   });
 });

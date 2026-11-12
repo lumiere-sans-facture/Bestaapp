@@ -48,6 +48,24 @@ export const HAUSSE_TARIF_DEFAUT = 0.05;
 export const DEGRADATION_ANNUELLE = 0.005;
 
 /**
+ * L'onduleur dure environ 5 ans — la durée de vie que la fiche de
+ * dimensionnement annonce (utils/sizingSheet/compute.js › DUREES_VIE). Sur la
+ * durée retenue, il est donc remplacé au bout de 5, 10, 15 et 20 ans, jamais
+ * la dernière année : on le remplace pour continuer, et la projection
+ * s'arrête là. Sur 10 ans, un remplacement — comme la fiche ; sur 25 ans,
+ * quatre.
+ */
+export const DUREE_VIE_ONDULEUR_ANS = 5;
+
+/** Années où l'onduleur est remplacé, sur la durée retenue : [5, 10, 15, 20] sur 25 ans. */
+export const anneesRemplacementOnduleur = (duree = DUREE_SYSTEME_ANS) => {
+  const fin = Math.max(1, Math.floor(Number(duree) || DUREE_SYSTEME_ANS));
+  const annees = [];
+  for (let a = DUREE_VIE_ONDULEUR_ANS; a < fin; a += DUREE_VIE_ONDULEUR_ANS) annees.push(a);
+  return annees;
+};
+
+/**
  * Émissions évitées : 2,68 kg de CO₂ par litre de gazole brûlé (facteur GIEC
  * pour le diesel), 0,45 kg par kWh du réseau togolais — ordres de grandeur,
  * à ne pas présenter comme une mesure.
@@ -185,29 +203,51 @@ export const economieAnnee = (annee, { coutAnnuel = 0, maintenance = 0, hausse =
   return Math.round(nombre(coutAnnuel) * inflation * rendement - nombre(maintenance) * inflation);
 };
 
-/** Projection année par année : économie, cumul, et reste à rembourser. */
+/**
+ * Projection année par année. Chaque ligne se lit comme le bilan :
+ *   brute      ce que le client ne paie plus cette année (réseau + groupe)
+ *   entretien  l'entretien de l'année            → economie = brute − entretien
+ *   onduleur   le remplacement de l'onduleur, les années où il tombe
+ *   cumul      somme des (economie − onduleur), et reste à rembourser.
+ * L'entretien est l'écart entre `brute` et `economie`, tous deux arrondis :
+ * additionnés sur la durée, les postes retombent au franc près sur le gain.
+ *
+ * @param {number} prixOnduleur  prix de l'onduleur à remplacer, au prix
+ *   d'aujourd'hui comme la fiche de dimensionnement ; 0 = non compté.
+ */
 export const projection = ({
   investissement = 0,
   coutAnnuel = 0,
   maintenance = 0,
   hausse = HAUSSE_TARIF_DEFAUT,
   duree = DUREE_SYSTEME_ANS,
+  prixOnduleur = 0,
 } = {}) => {
   const invest = nombre(investissement);
   const annees = Math.max(1, Math.floor(Number(duree) || DUREE_SYSTEME_ANS));
+  const prix = Math.round(nombre(prixOnduleur));
+  const remplacements = new Set(prix > 0 ? anneesRemplacementOnduleur(annees) : []);
   const lignes = [];
   let cumul = 0;
   for (let annee = 1; annee <= annees; annee += 1) {
     const economie = economieAnnee(annee, { coutAnnuel, maintenance, hausse });
-    cumul += economie;
+    const brute = economieAnnee(annee, { coutAnnuel, maintenance: 0, hausse });
+    const onduleur = remplacements.has(annee) ? prix : 0;
+    cumul += economie - onduleur;
     // Jamais négatif : une fois remboursé, l'investissement est remboursé.
-    lignes.push({ annee, economie, cumul, restant: Math.max(0, Math.round(invest - cumul)) });
+    lignes.push({
+      annee, brute, entretien: brute - economie, economie, onduleur,
+      cumul, restant: Math.max(0, Math.round(invest - cumul)),
+    });
   }
   return lignes;
 };
 
 /**
  * Année où l'installation est remboursée, fraction comprise (2,4 ans).
+ * Remboursée POUR DE BON : un remplacement d'onduleur peut refaire passer le
+ * cumul sous le prix payé — le client n'a alors pas récupéré sa mise, et le
+ * remboursement tombe après ce creux.
  * `null` quand elle ne l'est JAMAIS sur la durée retenue — cas réel d'une
  * petite consommation face à une grosse installation. Afficher « 0 an » ou
  * masquer le résultat serait un mensonge commercial : le simulateur doit
@@ -215,16 +255,16 @@ export const projection = ({
  */
 export const retourInvestissement = (lignes = [], investissement = 0) => {
   const invest = nombre(investissement);
-  if (invest <= 0) return null;
-  let precedent = 0;
-  for (const ligne of lignes) {
-    if (ligne.cumul >= invest) {
-      const fraction = ligne.economie > 0 ? (invest - precedent) / ligne.economie : 0;
-      return Math.round((ligne.annee - 1 + fraction) * 10) / 10;
-    }
-    precedent = ligne.cumul;
-  }
-  return null;
+  if (invest <= 0 || !lignes.length) return null;
+  let dernierSous = -1;
+  lignes.forEach((ligne, i) => { if (ligne.cumul < invest) dernierSous = i; });
+  if (dernierSous === lignes.length - 1) return null;
+  const precedent = dernierSous >= 0 ? lignes[dernierSous].cumul : 0;
+  const ligne = lignes[dernierSous + 1];
+  // Ce que l'année a réellement rapporté : économie, moins l'onduleur s'il y a lieu.
+  const flux = ligne.cumul - precedent;
+  const fraction = flux > 0 ? (invest - precedent) / flux : 0;
+  return Math.round((ligne.annee - 1 + fraction) * 10) / 10;
 };
 
 /** CO₂ évité en un an : le gazole non brûlé et les kWh non tirés du réseau. */
@@ -277,6 +317,7 @@ export const simulerRoi = ({
   nbPanneaux = 0,
   hausse = HAUSSE_TARIF_DEFAUT,
   duree = DUREE_SYSTEME_ANS,
+  prixOnduleur = 0,
 } = {}) => {
   const consommation = consommationRetenue(appareils, conso);
   const cout = coutActuel({
@@ -285,11 +326,13 @@ export const simulerRoi = ({
   // Entretien : la règle commune à toute l'application, sur les panneaux du
   // système proposé — la fiche de dimensionnement donne le même montant.
   const maintenance = calculMaintenanceAnnuelle(nbPanneaux);
-  const lignes = projection({ investissement, coutAnnuel: cout.total, maintenance, hausse, duree });
+  const lignes = projection({ investissement, coutAnnuel: cout.total, maintenance, hausse, duree, prixOnduleur });
   const invest = nombre(investissement);
   const cumulFinal = lignes.length ? lignes[lignes.length - 1].cumul : 0;
   const gainDuree = Math.round(cumulFinal - invest);
   const co2AnKg = co2EviteAn(cout);
+  const somme = (cle) => lignes.reduce((t, l) => t + l[cle], 0);
+  const remplacements = lignes.filter((l) => l.onduleur > 0);
 
   return {
     conso: consommation,
@@ -299,6 +342,19 @@ export const simulerRoi = ({
     economieAn1: lignes[0]?.economie ?? 0,
     retourAns: retourInvestissement(lignes, invest),
     gainDuree,
+    // Le gain, poste par poste, tel que l'écran l'additionne devant le client :
+    //   économies − installation − entretien − onduleurs = gain (au franc près).
+    bilan: {
+      economies: somme('brute'),
+      investissement: invest,
+      entretien: somme('entretien'),
+      onduleur: {
+        prix: remplacements[0]?.onduleur ?? 0,
+        annees: remplacements.map((l) => l.annee),
+        total: somme('onduleur'),
+      },
+      gain: gainDuree,
+    },
     // Sans montant d'installation, il n'y a rien à rentabiliser : `null`
     // plutôt qu'une division par zéro affichée au client.
     roiPct: invest > 0 ? Math.round((gainDuree / invest) * 100) : null,

@@ -8,6 +8,14 @@ export const formatNombre = (v) =>
 export const formatCFA = (amount) => formatNombre(amount) + ' F';
 
 /**
+ * Nombre à virgule, à la française : 3.8 → « 3,8 ». Pour les kWh, kWc et
+ * autres grandeurs décimales de l'interface — `toFixed` seul écrit un point
+ * (« 3.8 kWh »), que la formation et les documents écrivent « 3,8 kWh ».
+ */
+export const formatDecimal = (v, decimales = 1) =>
+  (Number(v) || 0).toFixed(decimales).replace('.', ',');
+
+/**
  * Montant abrégé pour les grands nombres : « 108,4 M F », « 720 k F ».
  * Réservé aux TUILES d'indicateurs, où « 108 405 662 F » passe à la ligne et
  * devient illisible. Les tableaux et les documents gardent `formatCFA` : un

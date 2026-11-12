@@ -6,6 +6,13 @@ la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
 ## 2026-11-12
+- **Simulateur ROI : gain net détaillé, avec le remplacement de l'onduleur tous les 5 ans.**
+  - Nouvelle carte « Bilan sur N ans » : économies sur la durée (ce que le client ne paie plus au réseau et au groupe), moins le prix de l'installation, moins l'entretien, moins le remplacement de l'onduleur = gain net. Les lignes s'additionnent au franc près, et c'est le gain de la tuile, rebaptisée « Gain net sur N ans ».
+  - Onduleur : durée de vie de 5 ans, comme sur la fiche de dimensionnement. Il est remplacé au bout de 5, 10, 15 et 20 ans, jamais la dernière année : 1 remplacement sur 10 ans (comme la fiche), 2 sur 15 ans, 4 sur 25 ans. Prix : celui de l'onduleur du kit proposé, au prix d'aujourd'hui, sans hausse, comme la fiche. Le forfait de la fiche (320 000 F) sert de repli si le kit n'a pas de ligne d'onduleur.
+  - Le remboursement n'est acquis qu'une fois les remplacements payés : si un remplacement refait passer les économies sous le prix payé, la date de remboursement tombe après ce creux. La courbe signale ses creux, et « Ce que le calcul suppose » l'explique.
+  - Exemple, facture de 60 000 F au Bénin (Kit 10 kWh, onduleur à 330 000 F), sur 25 ans : 37 766 929 F d'économies − 1 990 000 F d'installation − 1 431 814 F d'entretien − 4 × 330 000 F d'onduleur = 33 025 115 F de gain net.
+  - Tests : 11 nouveaux dans `roi.test.js`, plus le scénario `e2e/simulateur-bilan.mjs` (22 vérifications sur 10, 15 et 25 ans).
+- **Virgule décimale : « 3,8 kWh », plus « 3.8 kWh ».** Les deux assistants de dimensionnement affichaient la batterie conseillée et la puissance des panneaux (kWc) avec un point. Même correction pour les quantités décimales de la liste du matériel et le « Retour sur investissement estimé » de l'assistant public. Nouveau `formatDecimal` (`utils/format.js`), testé. Les coordonnées GPS gardent leur point.
 - **Académie : les exemples de facture SBEE recalculés à 145 F le kWh.**
   - Les leçons, l'exercice de Parakou et les quiz comptaient 115 F. Avec 25 000 F par mois à 145 F : 172 kWh par mois (au lieu de 217), 5,7 kWh par jour (au lieu de 7,2), batterie conseillée de 3,8 kWh en « Équilibré » et 5,3 kWh en « Surtout le soir » (au lieu de 4,8 et 6,7). Avec les kits livrés par défaut, l'exercice aboutit au Kit 3,8 kWh (au lieu du Kit 5 kWh) puis au Kit 10 kWh. Les mauvaises réponses des quiz sont recalculées sur les mêmes erreurs qu'avant.
   - Le kWh du groupe électrogène (250 F avec un gazole à 750 F) n'est plus « plus du double » du réseau à 145 F : la leçon dit désormais « bien plus cher ».

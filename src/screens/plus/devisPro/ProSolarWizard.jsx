@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, FileText, Package } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useData } from '../../../context/DataContext';
-import { formatCFA, formatNombre } from '../../../utils/format';
+import { formatCFA, formatNombre, formatDecimal } from '../../../utils/format';
 import { calculMaintenanceAnnuelle } from '../../../utils/maintenance';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../../data/appliances';
 import {
@@ -662,9 +662,9 @@ export default function ProSolarWizard({ onDone, devisAModifier = null }) {
               </details>
             </div>
             <div className="sizing-grid" style={{ marginTop: 16 }}>
-              <div className="sizing-card"><div className="sizing-icon"><PanelTop size={18} /></div><div className="sizing-value">{sizing.numberOfPanels}</div><div className="sizing-label">Panneaux · {sizing.panelCapacity.toFixed(1)} kWc</div></div>
+              <div className="sizing-card"><div className="sizing-icon"><PanelTop size={18} /></div><div className="sizing-value">{sizing.numberOfPanels}</div><div className="sizing-label">Panneaux · {formatDecimal(sizing.panelCapacity)} kWc</div></div>
               <div className="sizing-card"><div className="sizing-icon"><Cpu size={18} /></div><div className="sizing-value">{Math.round(sizing.requiredPanelPower)} W</div><div className="sizing-label">Puissance requise</div></div>
-              <div className="sizing-card"><div className="sizing-icon"><Battery size={18} /></div><div className="sizing-value">{sizing.batteryCapacity > 0 ? `${sizing.batteryCapacity.toFixed(1)} kWh` : '—'}</div><div className="sizing-label">Batterie conseillée</div></div>
+              <div className="sizing-card"><div className="sizing-icon"><Battery size={18} /></div><div className="sizing-value">{sizing.batteryCapacity > 0 ? `${formatDecimal(sizing.batteryCapacity)} kWh` : '—'}</div><div className="sizing-label">Batterie conseillée</div></div>
               <div className="sizing-card"><div className="sizing-icon"><Zap size={18} /></div><div className="sizing-value">{Math.round(sizing.estimatedProduction).toLocaleString('fr-FR')}</div><div className="sizing-label">kWh / an</div></div>
             </div>
             <div className="field-hint" role="status">

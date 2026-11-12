@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Sun, Moon, Zap, Gauge, PanelTop, Cpu, Battery, MapPin, Search, Package, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { formatCFA } from '../../utils/format';
+import { formatCFA, formatDecimal } from '../../utils/format';
 import { applianceCategories, getApplianceById, CUSTOM_APPLIANCE_ID, newCustomAppliance } from '../../data/appliances';
 import { factureVersConsommation } from '../../utils/factureConso';
 import { buildKitQuotation, designationOnduleur, phasesDuKit, SYSTEM_TYPES, DEFAULT_PEAK_SUN_HOURS, AUTONOMY_OPTIONS, MOUNTING_TYPES } from '../../utils/solarSizing';
@@ -575,7 +575,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                 <div className="sizing-card">
                   <div className="sizing-icon"><PanelTop size={18} /></div>
                   <div className="sizing-value">{sizing.numberOfPanels}</div>
-                  <div className="sizing-label">Panneaux · {sizing.panelCapacity.toFixed(1)} kWc</div>
+                  <div className="sizing-label">Panneaux · {formatDecimal(sizing.panelCapacity)} kWc</div>
                 </div>
                 <div className="sizing-card">
                   <div className="sizing-icon"><Cpu size={18} /></div>
@@ -584,7 +584,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
                 </div>
                 <div className="sizing-card">
                   <div className="sizing-icon"><Battery size={18} /></div>
-                  <div className="sizing-value">{sizing.batteryCapacity > 0 ? `${sizing.batteryCapacity.toFixed(1)} kWh` : '—'}</div>
+                  <div className="sizing-value">{sizing.batteryCapacity > 0 ? `${formatDecimal(sizing.batteryCapacity)} kWh` : '—'}</div>
                   <div className="sizing-label">Batterie conseillée</div>
                 </div>
                 <div className="sizing-card">
@@ -809,7 +809,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
               <div className="bom-title">Équipements</div>
               {displayQuotation.components.map((c, i) => (
                 <div key={i} className="bom-row">
-                  <div className="bom-name">{c.name}{c.quantity > 1 ? <span className="bom-qty"> × {c.quantity % 1 === 0 ? c.quantity : c.quantity.toFixed(1)}</span> : ''}</div>
+                  <div className="bom-name">{c.name}{c.quantity > 1 ? <span className="bom-qty"> × {c.quantity % 1 === 0 ? c.quantity : formatDecimal(c.quantity)}</span> : ''}</div>
                   <div className="bom-price">{formatCFA(c.totalPrice)}</div>
                 </div>
               ))}
@@ -831,7 +831,7 @@ export default function SolarWizard({ onDone, initialLeadId = null, devisAModifi
             </div>
             {displayQuotation.roi > 0 && (
               <div className="roi-note">
-                <Zap size={14} /> Retour sur investissement estimé : <strong>{displayQuotation.roi.toFixed(1)} mois</strong>
+                <Zap size={14} /> Retour sur investissement estimé : <strong>{formatDecimal(displayQuotation.roi)} mois</strong>
               </div>
             )}
 

@@ -12,9 +12,10 @@ import ChampNombre from '../../components/ChampNombre';
 import { REPARTITIONS, DEFAULT_REPARTITION, JOURS_PAR_MOIS, partJourDe } from '../../utils/factureConso';
 import {
   simulerRoi, consommationDepuisFacture,
-  DUREE_SYSTEME_ANS, DUREES_SYSTEME, HAUSSE_TARIF_DEFAUT,
+  DUREE_SYSTEME_ANS, DUREES_SYSTEME, HAUSSE_TARIF_DEFAUT, DUREE_VIE_ONDULEUR_ANS,
   DEGRADATION_ANNUELLE, KWH_PAR_LITRE_GAZOLE, CO2_PAR_LITRE_GAZOLE, CO2_PAR_KWH_RESEAU,
 } from '../../utils/roi';
+import { provisionOnduleurDuDevis, RENTA_DEFAUTS } from '../../utils/sizingSheet/compute';
 
 // Client de départ : un petit commerce de Lomé, l'essentiel de ce que l'équipe
 // rencontre en visite. Il donne un écran déjà chiffré à l'ouverture, plutôt
@@ -34,6 +35,10 @@ const dec = (n, d = 1) => Number(n || 0).toFixed(d).replace('.', ',');
 // Capacité batterie : 72, 5,12 — sans zéros inutiles.
 const kwh = (n) => Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 const ans = (n) => `${String(n).replace('.', ',')} an${n >= 2 ? 's' : ''}`;
+// [5, 10, 15, 20] → « 5, 10, 15 et 20 ans »
+const listeAnnees = (annees) => (annees.length > 1
+  ? `${annees.slice(0, -1).join(', ')} et ${annees[annees.length - 1]} ans`
+  : `${annees[0]} ans`);
 
 /** Curseur avec sa valeur à droite. */
 function Curseur({ label, value, onChange, min, max, step = 1, suffixe }) {
@@ -73,12 +78,15 @@ function Ligne({ label, montant, detail, fort = false, negatif = false }) {
 
 /** Économies cumulées face au prix de l'installation. SVG fait main. */
 function Projection({ lignes, investissement, retourAns }) {
-  const max = Math.max(investissement, lignes[lignes.length - 1]?.cumul || 0, 1);
+  // Le plus haut point de la courbe, pas forcément la dernière année : un
+  // remplacement d'onduleur la fait redescendre d'un cran.
+  const max = Math.max(investissement, ...lignes.map((l) => l.cumul), 1);
   const L = 100; const H = 100;
   const x = (annee) => ((annee - 1) / Math.max(1, lignes.length - 1)) * L;
   const y = (v) => H - (v / max) * H;
   const courbe = lignes.map((l) => `${x(l.annee).toFixed(2)},${y(l.cumul).toFixed(2)}`).join(' ');
   const xSeuil = retourAns != null ? (retourAns / Math.max(1, lignes.length - 1)) * L : null;
+  const remplacements = lignes.filter((l) => l.onduleur > 0).map((l) => l.annee);
   return (
     <div className="roi-projection">
       <svg viewBox={`0 0 ${L} ${H}`} preserveAspectRatio="none" className="roi-svg" role="img"
@@ -97,6 +105,12 @@ function Projection({ lignes, investissement, retourAns }) {
       <div className="chart-legend">
         <span className="legend-item"><span className="legend-dot roi-dot-cumul" /> Économies cumulées</span>
         <span className="legend-item"><span className="legend-dot roi-dot-invest" /> Prix de l’installation</span>
+        {remplacements.length > 0 && (
+          <span className="legend-item roi-legende-onduleur">
+            {remplacements.length > 1 ? 'Les creux' : 'Le creux'} : onduleur remplacé
+            ({remplacements.length > 1 ? 'années' : 'année'} {remplacements.join(', ')})
+          </span>
+        )}
       </div>
     </div>
   );
@@ -210,6 +224,12 @@ export default function RoiSection() {
   }, [rows, consoRetenue, facture, tarif, repartition, kits, inverters, products, coefMainOeuvre, kitRepris]);
 
   const investissement = prixDevis ?? kit?.total ?? 0;
+  // L'onduleur à remplacer tous les 5 ans : celui du kit proposé, à son prix
+  // (onduleur de remplacement compris, s'il a fallu en changer) — la règle de
+  // la fiche de dimensionnement, avec son forfait en repli.
+  const prixOnduleur = kit
+    ? (provisionOnduleurDuDevis(kit.quotation?.components) ?? RENTA_DEFAUTS.provisionOnduleur)
+    : 0;
 
   const sim = useMemo(() => simulerRoi({
     appareils: rows,
@@ -222,7 +242,9 @@ export default function RoiSection() {
     duree,
     // Les panneaux du kit proposé fixent l'entretien annuel.
     nbPanneaux: kit?.panneaux.poses || 0,
-  }), [rows, consoRetenue, investissement, coupures, tarif, carburant, groupeActif, duree, kit?.panneaux.poses]);
+    prixOnduleur,
+  }), [rows, consoRetenue, investissement, coupures, tarif, carburant, groupeActif, duree, kit?.panneaux.poses, prixOnduleur]);
+  const bilan = sim.bilan;
 
   return (
     <div className="roi-grid">
@@ -416,7 +438,7 @@ export default function RoiSection() {
             <div className="kpi-icon"><Sun size={17} /></div>
             <div className="kpi-value">{formatCFACourt(sim.gainDuree)}</div>
             <div className="kpi-label">
-              Gagné sur {duree} ans{sim.roiPct != null ? `, soit ${sim.roiPct.toLocaleString('fr-FR')} % du prix payé` : ''}
+              Gain net sur {duree} ans{sim.roiPct != null ? `, soit ${sim.roiPct.toLocaleString('fr-FR')} % du prix payé` : ''}
             </div>
           </div>
           <div className="kpi-card is-info">
@@ -453,6 +475,27 @@ export default function RoiSection() {
           <Ligne label="Économie nette la 1re année" montant={sim.economieAn1} fort />
         </div>
 
+        {/* Le gain net, poste par poste : ce que le client ne paie plus, moins
+            tout ce que l'installation lui coûte sur la durée. Les lignes
+            s'additionnent au franc près jusqu'au gain de la tuile. */}
+        {bilan.investissement > 0 && (
+          <div className="card roi-bloc roi-bilan">
+            <div className="sheet-section-title">Bilan sur {duree} ans</div>
+            <Ligne label={`Économies sur ${duree} ans`}
+                   detail={`ce qu’il ne paie plus${groupeActif ? ' au réseau et au groupe' : ' au réseau'}, hausse de l’énergie comprise`}
+                   montant={bilan.economies} />
+            <Ligne label="Prix de l’installation" detail="pose comprise" montant={bilan.investissement} negatif />
+            <Ligne label="Entretien" detail={`${duree} ans, à partir de ${formatCFA(sim.maintenance)} par an`}
+                   montant={bilan.entretien} negatif />
+            {bilan.onduleur.total > 0 && (
+              <Ligne label="Remplacement de l’onduleur"
+                     detail={`tous les ${DUREE_VIE_ONDULEUR_ANS} ans : ${bilan.onduleur.annees.length} × ${formatCFA(bilan.onduleur.prix)}, au bout de ${listeAnnees(bilan.onduleur.annees)}`}
+                     montant={bilan.onduleur.total} negatif />
+            )}
+            <Ligne label={`Gain net sur ${duree} ans`} montant={bilan.gain} negatif={bilan.gain < 0} fort />
+          </div>
+        )}
+
         <div className="card roi-bloc">
           <div className="sheet-section-title">Projection sur {duree} ans</div>
           <Projection lignes={sim.projection} investissement={investissement} retourAns={sim.retourAns} />
@@ -468,6 +511,9 @@ export default function RoiSection() {
             <li>Les coupures sont réparties sur la journée : {dec(coupures)} h sur 24, soit {Math.round((coupures / 24) * 100)} % des kWh produits par le groupe.</li>
             <li>Le kit étant dimensionné pour ces appareils, il les alimente : l’économie, c’est tout ce qui est payé aujourd’hui pour les faire tourner.</li>
             <li>L’énergie renchérit de {dec(HAUSSE_TARIF_DEFAUT * 100)} %/an ; l’entretien ({formatCFA(sim.maintenance)}/an) suit la même hausse.</li>
+            {bilan.onduleur.total > 0 && (
+              <li>L’onduleur dure environ {DUREE_VIE_ONDULEUR_ANS} ans : il est remplacé au bout de {listeAnnees(bilan.onduleur.annees)}, au prix de celui du kit ({formatCFA(bilan.onduleur.prix)}), sans hausse — comme sur la fiche de dimensionnement. Le remboursement n’est acquis qu’une fois ces remplacements payés.</li>
+            )}
             <li>Les panneaux perdent {dec(DEGRADATION_ANNUELLE * 100)} % de rendement par an (garantie constructeur : {DUREE_SYSTEME_ANS} ans).</li>
             <li>Estimation par facture : comme dans l’assistant de devis, la facture est convertie sur des mois de {JOURS_PAR_MOIS} jours et répartie selon « Quand consomme-t-il le plus ? » ({REPARTITIONS.find((r) => r.id === repartition)?.label.toLowerCase()}) — la part de nuit dimensionne la batterie. Le coût annuel, lui, reprend exactement douze factures. Le mode « appareils » garde les heures réelles de chacun.</li>
             <li>Les prix du kWh proposés par pays sont des ordres de grandeur de la tranche domestique, pas des tarifs officiels : c’est la facture du client qui fait foi.</li>

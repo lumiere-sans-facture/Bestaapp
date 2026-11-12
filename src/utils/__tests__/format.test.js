@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCFA, formatCFACourt, formatDate, initials, formatTaux } from '../format';
+import { formatCFA, formatCFACourt, formatDate, initials, formatTaux, formatDecimal } from '../format';
 
 describe('formatCFA', () => {
   it('groupe les milliers par espaces', () => {
@@ -13,6 +13,20 @@ describe('formatCFA', () => {
   });
   it('arrondit', () => {
     expect(formatCFA(1234.6)).toBe('1 235 F');
+  });
+});
+
+describe('formatDecimal — la virgule française', () => {
+  it('écrit une virgule, jamais un point', () => {
+    expect(formatDecimal(3.78)).toBe('3,8');
+    expect(formatDecimal(5.29)).toBe('5,3');
+    expect(formatDecimal(10)).toBe('10,0');
+    expect(formatDecimal(5.747, 2)).toBe('5,75');
+  });
+  it('gère 0 et les valeurs absentes', () => {
+    expect(formatDecimal(0)).toBe('0,0');
+    expect(formatDecimal(null)).toBe('0,0');
+    expect(formatDecimal('abc')).toBe('0,0');
   });
 });
 
