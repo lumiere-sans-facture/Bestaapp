@@ -55,6 +55,7 @@ puis vérifie ce que l'utilisateur voit réellement à l'écran.
 | `academie-exemple-sbee.mjs` | L'exercice SBEE de l'Académie refait dans l'application : 25 000 F à 145 F le kWh, dans l'assistant de l'espace public puis de l'espace Pro, en « Équilibré » et « Surtout le soir ». On y lit les chiffres de la leçon (172 kWh par mois, batterie de 3,8 puis 5,3 kWh, kits 3,8 et 10 kWh), et la leçon les affiche. |
 | `simulateur-bilan.mjs` | Simulateur ROI, carte « Bilan » : économies − prix de l'installation − entretien − remplacement de l'onduleur (tous les 5 ans, au prix de celui du kit) = gain net, au franc près, et c'est le gain de la tuile. Sur 10, 15 et 25 ans : 1, 2 puis 4 remplacements, signalés sur la courbe et dans les hypothèses. |
 | `facture-tarif-pays.mjs` | Dimensionnement par facture : le prix du kWh proposé est celui du pays du client (145 F SBEE au Bénin, 114 F CEET au Togo), annoncé par la ligne d'aide. Il suit le client choisi, ne remplace jamais un prix tapé à la main, et un devis rouvert garde le sien. Assistant public et espace Pro. |
+| `rappel-identifiant-fiscal.mjs` | Espace Pro, « Devis & Factures » : le rappel d'identifiant fiscal porte le sigle et le pays de l'entreprise (IFU au Bénin, NIF au Togo, NCC en Côte d'Ivoire, NINEA au Sénégal, NIU au Cameroun) ; « Renseigner » mène au champ du même nom, et le rappel disparaît une fois l'identifiant saisi. |
 
 Les scénarios tournent en mode local (sans backend) : ils couvrent le circuit
 à l'intérieur d'une organisation. La remontée des demandes et commissions des

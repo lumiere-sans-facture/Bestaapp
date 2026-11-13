@@ -7,6 +7,7 @@ import { needsRenewalAlert, daysLeft } from '../../utils/subscription';
 import { formatDate } from '../../utils/format';
 import DocumentsTab from '../plus/devisPro/DocumentsTab';
 import { normalizeModele } from '../plus/devisPro/constants';
+import { paysDeLEntreprise } from '../../data/pays';
 
 // Écran Pro « Devis & Factures » (route /pro/documents).
 export default function ProDocuments() {
@@ -16,6 +17,9 @@ export default function ProDocuments() {
   const company = getCompanyForUser(user.id);
   const sub = getSubscriptionForUser(user.id);
   const modeleDefaut = normalizeModele(company?.modeleDefaut);
+  // Pays de l'entreprise : le rappel ci-dessous porte SON identifiant fiscal
+  // (IFU au Bénin, NIF au Togo, NCC en Côte d'Ivoire…), comme « Mon entreprise ».
+  const pays = paysDeLEntreprise(company);
 
   return (
     <div className="page">
@@ -30,15 +34,17 @@ export default function ProDocuments() {
             <button className="btn btn-sm btn-accent" onClick={() => navigate('/pro/abonnement')}>Renouveler</button>
           </div>
         )}
-        {/* Conformité : au Togo, une facture doit porter le NIF de l'émetteur.
-            Sans ce rappel, un abonné émet des factures non conformes sans le
-            savoir — c'est lui qui en répond devant l'administration. */}
+        {/* Conformité : une facture doit porter l'identifiant fiscal de
+            l'émetteur — IFU au Bénin, NIF au Togo, NCC en Côte d'Ivoire…
+            (data/pays.js). Sans ce rappel, un abonné émet des factures non
+            conformes sans le savoir — c'est lui qui en répond devant
+            l'administration. */}
         {!company?.ifu && (
-          <div className="pro-alert is-info">
+          <div className="pro-alert is-info rappel-identifiant-fiscal">
             <FileWarning size={17} />
             <span>
-              Vos factures ne portent pas d'<strong>NIF</strong>. Il est obligatoire sur une
-              facture au Togo — renseignez-le dans « Mon entreprise ».
+              Vos factures ne portent pas votre <strong>{pays.fiscal.sigle}</strong>. Il est obligatoire sur une
+              facture {pays.dans} — renseignez-le dans « Mon entreprise ».
             </span>
             <button className="btn btn-sm btn-outline" onClick={() => navigate('/pro/entreprise')}>
               Renseigner

@@ -5,6 +5,11 @@ généré à partir de l'historique Git (une entrée par commit sur `main` ou su
 la branche de travail en cours). Les numéros entre parenthèses renvoient aux
 pull requests correspondantes sur GitHub.
 
+## 2026-11-13
+- **Espace Pro : le rappel d'identifiant fiscal suit le pays de l'entreprise.**
+  - Le bandeau de « Devis & Factures » disait à tous les abonnés « Vos factures ne portent pas d'NIF. Il est obligatoire sur une facture au Togo », même à une entreprise au Bénin. Il reprend maintenant le sigle et le pays de l'entreprise (`data/pays.js`), comme le champ de « Mon entreprise » : « Vos factures ne portent pas votre IFU. Il est obligatoire sur une facture au Bénin ». De même NIF au Togo, au Mali et au Niger, NCC en Côte d'Ivoire, NINEA au Sénégal, NIU au Cameroun et IFU au Burkina Faso. Au passage, « d'NIF » devient « votre NIF ».
+  - Scénario `e2e/rappel-identifiant-fiscal.mjs` (8 vérifications, cinq pays).
+
 ## 2026-11-12
 - **Dimensionnement par facture : au Bénin, le kWh part de 145 F.**
   - Les deux assistants (espace public et espace Pro) proposaient 114 F, le prix CEET du Togo, quel que soit le client. Le prix proposé est maintenant celui du pays du client, dans l'ordre : le lieu géocodé, une ville togolaise reconnue, le numéro du client (+229, +228, ou un numéro à 8 chiffres au Togo, comme pour la main-d'œuvre), le pays de l'entreprise dans l'espace Pro, et le Bénin à défaut. Au Bénin, c'est 145 F (SBEE). Une adresse comme « Quartier Zongo, Lomé » n'est pas reconnue comme ville, mais le « +228 » du client l'est : il garde 114 F.
